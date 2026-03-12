@@ -1,0 +1,14 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: urfu-postgres
+  namespace: urfu-platform
+spec:
+  instances: 3
+  storage:
+    size: 100Gi
+    storageClass: fast-ssd
+  backup:
+    retentionPolicy: "14d"
+  monitoring:
+    enablePodMonitor: true

@@ -1,0 +1,99 @@
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 1
+
+image:
+  repository: ghcr.io/horexdev/urfu-service
+  pullPolicy: IfNotPresent
+  tag: "latest"
+  digest: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  linkerd.io/inject: enabled
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8080
+
+revisionHistoryLimit: 3
+
+minReadySeconds: 5
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+  allowFromSameNamespace: true
+  allowToSameNamespace: true
+  allowDns: true
+  allowedIngressNamespaces: []
+  allowedEgressNamespaces:
+    - urfu-platform
+    - observability
+    - linkerd
+
+serviceMonitor:
+  enabled: false
+  namespace: observability
+  interval: 30s
+  scrapePath: /health/ready
+
+rollout:
+  enabled: true
+  autoPromotionEnabled: false
+
+env:
+  ASPNETCORE_URLS: http://+:8080
+  ASPNETCORE_ENVIRONMENT: Production
+
+secrets:
+  enabled: false
+  name: ""
+
+probes:
+  livenessPath: /health/live
+  readinessPath: /health/ready
+  startupPath: /health/live
+  startupEnabled: true
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+topologySpreadConstraints: []

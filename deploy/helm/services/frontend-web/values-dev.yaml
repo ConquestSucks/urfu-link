@@ -1,0 +1,54 @@
+nameOverride: frontend-web
+fullnameOverride: frontend-web
+image:
+  repository: ghcr.io/urfu-link/frontend-web
+  pullPolicy: IfNotPresent
+  tag: dev-local
+
+replicaCount: 1
+
+podAnnotations:
+  linkerd.io/inject: disabled
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  port: 8080
+
+env:
+  APP_ENV: dev
+  EXPO_PUBLIC_API_URL: https://api.dev.127.0.0.1.nip.io
+
+rollout:
+  enabled: false
+  autoPromotionEnabled: true
+
+autoscaling:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+
+networkPolicy:
+  allowToSameNamespace: false
+  allowedIngressNamespaces:
+    - ingress-nginx
+  allowedEgressNamespaces: []
+
+probes:
+  livenessPath: /health/live
+  readinessPath: /health/ready
+  startupPath: /health/live

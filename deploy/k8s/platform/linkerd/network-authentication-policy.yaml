@@ -1,0 +1,158 @@
+apiVersion: policy.linkerd.io/v1beta1
+kind: MeshTLSAuthentication
+metadata:
+  name: cluster-authenticated
+  namespace: urfu-dev
+spec:
+  identities:
+    - "*.urfu-dev.serviceaccount.identity.linkerd.cluster.local"
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: media-service
+  namespace: urfu-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: media-service
+  port: 8080
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: media-service-allow-mtls
+  namespace: urfu-dev
+spec:
+  server:
+    name: media-service
+  client:
+    meshTLS:
+      authenticationRef:
+        name: cluster-authenticated
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: user-service
+  namespace: urfu-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: user-service
+  port: 8080
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: user-service-allow-mtls
+  namespace: urfu-dev
+spec:
+  server:
+    name: user-service
+  client:
+    meshTLS:
+      authenticationRef:
+        name: cluster-authenticated
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: chat-service
+  namespace: urfu-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: chat-service
+  port: 8080
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: chat-service-allow-mtls
+  namespace: urfu-dev
+spec:
+  server:
+    name: chat-service
+  client:
+    meshTLS:
+      authenticationRef:
+        name: cluster-authenticated
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: presence-service
+  namespace: urfu-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: presence-service
+  port: 8080
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: presence-service-allow-mtls
+  namespace: urfu-dev
+spec:
+  server:
+    name: presence-service
+  client:
+    meshTLS:
+      authenticationRef:
+        name: cluster-authenticated
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: notification-service
+  namespace: urfu-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  port: 8080
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: notification-service-allow-mtls
+  namespace: urfu-dev
+spec:
+  server:
+    name: notification-service
+  client:
+    meshTLS:
+      authenticationRef:
+        name: cluster-authenticated
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: Server
+metadata:
+  name: call-service
+  namespace: urfu-dev
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: call-service
+  port: 8080
+  proxyProtocol: HTTP/1
+---
+apiVersion: policy.linkerd.io/v1beta1
+kind: ServerAuthorization
+metadata:
+  name: call-service-allow-mtls
+  namespace: urfu-dev
+spec:
+  server:
+    name: call-service
+  client:
+    meshTLS:
+      authenticationRef:
+        name: cluster-authenticated

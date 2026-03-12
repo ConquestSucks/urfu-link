@@ -1,0 +1,77 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: urfu-link-services
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - service: api-gateway
+            env: dev
+            namespace: urfu-dev
+          - service: media-service
+            env: dev
+            namespace: urfu-dev
+          - service: user-service
+            env: dev
+            namespace: urfu-dev
+          - service: chat-service
+            env: dev
+            namespace: urfu-dev
+          - service: presence-service
+            env: dev
+            namespace: urfu-dev
+          - service: notification-service
+            env: dev
+            namespace: urfu-dev
+          - service: call-service
+            env: dev
+            namespace: urfu-dev
+          - service: frontend-web
+            env: dev
+            namespace: urfu-dev
+          - service: api-gateway
+            env: prod
+            namespace: urfu-prod
+          - service: media-service
+            env: prod
+            namespace: urfu-prod
+          - service: user-service
+            env: prod
+            namespace: urfu-prod
+          - service: chat-service
+            env: prod
+            namespace: urfu-prod
+          - service: presence-service
+            env: prod
+            namespace: urfu-prod
+          - service: notification-service
+            env: prod
+            namespace: urfu-prod
+          - service: call-service
+            env: prod
+            namespace: urfu-prod
+          - service: frontend-web
+            env: prod
+            namespace: urfu-prod
+  template:
+    metadata:
+      name: "{{service}}-{{env}}"
+    spec:
+      project: urfu-link
+      source:
+        repoURL: https://github.com/ConquestSucks/urfu-link.git
+        targetRevision: main
+        path: deploy/helm/charts/urfu-service
+        helm:
+          releaseName: "{{service}}"
+          valueFiles:
+            - "../../services/{{service}}/values-{{env}}.yaml"
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true

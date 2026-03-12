@@ -1,0 +1,16 @@
+apiVersion: minio.min.io/v2
+kind: Tenant
+metadata:
+  name: urfu-minio
+  namespace: urfu-platform
+spec:
+  image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
+  pools:
+    - servers: 4
+      volumesPerServer: 4
+      size: 100Gi
+      storageClassName: fast-ssd
+  mountPath: /export
+  requestAutoCert: true
+  features:
+    bucketDNS: false

@@ -1,0 +1,35 @@
+nameOverride: user-service
+fullnameOverride: user-service
+image:
+  repository: urfu-link/user-service
+  pullPolicy: IfNotPresent
+  tag: dev-local
+
+replicaCount: 1
+
+env:
+  ASPNETCORE_ENVIRONMENT: Development
+  ASPNETCORE_URLS: http://+:8080
+
+secrets:
+  enabled: true
+  name: user-service-secrets
+
+rollout:
+  enabled: false
+  autoPromotionEnabled: true
+
+autoscaling:
+  enabled: false
+
+serviceMonitor:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+

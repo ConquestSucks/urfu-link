@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: urfu-link
+  namespace: argocd
+spec:
+  description: URFU Link environments
+  sourceRepos:
+    - https://github.com/ConquestSucks/urfu-link.git
+  destinations:
+    - namespace: urfu-dev
+      server: https://kubernetes.default.svc
+    - namespace: urfu-prod
+      server: https://kubernetes.default.svc
+    - namespace: argocd
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

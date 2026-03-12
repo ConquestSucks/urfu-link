@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coturn
+  namespace: urfu-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coturn
+  template:
+    metadata:
+      labels:
+        app: coturn
+    spec:
+      containers:
+        - name: coturn
+          image: coturn/coturn:4.8.0-r0
+          args: ["-c", "/etc/coturn/turnserver.conf"]
+          ports:
+            - name: turn-udp
+              containerPort: 3478
+              protocol: UDP
+            - name: turn-tcp
+              containerPort: 3478
+              protocol: TCP
+            - name: turns-udp
+              containerPort: 5349
+              protocol: UDP
+            - name: turns-tcp
+              containerPort: 5349
+              protocol: TCP
+          volumeMounts:
+            - name: coturn-config
+              mountPath: /etc/coturn
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: coturn-config
+          configMap:
+            name: coturn-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coturn-config
+  namespace: urfu-platform
+data:
+  turnserver.conf: |
+    listening-port=3478
+    tls-listening-port=5349
+    fingerprint
+    lt-cred-mech
+    realm=ghjc.ru
+    min-port=49160
+    max-port=49200
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coturn
+  namespace: urfu-platform
+spec:
+  selector:
+    app: coturn
+  ports:
+    - name: turn-udp
+      port: 3478
+      targetPort: turn-udp
+      protocol: UDP
+    - name: turn-tcp
+      port: 3478
+      targetPort: turn-tcp
+      protocol: TCP
+    - name: turns-udp
+      port: 5349
+      targetPort: turns-udp
+      protocol: UDP
+    - name: turns-tcp
+      port: 5349
+      targetPort: turns-tcp
+      protocol: TCP

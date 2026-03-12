@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: redis-backup
+  namespace: urfu-platform
+spec:
+  schedule: "30 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: redis-backup
+              image: redis:7.4.2
+              command:
+                - /bin/sh
+                - -c
+                - >-
+                  redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" --rdb /tmp/dump.rdb &&
+                  mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" &&
+                  mc cp /tmp/dump.rdb minio/urfu-backups/redis/dump-$(date +%F-%H%M).rdb
+              env:
+                - name: REDIS_HOST
+                  value: urfu-redis-leader.urfu-platform.svc.cluster.local
+                - name: REDIS_PORT
+                  value: "6379"
+                - name: MINIO_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-backup-secret
+                      key: minio_endpoint
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-backup-secret
+                      key: minio_access_key
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: redis-backup-secret
+                      key: minio_secret_key

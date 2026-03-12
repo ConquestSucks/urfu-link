@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mongo-backup
+  namespace: urfu-platform
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mongo-backup
+              image: mongo:8.0.5
+              command:
+                - /bin/sh
+                - -c
+                - >-
+                  mongodump --uri "$MONGO_URI" --archive=/tmp/backup.archive &&
+                  mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" &&
+                  mc cp /tmp/backup.archive minio/urfu-backups/mongo/backup-$(date +%F-%H%M).archive
+              env:
+                - name: MONGO_URI
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongo-backup-secret
+                      key: mongo_uri
+                - name: MINIO_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongo-backup-secret
+                      key: minio_endpoint
+                - name: MINIO_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongo-backup-secret
+                      key: minio_access_key
+                - name: MINIO_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: mongo-backup-secret
+                      key: minio_secret_key

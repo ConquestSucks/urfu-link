@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: livekit
+  namespace: urfu-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: livekit
+  template:
+    metadata:
+      labels:
+        app: livekit
+    spec:
+      containers:
+        - name: livekit
+          image: livekit/livekit-server:v1.9.12
+          args: ["--config", "/etc/livekit/livekit.yaml"]
+          ports:
+            - name: http
+              containerPort: 7880
+            - name: rtc
+              containerPort: 7881
+          volumeMounts:
+            - name: livekit-config
+              mountPath: /etc/livekit
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+      volumes:
+        - name: livekit-config
+          configMap:
+            name: livekit-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: livekit-config
+  namespace: urfu-platform
+data:
+  livekit.yaml: |
+    port: 7880
+    rtc:
+      tcp_port: 7881
+      port_range_start: 50000
+      port_range_end: 50100
+    keys:
+      prodkey: replace-me
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: livekit
+  namespace: urfu-platform
+spec:
+  selector:
+    app: livekit
+  ports:
+    - name: http
+      port: 7880
+      targetPort: http
+    - name: rtc
+      port: 7881
+      targetPort: rtc
