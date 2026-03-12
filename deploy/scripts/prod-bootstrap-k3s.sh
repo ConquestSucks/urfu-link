@@ -343,6 +343,11 @@ phase8_stateful() {
 
 phase9_services() {
   log "STEP" "Phase 9: Deploy services (urfu-prod)"
+  export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+  if ! kubectl cluster-info &>/dev/null; then
+    log "ERROR" "Cluster unreachable (KUBECONFIG=$KUBECONFIG). Deploy services manually: export KUBECONFIG=$KUBECONFIG"
+    exit 1
+  fi
   local services=(api-gateway media-service user-service chat-service presence-service notification-service call-service frontend-web)
   local total=${#services[@]} current=0
   for svc in "${services[@]}"; do
@@ -369,7 +374,8 @@ phase10_wait_smoke() {
 
 main() {
   init_log
-  log "INFO" "Start DOMAIN=$DOMAIN REPO_ROOT=$REPO_ROOT"
+  export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
+  log "INFO" "Start DOMAIN=$DOMAIN REPO_ROOT=$REPO_ROOT KUBECONFIG=$KUBECONFIG"
   phase0_env
   phase1_host_and_k3s
   phase2_ingress_certmanager
