@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option csharp_namespace = "Urfu.Link.Services.Notification.Grpc";
+package notification.internal.v1;
+
+service InternalApi {
+  rpc Ping (PingRequest) returns (PingReply);
+}
+
+message PingRequest {
+  string message = 1;
+}
+
+message PingReply {
+  string message = 1;
+  string service = 2;
+  string utc = 3;
+}

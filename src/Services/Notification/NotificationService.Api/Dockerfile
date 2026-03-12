@@ -1,0 +1,26 @@
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.3 AS base
+WORKDIR /app
+EXPOSE 8080
+ENV ASPNETCORE_URLS=http://+:8080
+
+FROM mcr.microsoft.com/dotnet/sdk:10.0.103 AS build
+WORKDIR /src
+COPY ["Directory.Build.props", "."]
+COPY ["Directory.Packages.props", "."]
+COPY ["NuGet.Config", "."]
+COPY ["src/BuildingBlocks/Auth/Auth.csproj", "src/BuildingBlocks/Auth/"]
+COPY ["src/BuildingBlocks/Contracts/Contracts.csproj", "src/BuildingBlocks/Contracts/"]
+COPY ["src/BuildingBlocks/Idempotency/Idempotency.csproj", "src/BuildingBlocks/Idempotency/"]
+COPY ["src/BuildingBlocks/Observability/Observability.csproj", "src/BuildingBlocks/Observability/"]
+COPY ["src/BuildingBlocks/Outbox/Outbox.csproj", "src/BuildingBlocks/Outbox/"]
+COPY ["src/BuildingBlocks/ServiceDefaults/ServiceDefaults.csproj", "src/BuildingBlocks/ServiceDefaults/"]
+COPY ["src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj", "src/Services/Notification/NotificationService.Api/"]
+RUN dotnet restore "src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj"
+COPY . .
+RUN dotnet publish "src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+
+FROM base AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+USER $APP_UID
+ENTRYPOINT ["dotnet", "NotificationService.Api.dll"]
