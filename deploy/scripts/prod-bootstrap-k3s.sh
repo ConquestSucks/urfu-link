@@ -42,13 +42,14 @@ progress_bar() {
   local current="$1" total="$2" label="${3:-}"
   local pct=0
   [[ "$total" -gt 0 ]] && pct=$((current * 100 / total))
-  local filled=$((pct / 5)) empty=$((20 - filled))
+  local filled=$((pct / 5))
+  local empty=$((20 - filled))
   [[ "$filled" -lt 0 ]] && filled=0
   [[ "$empty" -lt 0 ]] && empty=0
   local bar_fill="" bar_empty=""
-  [[ "$filled" -gt 0 ]] && bar_fill=$(printf '#%.0s' $(seq 1 "$filled" 2>/dev/null))
-  [[ "$empty" -gt 0 ]] && bar_empty=$(printf ' %.0s' $(seq 1 "$empty" 2>/dev/null))
-  printf "\r  %s [%s%s] %d/%d (%d%%)  " "$label" "$bar_fill" "$bar_empty" "$current" "$total" "$pct"
+  [[ "${filled:-0}" -gt 0 ]] && bar_fill=$(printf '#%.0s' $(seq 1 "$filled" 2>/dev/null))
+  [[ "${empty:-0}" -gt 0 ]] && bar_empty=$(printf ' %.0s' $(seq 1 "$empty" 2>/dev/null))
+  printf "\r  %s [%s%s] %d/%d (%d%%)  " "$label" "${bar_fill:-}" "${bar_empty:-}" "$current" "$total" "$pct"
   [[ "$current" -eq "$total" ]] && echo
 }
 
