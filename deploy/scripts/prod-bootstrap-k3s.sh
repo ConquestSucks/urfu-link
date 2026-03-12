@@ -48,45 +48,9 @@ helm_repo_add_update() {
     [[ $add_ok -eq 0 ]] && [[ $update_ok -eq 0 ]] && return 0
     [[ $attempt -ge $max ]] && { log "ERROR" "helm repo add/update $name failed after $max attempts"; return 1; }
     log "INFO" "helm repo $name attempt $attempt failed (add=$add_ok update=$update_ok), retry in 15s..."
-    echo "[$(date -Iseconds)] helm repo $name failed, retry $attempt/$max in 15s" >&2
     sleep 15
     attempt=$((attempt + 1))
   done
-}
-
-progress_bar() {
-  local current="$1" total="$2" label="${3:-}"
-  local pct=0
-  [[ "$total" -gt 0 ]] && pct=$((current * 100 / total))
-  local filled=$((pct / 5))
-  local empty=$((20 - filled))
-  [[ "$filled" -lt 0 ]] && filled=0
-  [[ "$empty" -lt 0 ]] && empty=0
-  local bar_fill="" bar_empty=""
-  [[ "${filled:-0}" -gt 0 ]] && bar_fill=$(printf '#%.0s' $(seq 1 "$filled" 2>/dev/null))
-  [[ "${empty:-0}" -gt 0 ]] && bar_empty=$(printf ' %.0s' $(seq 1 "$empty" 2>/dev/null))
-  printf "\r  %s [%s%s] %d/%d (%d%%)  " "$label" "${bar_fill:-}" "${bar_empty:-}" "$current" "$total" "$pct"
-  [[ "$current" -eq "$total" ]] && echo
-}
-
-spinner_pid=""
-spinner_start() {
-  local msg="${1:-Waiting...}"
-  (
-    local i=0
-    local chars='-\|/'
-    while true; do
-      printf "\r  %s %s  " "$msg" "${chars:i++%4:1}"
-      sleep 1
-    done
-  ) &
-  spinner_pid=$!
-}
-
-spinner_stop() {
-  [[ -n "${spinner_pid:-}" ]] && kill "$spinner_pid" 2>/dev/null || true
-  spinner_pid=""
-  printf "\r%-50s\n" "  Done."
 }
 
 phase0_env() {
@@ -142,14 +106,13 @@ phase1_host_and_k3s() {
   fi
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
 
-  spinner_start "Waiting for k3s node"
+  log "INFO" "Waiting for k3s node..."
   for i in {1..60}; do
     if kubectl get nodes --no-headers 2>/dev/null | grep -q Ready; then
-      spinner_stop
       log "INFO" "k3s node Ready"
       break
     fi
-    [[ $i -eq 60 ]] && { spinner_stop; log "ERROR" "k3s node not ready"; exit 1; }
+    [[ $i -eq 60 ]] && { log "ERROR" "k3s node not ready"; exit 1; }
     sleep 5
   done
 
@@ -240,42 +203,27 @@ phase6_install_one() {
   log "CMD" "helm repo add $name $repo_url && helm repo update $name"
   helm_repo_add_update "$name" "$repo_url"
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
-  echo "[$(date -Iseconds)] Installing $release_name in $ns..." >&2
+  log "INFO" "Installing $release_name in $ns..."
   helm upgrade --install "$release_name" "$chart" -n "$ns" $helm_extra --wait --timeout 5m 2>&1 | tee -a "$LOG_FILE"
   helm_ret=${PIPESTATUS[0]}
   if [[ $helm_ret -ne 0 ]]; then
     log "ERROR" "helm upgrade --install $release_name failed (exit $helm_ret)"
-    echo "[$(date -Iseconds)] ERROR: helm install $release_name failed (exit $helm_ret). See log: $LOG_FILE" >&2
     exit 1
   fi
 }
 
 phase6_operators() {
   log "STEP" "Phase 6: Stateful operators"
-  echo "[$(date -Iseconds)] Phase 6: Stateful operators (CloudNativePG, MongoDB, Redis, Strimzi, MinIO)" >&2
-  local total=5 current=0
-
-  current=1; progress_bar "$current" "$total" "CloudNativePG"
   phase6_install_one cnpg https://cloudnative-pg.github.io/charts cnpg/cloudnative-pg cnpg-system
-
-  current=2; progress_bar "$current" "$total" "MongoDB"
   phase6_install_one mongodb https://mongodb.github.io/helm-charts mongodb/community-operator mongodb community-operator
-
-  current=3; progress_bar "$current" "$total" "Redis"
   phase6_install_one ot-helm https://ot-container-kit.github.io/helm-charts ot-helm/redis-operator redis-operator redis-operator
-
-  current=4; progress_bar "$current" "$total" "Strimzi"
   phase6_install_one strimzi https://strimzi.io/charts strimzi/strimzi-kafka-operator kafka strimzi-kafka "--set watchAnyNamespace=true"
-
-  current=5; progress_bar "$current" "$total" "MinIO"
   phase6_install_one minio https://operator.min.io/helm-releases minio/operator minio-operator minio-operator
-
   log "INFO" "Operators installed"
 }
 
 phase7_platform() {
   log "STEP" "Phase 7: Platform manifests (domain=$DOMAIN)"
-  echo "[$(date -Iseconds)] Phase 7: Platform manifests" >&2
   kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/namespaces.yaml"
   run_cmd_visible bash -c "kubectl kustomize \"$REPO_ROOT/deploy/k8s/platform\" | sed \"s/urfu-link\.local/$DOMAIN/g\" | kubectl apply -f -"
   sleep 5
@@ -295,15 +243,12 @@ phase7_platform() {
 
 phase7b_headlamp() {
   log "STEP" "Phase 7b: Headlamp dashboard (OIDC via Keycloak)"
-  echo "[$(date -Iseconds)] Phase 7b: Headlamp" >&2
   if [[ "$SKIP_VAULT" != "true" ]]; then
-    spinner_start "Waiting for headlamp-oidc secret (ESO sync)"
+    log "INFO" "Waiting for headlamp-oidc secret (ESO sync)..."
     for i in {1..24}; do
       if kubectl get secret headlamp-oidc -n urfu-platform &>/dev/null; then
-        spinner_stop
         break
       fi
-      [[ $i -eq 24 ]] && spinner_stop
       sleep 5
     done
   fi
@@ -344,43 +289,37 @@ phase7c_wait_certs() {
 
 phase8_stateful() {
   log "STEP" "Phase 8: Stateful stack (120GB storage profile)"
-  echo "[$(date -Iseconds)] Phase 8: Stateful stack" >&2
   kubectl kustomize "$REPO_ROOT/deploy/k8s/platform/stateful" | sed -e "$STATEFUL_STORAGE_SED" | kubectl apply -f -
 
-  spinner_start "Waiting for PostgreSQL cluster"
+  log "INFO" "Waiting for PostgreSQL cluster..."
   for i in {1..60}; do
     if kubectl get cluster -n urfu-platform urfu-postgres -o jsonpath='{.status.phase}' 2>/dev/null | grep -qE 'Cluster in healthy state|running'; then
-      spinner_stop
       break
     fi
-    [[ $i -eq 60 ]] && { spinner_stop; log "INFO" "PostgreSQL wait timeout"; }
+    [[ $i -eq 60 ]] && log "INFO" "PostgreSQL wait timeout"
     sleep 10
   done
 
-  spinner_start "Waiting for Kafka"
+  log "INFO" "Waiting for Kafka..."
   for i in {1..60}; do
     if kubectl get kafka -n urfu-platform urfu-kafka -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
-      spinner_stop
       break
     fi
-    [[ $i -eq 60 ]] && { spinner_stop; log "INFO" "Kafka wait timeout"; }
+    [[ $i -eq 60 ]] && log "INFO" "Kafka wait timeout"
     sleep 10
   done
 }
 
 phase9_services() {
   log "STEP" "Phase 9: Deploy services (urfu-prod)"
-  echo "[$(date -Iseconds)] Phase 9: Deploy services (urfu-prod)" >&2
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
   if ! kubectl cluster-info &>/dev/null; then
     log "ERROR" "Cluster unreachable (KUBECONFIG=$KUBECONFIG). Deploy services manually: export KUBECONFIG=$KUBECONFIG"
     exit 1
   fi
   local services=(api-gateway media-service user-service chat-service presence-service notification-service call-service frontend-web)
-  local total=${#services[@]} current=0
   for svc in "${services[@]}"; do
-    ((current++)) || true
-    progress_bar "$current" "$total" "Helm $svc"
+    log "INFO" "Deploying $svc..."
     helm upgrade --install "$svc" "$REPO_ROOT/deploy/helm/charts/urfu-service" -n urfu-prod --create-namespace -f "$REPO_ROOT/deploy/helm/services/$svc/values-prod.yaml"
   done
   log "INFO" "Services deployed"
@@ -388,14 +327,13 @@ phase9_services() {
 
 phase10_wait_smoke() {
   log "STEP" "Phase 10: Wait for pods and smoke"
-  echo "[$(date -Iseconds)] Phase 10: Wait for pods" >&2
-  spinner_start "Waiting for urfu-prod pods"
+  log "INFO" "Waiting for urfu-prod pods..."
   for i in {1..60}; do
     local ready total
     ready=$(kubectl get pods -n urfu-prod -l 'app.kubernetes.io/name' -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | tr ' ' '\n' | grep -c True || echo 0)
     total=$(kubectl get pods -n urfu-prod -l 'app.kubernetes.io/name' --no-headers 2>/dev/null | wc -l)
-    [[ "$total" -gt 0 ]] && [[ "$ready" -ge "$((total/2))" ]] && { spinner_stop; break; }
-    [[ $i -eq 60 ]] && { spinner_stop; log "INFO" "Pods wait timeout"; }
+    [[ "$total" -gt 0 ]] && [[ "$ready" -ge "$((total/2))" ]] && break
+    [[ $i -eq 60 ]] && log "INFO" "Pods wait timeout"
     sleep 5
   done
   log "INFO" "Bootstrap complete. API: https://api.$DOMAIN Frontend: https://app.$DOMAIN Headlamp: https://k8s.$DOMAIN"
