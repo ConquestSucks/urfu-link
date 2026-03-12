@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": ">= 16.26.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "preview",
+      "env": {
+        "APP_ENV": "dev",
+        "EXPO_PUBLIC_API_URL": "https://api.dev.127.0.0.1.nip.io"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "staging",
+      "env": {
+        "APP_ENV": "dev",
+        "EXPO_PUBLIC_API_URL": "https://api.dev.127.0.0.1.nip.io"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "channel": "production",
+      "env": {
+        "APP_ENV": "prod",
+        "EXPO_PUBLIC_API_URL": "https://api.ghjc.ru"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
