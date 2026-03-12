@@ -1,0 +1,41 @@
+{
+  "realm": "urfu-link",
+  "enabled": true,
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "admin" },
+      { "name": "user" },
+      { "name": "service" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "urfu-link-api",
+      "name": "URFU Link API",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:8081/*"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "urfu-link-web",
+      "name": "URFU Link Web",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"]
+    }
+  ]
+}
