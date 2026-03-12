@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.103
+
+      - name: Restore
+        run: dotnet restore Urfu.Link.slnx
+
+      - name: Build
+        run: dotnet build Urfu.Link.slnx -c Release --no-restore
+
+      - name: Test
+        run: dotnet test Urfu.Link.slnx -c Release --no-build
+
+  helm-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint shared chart
+        run: helm lint deploy/helm/charts/urfu-service
+
+      - name: Render manifests for all environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          services=(
+            api-gateway
+            media-service
+            user-service
+            chat-service
+            presence-service
+            notification-service
+            call-service
+          )
+          for service in "${services[@]}"; do
+            helm template "$service" deploy/helm/charts/urfu-service -f "deploy/helm/services/$service/values-dev.yaml" > /tmp/"$service"-dev.yaml
+            helm template "$service" deploy/helm/charts/urfu-service -f "deploy/helm/services/$service/values-prod.yaml" > /tmp/"$service"-prod.yaml
+          done
+
+  build-images:
+    if: github.event_name == 'push'
+    needs: [build-test, helm-validate]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-gateway
+            dockerfile: src/Gateway/ApiGateway/Dockerfile
+            context: .
+          - service: media-service
+            dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+            context: .
+          - service: user-service
+            dockerfile: src/Services/User/UserService.Api/Dockerfile
+            context: .
+          - service: chat-service
+            dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
+            context: .
+          - service: presence-service
+            dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+            context: .
+          - service: notification-service
+            dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+            context: .
+          - service: call-service
+            dockerfile: src/Services/Call/CallService.Api/Dockerfile
+            context: .
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}
+          tags: |
+            type=sha
+            type=raw,value=stable,enable={{is_default_branch}}
+            type=raw,value=dev-local,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}@${{ steps.build.outputs.digest }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.7.0
+
+      - name: Sign image
+        env:
+          COSIGN_YES: "true"
+        run: cosign sign "ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}@${{ steps.build.outputs.digest }}"
+
+      - name: Export image digest
+        shell: bash
+        run: |
+          mkdir -p dist/digests
+          echo "${{ steps.build.outputs.digest }}" > "dist/digests/${{ matrix.service }}.txt"
+
+      - name: Upload digests
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-digests-${{ matrix.service }}
+          path: dist/digests/${{ matrix.service }}.txt

@@ -1,0 +1,72 @@
+﻿name: Promote App
+
+on:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service to promote
+        required: true
+        type: choice
+        options:
+          - api-gateway
+          - media-service
+          - user-service
+          - chat-service
+          - presence-service
+          - notification-service
+          - call-service
+          - frontend-web
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+      image_tag:
+        description: Image tag to pin in Helm values
+        required: true
+        type: string
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update Helm values
+        env:
+          SERVICE: ${{ inputs.service }}
+          TARGET_ENV: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os
+          import re
+
+          path = Path(f"deploy/helm/services/{os.environ['SERVICE']}/values-{os.environ['TARGET_ENV']}.yaml")
+          content = path.read_text(encoding="utf-8")
+          updated = re.sub(
+              r"(^\s*tag:\s*).*$",
+              lambda match: f"{match.group(1)}{os.environ['IMAGE_TAG']}",
+              content,
+              count=1,
+              flags=re.MULTILINE,
+          )
+          if updated == content:
+              raise SystemExit(f"Unable to update image tag in {path}")
+          path.write_text(updated, encoding="utf-8")
+          PY
+      - name: Commit promotion
+        env:
+          SERVICE: ${{ inputs.service }}
+          TARGET_ENV: ${{ inputs.environment }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/helm/services/${SERVICE}/values-${TARGET_ENV}.yaml
+          git commit -m "promote(${SERVICE}): ${TARGET_ENV} -> ${IMAGE_TAG}" || exit 0
+          git push

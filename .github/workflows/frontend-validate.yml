@@ -1,0 +1,41 @@
+name: Frontend Validate
+
+on:
+  pull_request:
+    paths:
+      - "apps/client/**"
+      - "packages/api-client/**"
+      - "packages/ui/**"
+      - "package.json"
+      - ".npmrc"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  push:
+    branches:
+      - main
+    paths:
+      - "apps/client/**"
+      - "packages/api-client/**"
+      - "packages/ui/**"
+      - "package.json"
+      - ".npmrc"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm client:typecheck
+      - run: pnpm client:web:build

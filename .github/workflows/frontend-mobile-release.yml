@@ -1,0 +1,65 @@
+name: Frontend Mobile Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: EAS build profile
+        required: true
+        type: choice
+        options:
+          - preview
+          - production
+      platform:
+        description: Target platform
+        required: true
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+      submit:
+        description: Submit build after completion
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: Resolve release env
+        shell: bash
+        run: |
+          if [ "${{ inputs.profile }}" = "production" ]; then
+            echo "APP_ENV=prod" >> "$GITHUB_ENV"
+            echo "EXPO_PUBLIC_API_URL=https://api.ghjc.ru" >> "$GITHUB_ENV"
+          else
+            echo "APP_ENV=dev" >> "$GITHUB_ENV"
+            echo "EXPO_PUBLIC_API_URL=https://api.dev.127.0.0.1.nip.io" >> "$GITHUB_ENV"
+          fi
+      - run: pnpm --filter @urfu-link/client exec eas build --profile ${{ inputs.profile }} --platform ${{ inputs.platform }} --non-interactive
+        env:
+          EXPO_EAS_PROJECT_ID: ${{ secrets.EXPO_EAS_PROJECT_ID }}
+          EXPO_OWNER: ${{ vars.EXPO_OWNER }}
+      - if: ${{ inputs.submit }}
+        run: pnpm --filter @urfu-link/client exec eas submit --profile ${{ inputs.profile }} --platform ${{ inputs.platform }} --non-interactive
+        env:
+          EXPO_EAS_PROJECT_ID: ${{ secrets.EXPO_EAS_PROJECT_ID }}
+          EXPO_OWNER: ${{ vars.EXPO_OWNER }}
