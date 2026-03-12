@@ -38,6 +38,22 @@ run_cmd_visible() {
   "$@" 2>&1 | tee -a "$LOG_FILE"
 }
 
+helm_repo_add_update() {
+  local name="$1" repo_url="$2" attempt=1 max=3 add_ok update_ok
+  while true; do
+    helm repo add "$name" "$repo_url" 2>&1 | tee -a "$LOG_FILE"
+    add_ok=${PIPESTATUS[0]}
+    helm repo update "$name" 2>&1 | tee -a "$LOG_FILE"
+    update_ok=${PIPESTATUS[0]}
+    [[ $add_ok -eq 0 ]] && [[ $update_ok -eq 0 ]] && return 0
+    [[ $attempt -ge $max ]] && { log "ERROR" "helm repo add/update $name failed after $max attempts"; return 1; }
+    log "INFO" "helm repo $name attempt $attempt failed (add=$add_ok update=$update_ok), retry in 15s..."
+    echo "[$(date -Iseconds)] helm repo $name failed, retry $attempt/$max in 15s" >&2
+    sleep 15
+    attempt=$((attempt + 1))
+  done
+}
+
 progress_bar() {
   local current="$1" total="$2" label="${3:-}"
   local pct=0
@@ -212,7 +228,7 @@ phase4_argocd() {
 
 phase5_eso() {
   log "STEP" "Phase 5: External Secrets Operator"
-  helm repo add external-secrets https://charts.external-secrets.io && helm repo update external-secrets
+  helm_repo_add_update external-secrets https://charts.external-secrets.io
   kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install external-secrets external-secrets/external-secrets -n external-secrets --wait --timeout 5m
   [[ "$SKIP_VAULT" == "true" ]] && log "INFO" "SKIP_VAULT=true: configure Vault and secrets later; see README"
@@ -222,7 +238,7 @@ phase5_eso() {
 phase6_install_one() {
   local name="$1" repo_url="$2" chart="$3" ns="$4" release_name="${5:-$1}" helm_extra="${6:-}"
   log "CMD" "helm repo add $name $repo_url && helm repo update $name"
-  helm repo add "$name" "$repo_url" && helm repo update "$name"
+  helm_repo_add_update "$name" "$repo_url"
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install "$release_name" "$chart" -n "$ns" $helm_extra --wait --timeout 5m
 }
