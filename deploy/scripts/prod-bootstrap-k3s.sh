@@ -172,9 +172,19 @@ phase3_linkerd() {
   fi
   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml 2>/dev/null || true
   linkerd install --crds | kubectl apply -f -
-  linkerd install | kubectl apply -f -
+  if kubectl get configmap linkerd-config -n linkerd &>/dev/null; then
+    log "INFO" "Linkerd already installed, running upgrade"
+    linkerd upgrade | kubectl apply -f -
+  else
+    linkerd install | kubectl apply -f -
+  fi
   kubectl wait --namespace linkerd --for=condition=available deployment/linkerd-destination deployment/linkerd-identity deployment/linkerd-proxy-injector --timeout=300s
-  linkerd viz install | kubectl apply -f -
+  if kubectl get deployment web -n linkerd-viz &>/dev/null; then
+    log "INFO" "Linkerd Viz already installed, running upgrade"
+    linkerd viz upgrade | kubectl apply -f -
+  else
+    linkerd viz install | kubectl apply -f -
+  fi
   kubectl wait --namespace linkerd-viz --for=condition=available deployment/metrics-api deployment/web --timeout=300s
 }
 
