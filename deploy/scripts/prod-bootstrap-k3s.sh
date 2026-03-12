@@ -187,11 +187,11 @@ phase4_argocd() {
   log "STEP" "Phase 4: Argo CD and Argo Rollouts"
   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
   if ! kubectl get deployment argocd-server -n argocd &>/dev/null; then
-    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+    kubectl apply --server-side --force-conflicts -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     kubectl wait --namespace argocd --for=condition=available deployment/argocd-server --timeout=300s
   fi
   kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
-  kubectl apply -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml 2>/dev/null || true
+  kubectl apply --server-side --force-conflicts -n argo-rollouts -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml 2>/dev/null || true
 }
 
 phase5_eso() {
