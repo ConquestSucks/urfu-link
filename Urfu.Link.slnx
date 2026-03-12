@@ -1,0 +1,43 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/Auth/Auth.csproj" />
+    <Project Path="src/BuildingBlocks/Contracts/Contracts.csproj" />
+    <Project Path="src/BuildingBlocks/Idempotency/Idempotency.csproj" />
+    <Project Path="src/BuildingBlocks/Observability/Observability.csproj" />
+    <Project Path="src/BuildingBlocks/Outbox/Outbox.csproj" />
+    <Project Path="src/BuildingBlocks/ServiceDefaults/ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Gateway/">
+    <Project Path="src/Gateway/ApiGateway/ApiGateway.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/" />
+  <Folder Name="/src/Services/Call/">
+    <Project Path="src/Services/Call/CallService.Api/CallService.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Chat/">
+    <Project Path="src/Services/Chat/ChatService.Api/ChatService.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Media/">
+    <Project Path="src/Services/Media/MediaService.Api/MediaService.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Notification/">
+    <Project Path="src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/Presence/">
+    <Project Path="src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj" />
+  </Folder>
+  <Folder Name="/src/Services/User/">
+    <Project Path="src/Services/User/UserService.Api/UserService.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/" />
+  <Folder Name="/tests/contract/">
+    <Project Path="tests/contract/ContractTests/ContractTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/integration/">
+    <Project Path="tests/integration/IntegrationTests/IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/smoke/">
+    <Project Path="tests/smoke/SmokeTests/SmokeTests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+{
+  "name": "urfu-link",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "engines": {
+    "node": ">=22.14.0",
+    "pnpm": ">=10.18.0"
+  },
+  "scripts": {
+    "client:dev": "pnpm --filter @urfu-link/client start",
+    "client:web": "pnpm --filter @urfu-link/client web",
+    "client:web:build": "pnpm --filter @urfu-link/client web:build",
+    "client:typecheck": "pnpm --filter @urfu-link/client typecheck",
+    "client:doctor": "pnpm --filter @urfu-link/client doctor"
+  }
+}
