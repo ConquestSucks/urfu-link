@@ -151,15 +151,13 @@ phase2_ingress_certmanager() {
   log "STEP" "Phase 2: Ingress NGINX and cert-manager"
   kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
   if ! helm status ingress-nginx -n ingress-nginx &>/dev/null; then
-    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>/dev/null || true
-    helm repo update ingress-nginx
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update ingress-nginx
     helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx --wait --timeout 5m
   fi
 
   kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
   if ! helm status cert-manager -n cert-manager &>/dev/null; then
-    helm repo add jetstack https://charts.jetstack.io 2>/dev/null || true
-    helm repo update jetstack
+    helm repo add jetstack https://charts.jetstack.io && helm repo update jetstack
     helm upgrade --install cert-manager jetstack/cert-manager -n cert-manager \
       --set installCRDs=true --wait --timeout 5m
   fi
@@ -198,8 +196,7 @@ phase4_argocd() {
 
 phase5_eso() {
   log "STEP" "Phase 5: External Secrets Operator"
-  helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
-  helm repo update external-secrets
+  helm repo add external-secrets https://charts.external-secrets.io && helm repo update external-secrets
   kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install external-secrets external-secrets/external-secrets -n external-secrets --wait --timeout 5m
   [[ "$SKIP_VAULT" == "true" ]] && log "INFO" "SKIP_VAULT=true: configure Vault and secrets later; see README"
@@ -210,32 +207,27 @@ phase6_operators() {
   local total=5 current=0
 
   current=1; progress_bar "$current" "$total" "CloudNativePG"
-  helm repo add cnpg https://cloudnative-pg.github.io/charts 2>/dev/null || true
-  helm repo update cnpg
+  helm repo add cnpg https://cloudnative-pg.github.io/charts && helm repo update cnpg
   kubectl create namespace cnpg-system --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install cnpg cnpg/cloudnative-pg -n cnpg-system --wait --timeout 5m
 
   current=2; progress_bar "$current" "$total" "MongoDB"
-  helm repo add mongodb https://mongodb.github.io/helm-charts 2>/dev/null || true
-  helm repo update mongodb
+  helm repo add mongodb https://mongodb.github.io/helm-charts && helm repo update mongodb
   kubectl create namespace mongodb --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install community-operator mongodb/community-operator -n mongodb --wait --timeout 5m
 
   current=3; progress_bar "$current" "$total" "Redis"
-  helm repo add ot-helm https://ot-container-kit.github.io/helm-charts 2>/dev/null || true
-  helm repo update ot-helm
+  helm repo add ot-helm https://ot-container-kit.github.io/helm-charts && helm repo update ot-helm
   kubectl create namespace redis-operator --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install redis-operator ot-helm/redis-operator -n redis-operator --wait --timeout 5m
 
   current=4; progress_bar "$current" "$total" "Strimzi"
-  helm repo add strimzi https://strimzi.io/charts 2>/dev/null || true
-  helm repo update strimzi
+  helm repo add strimzi https://strimzi.io/charts && helm repo update strimzi
   kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install strimzi-kafka strimzi/strimzi-kafka-operator -n kafka --set watchAnyNamespace=true --wait --timeout 5m
 
   current=5; progress_bar "$current" "$total" "MinIO"
-  helm repo add minio https://operator.min.io/helm-releases 2>/dev/null || true
-  helm repo update minio
+  helm repo add minio https://operator.min.io/helm-releases && helm repo update minio
   kubectl create namespace minio-operator --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install minio-operator minio/operator -n minio-operator --wait --timeout 5m
 
