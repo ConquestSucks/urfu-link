@@ -29,8 +29,8 @@ spec:
     name: media-service
   client:
     meshTLS:
-      authenticationRef:
-        name: cluster-authenticated
+      identities:
+        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
 apiVersion: policy.linkerd.io/v1beta1
 kind: Server
@@ -54,8 +54,8 @@ spec:
     name: user-service
   client:
     meshTLS:
-      authenticationRef:
-        name: cluster-authenticated
+      identities:
+        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
 apiVersion: policy.linkerd.io/v1beta1
 kind: Server
@@ -79,8 +79,8 @@ spec:
     name: chat-service
   client:
     meshTLS:
-      authenticationRef:
-        name: cluster-authenticated
+      identities:
+        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
 apiVersion: policy.linkerd.io/v1beta1
 kind: Server
@@ -104,8 +104,8 @@ spec:
     name: presence-service
   client:
     meshTLS:
-      authenticationRef:
-        name: cluster-authenticated
+      identities:
+        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
 apiVersion: policy.linkerd.io/v1beta1
 kind: Server
@@ -129,8 +129,8 @@ spec:
     name: notification-service
   client:
     meshTLS:
-      authenticationRef:
-        name: cluster-authenticated
+      identities:
+        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
 apiVersion: policy.linkerd.io/v1beta1
 kind: Server
@@ -154,5 +154,5 @@ spec:
     name: call-service
   client:
     meshTLS:
-      authenticationRef:
-        name: cluster-authenticated
+      identities:
+        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
