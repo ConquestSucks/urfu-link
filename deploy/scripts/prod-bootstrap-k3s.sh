@@ -173,7 +173,14 @@ phase3_linkerd() {
     export PATH="$PATH:$HOME/.linkerd2/bin"
   fi
   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml 2>/dev/null || true
-  linkerd install --crds | kubectl apply -f -
+  crds_out=""
+  crds_out=$(linkerd upgrade --crds 2>/dev/null) || true
+  if [[ -n "${crds_out//[[:space:]]/}" ]]; then
+    echo "$crds_out" | kubectl apply -f -
+    log "INFO" "Linkerd CRDs upgraded"
+  else
+    linkerd install --crds | kubectl apply -f -
+  fi
   upgrade_out=""
   upgrade_out=$(linkerd upgrade 2>/dev/null) || true
   if [[ -n "${upgrade_out//[[:space:]]/}" ]]; then
