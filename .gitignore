@@ -1,0 +1,41 @@
+# Build outputs
+**/bin/
+**/obj/
+
+# User/IDE
+.vs/
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Test artifacts
+TestResults/
+coverage/
+*.trx
+
+# Containers & infra
+*.pid
+*.seed
+.env
+.env.*
+!.env.example
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+
+# Generated assets
+artifacts/
+*.nupkg
+*.snupkg
+
+# Tooling
+**/.toolstarget
+node_modules/
+.pnpm-store/
+.expo/
+apps/client/dist/
+apps/client/.expo/
