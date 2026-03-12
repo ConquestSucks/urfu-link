@@ -43,7 +43,7 @@ jobs:
         run: |
           echo "IMAGE_NAME=ghcr.io/horexdev/urfu-link/frontend-web" >> "$GITHUB_ENV"
           echo "IMAGE_TAG=sha-${GITHUB_SHA::12}" >> "$GITHUB_ENV"
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/client/Dockerfile
