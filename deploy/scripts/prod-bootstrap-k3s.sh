@@ -236,11 +236,18 @@ phase5_eso() {
 }
 
 phase6_install_one() {
-  local name="$1" repo_url="$2" chart="$3" ns="$4" release_name="${5:-$1}" helm_extra="${6:-}"
+  local name="$1" repo_url="$2" chart="$3" ns="$4" release_name="${5:-$1}" helm_extra="${6:-}" helm_ret
   log "CMD" "helm repo add $name $repo_url && helm repo update $name"
   helm_repo_add_update "$name" "$repo_url"
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
-  helm upgrade --install "$release_name" "$chart" -n "$ns" $helm_extra --wait --timeout 5m
+  echo "[$(date -Iseconds)] Installing $release_name in $ns..." >&2
+  helm upgrade --install "$release_name" "$chart" -n "$ns" $helm_extra --wait --timeout 5m 2>&1 | tee -a "$LOG_FILE"
+  helm_ret=${PIPESTATUS[0]}
+  if [[ $helm_ret -ne 0 ]]; then
+    log "ERROR" "helm upgrade --install $release_name failed (exit $helm_ret)"
+    echo "[$(date -Iseconds)] ERROR: helm install $release_name failed (exit $helm_ret). See log: $LOG_FILE" >&2
+    exit 1
+  fi
 }
 
 phase6_operators() {
