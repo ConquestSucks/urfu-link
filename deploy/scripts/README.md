@@ -2,7 +2,7 @@
 
 Один скрипт поднимает всю prod-среду URFU Link на голом Ubuntu 24 с k3s.
 
-**Нужно:** один узел Ubuntu 24, минимум 120 GB SSD (скрипт сам проверит место; под stateful заложено ~90 GB PVC). Интернет, домен **ghjc.ru** — A-записи на IP сервера: `api.ghjc.ru`, `app.ghjc.ru`, `id.ghjc.ru`, при использовании Vault — `vault.ghjc.ru`. Запуск от root или через sudo.
+**Нужно:** один узел Ubuntu 24, минимум 120 GB SSD (скрипт сам проверит место; под stateful заложено ~90 GB PVC). Интернет, домен **ghjc.ru** — A-записи на IP сервера: `api.ghjc.ru`, `app.ghjc.ru`, `id.ghjc.ru`, `k8s.ghjc.ru` (дашборд Headlamp), при использовании Vault — `vault.ghjc.ru`. Запуск от root или через sudo.
 
 ```bash
 cd /path/to/urfu-link
@@ -23,9 +23,9 @@ sudo ./deploy/scripts/prod-bootstrap-k3s.sh
 
 ## Что делает скрипт
 
-Проверка окружения (root/sudo, curl, место) → подготовка хоста (apt, отключение swap, k3s без Traefik, StorageClass fast-ssd, Helm) → NGINX Ingress, cert-manager, ClusterIssuer под ghjc.ru → при необходимости Linkerd + Viz → Argo CD и Argo Rollouts → External Secrets Operator → операторы (CloudNativePG, MongoDB Community, Redis OpsTree, Strimzi, MinIO) → манифесты платформы с подстановкой домена → stateful-стек с объёмами под 120 GB → Helm-деплой восьми сервисов в `urfu-prod` с `values-prod.yaml` → ожидание подов.
+Проверка окружения (root/sudo, curl, место) → подготовка хоста (apt, отключение swap, k3s без Traefik, StorageClass fast-ssd, Helm) → NGINX Ingress, cert-manager, ClusterIssuer под ghjc.ru → при необходимости Linkerd + Viz → Argo CD и Argo Rollouts → External Secrets Operator → операторы (CloudNativePG, MongoDB Community, Redis OpsTree, Strimzi, MinIO) → манифесты платформы с подстановкой домена → **Headlamp** (дашборд с OIDC через Keycloak) → stateful-стек с объёмами под 120 GB → Helm-деплой восьми сервисов в `urfu-prod` с `values-prod.yaml` → ожидание подов.
 
-В итоге API на `https://api.ghjc.ru`, фронт на `https://app.ghjc.ru`.
+В итоге API на `https://api.ghjc.ru`, фронт на `https://app.ghjc.ru`, дашборд Headlamp на `https://k8s.ghjc.ru` (вход через Keycloak). Настройка клиента Keycloak и секретов — см. `deploy/k8s/platform/identity/HEADLAMP.md`.
 
 ## Секреты без Vault
 
@@ -48,6 +48,8 @@ kubectl create secret generic keycloak-secrets -n urfu-platform \
 ```bash
 kubectl create secret generic mongo-app-user-password -n urfu-platform --from-literal=password=CHANGE_ME
 ```
+
+**Headlamp** (namespace `urfu-platform`, secret `headlamp-oidc`): при использовании OIDC через Keycloak нужны ключи `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER_URL`, `OIDC_SCOPES`, `OIDC_USE_PKCE`. Подробно — `deploy/k8s/platform/identity/HEADLAMP.md`.
 
 **Сервисы в urfu-prod** (api-gateway, user-service и т.д.): у каждого при `secrets.enabled: true` ожидается Secret с именем из values (например `api-gateway-secrets`). Ключи — как в конфиге приложения (например `Auth__ClientSecret`). Создай секреты по доке сервиса, потом перезапусти поды или дождись рестарта.
 
