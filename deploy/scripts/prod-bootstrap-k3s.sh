@@ -166,24 +166,25 @@ phase3_linkerd() {
     return 0
   fi
   log "STEP" "Phase 3: Linkerd + Viz"
+  export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
   if ! command -v linkerd &>/dev/null; then
     run_cmd_visible curl -sL https://run.linkerd.io/install | sh
     export PATH="$PATH:$HOME/.linkerd2/bin"
   fi
   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml 2>/dev/null || true
   linkerd install --crds | kubectl apply -f -
-  if kubectl get configmap linkerd-config -n linkerd &>/dev/null; then
+  if kubectl get namespace linkerd &>/dev/null && kubectl get configmap linkerd-config -n linkerd &>/dev/null; then
     log "INFO" "Linkerd already installed, running upgrade"
     linkerd upgrade | kubectl apply -f -
   else
-    linkerd install | kubectl apply -f -
+    linkerd install | kubectl apply -f - || { log "INFO" "Linkerd install failed (may already exist), trying upgrade"; linkerd upgrade | kubectl apply -f -; }
   fi
   kubectl wait --namespace linkerd --for=condition=available deployment/linkerd-destination deployment/linkerd-identity deployment/linkerd-proxy-injector --timeout=300s
-  if kubectl get deployment web -n linkerd-viz &>/dev/null; then
+  if kubectl get namespace linkerd-viz &>/dev/null && kubectl get deployment web -n linkerd-viz &>/dev/null; then
     log "INFO" "Linkerd Viz already installed, running upgrade"
     linkerd viz upgrade | kubectl apply -f -
   else
-    linkerd viz install | kubectl apply -f -
+    linkerd viz install | kubectl apply -f - || { log "INFO" "Linkerd Viz install failed (may already exist), trying upgrade"; linkerd viz upgrade | kubectl apply -f -; }
   fi
   kubectl wait --namespace linkerd-viz --for=condition=available deployment/metrics-api deployment/web --timeout=300s
 }
