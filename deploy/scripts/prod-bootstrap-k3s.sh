@@ -43,7 +43,12 @@ progress_bar() {
   local pct=0
   [[ "$total" -gt 0 ]] && pct=$((current * 100 / total))
   local filled=$((pct / 5)) empty=$((20 - filled))
-  printf "\r  %s [%s%s] %d/%d (%d%%)  " "$label" "$(printf '#%.0s' $(seq 1 $filled 2>/dev/null))" "$(printf ' %.0s' $(seq 1 $empty 2>/dev/null))" "$current" "$total" "$pct"
+  [[ "$filled" -lt 0 ]] && filled=0
+  [[ "$empty" -lt 0 ]] && empty=0
+  local bar_fill="" bar_empty=""
+  [[ "$filled" -gt 0 ]] && bar_fill=$(printf '#%.0s' $(seq 1 "$filled" 2>/dev/null))
+  [[ "$empty" -gt 0 ]] && bar_empty=$(printf ' %.0s' $(seq 1 "$empty" 2>/dev/null))
+  printf "\r  %s [%s%s] %d/%d (%d%%)  " "$label" "$bar_fill" "$bar_empty" "$current" "$total" "$pct"
   [[ "$current" -eq "$total" ]] && echo
 }
 
@@ -94,7 +99,7 @@ phase1_host_and_k3s() {
   [[ "$(id -u)" -ne 0 ]] && run="sudo"
 
   log "INFO" "apt update && upgrade"
-  $run apt-get update -qq && $run DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+  $run apt-get update -qq && env DEBIAN_FRONTEND=noninteractive $run apt-get upgrade -y -qq
   $run apt-get install -y -qq curl ca-certificates apt-transport-https gnupg
 
   local mem_mb
