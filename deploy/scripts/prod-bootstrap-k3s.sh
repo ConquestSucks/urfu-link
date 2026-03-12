@@ -179,21 +179,24 @@ phase3_linkerd() {
   if [[ -n "${upgrade_out//[[:space:]]/}" ]]; then
     echo "$upgrade_out" | kubectl apply -f -
     log "INFO" "Linkerd control plane upgraded"
-  elif kubectl get configmap linkerd-config -n linkerd --request-timeout=10s &>/dev/null; then
-    log "INFO" "Linkerd control plane already installed, skipping install"
   else
-    log "INFO" "Linkerd not installed, running install"
+    log "INFO" "Linkerd upgrade produced no manifests, trying install or continuing if already present"
+    linkerd_stderr=$(mktemp)
     set +e
-    linkerd install 2>/dev/null | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
+    linkerd install 2>"$linkerd_stderr" | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
     apply_ret=${PIPESTATUS[1]}
     set -e
-    if [[ $apply_ret -ne 0 ]] && ! kubectl get configmap linkerd-config -n linkerd --request-timeout=5s &>/dev/null; then
-      log "ERROR" "Linkerd install failed and control plane not found"
-      exit 1
-    fi
     if [[ $apply_ret -ne 0 ]]; then
-      log "INFO" "Linkerd install failed but control plane present, continuing"
+      if grep -q -e "already exists" -e "linkerd upgrade" "$linkerd_stderr" 2>/dev/null; then
+        log "INFO" "Linkerd control plane already installed (install refused), continuing"
+      else
+        cat "$linkerd_stderr" >> "$LOG_FILE"
+        log "ERROR" "Linkerd install failed (exit $apply_ret)"
+        rm -f "$linkerd_stderr"
+        exit 1
+      fi
     fi
+    rm -f "$linkerd_stderr"
   fi
   kubectl wait --namespace linkerd --for=condition=available deployment/linkerd-destination deployment/linkerd-identity deployment/linkerd-proxy-injector --timeout=300s
   viz_out=""
@@ -201,21 +204,24 @@ phase3_linkerd() {
   if [[ -n "${viz_out//[[:space:]]/}" ]]; then
     echo "$viz_out" | kubectl apply -f -
     log "INFO" "Linkerd Viz upgraded"
-  elif kubectl get deployment metrics-api -n linkerd-viz --request-timeout=10s &>/dev/null; then
-    log "INFO" "Linkerd Viz already installed, skipping install"
   else
-    log "INFO" "Linkerd Viz not installed, running install"
+    log "INFO" "Linkerd Viz upgrade produced no manifests, trying install or continuing if already present"
+    viz_stderr=$(mktemp)
     set +e
-    linkerd viz install 2>/dev/null | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
+    linkerd viz install 2>"$viz_stderr" | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
     viz_apply_ret=${PIPESTATUS[1]}
     set -e
-    if [[ $viz_apply_ret -ne 0 ]] && ! kubectl get deployment metrics-api -n linkerd-viz --request-timeout=5s &>/dev/null; then
-      log "ERROR" "Linkerd Viz install failed and extension not found"
-      exit 1
-    fi
     if [[ $viz_apply_ret -ne 0 ]]; then
-      log "INFO" "Linkerd Viz install failed but extension present, continuing"
+      if grep -q -e "already exists" -e "linkerd.*upgrade" "$viz_stderr" 2>/dev/null; then
+        log "INFO" "Linkerd Viz already installed (install refused), continuing"
+      else
+        cat "$viz_stderr" >> "$LOG_FILE"
+        log "ERROR" "Linkerd Viz install failed (exit $viz_apply_ret)"
+        rm -f "$viz_stderr"
+        exit 1
+      fi
     fi
+    rm -f "$viz_stderr"
   fi
   kubectl wait --namespace linkerd-viz --for=condition=available deployment/metrics-api deployment/web --timeout=300s
 }
