@@ -50,7 +50,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Generate SBOM
-        uses: anchore/sbom-action@v0.22.0
+        uses: anchore/sbom-action@v0.23.1
         with:
           format: cyclonedx-json
           output-file: sbom.cdx.json
