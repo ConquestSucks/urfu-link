@@ -215,42 +215,43 @@ phase5_eso() {
   kubectl create namespace external-secrets --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install external-secrets external-secrets/external-secrets -n external-secrets --wait --timeout 5m
   [[ "$SKIP_VAULT" == "true" ]] && log "INFO" "SKIP_VAULT=true: configure Vault and secrets later; see README"
+  log "INFO" "Phase 5 done"
+}
+
+phase6_install_one() {
+  local name="$1" repo_url="$2" chart="$3" ns="$4" release_name="${5:-$1}" helm_extra="${6:-}"
+  log "CMD" "helm repo add $name $repo_url && helm repo update $name"
+  helm repo add "$name" "$repo_url" && helm repo update "$name"
+  kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
+  helm upgrade --install "$release_name" "$chart" -n "$ns" $helm_extra --wait --timeout 5m
 }
 
 phase6_operators() {
   log "STEP" "Phase 6: Stateful operators"
+  echo "[$(date -Iseconds)] Phase 6: Stateful operators (CloudNativePG, MongoDB, Redis, Strimzi, MinIO)" >&2
   local total=5 current=0
 
   current=1; progress_bar "$current" "$total" "CloudNativePG"
-  helm repo add cnpg https://cloudnative-pg.github.io/charts && helm repo update cnpg
-  kubectl create namespace cnpg-system --dry-run=client -o yaml | kubectl apply -f -
-  helm upgrade --install cnpg cnpg/cloudnative-pg -n cnpg-system --wait --timeout 5m
+  phase6_install_one cnpg https://cloudnative-pg.github.io/charts cnpg/cloudnative-pg cnpg-system
 
   current=2; progress_bar "$current" "$total" "MongoDB"
-  helm repo add mongodb https://mongodb.github.io/helm-charts && helm repo update mongodb
-  kubectl create namespace mongodb --dry-run=client -o yaml | kubectl apply -f -
-  helm upgrade --install community-operator mongodb/community-operator -n mongodb --wait --timeout 5m
+  phase6_install_one mongodb https://mongodb.github.io/helm-charts mongodb/community-operator mongodb community-operator
 
   current=3; progress_bar "$current" "$total" "Redis"
-  helm repo add ot-helm https://ot-container-kit.github.io/helm-charts && helm repo update ot-helm
-  kubectl create namespace redis-operator --dry-run=client -o yaml | kubectl apply -f -
-  helm upgrade --install redis-operator ot-helm/redis-operator -n redis-operator --wait --timeout 5m
+  phase6_install_one ot-helm https://ot-container-kit.github.io/helm-charts ot-helm/redis-operator redis-operator redis-operator
 
   current=4; progress_bar "$current" "$total" "Strimzi"
-  helm repo add strimzi https://strimzi.io/charts && helm repo update strimzi
-  kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
-  helm upgrade --install strimzi-kafka strimzi/strimzi-kafka-operator -n kafka --set watchAnyNamespace=true --wait --timeout 5m
+  phase6_install_one strimzi https://strimzi.io/charts strimzi/strimzi-kafka-operator kafka strimzi-kafka "--set watchAnyNamespace=true"
 
   current=5; progress_bar "$current" "$total" "MinIO"
-  helm repo add minio https://operator.min.io/helm-releases && helm repo update minio
-  kubectl create namespace minio-operator --dry-run=client -o yaml | kubectl apply -f -
-  helm upgrade --install minio-operator minio/operator -n minio-operator --wait --timeout 5m
+  phase6_install_one minio https://operator.min.io/helm-releases minio/operator minio-operator minio-operator
 
   log "INFO" "Operators installed"
 }
 
 phase7_platform() {
   log "STEP" "Phase 7: Platform manifests (domain=$DOMAIN)"
+  echo "[$(date -Iseconds)] Phase 7: Platform manifests" >&2
   kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/namespaces.yaml"
   run_cmd_visible bash -c "kubectl kustomize \"$REPO_ROOT/deploy/k8s/platform\" | sed \"s/urfu-link\.local/$DOMAIN/g\" | kubectl apply -f -"
   sleep 5
@@ -270,6 +271,7 @@ phase7_platform() {
 
 phase7b_headlamp() {
   log "STEP" "Phase 7b: Headlamp dashboard (OIDC via Keycloak)"
+  echo "[$(date -Iseconds)] Phase 7b: Headlamp" >&2
   if [[ "$SKIP_VAULT" != "true" ]]; then
     spinner_start "Waiting for headlamp-oidc secret (ESO sync)"
     for i in {1..24}; do
@@ -318,6 +320,7 @@ phase7c_wait_certs() {
 
 phase8_stateful() {
   log "STEP" "Phase 8: Stateful stack (120GB storage profile)"
+  echo "[$(date -Iseconds)] Phase 8: Stateful stack" >&2
   kubectl kustomize "$REPO_ROOT/deploy/k8s/platform/stateful" | sed -e "$STATEFUL_STORAGE_SED" | kubectl apply -f -
 
   spinner_start "Waiting for PostgreSQL cluster"
@@ -343,6 +346,7 @@ phase8_stateful() {
 
 phase9_services() {
   log "STEP" "Phase 9: Deploy services (urfu-prod)"
+  echo "[$(date -Iseconds)] Phase 9: Deploy services (urfu-prod)" >&2
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
   if ! kubectl cluster-info &>/dev/null; then
     log "ERROR" "Cluster unreachable (KUBECONFIG=$KUBECONFIG). Deploy services manually: export KUBECONFIG=$KUBECONFIG"
@@ -360,6 +364,7 @@ phase9_services() {
 
 phase10_wait_smoke() {
   log "STEP" "Phase 10: Wait for pods and smoke"
+  echo "[$(date -Iseconds)] Phase 10: Wait for pods" >&2
   spinner_start "Waiting for urfu-prod pods"
   for i in {1..60}; do
     local ready total
