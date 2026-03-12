@@ -147,7 +147,7 @@ jobs:
           echo "${{ steps.build.outputs.digest }}" > "dist/digests/${{ matrix.service }}.txt"
 
       - name: Upload digests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: image-digests-${{ matrix.service }}
           path: dist/digests/${{ matrix.service }}.txt
