@@ -1,0 +1,72 @@
+replicaCount: 1
+
+image:
+  registry: ghcr.io
+  repository: headlamp-k8s/headlamp
+  tag: "v0.40.0"
+  pullPolicy: IfNotPresent
+
+config:
+  inCluster: true
+  oidc:
+    secret:
+      create: false
+    externalSecret:
+      enabled: true
+      name: headlamp-oidc
+    usePKCE: true
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header X-Forwarded-Proto $scheme;
+    nginx.ingress.kubernetes.io/server-snippet: |
+      large_client_header_buffers 4 64k;
+  hosts:
+    - host: k8s.ghjc.ru
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: headlamp-tls
+      hosts:
+        - k8s.ghjc.ru
+
+serviceAccount:
+  create: true
+
+clusterRoleBinding:
+  create: true
+  clusterRoleName: cluster-admin
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 100
+  runAsGroup: 101
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: null
+
+hostUsers: true
