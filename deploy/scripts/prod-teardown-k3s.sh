@@ -45,9 +45,14 @@ phase8_stateful() {
   run_ignore kubectl delete pvc -n urfu-platform --all --ignore-not-found --wait=false
 }
 
+phase7b_headlamp() {
+  log "STEP" "Phase 7b reverse: Remove Headlamp"
+  helm uninstall headlamp -n urfu-platform 2>/dev/null || true
+}
+
 phase7_platform() {
-  log "STEP" "Phase 7 reverse: Remove platform manifests"
-  kubectl kustomize "$REPO_ROOT/deploy/k8s/platform" | sed "s/urfu-link\.local/$DOMAIN/g" | kubectl delete -f - --ignore-not-found --wait=false 2>/dev/null || true
+  log "STEP" "Phase 7 reverse: Remove platform manifests (Ingress, identity, etc.)"
+  run_ignore bash -c "kubectl kustomize \"$REPO_ROOT/deploy/k8s/platform\" | sed \"s/urfu-link\.local/$DOMAIN/g\" | kubectl delete -f - --ignore-not-found --wait=false"
   run_ignore kubectl delete -f "$REPO_ROOT/deploy/k8s/platform/namespaces.yaml" --ignore-not-found --wait=false
 }
 
@@ -120,6 +125,7 @@ main() {
   fi
   phase9_services
   phase8_stateful
+  phase7b_headlamp
   phase7_platform
   phase6_operators
   phase5_eso

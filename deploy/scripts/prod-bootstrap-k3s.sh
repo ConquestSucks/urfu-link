@@ -252,10 +252,68 @@ phase6_operators() {
 phase7_platform() {
   log "STEP" "Phase 7: Platform manifests (domain=$DOMAIN)"
   kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/namespaces.yaml"
-  kubectl kustomize "$REPO_ROOT/deploy/k8s/platform" | sed "s/urfu-link\.local/$DOMAIN/g" | kubectl apply -f -
+  run_cmd_visible bash -c "kubectl kustomize \"$REPO_ROOT/deploy/k8s/platform\" | sed \"s/urfu-link\.local/$DOMAIN/g\" | kubectl apply -f -"
+  sleep 5
+  local missing=""
+  kubectl get ingress api-gateway -n urfu-prod &>/dev/null || missing="api-gateway(urfu-prod)"
+  kubectl get ingress frontend-web -n urfu-prod &>/dev/null || missing="${missing:+$missing }frontend-web(urfu-prod)"
+  kubectl get ingress keycloak -n urfu-platform &>/dev/null || missing="${missing:+$missing }keycloak(urfu-platform)"
+  if [[ -n "$missing" ]]; then
+    log "ERROR" "Platform apply: missing Ingress: $missing"
+    exit 1
+  fi
+  log "INFO" "Platform Ingress verified (api-gateway, frontend-web, keycloak)"
   if [[ "$SKIP_VAULT" == "true" ]]; then
     log "INFO" "Vault skipped: create secrets manually for Keycloak and services in urfu-prod"
   fi
+}
+
+phase7b_headlamp() {
+  log "STEP" "Phase 7b: Headlamp dashboard (OIDC via Keycloak)"
+  if [[ "$SKIP_VAULT" != "true" ]]; then
+    spinner_start "Waiting for headlamp-oidc secret (ESO sync)"
+    for i in {1..24}; do
+      if kubectl get secret headlamp-oidc -n urfu-platform &>/dev/null; then
+        spinner_stop
+        break
+      fi
+      [[ $i -eq 24 ]] && spinner_stop
+      sleep 5
+    done
+  fi
+  helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/ 2>/dev/null || true
+  helm repo update headlamp
+  kubectl create namespace urfu-platform --dry-run=client -o yaml | kubectl apply -f -
+  helm upgrade --install headlamp headlamp/headlamp -n urfu-platform -f "$REPO_ROOT/deploy/helm/services/headlamp/values-prod.yaml" \
+    --set ingress.hosts[0].host=k8s.$DOMAIN \
+    --set ingress.tls[0].hosts[0]=k8s.$DOMAIN \
+    --set ingress.tls[0].secretName=headlamp-tls \
+    --wait --timeout 3m
+  local headlamp_host
+  headlamp_host=$(kubectl get ingress -n urfu-platform -o jsonpath='{.items[*].spec.rules[0].host}' 2>/dev/null | tr ' ' '\n' | grep "k8s\.$DOMAIN" || true)
+  if [[ -z "$headlamp_host" ]]; then
+    log "ERROR" "Headlamp Ingress (k8s.$DOMAIN) not found in urfu-platform"
+    exit 1
+  fi
+  log "INFO" "Headlamp: https://k8s.$DOMAIN (OIDC callback: https://k8s.$DOMAIN/oidc-callback)"
+}
+
+phase7c_wait_certs() {
+  log "STEP" "Phase 7c: Wait for TLS certificates (cert-manager)"
+  local max_wait=300
+  local elapsed=0
+  while [[ $elapsed -lt $max_wait ]]; do
+    local api_ready app_ready
+    api_ready=$(kubectl get certificate api-ghjc-ru-tls -n urfu-prod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+    app_ready=$(kubectl get certificate app-ghjc-ru-tls -n urfu-prod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+    if [[ "$api_ready" == "True" ]] && [[ "$app_ready" == "True" ]]; then
+      log "INFO" "TLS certificates ready (api.${DOMAIN}, app.${DOMAIN})"
+      return 0
+    fi
+    sleep 10
+    elapsed=$((elapsed + 10))
+  done
+  log "INFO" "TLS wait timeout (${max_wait}s). Check: kubectl describe certificate -n urfu-prod; kubectl get challenge -A"
 }
 
 phase8_stateful() {
@@ -306,7 +364,7 @@ phase10_wait_smoke() {
     [[ $i -eq 60 ]] && { spinner_stop; log "INFO" "Pods wait timeout"; }
     sleep 5
   done
-  log "INFO" "Bootstrap complete. API: https://api.$DOMAIN Frontend: https://app.$DOMAIN"
+  log "INFO" "Bootstrap complete. API: https://api.$DOMAIN Frontend: https://app.$DOMAIN Headlamp: https://k8s.$DOMAIN"
 }
 
 main() {
@@ -320,6 +378,8 @@ main() {
   phase5_eso
   phase6_operators
   phase7_platform
+  phase7b_headlamp
+  phase7c_wait_certs
   phase8_stateful
   phase9_services
   phase10_wait_smoke
