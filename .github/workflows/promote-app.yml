@@ -1,4 +1,4 @@
-﻿name: Promote App
+name: Promote App
 
 on:
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Update Helm values
         env:
           SERVICE: ${{ inputs.service }}
