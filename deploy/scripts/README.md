@@ -54,3 +54,19 @@ kubectl create secret generic mongo-app-user-password -n urfu-platform --from-li
 ## Логи
 
 Всё пишется в один лог-файл; формат: `[ISO8601] [LEVEL] сообщение` (INFO, STEP, CMD, ERROR). В консоль идут этапы (STEP) и ошибки; долгие шаги — с прогресс-баром или спиннером.
+
+## Teardown (полное снятие)
+
+Скрипт `prod-teardown-k3s.sh` сносит всё, что ставит установщик, в обратном порядке: Helm-сервисы в urfu-prod → stateful-стек и PVC → манифесты платформы и namespaces → операторы (MinIO, Strimzi, Redis, MongoDB, CloudNativePG) → ESO → Argo Rollouts и Argo CD → при флаге Linkerd → cert-manager и ingress-nginx → StorageClass; при флаге — k3s.
+
+```bash
+sudo bash deploy/scripts/prod-teardown-k3s.sh
+```
+
+| Переменная | По умолчанию | Смысл |
+|------------|--------------|--------|
+| `REMOVE_LINKERD` | `false` | Удалить Linkerd + Viz |
+| `REMOVE_K3S` | `false` | Запустить k3s-uninstall.sh (полное снятие узла) |
+| `REPO_ROOT`, `LOG_FILE`, `DOMAIN` | как у bootstrap | Корень репо, лог, домен для манифестов |
+
+Если кластер недоступен (kubectl не доходит), скрипт удалит только StorageClass и при `REMOVE_K3S=true` — k3s.
