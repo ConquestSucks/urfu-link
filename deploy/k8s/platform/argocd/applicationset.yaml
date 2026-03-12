@@ -8,30 +8,6 @@ spec:
     - list:
         elements:
           - service: api-gateway
-            env: dev
-            namespace: urfu-dev
-          - service: media-service
-            env: dev
-            namespace: urfu-dev
-          - service: user-service
-            env: dev
-            namespace: urfu-dev
-          - service: chat-service
-            env: dev
-            namespace: urfu-dev
-          - service: presence-service
-            env: dev
-            namespace: urfu-dev
-          - service: notification-service
-            env: dev
-            namespace: urfu-dev
-          - service: call-service
-            env: dev
-            namespace: urfu-dev
-          - service: frontend-web
-            env: dev
-            namespace: urfu-dev
-          - service: api-gateway
             env: prod
             namespace: urfu-prod
           - service: media-service
