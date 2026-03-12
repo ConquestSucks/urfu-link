@@ -6,6 +6,7 @@ REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 LOG_FILE="${LOG_FILE:-}"
 SKIP_VAULT="${SKIP_VAULT:-false}"
 INSTALL_LINKERD="${INSTALL_LINKERD:-true}"
+LINKERD2_VERSION="${LINKERD2_VERSION:-edge-25.10.7}"
 DISK_MIN_GB=90
 RAM_MIN_MB=3500
 STATEFUL_STORAGE_SED='s/100Gi/4Gi/g; s/200Gi/4Gi/g; s/50Gi/4Gi/g'
@@ -168,23 +169,23 @@ phase3_linkerd() {
   log "STEP" "Phase 3: Linkerd + Viz"
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
   if ! command -v linkerd &>/dev/null; then
-    run_cmd_visible curl -sL https://run.linkerd.io/install | sh
+    run_cmd_visible env LINKERD2_VERSION="$LINKERD2_VERSION" curl -sL https://run.linkerd.io/install-edge | sh
     export PATH="$PATH:$HOME/.linkerd2/bin"
   fi
   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/standard-install.yaml 2>/dev/null || true
   linkerd install --crds | kubectl apply -f -
-  if kubectl get namespace linkerd &>/dev/null && kubectl get configmap linkerd-config -n linkerd &>/dev/null; then
-    log "INFO" "Linkerd already installed, running upgrade"
-    linkerd upgrade | kubectl apply -f -
+  if ! linkerd upgrade | kubectl apply -f -; then
+    log "INFO" "Linkerd not installed or upgrade produced nothing, running install"
+    linkerd install | kubectl apply -f -
   else
-    linkerd install | kubectl apply -f - || { log "INFO" "Linkerd install failed (may already exist), trying upgrade"; linkerd upgrade | kubectl apply -f -; }
+    log "INFO" "Linkerd control plane upgraded"
   fi
   kubectl wait --namespace linkerd --for=condition=available deployment/linkerd-destination deployment/linkerd-identity deployment/linkerd-proxy-injector --timeout=300s
-  if kubectl get namespace linkerd-viz &>/dev/null && kubectl get deployment web -n linkerd-viz &>/dev/null; then
-    log "INFO" "Linkerd Viz already installed, running upgrade"
-    linkerd viz upgrade | kubectl apply -f -
+  if ! linkerd viz upgrade | kubectl apply -f -; then
+    log "INFO" "Linkerd Viz not installed or upgrade produced nothing, running install"
+    linkerd viz install | kubectl apply -f -
   else
-    linkerd viz install | kubectl apply -f - || { log "INFO" "Linkerd Viz install failed (may already exist), trying upgrade"; linkerd viz upgrade | kubectl apply -f -; }
+    log "INFO" "Linkerd Viz upgraded"
   fi
   kubectl wait --namespace linkerd-viz --for=condition=available deployment/metrics-api deployment/web --timeout=300s
 }
