@@ -147,8 +147,23 @@ phase1_host_and_k3s() {
   fi
 }
 
+wait_ns_ready() {
+  local ns="$1"
+  for i in {1..60}; do
+    local phase
+    phase=$(kubectl get namespace "$ns" -o jsonpath='{.status.phase}' 2>/dev/null || echo "")
+    if [[ -z "$phase" ]] || [[ "$phase" == "Active" ]]; then
+      return 0
+    fi
+    [[ $i -eq 60 ]] && { log "INFO" "Timeout waiting for namespace $ns"; return 1; }
+    sleep 5
+  done
+}
+
 phase2_ingress_certmanager() {
   log "STEP" "Phase 2: Ingress NGINX and cert-manager"
+  wait_ns_ready ingress-nginx || true
+  wait_ns_ready cert-manager || true
   kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
   if ! helm status ingress-nginx -n ingress-nginx &>/dev/null; then
     helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update ingress-nginx
