@@ -6,13 +6,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: urfu-dev
-  labels:
-    linkerd.io/inject: enabled
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: urfu-prod
   labels:
     linkerd.io/inject: enabled
