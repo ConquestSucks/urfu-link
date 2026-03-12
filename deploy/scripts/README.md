@@ -15,7 +15,7 @@ sudo ./deploy/scripts/prod-bootstrap-k3s.sh
 |------------|--------------|--------|
 | `DOMAIN` | `ghjc.ru` | Домен для ingress и cert-manager |
 | `SKIP_VAULT` | `false` | Не ставить Vault — секреты создаёшь сам |
-| `INSTALL_LINKERD` | `false` | Поставить Linkerd + Viz |
+| `INSTALL_LINKERD` | `true` | Поставить Linkerd + Viz (без: `INSTALL_LINKERD=false`) |
 | `REPO_ROOT` | на 2 уровня выше скрипта | Корень репо |
 | `LOG_FILE` | `prod-bootstrap-YYYYMMDD-HHMMSS.log` в `REPO_ROOT` | Куда пишем лог |
 
