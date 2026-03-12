@@ -218,7 +218,7 @@ phase6_operators() {
   phase6_install_one mongodb https://mongodb.github.io/helm-charts mongodb/community-operator mongodb community-operator
   phase6_install_one ot-helm https://ot-container-kit.github.io/helm-charts ot-helm/redis-operator redis-operator redis-operator
   phase6_install_one strimzi https://strimzi.io/charts strimzi/strimzi-kafka-operator kafka strimzi-kafka "--set watchAnyNamespace=true"
-  phase6_install_one minio https://operator.min.io/helm-releases minio/operator minio-operator minio-operator
+  phase6_install_one minio https://operator.min.io minio/operator minio-operator minio-operator
   log "INFO" "Operators installed"
 }
 
