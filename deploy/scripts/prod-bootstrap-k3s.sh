@@ -184,14 +184,14 @@ phase3_linkerd() {
   upgrade_out=""
   upgrade_out=$(linkerd upgrade 2>/dev/null) || true
   if [[ -n "${upgrade_out//[[:space:]]/}" ]]; then
-    echo "$upgrade_out" | kubectl apply -f -
+    echo "$upgrade_out" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f -
     log "INFO" "Linkerd control plane upgraded"
   else
     log "INFO" "Linkerd upgrade produced no manifests, trying install or continuing if already present"
     linkerd_stderr=$(mktemp)
     set +e
-    linkerd install 2>"$linkerd_stderr" | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
-    apply_ret=${PIPESTATUS[1]}
+    linkerd install 2>"$linkerd_stderr" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
+    apply_ret=${PIPESTATUS[2]}
     set -e
     if [[ $apply_ret -ne 0 ]]; then
       if grep -q -e "already exists" -e "linkerd upgrade" "$linkerd_stderr" 2>/dev/null; then
@@ -209,14 +209,14 @@ phase3_linkerd() {
   viz_out=""
   viz_out=$(linkerd viz upgrade 2>/dev/null) || true
   if [[ -n "${viz_out//[[:space:]]/}" ]]; then
-    echo "$viz_out" | kubectl apply -f -
+    echo "$viz_out" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f -
     log "INFO" "Linkerd Viz upgraded"
   else
     log "INFO" "Linkerd Viz upgrade produced no manifests, trying install or continuing if already present"
     viz_stderr=$(mktemp)
     set +e
-    linkerd viz install 2>"$viz_stderr" | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
-    viz_apply_ret=${PIPESTATUS[1]}
+    linkerd viz install 2>"$viz_stderr" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
+    viz_apply_ret=${PIPESTATUS[2]}
     set -e
     if [[ $viz_apply_ret -ne 0 ]]; then
       if grep -q -e "already exists" -e "linkerd.*upgrade" "$viz_stderr" 2>/dev/null; then
