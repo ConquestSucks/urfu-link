@@ -60,7 +60,8 @@ print_phase_summary() {
   log "STEP" "Phase duration summary"
   for phase_name in \
     phase0_env phase1_host_and_k3s phase2_ingress_certmanager phase3_linkerd phase4_argocd \
-    phase5_eso phase6_operators phase7_platform phase7b_headlamp phase8_stateful phase9_services phase10_wait_smoke; do
+    phase4b_vault phase5_eso phase6_operators phase6b_observability phase7_platform phase7b_headlamp \
+    phase8_stateful phase9_services phase10_wait_smoke; do
     if [[ -n "${PHASE_DURATIONS[$phase_name]+x}" ]]; then
       log "INFO" "$phase_name=${PHASE_DURATIONS[$phase_name]}s"
     fi
@@ -373,6 +374,83 @@ phase4_argocd() {
   kubectl wait --namespace argo-rollouts --for=condition=available deployment/argo-rollouts --timeout="$K8S_WAIT_TIMEOUT"
 }
 
+phase4b_vault() {
+  if [[ "$SKIP_VAULT" == "true" ]]; then
+    log "INFO" "Phase 4b: Vault skipped (SKIP_VAULT=true)"
+    return 0
+  fi
+  log "STEP" "Phase 4b: HashiCorp Vault (in-cluster)"
+  helm_repo_add_update hashicorp https://helm.releases.hashicorp.com
+  kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+  
+  if ! helm status vault -n vault &>/dev/null; then
+    log "INFO" "Installing Vault..."
+    helm upgrade --install vault hashicorp/vault -n vault \
+      --set "server.standalone.enabled=true" \
+      --set "server.standalone.config= |
+        ui = true
+        listener \"tcp\" {
+          tls_disable = 1
+          address = \"[::]:8200\"
+          cluster_address = \"[::]:8201\"
+        }
+        storage \"file\" {
+          path = \"/vault/data\"
+        }" \
+      --wait --timeout 5m
+  fi
+  
+  kubectl wait --namespace vault --for=condition=ready pod/vault-0 --timeout="$K8S_WAIT_TIMEOUT"
+  
+  # Check if Vault is initialized
+  local init_status
+  init_status=$(kubectl exec -n vault vault-0 -- vault status -format=json 2>/dev/null | grep '"initialized"' | grep -o 'true\|false' || echo "false")
+  
+  if [[ "$init_status" == "false" ]]; then
+    log "INFO" "Initializing Vault..."
+    kubectl exec -n vault vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > "$REPO_ROOT/vault-keys.json"
+    local unseal_key
+    unseal_key=$(grep -o '"unseal_keys_b64": \[[^]]*\]' "$REPO_ROOT/vault-keys.json" | grep -o '"[^"]*"' | head -1 | tr -d '"')
+    local root_token
+    root_token=$(grep -o '"root_token": "[^"]*"' "$REPO_ROOT/vault-keys.json" | grep -o '"[^"]*"' | tail -1 | tr -d '"')
+    
+    log "INFO" "Unsealing Vault..."
+    kubectl exec -n vault vault-0 -- vault operator unseal "$unseal_key"
+    
+    log "INFO" "Configuring Vault Kubernetes Auth..."
+    kubectl exec -n vault vault-0 -- sh -c "
+      export VAULT_TOKEN=$root_token
+      vault auth enable kubernetes
+      vault write auth/kubernetes/config \
+        kubernetes_host=https://\$KUBERNETES_PORT_443_TCP_ADDR:443
+      
+      vault policy write urfu-link-prod - <<EOF
+path \"kv/*\" {
+  capabilities = [\"read\", \"list\"]
+}
+EOF
+      
+      vault write auth/kubernetes/role/urfu-link-prod \
+        bound_service_account_names=external-secrets \
+        bound_service_account_namespaces=external-secrets \
+        policies=urfu-link-prod \
+        ttl=24h
+        
+      vault secrets enable -version=2 kv
+    "
+    log "INFO" "Vault initialized. Keys saved to $REPO_ROOT/vault-keys.json (KEEP THIS SAFE!)"
+  else
+    log "INFO" "Vault already initialized. Checking sealed status..."
+    local sealed_status
+    sealed_status=$(kubectl exec -n vault vault-0 -- vault status -format=json 2>/dev/null | grep '"sealed"' | grep -o 'true\|false' || echo "true")
+    if [[ "$sealed_status" == "true" ]]; then
+      log "WARNING" "Vault is sealed! You must unseal it manually."
+    else
+      log "INFO" "Vault is already unsealed."
+    fi
+  fi
+}
+
 phase5_eso() {
   log "STEP" "Phase 5: External Secrets Operator"
   helm_repo_add_update external-secrets https://charts.external-secrets.io
@@ -473,6 +551,37 @@ phase6_operators() {
   log "INFO" "Operators installed"
 }
 
+phase6b_observability() {
+  log "STEP" "Phase 6b: Observability Stack (Prometheus, Grafana, Loki)"
+  helm_repo_add_update prometheus-community https://prometheus-community.github.io/helm-charts
+  helm_repo_add_update grafana https://grafana.github.io/helm-charts
+  
+  kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
+  
+  log "INFO" "Installing kube-prometheus-stack..."
+  if ! helm status kube-prometheus-stack -n observability &>/dev/null; then
+    helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n observability \
+      --set grafana.ingress.enabled=true \
+      --set grafana.ingress.ingressClassName=nginx \
+      --set grafana.ingress.hosts[0]=grafana.$DOMAIN \
+      --set grafana.ingress.tls[0].hosts[0]=grafana.$DOMAIN \
+      --set grafana.ingress.tls[0].secretName=grafana-tls \
+      --set grafana.ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-production \
+      --set grafana.adminPassword=admin \
+      --set prometheus.prometheusSpec.remoteWriteReceiver.enabled=true \
+      --wait --timeout 10m
+  fi
+  
+  log "INFO" "Installing loki-stack..."
+  if ! helm status loki -n observability &>/dev/null; then
+    helm upgrade --install loki grafana/loki-stack -n observability \
+      --set promtail.enabled=true \
+      --wait --timeout 10m
+  fi
+  
+  log "INFO" "Observability stack installed. Grafana: https://grafana.$DOMAIN"
+}
+
 phase7_platform() {
   log "STEP" "Phase 7: Platform manifests (domain=$DOMAIN)"
   kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/namespaces.yaml"
@@ -553,26 +662,44 @@ phase8_stateful() {
 }
 
 phase9_services() {
-  log "STEP" "Phase 9: Deploy services (urfu-prod)"
+  log "STEP" "Phase 9: Deploy services (GitOps via ArgoCD)"
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
   if ! kubectl cluster-info &>/dev/null; then
     log "ERROR" "Cluster unreachable (KUBECONFIG=$KUBECONFIG). Deploy services manually: export KUBECONFIG=$KUBECONFIG"
     exit 1
   fi
-  local -a pids=()
-  declare -A pid_to_name=()
+  
+  log "INFO" "Applying ArgoCD ApplicationSet for services..."
+  kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/argocd/applicationset.yaml"
+  
+  log "INFO" "Waiting for ArgoCD applications to be created..."
+  # Wait for ApplicationSet controller to generate Application resources
+  sleep 10
+  
   local svc
   for svc in "${SERVICES[@]}"; do
-    log "INFO" "Deploying $svc..."
-    (
-      helm upgrade --install "$svc" "$REPO_ROOT/deploy/helm/charts/urfu-service" -n urfu-prod --create-namespace -f "$REPO_ROOT/deploy/helm/services/$svc/values-prod.yaml"
-    ) &
-    pids+=("$!")
-    pid_to_name[$!]="$svc"
-    wait_for_background_jobs "$SERVICE_PARALLELISM" pids pid_to_name
+    local app_name="${svc}-prod"
+    log "INFO" "Waiting for ArgoCD application $app_name to be Healthy and Synced..."
+    for i in {1..60}; do
+      local sync_status health_status
+      sync_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
+      health_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
+      
+      if [[ "$sync_status" == "Synced" ]] && [[ "$health_status" == "Healthy" ]]; then
+        log "INFO" "Application $app_name is Synced and Healthy"
+        break
+      fi
+      
+      if [[ $i -eq 60 ]]; then
+        log "ERROR" "Timeout waiting for Application $app_name. Sync: $sync_status, Health: $health_status"
+        exit 1
+      fi
+      
+      sleep 10
+    done
   done
-  collect_background_jobs pids pid_to_name || exit 1
-  log "INFO" "Services deployed"
+  
+  log "INFO" "All services deployed via ArgoCD"
 }
 
 phase10_wait_smoke() {
@@ -586,6 +713,14 @@ phase10_wait_smoke() {
     fi
     kubectl rollout status "deployment/$svc" -n urfu-prod --timeout="$K8S_WAIT_TIMEOUT"
   done
+  
+  log "INFO" "Checking systemic components (Vault, Prometheus, Grafana)..."
+  if [[ "$SKIP_VAULT" != "true" ]]; then
+    kubectl rollout status statefulset/vault -n vault --timeout="$K8S_WAIT_TIMEOUT" || log "WARNING" "Vault not fully ready"
+  fi
+  kubectl rollout status deployment/kube-prometheus-stack-grafana -n observability --timeout="$K8S_WAIT_TIMEOUT" || log "WARNING" "Grafana not fully ready"
+  kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus -n observability --timeout="$K8S_WAIT_TIMEOUT" || log "WARNING" "Prometheus not fully ready"
+  
   local ready total
   ready=$(kubectl get pods -n urfu-prod -l 'app.kubernetes.io/name' -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | tr ' ' '\n' | grep -c True || echo 0)
   total=$(kubectl get pods -n urfu-prod -l 'app.kubernetes.io/name' --no-headers 2>/dev/null | wc -l)
@@ -593,7 +728,18 @@ phase10_wait_smoke() {
     log "ERROR" "Smoke check failed: ready pods $ready/$total in urfu-prod"
     exit 1
   fi
-  log "INFO" "Bootstrap complete. API: https://api.$DOMAIN Frontend: https://app.$DOMAIN Headlamp: https://k8s.$DOMAIN"
+  
+  log "INFO" "============================================================"
+  log "INFO" "Bootstrap complete."
+  log "INFO" "API Gateway: https://api.$DOMAIN"
+  log "INFO" "Frontend App: https://app.$DOMAIN"
+  log "INFO" "ArgoCD UI: (Port-forward needed, or Ingress to be configured manually)"
+  log "INFO" "Kubernetes Headlamp: https://k8s.$DOMAIN"
+  log "INFO" "Grafana: https://grafana.$DOMAIN (admin / admin)"
+  if [[ "$SKIP_VAULT" != "true" ]]; then
+    log "INFO" "HashiCorp Vault: https://vault.$DOMAIN"
+  fi
+  log "INFO" "============================================================"
 }
 
 main() {
