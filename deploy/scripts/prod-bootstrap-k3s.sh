@@ -65,6 +65,36 @@ log() {
   fi
 }
 
+configure_apt_proxy() {
+  local run=""
+  [[ "$(id -u)" -ne 0 ]] && run="sudo"
+  local apt_proxy_file="/etc/apt/apt.conf.d/99proxy"
+  local proxy_url="${HTTP_PROXY:-${ALL_PROXY:-}}"
+
+  if [[ -z "$proxy_url" ]]; then
+    if [[ -f "$apt_proxy_file" ]]; then
+      $run rm -f "$apt_proxy_file"
+      log "INFO" "Removed apt proxy config: $apt_proxy_file"
+    fi
+    return 0
+  fi
+
+  if [[ "$proxy_url" =~ ^https?:// ]]; then
+    {
+      echo "Acquire::http::Proxy \"$proxy_url\";"
+      echo "Acquire::https::Proxy \"$proxy_url\";"
+    } | $run tee "$apt_proxy_file" >/dev/null
+    log "INFO" "Configured apt proxy: $proxy_url"
+    return 0
+  fi
+
+  if [[ -f "$apt_proxy_file" ]]; then
+    $run rm -f "$apt_proxy_file"
+    log "INFO" "Removed unsupported apt proxy config for scheme in $proxy_url"
+  fi
+  log "INFO" "Skipping apt proxy configuration for unsupported scheme: $proxy_url"
+}
+
 timestamp_now() {
   date +%s
 }
@@ -263,14 +293,7 @@ phase1_host_and_k3s() {
   local run=""
   [[ "$(id -u)" -ne 0 ]] && run="sudo"
 
-  # Apply apt proxy if ALL_PROXY or HTTP_PROXY is defined
-  if [[ -n "${HTTP_PROXY:-}" ]] || [[ -n "${ALL_PROXY:-}" ]]; then
-    local proxy_url="${HTTP_PROXY:-${ALL_PROXY:-}}"
-    echo "Acquire::http::Proxy \"$proxy_url\";" | $run tee /etc/apt/apt.conf.d/99proxy >/dev/null
-    echo "Acquire::https::Proxy \"$proxy_url\";" | $run tee -a /etc/apt/apt.conf.d/99proxy >/dev/null
-    log "INFO" "Configured apt proxy: $proxy_url"
-  fi
-
+  configure_apt_proxy
   normalize_ubuntu_apt_sources
   log "INFO" "apt update"
   $run apt-get update -qq
