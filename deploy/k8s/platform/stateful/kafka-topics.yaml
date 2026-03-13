@@ -1,4 +1,4 @@
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-user-events-v1
@@ -13,7 +13,7 @@ spec:
     retention.ms: 604800000
     cleanup.policy: delete
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-media-events-v1
@@ -27,7 +27,7 @@ spec:
   config:
     retention.ms: 604800000
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-chat-events-v1
@@ -41,7 +41,7 @@ spec:
   config:
     retention.ms: 1209600000
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-presence-events-v1
@@ -55,7 +55,7 @@ spec:
   config:
     retention.ms: 86400000
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-notification-events-v1
@@ -69,7 +69,7 @@ spec:
   config:
     retention.ms: 604800000
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-call-events-v1
@@ -83,7 +83,7 @@ spec:
   config:
     retention.ms: 259200000
 ---
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: KafkaTopic
 metadata:
   name: urfu-call-events-v1-dlq
