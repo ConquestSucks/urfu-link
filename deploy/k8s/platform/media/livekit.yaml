@@ -13,6 +13,7 @@ spec:
       labels:
         app: livekit
     spec:
+      enableServiceLinks: false
       containers:
         - name: livekit
           image: livekit/livekit-server:v1.9.12
