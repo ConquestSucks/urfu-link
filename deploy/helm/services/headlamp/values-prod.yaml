@@ -30,7 +30,7 @@ ingress:
     - host: k8s.ghjc.ru
       paths:
         - path: /
-          pathType: Prefix
+          type: Prefix
   tls:
     - secretName: headlamp-tls
       hosts:
