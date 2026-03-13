@@ -9,3 +9,5 @@ Recommended operators (production):
 
 This folder contains starter CR manifests for production-grade setup.
 Use dedicated storage classes and backup tooling before enabling workloads.
+
+Для prod-bootstrap используется overlay `../stateful-prod` (объёмы 4Gi), подключаемый через Kustomize.

@@ -1,0 +1,8 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: urfu-postgres
+  namespace: urfu-platform
+spec:
+  storage:
+    size: 4Gi
