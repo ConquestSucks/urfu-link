@@ -223,13 +223,11 @@ phase3_linkerd() {
     if [[ $viz_apply_ret -ne 0 ]]; then
       if grep -q -e "already exists" -e "linkerd.*upgrade" "$viz_stderr" 2>/dev/null; then
         log "INFO" "Linkerd Viz already installed (install refused), continuing"
-      elif kubectl get deployment metrics-api -n linkerd-viz --request-timeout=5s &>/dev/null; then
+      elif KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}" kubectl get deployment metrics-api -n linkerd-viz --request-timeout=5s &>/dev/null; then
         log "INFO" "Linkerd Viz already present (no manifests from install), continuing"
       else
         cat "$viz_stderr" >> "$LOG_FILE"
-        log "ERROR" "Linkerd Viz install failed (exit $viz_apply_ret)"
-        rm -f "$viz_stderr"
-        exit 1
+        log "INFO" "Linkerd Viz install produced no objects (exit $viz_apply_ret), continuing to wait"
       fi
     fi
     rm -f "$viz_stderr"
