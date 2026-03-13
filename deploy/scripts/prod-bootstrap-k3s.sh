@@ -528,10 +528,13 @@ phase4b_vault() {
   local vault_api_reachable="false"
   local i
   for i in {1..60}; do
-    if [[ "$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}' 2>/dev/null || echo "")" == "Running" ]] && \
-       kubectl exec -n vault vault-0 -- vault status >/dev/null 2>&1; then
-      vault_api_reachable="true"
-      break
+    if [[ "$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}' 2>/dev/null || echo "")" == "Running" ]]; then
+      local vault_status_json
+      vault_status_json="$(kubectl exec -n vault vault-0 -- vault status -format=json 2>/dev/null || true)"
+      if [[ -n "$vault_status_json" ]]; then
+        vault_api_reachable="true"
+        break
+      fi
     fi
     sleep "$POD_POLL_INTERVAL_SEC"
   done
