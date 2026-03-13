@@ -46,6 +46,10 @@ kubectl create secret generic headlamp-oidc -n urfu-platform \
 
 После этого перезапусти под Headlamp (или дождись рестарта).
 
+## Ingress и snippet
+
+Манифесты Headlamp не используют `configuration-snippet` / `server-snippet`, чтобы не конфликтовать с политикой NGINX Ingress (snippet отключены). Если при OIDC-логине появляется 400/414 из-за длинных заголовков, администратор кластера может включить `allow-snippet-annotations` в Ingress NGINX и при необходимости вернуть аннотации в `values-prod.yaml`.
+
 ## RBAC в кластере
 
 Сейчас Headlamp использует свой ServiceAccount с правами `cluster-admin` и показывает кластер от его имени. Вход через OIDC только проверяет, что пользователь авторизован в Keycloak; права в Kubernetes для пользователей OIDC можно добавить позже через OIDC в kube-apiserver и ClusterRoleBinding по группам/имени пользователя.

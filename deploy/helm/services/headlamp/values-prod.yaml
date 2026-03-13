@@ -22,10 +22,6 @@ ingress:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header X-Forwarded-Proto $scheme;
-    nginx.ingress.kubernetes.io/server-snippet: |
-      large_client_header_buffers 4 64k;
   hosts:
     - host: k8s.ghjc.ru
       paths:
