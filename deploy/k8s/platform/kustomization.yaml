@@ -6,6 +6,8 @@ resources:
   - cert-manager/cluster-issuer.yaml
   - ingress/api-gateway-ingress.yaml
   - ingress/frontend-web-ingress.yaml
+  - ingress/vault-ingress.yaml
+  - ingress/grafana-ingress.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
   - argocd/project.yaml
