@@ -7,7 +7,7 @@ spec:
   identities:
     - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: media-service
@@ -19,7 +19,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: ServerAuthorization
 metadata:
   name: media-service-allow-mtls
@@ -32,7 +32,7 @@ spec:
       identities:
         - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: user-service
@@ -44,7 +44,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: ServerAuthorization
 metadata:
   name: user-service-allow-mtls
@@ -57,7 +57,7 @@ spec:
       identities:
         - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: chat-service
@@ -69,7 +69,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: ServerAuthorization
 metadata:
   name: chat-service-allow-mtls
@@ -82,7 +82,7 @@ spec:
       identities:
         - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: presence-service
@@ -94,7 +94,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: ServerAuthorization
 metadata:
   name: presence-service-allow-mtls
@@ -107,7 +107,7 @@ spec:
       identities:
         - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: notification-service
@@ -119,7 +119,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: ServerAuthorization
 metadata:
   name: notification-service-allow-mtls
@@ -132,7 +132,7 @@ spec:
       identities:
         - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: Server
 metadata:
   name: call-service
@@ -144,7 +144,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1beta3
 kind: ServerAuthorization
 metadata:
   name: call-service-allow-mtls
