@@ -364,7 +364,8 @@ phase4_argocd() {
   if ! kubectl get deployment argocd-server -n argocd &>/dev/null; then
     kubectl_apply_url "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
   fi
-  kubectl wait --namespace argocd --for=condition=available deployment/argocd-server deployment/argocd-repo-server deployment/argocd-application-controller --timeout="$K8S_WAIT_TIMEOUT"
+  kubectl wait --namespace argocd --for=condition=available deployment/argocd-server deployment/argocd-repo-server --timeout="$K8S_WAIT_TIMEOUT"
+  kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout="$K8S_WAIT_TIMEOUT"
   kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
   if ! kubectl get deployment argo-rollouts -n argo-rollouts &>/dev/null; then
     kubectl_apply_url "https://github.com/argoproj/argo-rollouts/releases/download/${ARGO_ROLLOUTS_VERSION}/install.yaml"
