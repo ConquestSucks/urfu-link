@@ -7,4 +7,7 @@ spec:
   storage:
     volumes:
       - id: 0
+        type: persistent-claim
         size: 4Gi
+        class: fast-ssd
+        deleteClaim: false
