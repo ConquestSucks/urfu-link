@@ -183,16 +183,27 @@ phase3_linkerd() {
   fi
   upgrade_out=""
   upgrade_out=$(linkerd upgrade 2>/dev/null) || true
+  upgrade_manifests=""
   if [[ -n "${upgrade_out//[[:space:]]/}" ]]; then
-    echo "$upgrade_out" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f -
+    upgrade_manifests=$(echo "$upgrade_out" | awk '/^apiVersion:|^---/{f=1}f')
+  fi
+  if [[ -n "${upgrade_manifests//[[:space:]]/}" ]]; then
+    echo "$upgrade_manifests" | kubectl apply -f -
     log "INFO" "Linkerd control plane upgraded"
   else
     log "INFO" "Linkerd upgrade produced no manifests, trying install or continuing if already present"
     linkerd_stderr=$(mktemp)
+    linkerd_install_out=$(mktemp)
     set +e
-    linkerd install 2>"$linkerd_stderr" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
-    apply_ret=${PIPESTATUS[2]}
+    linkerd install 2>"$linkerd_stderr" | awk '/^apiVersion:|^---/{f=1}f' >"$linkerd_install_out"
     set -e
+    if [[ -s "$linkerd_install_out" ]]; then
+      kubectl apply -f "$linkerd_install_out" 2>&1 | tee -a "$LOG_FILE"
+      apply_ret=${PIPESTATUS[0]}
+    else
+      apply_ret=0
+    fi
+    rm -f "$linkerd_install_out"
     if [[ $apply_ret -ne 0 ]]; then
       if grep -q -e "already exists" -e "linkerd upgrade" "$linkerd_stderr" 2>/dev/null; then
         log "INFO" "Linkerd control plane already installed (install refused), continuing"
@@ -210,16 +221,28 @@ phase3_linkerd() {
   kubectl wait --namespace linkerd --for=condition=available deployment/linkerd-destination deployment/linkerd-identity deployment/linkerd-proxy-injector --timeout=300s
   viz_out=""
   viz_out=$(linkerd viz upgrade 2>/dev/null) || true
+  viz_manifests=""
   if [[ -n "${viz_out//[[:space:]]/}" ]]; then
-    echo "$viz_out" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f -
+    viz_manifests=$(echo "$viz_out" | awk '/^apiVersion:|^---/{f=1}f')
+  fi
+  if [[ -n "${viz_manifests//[[:space:]]/}" ]]; then
+    echo "$viz_manifests" | kubectl apply -f -
     log "INFO" "Linkerd Viz upgraded"
   else
     log "INFO" "Linkerd Viz upgrade produced no manifests, trying install or continuing if already present"
     viz_stderr=$(mktemp)
+    viz_install_out=$(mktemp)
     set +e
-    linkerd viz install 2>"$viz_stderr" | awk '/^apiVersion:|^---/{f=1}f' | kubectl apply -f - 2>&1 | tee -a "$LOG_FILE"
-    viz_apply_ret=${PIPESTATUS[2]}
+    linkerd viz install 2>"$viz_stderr" | awk '/^apiVersion:|^---/{f=1}f' >"$viz_install_out"
+    viz_install_ret=${PIPESTATUS[0]}
     set -e
+    if [[ -s "$viz_install_out" ]]; then
+      kubectl apply -f "$viz_install_out" 2>&1 | tee -a "$LOG_FILE"
+      viz_apply_ret=${PIPESTATUS[0]}
+    else
+      viz_apply_ret=0
+    fi
+    rm -f "$viz_install_out"
     if [[ $viz_apply_ret -ne 0 ]]; then
       if grep -q -e "already exists" -e "linkerd.*upgrade" "$viz_stderr" 2>/dev/null; then
         log "INFO" "Linkerd Viz already installed (install refused), continuing"
