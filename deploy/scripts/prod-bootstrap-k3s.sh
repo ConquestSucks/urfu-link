@@ -717,12 +717,6 @@ phase6b_observability() {
   log "INFO" "Installing kube-prometheus-stack..."
   if ! helm status kube-prometheus-stack -n observability &>/dev/null; then
     helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n observability \
-      --set grafana.ingress.enabled=true \
-      --set grafana.ingress.ingressClassName=nginx \
-      --set grafana.ingress.hosts[0]=grafana.$DOMAIN \
-      --set grafana.ingress.tls[0].hosts[0]=grafana.$DOMAIN \
-      --set grafana.ingress.tls[0].secretName=grafana-tls \
-      --set grafana.ingress.annotations."cert-manager\.io/cluster-issuer"=letsencrypt-production \
       --set grafana.adminPassword=admin \
       --set prometheus.prometheusSpec.remoteWriteReceiver.enabled=true \
       --wait --timeout 10m
