@@ -722,10 +722,10 @@ phase6b_observability() {
       --wait --timeout 10m
   fi
   
-  log "INFO" "Installing loki-stack..."
+  log "INFO" "Installing Loki..."
   if ! helm status loki -n observability &>/dev/null; then
-    helm upgrade --install loki grafana/loki-stack -n observability \
-      --set promtail.enabled=true \
+    helm upgrade --install loki grafana/loki -n observability \
+      -f "$REPO_ROOT/deploy/helm/services/loki/values-prod.yaml" \
       --wait --timeout 10m
   fi
   

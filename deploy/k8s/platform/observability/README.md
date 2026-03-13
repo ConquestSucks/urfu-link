@@ -4,7 +4,7 @@ Recommended baseline:
 - OpenTelemetry Collector (DaemonSet/Deployment)
 - Prometheus + Alertmanager
 - Grafana
-- Loki + Promtail
+- Loki + Grafana Alloy
 - Tempo
 
 This repository includes application-side OTLP instrumentation and collector config for dev.
@@ -12,6 +12,7 @@ For production, install your preferred stack via Helm and route OTLP to collecto
 
 Suggested Helm charts:
 - kube-prometheus-stack
-- grafana/loki-stack
+- grafana/loki
+- grafana/alloy
 - grafana/tempo
 - open-telemetry/opentelemetry-collector
