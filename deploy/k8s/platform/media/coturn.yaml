@@ -13,6 +13,8 @@ spec:
       labels:
         app: coturn
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: coturn
           image: coturn/coturn:4.8.0-r0
