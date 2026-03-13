@@ -9,5 +9,7 @@ patches:
   - path: patch-mongodb.yaml
   - path: patch-redis.yaml
   - path: patch-minio.yaml
+  - path: patch-kafka-cluster.yaml
   - path: patch-kafka-broker.yaml
   - path: patch-kafka-controller.yaml
+  - path: patch-kafka-topics.yaml

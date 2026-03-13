@@ -4,5 +4,6 @@ metadata:
   name: urfu-postgres
   namespace: urfu-platform
 spec:
+  instances: 1
   storage:
     size: 4Gi
