@@ -1,4 +1,4 @@
-apiVersion: policy.linkerd.io/v1beta1
+apiVersion: policy.linkerd.io/v1alpha1
 kind: MeshTLSAuthentication
 metadata:
   name: cluster-authenticated
