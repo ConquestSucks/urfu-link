@@ -5,7 +5,8 @@ metadata:
   namespace: urfu-platform
 spec:
   pools:
-    - servers: 4
+    - name: pool-0
+      servers: 4
       volumesPerServer: 4
       volumeClaimTemplate:
         spec:
