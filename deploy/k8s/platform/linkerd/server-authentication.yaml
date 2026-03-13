@@ -19,18 +19,20 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta3
-kind: ServerAuthorization
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
 metadata:
   name: media-service-allow-mtls
   namespace: urfu-prod
 spec:
-  server:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
     name: media-service
-  client:
-    meshTLS:
-      identities:
-        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
+  requiredAuthenticationRefs:
+    - name: cluster-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
 ---
 apiVersion: policy.linkerd.io/v1beta3
 kind: Server
@@ -44,18 +46,20 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta3
-kind: ServerAuthorization
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
 metadata:
   name: user-service-allow-mtls
   namespace: urfu-prod
 spec:
-  server:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
     name: user-service
-  client:
-    meshTLS:
-      identities:
-        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
+  requiredAuthenticationRefs:
+    - name: cluster-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
 ---
 apiVersion: policy.linkerd.io/v1beta3
 kind: Server
@@ -69,18 +73,20 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta3
-kind: ServerAuthorization
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
 metadata:
   name: chat-service-allow-mtls
   namespace: urfu-prod
 spec:
-  server:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
     name: chat-service
-  client:
-    meshTLS:
-      identities:
-        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
+  requiredAuthenticationRefs:
+    - name: cluster-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
 ---
 apiVersion: policy.linkerd.io/v1beta3
 kind: Server
@@ -94,18 +100,20 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta3
-kind: ServerAuthorization
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
 metadata:
   name: presence-service-allow-mtls
   namespace: urfu-prod
 spec:
-  server:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
     name: presence-service
-  client:
-    meshTLS:
-      identities:
-        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
+  requiredAuthenticationRefs:
+    - name: cluster-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
 ---
 apiVersion: policy.linkerd.io/v1beta3
 kind: Server
@@ -119,18 +127,20 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta3
-kind: ServerAuthorization
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
 metadata:
   name: notification-service-allow-mtls
   namespace: urfu-prod
 spec:
-  server:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
     name: notification-service
-  client:
-    meshTLS:
-      identities:
-        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
+  requiredAuthenticationRefs:
+    - name: cluster-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io
 ---
 apiVersion: policy.linkerd.io/v1beta3
 kind: Server
@@ -144,15 +154,17 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1beta3
-kind: ServerAuthorization
+apiVersion: policy.linkerd.io/v1alpha1
+kind: AuthorizationPolicy
 metadata:
   name: call-service-allow-mtls
   namespace: urfu-prod
 spec:
-  server:
+  targetRef:
+    group: policy.linkerd.io
+    kind: Server
     name: call-service
-  client:
-    meshTLS:
-      identities:
-        - "*.urfu-prod.serviceaccount.identity.linkerd.cluster.local"
+  requiredAuthenticationRefs:
+    - name: cluster-authenticated
+      kind: MeshTLSAuthentication
+      group: policy.linkerd.io

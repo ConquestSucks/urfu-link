@@ -9,7 +9,7 @@ On-prem production requires service identity, mTLS, and traffic-level observabil
 ## Decision
 - Use Linkerd as the service mesh for all production namespaces.
 - Enable Linkerd Viz for operator diagnostics.
-- Enforce mTLS via policy objects (`Server`, `MeshTLSAuthentication`, `ServerAuthorization`).
+- Enforce mTLS via policy objects (`Server`, `MeshTLSAuthentication`, `AuthorizationPolicy`).
 
 ## Consequences
 - Secure east-west communication by default.
