@@ -485,7 +485,13 @@ phase7_platform() {
     log "ERROR" "Platform apply: missing Ingress: $missing"
     exit 1
   fi
-  kubectl wait --namespace urfu-platform --for=condition=available deployment/keycloak --timeout="$K8S_WAIT_TIMEOUT"
+  if ! kubectl get deployment keycloak -n urfu-platform &>/dev/null; then
+    log "ERROR" "Keycloak deployment not found in urfu-platform"
+    exit 1
+  fi
+  if ! kubectl rollout status deployment/keycloak -n urfu-platform --timeout="$K8S_WAIT_TIMEOUT"; then
+    log "INFO" "Keycloak rollout is not ready yet; continuing because first start may wait for secrets, database, or migrations"
+  fi
   log "INFO" "Platform Ingress verified (api-gateway, frontend-web, keycloak)"
   if [[ "$SKIP_VAULT" == "true" ]]; then
     log "INFO" "Vault skipped: create secrets manually for Keycloak and services in urfu-prod"
