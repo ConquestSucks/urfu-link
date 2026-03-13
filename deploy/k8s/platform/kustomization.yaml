@@ -13,6 +13,7 @@ resources:
   - external-secrets/cluster-secret-store.yaml
   - external-secrets/api-gateway-external-secret.yaml
   - external-secrets/services-external-secrets.yaml
+  - external-secrets/minio-bootstrap-external-secret.yaml
   - identity/keycloak-external-secret.yaml
   - identity/headlamp-external-secret.yaml
   - identity/keycloak.yaml
