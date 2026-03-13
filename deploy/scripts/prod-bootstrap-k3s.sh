@@ -26,6 +26,15 @@ STATEFUL_OVERLAY="${STATEFUL_OVERLAY:-$REPO_ROOT/deploy/k8s/platform/stateful-pr
 declare -A HELM_REPOS_UPDATED=()
 declare -A PHASE_DURATIONS=()
 SERVICES=(api-gateway media-service user-service chat-service presence-service notification-service call-service frontend-web)
+
+# Proxy Configuration
+PROXY_URL="${PROXY_URL:-socks5://proxyuser:root@82.24.174.17:1080}"
+export HTTP_PROXY="$PROXY_URL"
+export HTTPS_PROXY="$PROXY_URL"
+export ALL_PROXY="$PROXY_URL"
+# Do not proxy local cluster traffic
+export NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12,.svc,.cluster.local,.urfu-link.local,.ghjc.ru"
+
 init_log() {
   if [[ -z "$LOG_FILE" ]]; then
     LOG_FILE="${REPO_ROOT}/prod-bootstrap-$(date +%Y%m%d-%H%M%S).log"
@@ -158,6 +167,15 @@ phase1_host_and_k3s() {
   log "STEP" "Phase 1: Host preparation and k3s"
   local run=""
   [[ "$(id -u)" -ne 0 ]] && run="sudo"
+
+  # Apply apt proxy if ALL_PROXY or HTTP_PROXY is defined
+  if [[ -n "${HTTP_PROXY:-}" ]] || [[ -n "${ALL_PROXY:-}" ]]; then
+    local proxy_url="${HTTP_PROXY:-${ALL_PROXY:-}}"
+    # Create an apt conf file to use proxy
+    echo "Acquire::http::Proxy \"$proxy_url\";" | $run tee /etc/apt/apt.conf.d/99proxy >/dev/null
+    echo "Acquire::https::Proxy \"$proxy_url\";" | $run tee -a /etc/apt/apt.conf.d/99proxy >/dev/null
+    log "INFO" "Configured apt proxy: $proxy_url"
+  fi
 
   log "INFO" "apt update"
   $run apt-get update -qq
@@ -745,6 +763,9 @@ phase10_wait_smoke() {
   fi
   kubectl rollout status deployment/kube-prometheus-stack-grafana -n observability --timeout="$K8S_WAIT_TIMEOUT" || log "WARNING" "Grafana not fully ready"
   kubectl rollout status statefulset/prometheus-kube-prometheus-stack-prometheus -n observability --timeout="$K8S_WAIT_TIMEOUT" || log "WARNING" "Prometheus not fully ready"
+  
+  log "INFO" "Waiting for all Pods in urfu-prod to be Ready..."
+  kubectl wait --namespace urfu-prod --for=condition=Ready pods -l 'app.kubernetes.io/name' --timeout="$K8S_WAIT_TIMEOUT" || true
   
   local ready total
   ready=$(kubectl get pods -n urfu-prod -l 'app.kubernetes.io/name' -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | tr ' ' '\n' | grep -c True || echo 0)
