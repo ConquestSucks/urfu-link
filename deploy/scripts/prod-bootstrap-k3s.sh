@@ -10,7 +10,6 @@ LINKERD2_VERSION="${LINKERD2_VERSION:-edge-25.10.7}"
 DISK_MIN_GB=90
 RAM_MIN_MB=3500
 STATEFUL_STORAGE_SED='s/100Gi/4Gi/g; s/200Gi/4Gi/g; s/50Gi/4Gi/g'
-
 init_log() {
   if [[ -z "$LOG_FILE" ]]; then
     LOG_FILE="${REPO_ROOT}/prod-bootstrap-$(date +%Y%m%d-%H%M%S).log"
@@ -40,12 +39,14 @@ run_cmd_visible() {
 }
 
 helm_repo_add_update() {
-  local name="$1" repo_url="$2" attempt=1 max=3 add_ok update_ok
+  local name="$1" repo_url="$2" attempt=1 max=5 add_ok update_ok
   while true; do
-    helm repo add "$name" "$repo_url" 2>&1 | tee -a "$LOG_FILE"
-    add_ok=${PIPESTATUS[0]}
-    helm repo update "$name" 2>&1 | tee -a "$LOG_FILE"
-    update_ok=${PIPESTATUS[0]}
+    log "CMD" "helm repo add $name $repo_url"
+    helm repo add "$name" "$repo_url" >> "$LOG_FILE" 2>&1
+    add_ok=$?
+    log "CMD" "helm repo update $name"
+    helm repo update "$name" >> "$LOG_FILE" 2>&1
+    update_ok=$?
     [[ $add_ok -eq 0 ]] && [[ $update_ok -eq 0 ]] && return 0
     [[ $attempt -ge $max ]] && { log "ERROR" "helm repo add/update $name failed after $max attempts"; return 1; }
     log "INFO" "helm repo $name attempt $attempt failed (add=$add_ok update=$update_ok), retry in 15s..."
@@ -147,13 +148,13 @@ phase2_ingress_certmanager() {
   wait_ns_ready cert-manager || true
   kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
   if ! helm status ingress-nginx -n ingress-nginx &>/dev/null; then
-    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && helm repo update ingress-nginx
+    helm_repo_add_update ingress-nginx https://kubernetes.github.io/ingress-nginx
     helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx -n ingress-nginx --wait --timeout 5m
   fi
 
   kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
   if ! helm status cert-manager -n cert-manager &>/dev/null; then
-    helm repo add jetstack https://charts.jetstack.io && helm repo update jetstack
+    helm_repo_add_update jetstack https://charts.jetstack.io
     helm upgrade --install cert-manager jetstack/cert-manager -n cert-manager \
       --set installCRDs=true --wait --timeout 5m
   fi
@@ -332,8 +333,7 @@ phase7b_headlamp() {
       sleep 5
     done
   fi
-  helm repo add headlamp https://kubernetes-sigs.github.io/headlamp/ 2>/dev/null || true
-  helm repo update headlamp
+  helm_repo_add_update headlamp https://kubernetes-sigs.github.io/headlamp/
   kubectl create namespace urfu-platform --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install headlamp headlamp/headlamp -n urfu-platform -f "$REPO_ROOT/deploy/helm/services/headlamp/values-prod.yaml" \
     --set ingress.hosts[0].host=k8s.$DOMAIN \
