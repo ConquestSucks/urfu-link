@@ -519,24 +519,28 @@ phase4b_vault() {
   helm_repo_add_update hashicorp https://helm.releases.hashicorp.com
   kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
   
-  if ! helm status vault -n vault &>/dev/null; then
-    log "INFO" "Installing Vault..."
-    helm upgrade --install vault hashicorp/vault -n vault \
-      --set "server.standalone.enabled=true" \
-      --set "server.standalone.config= |
-        ui = true
-        listener \"tcp\" {
-          tls_disable = 1
-          address = \"[::]:8200\"
-          cluster_address = \"[::]:8201\"
-        }
-        storage \"file\" {
-          path = \"/vault/data\"
-        }" \
-      --wait --timeout 5m
-  fi
+  log "INFO" "Installing or upgrading Vault..."
+  helm upgrade --install vault hashicorp/vault -n vault \
+    --set "server.standalone.enabled=true" \
+    --set-string server.standalone.config=$'ui = true\nlistener "tcp" {\n  tls_disable = 1\n  address = "[::]:8200"\n  cluster_address = "[::]:8201"\n}\nstorage "file" {\n  path = "/vault/data"\n}' \
+    --wait --timeout 5m
   
-  kubectl wait --namespace vault --for=condition=ready pod/vault-0 --timeout="$K8S_WAIT_TIMEOUT"
+  local vault_api_reachable="false"
+  local i
+  for i in {1..60}; do
+    if [[ "$(kubectl get pod vault-0 -n vault -o jsonpath='{.status.phase}' 2>/dev/null || echo "")" == "Running" ]] && \
+       kubectl exec -n vault vault-0 -- vault status >/dev/null 2>&1; then
+      vault_api_reachable="true"
+      break
+    fi
+    sleep "$POD_POLL_INTERVAL_SEC"
+  done
+  if [[ "$vault_api_reachable" != "true" ]]; then
+    log "ERROR" "Vault pod did not become reachable for initialization"
+    kubectl get pod vault-0 -n vault -o wide >&2 || true
+    kubectl describe pod vault-0 -n vault >&2 || true
+    exit 1
+  fi
   
   # Check if Vault is initialized
   local init_status
