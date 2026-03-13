@@ -27,13 +27,25 @@ declare -A HELM_REPOS_UPDATED=()
 declare -A PHASE_DURATIONS=()
 SERVICES=(api-gateway media-service user-service chat-service presence-service notification-service call-service frontend-web)
 
-# Proxy Configuration
-PROXY_URL="${PROXY_URL:-socks5://proxyuser:root@82.24.174.17:1080}"
-export HTTP_PROXY="$PROXY_URL"
-export HTTPS_PROXY="$PROXY_URL"
-export ALL_PROXY="$PROXY_URL"
-# Do not proxy local cluster traffic
-export NO_PROXY="localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12,.svc,.cluster.local,.urfu-link.local,.ghjc.ru"
+PROXY_SCHEME="${PROXY_SCHEME:-socks5}"
+PROXY_HOST="${PROXY_HOST:-}"
+PROXY_PORT="${PROXY_PORT:-1080}"
+PROXY_USERNAME="${PROXY_USERNAME:-}"
+PROXY_PASSWORD="${PROXY_PASSWORD:-}"
+PROXY_AUTH=""
+if [[ -n "$PROXY_USERNAME" ]] && [[ -n "$PROXY_PASSWORD" ]]; then
+  PROXY_AUTH="${PROXY_USERNAME}:${PROXY_PASSWORD}@"
+fi
+PROXY_URL="${PROXY_URL:-}"
+if [[ -z "$PROXY_URL" ]] && [[ -n "$PROXY_HOST" ]]; then
+  PROXY_URL="${PROXY_SCHEME}://${PROXY_AUTH}${PROXY_HOST}:${PROXY_PORT}"
+fi
+if [[ -n "$PROXY_URL" ]]; then
+  export HTTP_PROXY="$PROXY_URL"
+  export HTTPS_PROXY="$PROXY_URL"
+  export ALL_PROXY="$PROXY_URL"
+fi
+export NO_PROXY="${NO_PROXY:-localhost,127.0.0.1,10.0.0.0/8,192.168.0.0/16,172.16.0.0/12,.svc,.cluster.local,.urfu-link.local,.ghjc.ru}"
 
 init_log() {
   if [[ -z "$LOG_FILE" ]]; then
