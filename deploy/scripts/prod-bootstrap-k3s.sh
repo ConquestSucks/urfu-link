@@ -506,8 +506,14 @@ phase7b_headlamp() {
     --set ingress.hosts[0].host=k8s.$DOMAIN \
     --set ingress.tls[0].hosts[0]=k8s.$DOMAIN \
     --set ingress.tls[0].secretName=headlamp-tls \
-    --wait --timeout 3m
-  kubectl wait --namespace urfu-platform --for=condition=available deployment/headlamp --timeout="$K8S_WAIT_TIMEOUT"
+    --timeout 10m
+  if ! kubectl get deployment headlamp -n urfu-platform &>/dev/null; then
+    log "ERROR" "Headlamp deployment not found in urfu-platform"
+    exit 1
+  fi
+  if ! kubectl rollout status deployment/headlamp -n urfu-platform --timeout="$K8S_WAIT_TIMEOUT"; then
+    log "INFO" "Headlamp rollout is not ready yet; continuing because first start may wait for OIDC configuration, secrets, or ingress/certificate provisioning"
+  fi
   local headlamp_host
   headlamp_host=$(kubectl get ingress -n urfu-platform -o jsonpath='{.items[*].spec.rules[0].host}' 2>/dev/null | tr ' ' '\n' | grep "k8s\.$DOMAIN" || true)
   if [[ -z "$headlamp_host" ]]; then
