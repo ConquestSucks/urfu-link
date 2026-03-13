@@ -14,17 +14,19 @@ sudo ./deploy/scripts/prod-bootstrap-k3s.sh
 | Переменная | По умолчанию | Смысл |
 |------------|--------------|--------|
 | `DOMAIN` | `ghjc.ru` | Домен для ingress и cert-manager |
+| `SOURCE_DOMAIN` | `urfu-link.local` | Домен-плейсхолдер в манифестах (подставляется на `DOMAIN`) |
 | `SKIP_VAULT` | `false` | Не ставить Vault — секреты создаёшь сам |
 | `INSTALL_LINKERD` | `true` | Поставить Linkerd + Viz (без: `INSTALL_LINKERD=false`) |
 | `LINKERD2_VERSION` | `edge-25.10.7` | Версия CLI/control plane (edge, соответствует Linkerd 2.19) |
 | `REPO_ROOT` | на 2 уровня выше скрипта | Корень репо |
+| `STATEFUL_OVERLAY` | `$REPO_ROOT/deploy/k8s/platform/stateful-prod` | Kustomize overlay для stateful (объёмы 4Gi) |
 | `LOG_FILE` | `prod-bootstrap-YYYYMMDD-HHMMSS.log` в `REPO_ROOT` | Куда пишем лог |
 
 Без Vault: `SKIP_VAULT=true sudo ./deploy/scripts/prod-bootstrap-k3s.sh`.
 
 ## Что делает скрипт
 
-Проверка окружения (root/sudo, curl, место) → подготовка хоста (apt, отключение swap, k3s без Traefik, StorageClass fast-ssd, Helm) → NGINX Ingress, cert-manager, ClusterIssuer под ghjc.ru → при необходимости Linkerd + Viz → Argo CD и Argo Rollouts → External Secrets Operator → операторы (CloudNativePG, MongoDB Community, Redis OpsTree, Strimzi, MinIO) → манифесты платформы с подстановкой домена → **Headlamp** (дашборд с OIDC через Keycloak) → stateful-стек с объёмами под 120 GB → Helm-деплой восьми сервисов в `urfu-prod` с `values-prod.yaml` → ожидание подов.
+Проверка окружения (root/sudo, curl, место) → подготовка хоста (apt, отключение swap, k3s без Traefik, kubeconfig 600, StorageClass fast-ssd, Helm) → NGINX Ingress, cert-manager, ClusterIssuer (подстановка `SOURCE_DOMAIN`→`DOMAIN`) → при необходимости Linkerd + Viz → Argo CD и Argo Rollouts → External Secrets Operator → операторы (CloudNativePG, MongoDB Community, Redis OpsTree, Strimzi, MinIO) → манифесты платформы с подстановкой домена → **Headlamp** (дашборд с OIDC через Keycloak) → stateful-стек через Kustomize overlay `stateful-prod` (объёмы 4Gi; при таймауте PostgreSQL/Kafka скрипт завершается с ошибкой) → Helm-деплой восьми сервисов в `urfu-prod` с `values-prod.yaml` → ожидание подов.
 
 В итоге API на `https://api.ghjc.ru`, фронт на `https://app.ghjc.ru`, дашборд Headlamp на `https://k8s.ghjc.ru` (вход через Keycloak). Настройка клиента Keycloak и секретов — см. `deploy/k8s/platform/identity/HEADLAMP.md`.
 

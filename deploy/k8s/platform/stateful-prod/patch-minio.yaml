@@ -1,0 +1,11 @@
+apiVersion: minio.min.io/v2
+kind: Tenant
+metadata:
+  name: urfu-minio
+  namespace: urfu-platform
+spec:
+  pools:
+    - servers: 4
+      volumesPerServer: 4
+      size: 4Gi
+      storageClassName: fast-ssd

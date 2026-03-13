@@ -1,0 +1,10 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: kafka-broker
+  namespace: urfu-platform
+spec:
+  storage:
+    volumes:
+      - id: 0
+        size: 4Gi

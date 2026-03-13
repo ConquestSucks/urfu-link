@@ -2,6 +2,7 @@
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-ghjc.ru}"
+SOURCE_DOMAIN="${SOURCE_DOMAIN:-urfu-link.local}"
 REPO_ROOT="${REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 LOG_FILE="${LOG_FILE:-}"
 SKIP_VAULT="${SKIP_VAULT:-false}"
@@ -9,7 +10,7 @@ INSTALL_LINKERD="${INSTALL_LINKERD:-true}"
 LINKERD2_VERSION="${LINKERD2_VERSION:-edge-25.10.7}"
 DISK_MIN_GB=90
 RAM_MIN_MB=3500
-STATEFUL_STORAGE_SED='s/100Gi/4Gi/g; s/200Gi/4Gi/g; s/50Gi/4Gi/g'
+STATEFUL_OVERLAY="${STATEFUL_OVERLAY:-$REPO_ROOT/deploy/k8s/platform/stateful-prod}"
 init_log() {
   if [[ -z "$LOG_FILE" ]]; then
     LOG_FILE="${REPO_ROOT}/prod-bootstrap-$(date +%Y%m%d-%H%M%S).log"
@@ -73,7 +74,7 @@ phase0_env() {
     log "ERROR" "Low disk: ${avail_gb}GB (min ${DISK_MIN_GB}GB)"
     exit 1
   fi
-  log "INFO" "Domain=$DOMAIN SkipVault=$SKIP_VAULT InstallLinkerd=$INSTALL_LINKERD"
+  log "INFO" "Domain=$DOMAIN SourceDomain=$SOURCE_DOMAIN SkipVault=$SKIP_VAULT InstallLinkerd=$INSTALL_LINKERD"
 }
 
 phase1_host_and_k3s() {
@@ -103,7 +104,7 @@ phase1_host_and_k3s() {
     log "INFO" "Installing k3s (Traefik disabled)"
     run_cmd_visible curl -sfL https://get.k3s.io | $run sh -s - --disable traefik
     if [[ "$(id -u)" -ne 0 ]]; then
-      $run chmod 644 /etc/rancher/k3s/k3s.yaml
+      $run chmod 600 /etc/rancher/k3s/k3s.yaml
     fi
   fi
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
@@ -159,7 +160,7 @@ phase2_ingress_certmanager() {
       --set installCRDs=true --wait --timeout 5m
   fi
 
-  sed "s/urfu-link\.local/$DOMAIN/g" "$REPO_ROOT/deploy/k8s/platform/cert-manager/cluster-issuer.yaml" | kubectl apply -f -
+  sed "s/${SOURCE_DOMAIN//./\\.}/$DOMAIN/g" "$REPO_ROOT/deploy/k8s/platform/cert-manager/cluster-issuer.yaml" | kubectl apply -f -
 }
 
 phase3_linkerd() {
@@ -199,8 +200,10 @@ phase3_linkerd() {
     linkerd install 2>"$linkerd_stderr" | awk '/^apiVersion:|^---/{f=1}f' >"$linkerd_install_out"
     set -e
     if [[ -s "$linkerd_install_out" ]]; then
+      set +o pipefail
       kubectl apply -f "$linkerd_install_out" 2>&1 | tee -a "$LOG_FILE"
       apply_ret=${PIPESTATUS[0]}
+      set -o pipefail
     else
       apply_ret=0
     fi
@@ -238,8 +241,10 @@ phase3_linkerd() {
     viz_install_ret=${PIPESTATUS[0]}
     set -e
     if [[ -s "$viz_install_out" ]]; then
+      set +o pipefail
       kubectl apply -f "$viz_install_out" 2>&1 | tee -a "$LOG_FILE"
       viz_apply_ret=${PIPESTATUS[0]}
+      set -o pipefail
     else
       viz_apply_ret=0
     fi
@@ -285,8 +290,10 @@ phase6_install_one() {
   helm_repo_add_update "$name" "$repo_url"
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
   log "INFO" "Installing $release_name in $ns..."
+  set +o pipefail
   helm upgrade --install "$release_name" "$chart" -n "$ns" $helm_extra --wait --timeout 5m 2>&1 | tee -a "$LOG_FILE"
   helm_ret=${PIPESTATUS[0]}
+  set -o pipefail
   if [[ $helm_ret -ne 0 ]]; then
     log "ERROR" "helm upgrade --install $release_name failed (exit $helm_ret)"
     exit 1
@@ -306,8 +313,7 @@ phase6_operators() {
 phase7_platform() {
   log "STEP" "Phase 7: Platform manifests (domain=$DOMAIN)"
   kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/namespaces.yaml"
-  run_cmd_visible bash -c "kubectl kustomize \"$REPO_ROOT/deploy/k8s/platform\" | sed \"s/urfu-link\.local/$DOMAIN/g\" | kubectl apply -f -"
-  sleep 5
+  run_cmd_visible bash -c "kubectl kustomize \"$REPO_ROOT/deploy/k8s/platform\" | sed \"s/${SOURCE_DOMAIN//./\\.}/$DOMAIN/g\" | kubectl apply -f -"
   local missing=""
   kubectl get ingress api-gateway -n urfu-prod &>/dev/null || missing="api-gateway(urfu-prod)"
   kubectl get ingress frontend-web -n urfu-prod &>/dev/null || missing="${missing:+$missing }frontend-web(urfu-prod)"
@@ -324,15 +330,6 @@ phase7_platform() {
 
 phase7b_headlamp() {
   log "STEP" "Phase 7b: Headlamp dashboard (OIDC via Keycloak)"
-  if [[ "$SKIP_VAULT" != "true" ]]; then
-    log "INFO" "Waiting for headlamp-oidc secret (ESO sync)..."
-    for i in {1..24}; do
-      if kubectl get secret headlamp-oidc -n urfu-platform &>/dev/null; then
-        break
-      fi
-      sleep 5
-    done
-  fi
   helm_repo_add_update headlamp https://kubernetes-sigs.github.io/headlamp/
   kubectl create namespace urfu-platform --dry-run=client -o yaml | kubectl apply -f -
   helm upgrade --install headlamp headlamp/headlamp -n urfu-platform -f "$REPO_ROOT/deploy/helm/services/headlamp/values-prod.yaml" \
@@ -349,34 +346,19 @@ phase7b_headlamp() {
   log "INFO" "Headlamp: https://k8s.$DOMAIN (OIDC callback: https://k8s.$DOMAIN/oidc-callback)"
 }
 
-phase7c_wait_certs() {
-  log "STEP" "Phase 7c: Wait for TLS certificates (cert-manager)"
-  local max_wait=300
-  local elapsed=0
-  while [[ $elapsed -lt $max_wait ]]; do
-    local api_ready app_ready
-    api_ready=$(kubectl get certificate api-ghjc-ru-tls -n urfu-prod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
-    app_ready=$(kubectl get certificate app-ghjc-ru-tls -n urfu-prod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
-    if [[ "$api_ready" == "True" ]] && [[ "$app_ready" == "True" ]]; then
-      log "INFO" "TLS certificates ready (api.${DOMAIN}, app.${DOMAIN})"
-      return 0
-    fi
-    sleep 10
-    elapsed=$((elapsed + 10))
-  done
-  log "INFO" "TLS wait timeout (${max_wait}s). Check: kubectl describe certificate -n urfu-prod; kubectl get challenge -A"
-}
-
 phase8_stateful() {
-  log "STEP" "Phase 8: Stateful stack (120GB storage profile)"
-  kubectl kustomize "$REPO_ROOT/deploy/k8s/platform/stateful" | sed -e "$STATEFUL_STORAGE_SED" | kubectl apply -f -
+  log "STEP" "Phase 8: Stateful stack (overlay: $STATEFUL_OVERLAY)"
+  kubectl kustomize "$STATEFUL_OVERLAY" | kubectl apply -f -
 
   log "INFO" "Waiting for PostgreSQL cluster..."
   for i in {1..60}; do
     if kubectl get cluster -n urfu-platform urfu-postgres -o jsonpath='{.status.phase}' 2>/dev/null | grep -qE 'Cluster in healthy state|running'; then
       break
     fi
-    [[ $i -eq 60 ]] && log "INFO" "PostgreSQL wait timeout"
+    if [[ $i -eq 60 ]]; then
+      log "ERROR" "PostgreSQL wait timeout"
+      exit 1
+    fi
     sleep 10
   done
 
@@ -385,7 +367,10 @@ phase8_stateful() {
     if kubectl get kafka -n urfu-platform urfu-kafka -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
       break
     fi
-    [[ $i -eq 60 ]] && log "INFO" "Kafka wait timeout"
+    if [[ $i -eq 60 ]]; then
+      log "ERROR" "Kafka wait timeout"
+      exit 1
+    fi
     sleep 10
   done
 }
@@ -422,7 +407,7 @@ phase10_wait_smoke() {
 main() {
   init_log
   export KUBECONFIG="${KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
-  log "INFO" "Start DOMAIN=$DOMAIN REPO_ROOT=$REPO_ROOT KUBECONFIG=$KUBECONFIG"
+  log "INFO" "Start DOMAIN=$DOMAIN SOURCE_DOMAIN=$SOURCE_DOMAIN REPO_ROOT=$REPO_ROOT STATEFUL_OVERLAY=$STATEFUL_OVERLAY KUBECONFIG=$KUBECONFIG"
   phase0_env
   phase1_host_and_k3s
   phase2_ingress_certmanager
@@ -432,7 +417,6 @@ main() {
   phase6_operators
   phase7_platform
   phase7b_headlamp
-  phase7c_wait_certs
   phase8_stateful
   phase9_services
   phase10_wait_smoke
