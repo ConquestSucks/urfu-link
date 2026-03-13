@@ -99,6 +99,59 @@ run_cmd_visible() {
   "$@" 2>&1 | tee -a "$LOG_FILE"
 }
 
+normalize_ubuntu_apt_sources() {
+  local run=""
+  [[ "$(id -u)" -ne 0 ]] && run="sudo"
+  if [[ ! -r /etc/os-release ]]; then
+    return 0
+  fi
+  . /etc/os-release
+  if [[ "${ID:-}" != "ubuntu" ]]; then
+    return 0
+  fi
+
+  local changed=false
+  local sources_files=()
+  [[ -f /etc/apt/sources.list ]] && sources_files+=(/etc/apt/sources.list)
+  while IFS= read -r file; do
+    sources_files+=("$file")
+  done < <(find /etc/apt/sources.list.d -maxdepth 1 \( -name '*.list' -o -name '*.sources' \) 2>/dev/null | sort)
+
+  local file
+  for file in "${sources_files[@]}"; do
+    if grep -Eq 'ru\.archive\.ubuntu\.com|archive\.ubuntu\.com|security\.ubuntu\.com|noble-proposed|Suites:\s+.*-proposed' "$file" 2>/dev/null; then
+      local tmp
+      tmp=$(mktemp)
+      python3 - "$file" "$VERSION_CODENAME" >"$tmp" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+codename = sys.argv[2]
+text = path.read_text()
+text = text.replace("http://ru.archive.ubuntu.com/ubuntu", "https://archive.ubuntu.com/ubuntu")
+text = text.replace("http://archive.ubuntu.com/ubuntu", "https://archive.ubuntu.com/ubuntu")
+text = text.replace("http://security.ubuntu.com/ubuntu", "https://security.ubuntu.com/ubuntu")
+text = re.sub(rf"^([ \t]*deb(?:-src)?\s+\S+\s+{re.escape(codename)}-proposed\b.*)$", r"# \1", text, flags=re.MULTILINE)
+text = re.sub(rf"^(Suites:\s.*)\b{re.escape(codename)}-proposed\b(.*)$", lambda m: m.group(1) + m.group(2), text, flags=re.MULTILINE)
+text = re.sub(r"^(Suites:\s+)\s+", r"\1", text, flags=re.MULTILINE)
+print(text, end="" if text.endswith("\n") else "\n")
+PY
+      if ! cmp -s "$file" "$tmp"; then
+        cat "$tmp" | $run tee "$file" >/dev/null
+        changed=true
+        log "INFO" "Normalized Ubuntu apt source file: $file"
+      fi
+      rm -f "$tmp"
+    fi
+  done
+
+  if [[ "$changed" == true ]]; then
+    log "INFO" "Ubuntu apt sources normalized"
+  fi
+}
+
 retry_cmd() {
   local attempt=1 max="${1:-$NET_RETRIES}" delay="${2:-$NET_RETRY_DELAY_SEC}"
   shift 2
@@ -183,12 +236,12 @@ phase1_host_and_k3s() {
   # Apply apt proxy if ALL_PROXY or HTTP_PROXY is defined
   if [[ -n "${HTTP_PROXY:-}" ]] || [[ -n "${ALL_PROXY:-}" ]]; then
     local proxy_url="${HTTP_PROXY:-${ALL_PROXY:-}}"
-    # Create an apt conf file to use proxy
     echo "Acquire::http::Proxy \"$proxy_url\";" | $run tee /etc/apt/apt.conf.d/99proxy >/dev/null
     echo "Acquire::https::Proxy \"$proxy_url\";" | $run tee -a /etc/apt/apt.conf.d/99proxy >/dev/null
     log "INFO" "Configured apt proxy: $proxy_url"
   fi
 
+  normalize_ubuntu_apt_sources
   log "INFO" "apt update"
   $run apt-get update -qq
   if [[ "$APT_UPGRADE" == "true" ]]; then
