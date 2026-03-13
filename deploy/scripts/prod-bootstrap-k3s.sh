@@ -467,9 +467,13 @@ phase6_install_one() {
   if [[ -n "$helm_extra" ]]; then
     read -r -a helm_extra_args <<< "$helm_extra"
   fi
-  log "CMD" "helm repo add $name $repo_url && helm repo update $name"
-  helm_repo_add_update "$name" "$repo_url"
   kubectl create namespace "$ns" --dry-run=client -o yaml | kubectl apply -f -
+  
+  if helm status "$release_name" -n "$ns" &>/dev/null; then
+    log "INFO" "Release $release_name is already installed in $ns, skipping..."
+    return 0
+  fi
+  
   log "INFO" "Installing $release_name in $ns..."
   set +o pipefail
   helm upgrade --install "$release_name" "$chart" -n "$ns" "${helm_extra_args[@]}" --wait --timeout 5m 2>&1 | tee -a "$LOG_FILE"
@@ -520,6 +524,15 @@ collect_background_jobs() {
 
 phase6_operators() {
   log "STEP" "Phase 6: Stateful operators"
+  
+  # Pre-flight: add all repos sequentially to avoid lock issues
+  log "INFO" "Adding Helm repositories..."
+  helm_repo_add_update cnpg https://cloudnative-pg.github.io/charts
+  helm_repo_add_update mongodb https://mongodb.github.io/helm-charts
+  helm_repo_add_update ot-helm https://ot-container-kit.github.io/helm-charts
+  helm_repo_add_update strimzi https://strimzi.io/charts
+  helm_repo_add_update minio https://operator.min.io
+  
   local -a pids=()
   declare -A pid_to_name=()
 
@@ -636,25 +649,32 @@ phase8_stateful() {
   log "STEP" "Phase 8: Stateful stack (overlay: $STATEFUL_OVERLAY)"
   kubectl kustomize "$STATEFUL_OVERLAY" | kubectl apply -f -
 
-  log "INFO" "Waiting for PostgreSQL cluster..."
+  log "INFO" "Waiting for PostgreSQL and Kafka clusters..."
+  local pg_ready=false
+  local kafka_ready=false
+  
   for i in {1..60}; do
-    if kubectl get cluster -n urfu-platform urfu-postgres -o jsonpath='{.status.phase}' 2>/dev/null | grep -qE 'Cluster in healthy state|running'; then
+    if [[ "$pg_ready" == "false" ]]; then
+      if kubectl get cluster -n urfu-platform urfu-postgres -o jsonpath='{.status.phase}' 2>/dev/null | grep -qE 'Cluster in healthy state|running'; then
+        log "INFO" "PostgreSQL cluster is ready"
+        pg_ready=true
+      fi
+    fi
+    
+    if [[ "$kafka_ready" == "false" ]]; then
+      if kubectl get kafka -n urfu-platform urfu-kafka -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
+        log "INFO" "Kafka cluster is ready"
+        kafka_ready=true
+      fi
+    fi
+    
+    if [[ "$pg_ready" == "true" ]] && [[ "$kafka_ready" == "true" ]]; then
+      log "INFO" "All stateful clusters are ready"
       break
     fi
+    
     if [[ $i -eq 60 ]]; then
-      log "ERROR" "PostgreSQL wait timeout"
-      exit 1
-    fi
-    sleep "$STATEFUL_POLL_INTERVAL_SEC"
-  done
-
-  log "INFO" "Waiting for Kafka..."
-  for i in {1..60}; do
-    if kubectl get kafka -n urfu-platform urfu-kafka -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q True; then
-      break
-    fi
-    if [[ $i -eq 60 ]]; then
-      log "ERROR" "Kafka wait timeout"
+      log "ERROR" "Stateful wait timeout. pg_ready=$pg_ready, kafka_ready=$kafka_ready"
       exit 1
     fi
     sleep "$STATEFUL_POLL_INTERVAL_SEC"
@@ -672,34 +692,39 @@ phase9_services() {
   log "INFO" "Applying ArgoCD ApplicationSet for services..."
   kubectl apply -f "$REPO_ROOT/deploy/k8s/platform/argocd/applicationset.yaml"
   
-  log "INFO" "Waiting for ArgoCD applications to be created..."
-  # Wait for ApplicationSet controller to generate Application resources
+  log "INFO" "Waiting for ArgoCD applications to be created and synced..."
   sleep 10
   
-  local svc
-  for svc in "${SERVICES[@]}"; do
-    local app_name="${svc}-prod"
-    log "INFO" "Waiting for ArgoCD application $app_name to be Healthy and Synced..."
-    for i in {1..60}; do
+  local all_synced=false
+  for i in {1..60}; do
+    local pending_apps=0
+    local svc
+    
+    for svc in "${SERVICES[@]}"; do
+      local app_name="${svc}-prod"
       local sync_status health_status
       sync_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || echo "Unknown")
       health_status=$(kubectl get application "$app_name" -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || echo "Unknown")
       
-      if [[ "$sync_status" == "Synced" ]] && [[ "$health_status" == "Healthy" ]]; then
-        log "INFO" "Application $app_name is Synced and Healthy"
-        break
+      if [[ "$sync_status" != "Synced" ]] || [[ "$health_status" != "Healthy" ]]; then
+        pending_apps=$((pending_apps + 1))
       fi
-      
-      if [[ $i -eq 60 ]]; then
-        log "ERROR" "Timeout waiting for Application $app_name. Sync: $sync_status, Health: $health_status"
-        exit 1
-      fi
-      
-      sleep 10
     done
+    
+    if [[ $pending_apps -eq 0 ]]; then
+      log "INFO" "All services are Synced and Healthy via ArgoCD"
+      all_synced=true
+      break
+    fi
+    
+    if [[ $i -eq 60 ]]; then
+      log "ERROR" "Timeout waiting for $pending_apps Applications to sync"
+      exit 1
+    fi
+    
+    log "INFO" "Waiting for $pending_apps applications to sync... (attempt $i/60)"
+    sleep 10
   done
-  
-  log "INFO" "All services deployed via ArgoCD"
 }
 
 phase10_wait_smoke() {
@@ -753,8 +778,10 @@ main() {
   phase_started_at=$(timestamp_now); phase2_ingress_certmanager; record_phase_duration phase2_ingress_certmanager "$phase_started_at"
   phase_started_at=$(timestamp_now); phase3_linkerd; record_phase_duration phase3_linkerd "$phase_started_at"
   phase_started_at=$(timestamp_now); phase4_argocd; record_phase_duration phase4_argocd "$phase_started_at"
+  phase_started_at=$(timestamp_now); phase4b_vault; record_phase_duration phase4b_vault "$phase_started_at"
   phase_started_at=$(timestamp_now); phase5_eso; record_phase_duration phase5_eso "$phase_started_at"
   phase_started_at=$(timestamp_now); phase6_operators; record_phase_duration phase6_operators "$phase_started_at"
+  phase_started_at=$(timestamp_now); phase6b_observability; record_phase_duration phase6b_observability "$phase_started_at"
   phase_started_at=$(timestamp_now); phase7_platform; record_phase_duration phase7_platform "$phase_started_at"
   phase_started_at=$(timestamp_now); phase7b_headlamp; record_phase_duration phase7b_headlamp "$phase_started_at"
   phase_started_at=$(timestamp_now); phase8_stateful; record_phase_duration phase8_stateful "$phase_started_at"
