@@ -4,10 +4,10 @@ kind: Kustomization
 resources:
   - ../stateful
 
-patchesStrategicMerge:
-  - patch-postgres.yaml
-  - patch-mongodb.yaml
-  - patch-redis.yaml
-  - patch-minio.yaml
-  - patch-kafka-broker.yaml
-  - patch-kafka-controller.yaml
+patches:
+  - path: patch-postgres.yaml
+  - path: patch-mongodb.yaml
+  - path: patch-redis.yaml
+  - path: patch-minio.yaml
+  - path: patch-kafka-broker.yaml
+  - path: patch-kafka-controller.yaml
