@@ -110,6 +110,14 @@ normalize_ubuntu_apt_sources() {
     return 0
   fi
 
+  local apt_arch="${DPKG_ARCHITECTURE:-}"
+  if [[ -z "$apt_arch" ]] && command -v dpkg &>/dev/null; then
+    apt_arch=$(dpkg --print-architecture 2>/dev/null || true)
+  fi
+  if [[ -z "$apt_arch" ]]; then
+    apt_arch=$(uname -m 2>/dev/null || true)
+  fi
+
   local changed=false
   local sources_files=()
   [[ -f /etc/apt/sources.list ]] && sources_files+=(/etc/apt/sources.list)
@@ -119,20 +127,42 @@ normalize_ubuntu_apt_sources() {
 
   local file
   for file in "${sources_files[@]}"; do
-    if grep -Eq 'ru\.archive\.ubuntu\.com|archive\.ubuntu\.com|security\.ubuntu\.com|noble-proposed|Suites:\s+.*-proposed' "$file" 2>/dev/null; then
+    if grep -Eq 'ru\.archive\.ubuntu\.com|archive\.ubuntu\.com|security\.ubuntu\.com|ports\.ubuntu\.com/ubuntu-ports|noble-proposed|Suites:\s+.*-proposed' "$file" 2>/dev/null; then
       local tmp
       tmp=$(mktemp)
-      python3 - "$file" "$VERSION_CODENAME" >"$tmp" <<'PY'
+      python3 - "$file" "$VERSION_CODENAME" "$apt_arch" >"$tmp" <<'PY'
 from pathlib import Path
 import re
 import sys
 
 path = Path(sys.argv[1])
 codename = sys.argv[2]
+apt_arch = sys.argv[3]
 text = path.read_text()
-text = text.replace("http://ru.archive.ubuntu.com/ubuntu", "https://archive.ubuntu.com/ubuntu")
-text = text.replace("http://archive.ubuntu.com/ubuntu", "https://archive.ubuntu.com/ubuntu")
-text = text.replace("http://security.ubuntu.com/ubuntu", "https://security.ubuntu.com/ubuntu")
+primary_arches = {"amd64", "i386"}
+ports_arches = {"arm64", "armhf", "ppc64el", "s390x", "riscv64", "aarch64", "armv7l", "armv8l"}
+use_ports = apt_arch in ports_arches or apt_arch not in primary_arches
+
+if use_ports:
+    replacements = {
+        "http://ru.archive.ubuntu.com/ubuntu": "https://ports.ubuntu.com/ubuntu-ports",
+        "https://ru.archive.ubuntu.com/ubuntu": "https://ports.ubuntu.com/ubuntu-ports",
+        "http://archive.ubuntu.com/ubuntu": "https://ports.ubuntu.com/ubuntu-ports",
+        "https://archive.ubuntu.com/ubuntu": "https://ports.ubuntu.com/ubuntu-ports",
+        "http://security.ubuntu.com/ubuntu": "https://ports.ubuntu.com/ubuntu-ports",
+        "https://security.ubuntu.com/ubuntu": "https://ports.ubuntu.com/ubuntu-ports",
+    }
+else:
+    replacements = {
+        "http://ru.archive.ubuntu.com/ubuntu": "https://archive.ubuntu.com/ubuntu",
+        "https://ru.archive.ubuntu.com/ubuntu": "https://archive.ubuntu.com/ubuntu",
+        "http://archive.ubuntu.com/ubuntu": "https://archive.ubuntu.com/ubuntu",
+        "http://security.ubuntu.com/ubuntu": "https://security.ubuntu.com/ubuntu",
+    }
+
+for old, new in replacements.items():
+    text = text.replace(old, new)
+
 text = re.sub(rf"^([ \t]*deb(?:-src)?\s+\S+\s+{re.escape(codename)}-proposed\b.*)$", r"# \1", text, flags=re.MULTILINE)
 text = re.sub(rf"^(Suites:\s.*)\b{re.escape(codename)}-proposed\b(.*)$", lambda m: m.group(1) + m.group(2), text, flags=re.MULTILINE)
 text = re.sub(r"^(Suites:\s+)\s+", r"\1", text, flags=re.MULTILINE)
