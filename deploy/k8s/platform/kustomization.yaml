@@ -2,7 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - namespaces.yaml
   - cert-manager/cluster-issuer.yaml
   - ingress/api-gateway-ingress.yaml
   - ingress/frontend-web-ingress.yaml
