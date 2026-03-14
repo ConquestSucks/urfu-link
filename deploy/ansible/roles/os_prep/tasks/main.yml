@@ -22,7 +22,63 @@
       - apt-transport-https
       - gnupg
       - python3
+      - ufw
+      - chrony
     state: present
+
+- name: Configure Chrony (Time Sync)
+  service:
+    name: chronyd
+    state: started
+    enabled: true
+
+- name: Configure sysctl for Kubernetes single-node
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: true
+  loop:
+    - { name: 'fs.inotify.max_user_watches', value: '524288' }
+    - { name: 'fs.inotify.max_user_instances', value: '8192' }
+    - { name: 'vm.max_map_count', value: '262144' }
+    - { name: 'vm.swappiness', value: '0' }
+    - { name: 'net.ipv4.ip_forward', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { name: 'net.bridge.bridge-nf-call-ip6tables', value: '1' }
+
+- name: Configure UFW - default deny incoming, allow outgoing
+  ufw:
+    direction: "{{ item.dir }}"
+    policy: "{{ item.pol }}"
+  loop:
+    - { dir: 'incoming', pol: 'deny' }
+    - { dir: 'outgoing', pol: 'allow' }
+
+- name: Configure UFW - allow SSH, HTTP, HTTPS, Kubernetes API
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '22'
+    - '80'
+    - '443'
+    - '6443'
+
+- name: Configure UFW - allow internal k3s pod network traffic
+  ufw:
+    rule: allow
+    src: "10.42.0.0/16"
+
+- name: Configure UFW - allow internal k3s service network traffic
+  ufw:
+    rule: allow
+    src: "10.43.0.0/16"
+
+- name: Enable UFW
+  ufw:
+    state: enabled
 
 - name: Disable SWAP since kubernetes requires it
   command: swapoff -a

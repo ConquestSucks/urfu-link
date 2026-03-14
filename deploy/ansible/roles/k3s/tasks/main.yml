@@ -6,7 +6,14 @@
     mode: '0755'
 
 - name: Install k3s
-  command: /tmp/k3s_install.sh -s - --disable traefik
+  command: >
+    /tmp/k3s_install.sh -s -
+    --disable traefik
+    --disable servicelb
+    --kubelet-arg="max-pods=250"
+    --kubelet-arg="system-reserved=cpu=500m,memory=1Gi"
+    --kubelet-arg="kube-reserved=cpu=500m,memory=1Gi"
+    --kubelet-arg="eviction-hard=memory.available<500Mi,nodefs.available<10%"
   environment:
     INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.30.0+k3s1') }}"
     HTTP_PROXY: "{{ proxy_env.http_proxy | default('') }}"
