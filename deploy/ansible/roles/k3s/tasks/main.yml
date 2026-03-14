@@ -46,7 +46,7 @@
         name: fast-ssd
         annotations:
           storageclass.kubernetes.io/is-default-class: "true"
-      provisioner: local-path
+      provisioner: rancher.io/local-path
       reclaimPolicy: Delete
       volumeBindingMode: WaitForFirstConsumer
   register: sc_result
