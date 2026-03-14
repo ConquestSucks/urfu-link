@@ -1,7 +1,15 @@
 ---
 - name: Bootstrap Urfu-Link Production Cluster
   hosts: k3s_cluster
-  gather_facts: yes
+  gather_facts: false
+  pre_tasks:
+    - name: Ensure Ansible remote tmp directory exists
+      raw: install -d -m 0700 /root/.ansible/tmp
+      changed_when: false
+    - name: Gather facts
+      setup:
+        gather_subset:
+          - all
   
   roles:
     - role: ../roles/os_prep
