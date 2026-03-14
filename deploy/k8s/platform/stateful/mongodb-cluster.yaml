@@ -4,7 +4,7 @@ metadata:
   name: urfu-mongo
   namespace: urfu-platform
 spec:
-  members: 3
+  members: 1
   type: ReplicaSet
   version: "8.0.5"
   security:
@@ -21,6 +21,17 @@ spec:
       scramCredentialsSecretName: app-user-scram
   statefulSet:
     spec:
+      template:
+        spec:
+          containers:
+            - name: mongod
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: 2000m
+                  memory: 4Gi
       volumeClaimTemplates:
         - metadata:
             name: data-volume

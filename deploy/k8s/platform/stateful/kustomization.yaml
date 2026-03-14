@@ -9,9 +9,8 @@ resources:
   - mongodb-backup-cronjob.yaml
   - redis-cluster.yaml
   - redis-backup-cronjob.yaml
-  - kafka-controller-pool.yaml
-  - kafka-broker-pool.yaml
-  - kafka-cluster.yaml
-  - kafka-topics.yaml
   - minio-tenant.yaml
   - minio-buckets-job.yaml
+  - kafka-cluster.yaml
+  - kafka-mixed-pool.yaml
+  - kafka-topics.yaml
