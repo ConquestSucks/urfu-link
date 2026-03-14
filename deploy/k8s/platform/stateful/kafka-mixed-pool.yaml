@@ -1,26 +1,27 @@
 apiVersion: kafka.strimzi.io/v1
 kind: KafkaNodePool
 metadata:
-  name: kafka-controller
+  name: kafka-mixed
   namespace: urfu-platform
   labels:
     strimzi.io/cluster: urfu-kafka
 spec:
   replicas: 1
   roles:
+    - broker
     - controller
   resources:
     requests:
-      cpu: 250m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
+      cpu: 500m
       memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
   storage:
     type: jbod
     volumes:
       - id: 0
         type: persistent-claim
-        size: 100Gi
+        size: 50Gi
         class: fast-ssd
         deleteClaim: false

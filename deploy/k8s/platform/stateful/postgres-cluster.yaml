@@ -4,7 +4,7 @@ metadata:
   name: urfu-postgres
   namespace: urfu-platform
 spec:
-  instances: 3
+  instances: 1
   storage:
     size: 100Gi
     storageClass: fast-ssd
@@ -12,3 +12,13 @@ spec:
     retentionPolicy: "14d"
   monitoring:
     enablePodMonitor: true
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
+  postgresql:
+    parameters:
+      shared_buffers: "512MB"

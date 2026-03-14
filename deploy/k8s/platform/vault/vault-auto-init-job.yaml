@@ -1,0 +1,155 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault-init
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vault-init
+  namespace: vault
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create", "get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-init
+  namespace: vault
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-init
+subjects:
+  - kind: ServiceAccount
+    name: vault-init
+    namespace: vault
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vault-init
+  namespace: vault
+spec:
+  template:
+    spec:
+      serviceAccountName: vault-init
+      restartPolicy: OnFailure
+      containers:
+        - name: vault-init
+          image: hashicorp/vault:1.16.2
+          env:
+            - name: VAULT_ADDR
+              value: "http://vault:8200"
+          command:
+            - "/bin/sh"
+            - "-c"
+            - |
+              echo "Waiting for vault to be ready..."
+              while ! vault status > /dev/null 2>&1; do
+                if vault status 2>&1 | grep -q "server is not yet initialized"; then
+                  break
+                fi
+                sleep 2
+              done
+              
+              if vault status 2>&1 | grep -q "server is not yet initialized"; then
+                echo "Initializing Vault..."
+                vault operator init -key-shares=1 -key-threshold=1 -format=json > /tmp/init.json
+                
+                ROOT_TOKEN=$(cat /tmp/init.json | grep root_token | awk -F '"' '{print $4}')
+                UNSEAL_KEY=$(cat /tmp/init.json | grep unseal_keys_b64 | awk -F '"' '{print $4}')
+                
+                echo "Creating Kubernetes Secret with Vault credentials..."
+                cat <<EOF > /tmp/secret.yaml
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: vault-keys
+                namespace: vault
+              type: Opaque
+              stringData:
+                root_token: "$ROOT_TOKEN"
+                unseal_key: "$UNSEAL_KEY"
+              EOF
+                
+                # We use kubectl image here to apply the secret
+                # But since we are in vault image, we'll use curl to API server
+                APISERVER=https://kubernetes.default.svc
+                SERVICEACCOUNT=/var/run/secrets/kubernetes.io/serviceaccount
+                TOKEN=$(cat ${SERVICEACCOUNT}/token)
+                CACERT=${SERVICEACCOUNT}/ca.crt
+                
+                curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
+                     -X POST ${APISERVER}/api/v1/namespaces/vault/secrets \
+                     -H 'Accept: application/json' -H 'Content-Type: application/json' \
+                     -d "{
+                       \"apiVersion\": \"v1\",
+                       \"kind\": \"Secret\",
+                       \"metadata\": { \"name\": \"vault-keys\" },
+                       \"stringData\": {
+                         \"root_token\": \"$ROOT_TOKEN\",
+                         \"unseal_key\": \"$UNSEAL_KEY\"
+                       }
+                     }"
+                
+                echo "Unsealing Vault..."
+                vault operator unseal $UNSEAL_KEY
+                
+                export VAULT_TOKEN=$ROOT_TOKEN
+                echo "Setting up Kubernetes Auth Method..."
+                vault auth enable kubernetes
+                vault write auth/kubernetes/config \
+                    kubernetes_host="https://kubernetes.default.svc"
+                    
+                echo "Creating urfu-link KV engine v2..."
+                vault secrets enable -path=urfu-link kv-v2
+                
+                echo "Creating External Secrets policy..."
+                vault policy write external-secrets - <<EOF_POL
+              path "urfu-link/data/*" {
+                capabilities = ["read", "list"]
+              }
+              path "urfu-link/metadata/*" {
+                capabilities = ["read", "list"]
+              }
+              EOF_POL
+              
+                echo "Binding policy to role..."
+                vault write auth/kubernetes/role/external-secrets \
+                    bound_service_account_names=external-secrets \
+                    bound_service_account_namespaces=external-secrets \
+                    policies=external-secrets \
+                    ttl=24h
+                    
+                echo "Vault initialization and configuration complete!"
+              else
+                echo "Vault is already initialized."
+                # Retrieve unseal key if needed
+                APISERVER=https://kubernetes.default.svc
+                SERVICEACCOUNT=/var/run/secrets/kubernetes.io/serviceaccount
+                TOKEN=$(cat ${SERVICEACCOUNT}/token)
+                CACERT=${SERVICEACCOUNT}/ca.crt
+                
+                RESPONSE=$(curl --silent --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
+                     -X GET ${APISERVER}/api/v1/namespaces/vault/secrets/vault-keys)
+                     
+                UNSEAL_KEY_B64=$(echo $RESPONSE | grep -o '"unseal_key":"[^"]*' | grep -o '[^"]*$')
+                
+                if [ ! -z "$UNSEAL_KEY_B64" ]; then
+                  UNSEAL_KEY=$(echo $UNSEAL_KEY_B64 | base64 -d)
+                  
+                  if vault status 2>&1 | grep -q "Sealed.*true"; then
+                    echo "Unsealing Vault..."
+                    vault operator unseal $UNSEAL_KEY
+                  else
+                    echo "Vault is already unsealed."
+                  fi
+                else
+                  echo "Could not find vault-keys secret. Cannot unseal."
+                  exit 1
+                fi
+              fi

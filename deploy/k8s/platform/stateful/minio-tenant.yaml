@@ -7,10 +7,17 @@ spec:
   image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
   pools:
     - name: pool-0
-      servers: 4
-      volumesPerServer: 4
-      size: 100Gi
+      servers: 1
+      volumesPerServer: 1
+      size: 50Gi
       storageClassName: fast-ssd
+      resources:
+        requests:
+          memory: 1Gi
+          cpu: 500m
+        limits:
+          memory: 2Gi
+          cpu: 2000m
   mountPath: /export
   requestAutoCert: true
   features:
