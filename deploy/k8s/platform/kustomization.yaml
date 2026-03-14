@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - cert-manager/cluster-issuer.yaml
+  - ingress/argocd-ingress.yaml
   - ingress/api-gateway-ingress.yaml
   - ingress/frontend-web-ingress.yaml
   - ingress/vault-ingress.yaml
