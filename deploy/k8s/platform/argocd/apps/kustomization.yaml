@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - wave-minus10/namespaces.yaml
+  - wave-minus10/gateway-api.yaml
+  - wave-minus10/linkerd-crds.yaml
+  
+  - wave-minus5/ingress-nginx.yaml
+  - wave-minus5/cert-manager.yaml
+  - wave-minus5/linkerd-control-plane.yaml
+  - wave-minus5/external-secrets.yaml
+  
+  - wave-0/cnpg-operator.yaml
+  - wave-0/mongodb-operator.yaml
+  - wave-0/redis-operator.yaml
+  - wave-0/strimzi-operator.yaml
+  - wave-0/minio-operator.yaml
+  - wave-0/linkerd-viz.yaml
+  
+  - wave-5/kube-prometheus-stack.yaml
+  - wave-5/loki.yaml
+  - wave-5/vault.yaml
+  - wave-5/platform-stateful.yaml
+  
+  - wave-10/headlamp.yaml
+  - wave-10/platform-manifests.yaml
+  
+  # Note: The application set (wave-15) is deployed as part of platform-manifests (argocd/applicationset.yaml)

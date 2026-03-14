@@ -1,0 +1,99 @@
+---
+- name: Download k3s installation script
+  get_url:
+    url: https://get.k3s.io
+    dest: /tmp/k3s_install.sh
+    mode: '0755'
+
+- name: Install k3s
+  command: /tmp/k3s_install.sh -s - --disable traefik
+  environment:
+    INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.30.0+k3s1') }}"
+    HTTP_PROXY: "{{ proxy_env.http_proxy | default('') }}"
+    HTTPS_PROXY: "{{ proxy_env.https_proxy | default('') }}"
+    NO_PROXY: "{{ proxy_env.no_proxy | default('') }}"
+  args:
+    creates: /usr/local/bin/k3s
+
+- name: Ensure .kube directory exists
+  file:
+    path: ~/.kube
+    state: directory
+    mode: '0700'
+
+- name: Copy kubeconfig to user home
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: ~/.kube/config
+    remote_src: yes
+    mode: '0600'
+
+- name: Wait for k3s node to be ready
+  command: k3s kubectl get nodes
+  register: k3s_nodes
+  until: '" Ready " in k3s_nodes.stdout'
+  retries: 12
+  delay: 5
+  changed_when: false
+
+- name: Create StorageClass fast-ssd
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: fast-ssd
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
+      provisioner: local-path
+      reclaimPolicy: Delete
+      volumeBindingMode: WaitForFirstConsumer
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  # Note: Requires kubernetes.core collection and python kubernetes package on target
+
+- name: Fallback create StorageClass using kubectl if kubernetes.core is not available
+  command: >
+    k3s kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: fast-ssd
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
+      provisioner: local-path
+      reclaimPolicy: Delete
+      volumeBindingMode: WaitForFirstConsumer
+  when: false # We use this as fallback, or just use it directly to avoid dependency issues
+
+# Actually, let's just use kubectl directly to avoid needing pip kubernetes on the target
+- name: Create StorageClass fast-ssd via kubectl
+  command: k3s kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: fast-ssd
+      provisioner: local-path
+      reclaimPolicy: Delete
+      volumeBindingMode: WaitForFirstConsumer
+  register: sc_result
+  changed_when: '"created" in sc_result.stdout or "configured" in sc_result.stdout'
+
+- name: Fetch kubeconfig to local machine
+  fetch:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: "{{ local_kubeconfig_path }}"
+    flat: yes
+  
+- name: Update server IP in local kubeconfig
+  delegate_to: localhost
+  become: no
+  replace:
+    path: "{{ local_kubeconfig_path }}"
+    regexp: '127\.0\.0\.1'
+    replace: "{{ ansible_host }}"
