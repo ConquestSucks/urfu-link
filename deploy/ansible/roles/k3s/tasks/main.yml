@@ -25,7 +25,7 @@
   copy:
     src: /etc/rancher/k3s/k3s.yaml
     dest: ~/.kube/config
-    remote_src: yes
+    remote_src: true
     mode: '0600'
 
 - name: Wait for k3s node to be ready
@@ -37,40 +37,6 @@
   changed_when: false
 
 - name: Create StorageClass fast-ssd
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: storage.k8s.io/v1
-      kind: StorageClass
-      metadata:
-        name: fast-ssd
-        annotations:
-          storageclass.kubernetes.io/is-default-class: "true"
-      provisioner: local-path
-      reclaimPolicy: Delete
-      volumeBindingMode: WaitForFirstConsumer
-  environment:
-    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-  # Note: Requires kubernetes.core collection and python kubernetes package on target
-
-- name: Fallback create StorageClass using kubectl if kubernetes.core is not available
-  command: >
-    k3s kubectl apply -f -
-  args:
-    stdin: |
-      apiVersion: storage.k8s.io/v1
-      kind: StorageClass
-      metadata:
-        name: fast-ssd
-        annotations:
-          storageclass.kubernetes.io/is-default-class: "true"
-      provisioner: local-path
-      reclaimPolicy: Delete
-      volumeBindingMode: WaitForFirstConsumer
-  when: false # We use this as fallback, or just use it directly to avoid dependency issues
-
-# Actually, let's just use kubectl directly to avoid needing pip kubernetes on the target
-- name: Create StorageClass fast-ssd via kubectl
   command: k3s kubectl apply -f -
   args:
     stdin: |
@@ -78,6 +44,8 @@
       kind: StorageClass
       metadata:
         name: fast-ssd
+        annotations:
+          storageclass.kubernetes.io/is-default-class: "true"
       provisioner: local-path
       reclaimPolicy: Delete
       volumeBindingMode: WaitForFirstConsumer
@@ -88,11 +56,11 @@
   fetch:
     src: /etc/rancher/k3s/k3s.yaml
     dest: "{{ local_kubeconfig_path }}"
-    flat: yes
+    flat: true
   
 - name: Update server IP in local kubeconfig
   delegate_to: localhost
-  become: no
+  become: false
   replace:
     path: "{{ local_kubeconfig_path }}"
     regexp: '127\.0\.0\.1'

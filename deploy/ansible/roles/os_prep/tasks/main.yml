@@ -11,7 +11,7 @@
 
 - name: Update apt cache
   apt:
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
 
 - name: Install required system packages
@@ -26,7 +26,7 @@
 
 - name: Disable SWAP since kubernetes requires it
   command: swapoff -a
-  when: ansible_swaptotal_mb > 0
+  when: ansible_facts['swaptotal_mb'] | default(0) | int > 0
 
 - name: Disable SWAP in fstab
   replace:
