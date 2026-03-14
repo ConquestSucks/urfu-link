@@ -32,6 +32,22 @@
     state: started
     enabled: true
 
+- name: Load necessary kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Ensure kernel modules are loaded on boot
+  copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: '0644'
+
 - name: Configure sysctl for Kubernetes single-node
   sysctl:
     name: "{{ item.name }}"
