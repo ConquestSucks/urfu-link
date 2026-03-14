@@ -245,6 +245,15 @@ kubectl_apply_url() {
   rm -f "$manifest"
 }
 
+kubectl_apply_url_in_namespace() {
+  local namespace="$1" url="$2"
+  local manifest
+  manifest=$(mktemp)
+  download_to_file "$url" "$manifest"
+  kubectl apply --server-side -n "$namespace" -f "$manifest"
+  rm -f "$manifest"
+}
+
 helm_repo_add_update() {
   local name="$1" repo_url="$2"
   log "CMD" "helm repo add --force-update $name $repo_url"
@@ -514,7 +523,7 @@ phase4_argocd() {
   log "STEP" "Phase 4: Argo CD and Argo Rollouts"
   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
   if ! kubectl get deployment argocd-server -n argocd &>/dev/null; then
-    kubectl_apply_url "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+    kubectl_apply_url_in_namespace argocd "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
   fi
   wait_for_namespaced_resource argocd deployment argocd-server 180
   wait_for_namespaced_resource argocd deployment argocd-repo-server 180
