@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# DEPRECATED: Please use the Ansible playbook and GitOps approach in deploy/ansible/
+# This script is kept for historical reference.
+echo "DEPRECATED: Please use the Ansible + GitOps approach."
+echo "See deploy/scripts/README.md for more details."
+exit 1
+
 set -euo pipefail
 
 DOMAIN="${DOMAIN:-ghjc.ru}"
