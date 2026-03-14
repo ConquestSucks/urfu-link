@@ -1,0 +1,14 @@
+---
+- name: Bootstrap Urfu-Link Production Cluster
+  hosts: k3s_cluster
+  gather_facts: yes
+  
+  roles:
+    - role: ../roles/os_prep
+      tags: ['os']
+      
+    - role: ../roles/k3s
+      tags: ['k3s']
+      
+    - role: ../roles/argocd_bootstrap
+      tags: ['argocd']

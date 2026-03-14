@@ -1,0 +1,35 @@
+---
+- name: Check available disk space
+  shell: df -BG / | awk 'NR==2 {gsub(/G/,""); print $4}'
+  register: disk_space
+  changed_when: false
+
+- name: Fail if disk space is less than 90GB
+  fail:
+    msg: "Low disk space: {{ disk_space.stdout }}GB (minimum required: 90GB)"
+  when: disk_space.stdout | int < 90
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install required system packages
+  apt:
+    name:
+      - curl
+      - ca-certificates
+      - apt-transport-https
+      - gnupg
+      - python3
+    state: present
+
+- name: Disable SWAP since kubernetes requires it
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+
+- name: Disable SWAP in fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'

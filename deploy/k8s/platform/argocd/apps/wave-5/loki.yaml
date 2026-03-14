@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  project: default
+  source:
+    repoURL: https://grafana.github.io/helm-charts
+    targetRevision: 5.43.3
+    chart: loki
+    helm:
+      releaseName: loki
+      valueFiles:
+        - $values/deploy/helm/services/loki/values-prod.yaml
+  sources:
+    - repoURL: https://grafana.github.io/helm-charts
+      targetRevision: 5.43.3
+      chart: loki
+    - repoURL: https://github.com/ConquestSucks/urfu-link.git
+      targetRevision: HEAD
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

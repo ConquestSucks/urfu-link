@@ -1,0 +1,85 @@
+---
+- name: Create argocd namespace
+  command: k3s kubectl create namespace argocd --dry-run=client -o yaml
+  register: create_ns
+  changed_when: false
+
+- name: Apply argocd namespace
+  command: k3s kubectl apply -f -
+  args:
+    stdin: "{{ create_ns.stdout }}"
+  register: apply_ns
+  changed_when: '"created" in apply_ns.stdout'
+
+- name: Create argo-rollouts namespace
+  command: k3s kubectl create namespace argo-rollouts --dry-run=client -o yaml
+  register: create_ns_rollouts
+  changed_when: false
+
+- name: Apply argo-rollouts namespace
+  command: k3s kubectl apply -f -
+  args:
+    stdin: "{{ create_ns_rollouts.stdout }}"
+  register: apply_ns_rollouts
+  changed_when: '"created" in apply_ns_rollouts.stdout'
+
+- name: Download ArgoCD install manifest
+  get_url:
+    url: "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version | default('v2.14.11') }}/manifests/install.yaml"
+    dest: /tmp/argocd-install.yaml
+
+- name: Install ArgoCD (explicitly in argocd namespace to avoid default namespace bug)
+  command: k3s kubectl apply -n argocd -f /tmp/argocd-install.yaml
+  register: argocd_install
+  changed_when: '"created" in argocd_install.stdout or "configured" in argocd_install.stdout'
+
+- name: Download Argo Rollouts install manifest
+  get_url:
+    url: "https://github.com/argoproj/argo-rollouts/releases/download/v1.8.3/install.yaml"
+    dest: /tmp/argo-rollouts-install.yaml
+
+- name: Install Argo Rollouts
+  command: k3s kubectl apply -n argo-rollouts -f /tmp/argo-rollouts-install.yaml
+  register: argo_rollouts_install
+  changed_when: '"created" in argo_rollouts_install.stdout or "configured" in argo_rollouts_install.stdout'
+
+- name: Wait for ArgoCD server deployment
+  command: k3s kubectl wait --namespace argocd --for=condition=available deployment/argocd-server --timeout=300s
+  changed_when: false
+
+- name: Wait for ArgoCD repo-server deployment
+  command: k3s kubectl wait --namespace argocd --for=condition=available deployment/argocd-repo-server --timeout=300s
+  changed_when: false
+
+- name: Wait for ArgoCD application-controller statefulset
+  command: k3s kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=300s
+  changed_when: false
+
+- name: Wait for Argo Rollouts deployment
+  command: k3s kubectl wait --namespace argo-rollouts --for=condition=available deployment/argo-rollouts --timeout=300s
+  changed_when: false
+
+- name: Apply Root App of Apps
+  command: k3s kubectl apply -f -
+  args:
+    stdin: |
+      apiVersion: argoproj.io/v1alpha1
+      kind: Application
+      metadata:
+        name: root-app
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          repoURL: https://github.com/ConquestSucks/urfu-link.git
+          targetRevision: HEAD
+          path: deploy/k8s/platform/argocd/root
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: argocd
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+  register: root_app
+  changed_when: '"created" in root_app.stdout'
