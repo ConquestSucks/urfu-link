@@ -370,6 +370,21 @@ wait_ns_ready() {
   done
 }
 
+wait_for_namespaced_resource() {
+  local namespace="$1" kind="$2" name="$3"
+  local timeout_seconds="${4:-300}"
+  local waited=0
+  while (( waited < timeout_seconds )); do
+    if kubectl get "$kind" "$name" -n "$namespace" --request-timeout=5s &>/dev/null; then
+      return 0
+    fi
+    sleep "$POD_POLL_INTERVAL_SEC"
+    waited=$((waited + POD_POLL_INTERVAL_SEC))
+  done
+  log "ERROR" "Timed out waiting for ${kind}/${name} in namespace ${namespace}"
+  return 1
+}
+
 phase2_ingress_certmanager() {
   log "STEP" "Phase 2: Ingress NGINX and cert-manager"
   wait_ns_ready ingress-nginx || true
@@ -501,12 +516,16 @@ phase4_argocd() {
   if ! kubectl get deployment argocd-server -n argocd &>/dev/null; then
     kubectl_apply_url "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
   fi
+  wait_for_namespaced_resource argocd deployment argocd-server 180
+  wait_for_namespaced_resource argocd deployment argocd-repo-server 180
+  wait_for_namespaced_resource argocd statefulset argocd-application-controller 180
   kubectl wait --namespace argocd --for=condition=available deployment/argocd-server deployment/argocd-repo-server --timeout="$K8S_WAIT_TIMEOUT"
   kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout="$K8S_WAIT_TIMEOUT"
   kubectl create namespace argo-rollouts --dry-run=client -o yaml | kubectl apply -f -
   if ! kubectl get deployment argo-rollouts -n argo-rollouts &>/dev/null; then
     kubectl_apply_url "https://github.com/argoproj/argo-rollouts/releases/download/${ARGO_ROLLOUTS_VERSION}/install.yaml"
   fi
+  wait_for_namespaced_resource argo-rollouts deployment argo-rollouts 180
   kubectl wait --namespace argo-rollouts --for=condition=available deployment/argo-rollouts --timeout="$K8S_WAIT_TIMEOUT"
 }
 
