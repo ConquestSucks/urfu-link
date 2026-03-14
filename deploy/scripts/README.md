@@ -1,77 +1,48 @@
-# Prod bootstrap (Ubuntu 24 + k3s)
+# Prod bootstrap (Ansible + GitOps)
 
-Один скрипт поднимает всю prod-среду URFU Link на голом Ubuntu 24 с k3s.
+Развертывание production-окружения URFU Link полностью переведено на подход Ansible + GitOps (ArgoCD).
+Старый монолитный bash-скрипт (`prod-bootstrap-k3s.sh`) признан устаревшим (deprecated) и оставлен только для истории.
 
-**Нужно:** один узел Ubuntu 24, минимум 120 GB SSD (скрипт сам проверит место; под stateful заложено ~90 GB PVC). Интернет, домен **ghjc.ru** — A-записи на IP сервера: `api.ghjc.ru`, `app.ghjc.ru`, `id.ghjc.ru`, `k8s.ghjc.ru` (дашборд Headlamp), при использовании Vault — `vault.ghjc.ru`. Запуск от root или через sudo.
+## Как развернуть кластер с нуля
 
+### 1. Подготовка
+- Вам нужен один узел Ubuntu 24 с минимум 120 GB SSD.
+- Домен **ghjc.ru** (A-записи: `api`, `app`, `id`, `k8s`, `vault`, `grafana` на IP сервера).
+- Установленный `ansible` на вашей локальной машине.
+
+### 2. Настройка Inventory
+Отредактируйте файл `deploy/ansible/inventory/hosts.yml`:
+- Укажите IP-адрес вашего сервера (`ansible_host: 192.168.1.100`).
+- Укажите пользователя SSH (`ansible_user: ubuntu`).
+- При необходимости укажите путь к SSH-ключу или настройки прокси.
+
+### 3. Запуск инфраструктурного пайплайна (Ansible)
+Ansible подготовит операционную систему, установит k3s и развернет ArgoCD:
 ```bash
-cd /path/to/urfu-link
-sudo ./deploy/scripts/prod-bootstrap-k3s.sh
+cd deploy/ansible
+ansible-playbook -i inventory/hosts.yml playbooks/bootstrap-cluster.yml
 ```
+После успешного выполнения у вас появится файл `kubeconfig-prod.yaml` для доступа к кластеру.
 
-**Переменные:**
+### 4. Дальнейшее развертывание (GitOps)
+Ansible автоматически создает корневое приложение (Root App) в ArgoCD.
+С этого момента ArgoCD подхватывает управление кластером:
+- **Wave -10**: Базовые неймспейсы и CRD.
+- **Wave -5**: Инфраструктурные компоненты (Nginx Ingress, Cert-Manager, Linkerd Control Plane, External Secrets).
+- **Wave 0**: Операторы баз данных (CNPG, MongoDB, Redis, Strimzi, MinIO).
+- **Wave 5**: Базы данных (Stateful), Vault и система мониторинга.
+- **Wave 10**: Headlamp и манифесты платформы.
+- **Wave 15**: Ваши микросервисы (разворачиваются через ApplicationSet).
 
-| Переменная | По умолчанию | Смысл |
-|------------|--------------|--------|
-| `DOMAIN` | `ghjc.ru` | Домен для ingress и cert-manager |
-| `SOURCE_DOMAIN` | `urfu-link.local` | Домен-плейсхолдер в манифестах (подставляется на `DOMAIN`) |
-| `SKIP_VAULT` | `false` | Не ставить Vault — секреты создаёшь сам |
-| `INSTALL_LINKERD` | `true` | Поставить Linkerd + Viz (без: `INSTALL_LINKERD=false`) |
-| `LINKERD2_VERSION` | `edge-25.10.7` | Версия CLI/control plane (edge, соответствует Linkerd 2.19) |
-| `REPO_ROOT` | на 2 уровня выше скрипта | Корень репо |
-| `STATEFUL_OVERLAY` | `$REPO_ROOT/deploy/k8s/platform/stateful-prod` | Kustomize overlay для stateful (объёмы 4Gi) |
-| `LOG_FILE` | `prod-bootstrap-YYYYMMDD-HHMMSS.log` в `REPO_ROOT` | Куда пишем лог |
+Вам больше не нужно запускать скрипты для обновления компонентов. Любые изменения конфигурации (например, добавление нового сервиса или обновление версии Helm-чарта) делаются через коммиты в ветку `main` в директории `deploy/k8s/platform/argocd/`.
 
-Без Vault: `SKIP_VAULT=true sudo ./deploy/scripts/prod-bootstrap-k3s.sh`.
-
-## Что делает скрипт
-
-Проверка окружения (root/sudo, curl, место) → подготовка хоста (apt, отключение swap, k3s без Traefik, kubeconfig 600, StorageClass fast-ssd, Helm) → NGINX Ingress, cert-manager, ClusterIssuer (подстановка `SOURCE_DOMAIN`→`DOMAIN`) → при необходимости Linkerd + Viz → Argo CD и Argo Rollouts → External Secrets Operator → операторы (CloudNativePG, MongoDB Community, Redis OpsTree, Strimzi, MinIO) → манифесты платформы с подстановкой домена → **Headlamp** (дашборд с OIDC через Keycloak) → stateful-стек через Kustomize overlay `stateful-prod` (объёмы 4Gi; при таймауте PostgreSQL/Kafka скрипт завершается с ошибкой) → Helm-деплой восьми сервисов в `urfu-prod` с `values-prod.yaml` → ожидание подов.
-
-В итоге API на `https://api.ghjc.ru`, фронт на `https://app.ghjc.ru`, дашборд Headlamp на `https://k8s.ghjc.ru` (вход через Keycloak). Настройка клиента Keycloak и секретов — см. `deploy/k8s/platform/identity/HEADLAMP.md`.
-
-## Секреты без Vault
-
-При `SKIP_VAULT=true` после деплоя секреты создаёшь вручную.
-
-**Keycloak** (namespace `urfu-platform`, secret `keycloak-secrets`): `db_host`, `db_name`, `db_username`, `db_password`, `admin_username`, `admin_password`.
-
+### 5. Инициализация Vault
+После развертывания ArgoCD и установки Vault (Wave 5), Vault нужно инициализировать (выполняется один раз):
 ```bash
-kubectl create secret generic keycloak-secrets -n urfu-platform \
-  --from-literal=db_host=urfu-postgres-rw.urfu-platform.svc \
-  --from-literal=db_name=keycloak \
-  --from-literal=db_username=keycloak \
-  --from-literal=db_password=CHANGE_ME \
-  --from-literal=admin_username=admin \
-  --from-literal=admin_password=CHANGE_ME
+export KUBECONFIG=kubeconfig-prod.yaml
+bash deploy/scripts/init-vault.sh
 ```
+Скрипт создаст файл `vault-keys.json` в корне проекта (ОБЯЗАТЕЛЬНО сохраните его в надежном месте) и настроит авторизацию через Kubernetes.
 
-**MongoDB** (`urfu-platform`, `mongo-app-user-password`): ключ `password` — пароль пользователя `app-user`.
-
-```bash
-kubectl create secret generic mongo-app-user-password -n urfu-platform --from-literal=password=CHANGE_ME
-```
-
-**Headlamp** (namespace `urfu-platform`, secret `headlamp-oidc`): при использовании OIDC через Keycloak нужны ключи `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_ISSUER_URL`, `OIDC_SCOPES`, `OIDC_USE_PKCE`. Подробно — `deploy/k8s/platform/identity/HEADLAMP.md`.
-
-**Сервисы в urfu-prod** (api-gateway, user-service и т.д.): у каждого при `secrets.enabled: true` ожидается Secret с именем из values (например `api-gateway-secrets`). Ключи — как в конфиге приложения (например `Auth__ClientSecret`). Создай секреты по доке сервиса, потом перезапусти поды или дождись рестарта.
-
-## Логи
-
-Всё пишется в один лог-файл; формат: `[ISO8601] [LEVEL] сообщение` (INFO, STEP, CMD, ERROR). В консоль идут этапы (STEP) и ошибки; долгие шаги — с прогресс-баром или спиннером.
-
-## Teardown (полное снятие)
-
-Скрипт `prod-teardown-k3s.sh` сносит всё, что ставит установщик, в обратном порядке: Helm-сервисы в urfu-prod → stateful-стек и PVC → манифесты платформы и namespaces → операторы (MinIO, Strimzi, Redis, MongoDB, CloudNativePG) → ESO → Argo Rollouts и Argo CD → при флаге Linkerd → cert-manager и ingress-nginx → StorageClass; при флаге — k3s.
-
-```bash
-sudo bash deploy/scripts/prod-teardown-k3s.sh
-```
-
-| Переменная | По умолчанию | Смысл |
-|------------|--------------|--------|
-| `REMOVE_LINKERD` | `false` | Удалить Linkerd + Viz |
-| `REMOVE_K3S` | `false` | Запустить k3s-uninstall.sh (полное снятие узла) |
-| `REPO_ROOT`, `LOG_FILE`, `DOMAIN` | как у bootstrap | Корень репо, лог, домен для манифестов |
-
-Если кластер недоступен (kubectl не доходит), скрипт удалит только StorageClass и при `REMOVE_K3S=true` — k3s.
+## Развертывание локально / Teardown
+Скрипт `prod-teardown-k3s.sh` пока оставлен без изменений, но рекомендуется в будущем удалять ресурсы декларативно или полностью пересоздавать виртуальную машину.
