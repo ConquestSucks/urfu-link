@@ -4,7 +4,7 @@ metadata:
   name: ingress-nginx
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "-4"
 spec:
   project: default
   source:
@@ -13,6 +13,9 @@ spec:
     chart: ingress-nginx
     helm:
       releaseName: ingress-nginx
+      parameters:
+        - name: controller.admissionWebhooks.certManager.enabled
+          value: "true"
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx
