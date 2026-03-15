@@ -125,6 +125,36 @@ spec:
               }
               EOF_POL
 
+                vault policy write platform-bootstrap - <<EOF_POL
+              path "kv/data/urfu-link/prod/keycloak" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/user-service" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/media-service" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/chat-service" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/presence-service" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/notification-service" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/call-service" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/api-gateway" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/metadata/urfu-link/prod/*" {
+                capabilities = ["read", "list"]
+              }
+              EOF_POL
+
                 vault write auth/kubernetes/role/urfu-link-prod \
                     bound_service_account_names=external-secrets \
                     bound_service_account_namespaces=external-secrets \
@@ -135,6 +165,12 @@ spec:
                     bound_service_account_names=minio-bootstrap \
                     bound_service_account_namespaces=urfu-platform \
                     policies=minio-bootstrap \
+                    ttl=24h
+
+                vault write auth/kubernetes/role/platform-bootstrap \
+                    bound_service_account_names=platform-bootstrap \
+                    bound_service_account_namespaces=urfu-platform \
+                    policies=platform-bootstrap \
                     ttl=24h
               }
 

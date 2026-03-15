@@ -5,6 +5,7 @@ metadata:
   namespace: urfu-platform
 spec:
   instances: 1
+  enableSuperuserAccess: true
   storage:
     size: 100Gi
     storageClass: fast-ssd
