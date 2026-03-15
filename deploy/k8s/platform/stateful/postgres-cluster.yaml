@@ -13,8 +13,6 @@ spec:
     storageClass: fast-ssd
   backup:
     retentionPolicy: "14d"
-  monitoring:
-    enablePodMonitor: true
   resources:
     requests:
       cpu: 500m
