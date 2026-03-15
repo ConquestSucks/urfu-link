@@ -43,7 +43,7 @@ spec:
           image: hashicorp/vault:1.16.2
           env:
             - name: VAULT_ADDR
-              value: "http://vault:8200"
+              value: "http://vault-internal.vault.svc.cluster.local:8200"
           command:
             - "/bin/sh"
             - "-c"
@@ -74,7 +74,9 @@ spec:
                 fi
 
                 vault write auth/kubernetes/config \
-                    kubernetes_host="https://kubernetes.default.svc"
+                    kubernetes_host="https://kubernetes.default.svc" \
+                    token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
+                    kubernetes_ca_cert="@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
                 if ! vault secrets list -format=json | grep -q '"kv/"'; then
                   vault secrets enable -path=kv kv-v2
