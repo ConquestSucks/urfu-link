@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cnpg-webhook-bootstrap
+  namespace: cnpg-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cnpg-webhook-bootstrap
+  namespace: cnpg-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cnpg-webhook-bootstrap
+  namespace: cnpg-system
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cnpg-webhook-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: cnpg-webhook-bootstrap
+    namespace: cnpg-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cnpg-webhook-bootstrap
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+rules:
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cnpg-webhook-bootstrap
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cnpg-webhook-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: cnpg-webhook-bootstrap
+    namespace: cnpg-system
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: cnpg-webhook-bootstrap
+  namespace: cnpg-system
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  template:
+    spec:
+      serviceAccountName: cnpg-webhook-bootstrap
+      restartPolicy: OnFailure
+      containers:
+        - name: cnpg-webhook-bootstrap
+          image: alpine:3.19
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              apk add --no-cache curl jq >/dev/null
+
+              APISERVER="https://kubernetes.default.svc"
+              SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
+              TOKEN="$(cat "${SERVICEACCOUNT}/token")"
+              CACERT="${SERVICEACCOUNT}/ca.crt"
+
+              api_get() {
+                curl --silent --show-error --fail --cacert "${CACERT}" \
+                  --header "Authorization: Bearer ${TOKEN}" \
+                  "${APISERVER}$1"
+              }
+
+              api_put() {
+                curl --silent --show-error --fail --cacert "${CACERT}" \
+                  --header "Authorization: Bearer ${TOKEN}" \
+                  -H "Accept: application/json" \
+                  -H "Content-Type: application/json" \
+                  -X PUT "${APISERVER}$1" \
+                  -d "$2" >/dev/null
+              }
+
+              while true; do
+                CA_B64="$(api_get "/api/v1/namespaces/cnpg-system/secrets/cnpg-ca-secret" | jq -r '.data["ca.crt"] // empty' || true)"
+                if [ -n "${CA_B64}" ]; then
+                  break
+                fi
+                sleep 3
+              done
+
+              ensure_cabundle() {
+                KIND="$1"
+                NAME="$2"
+                PATH="/apis/admissionregistration.k8s.io/v1/${KIND}/${NAME}"
+
+                while true; do
+                  CURRENT="$(api_get "${PATH}" || true)"
+                  if [ -n "${CURRENT}" ]; then
+                    break
+                  fi
+                  sleep 3
+                done
+
+                MATCHED="$(echo "${CURRENT}" | jq -r --arg ca "${CA_B64}" 'all(.webhooks[]?; .clientConfig.caBundle == $ca)')"
+
+                if [ "${MATCHED}" = "true" ]; then
+                  return 0
+                fi
+
+                UPDATED="$(echo "${CURRENT}" | jq --arg ca "${CA_B64}" '
+                  del(
+                    .metadata.managedFields,
+                    .metadata.creationTimestamp,
+                    .metadata.generation,
+                    .metadata.uid,
+                    .metadata.annotations."kubectl.kubernetes.io/last-applied-configuration"
+                  )
+                  | (.webhooks |= map(.clientConfig.caBundle = $ca))
+                ')"
+
+                api_put "${PATH}" "${UPDATED}"
+              }
+
+              ensure_cabundle mutatingwebhookconfigurations cnpg-mutating-webhook-configuration
+              ensure_cabundle validatingwebhookconfigurations cnpg-validating-webhook-configuration
