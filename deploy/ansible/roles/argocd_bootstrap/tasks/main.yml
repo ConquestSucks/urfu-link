@@ -69,10 +69,10 @@
         name: root-app
         namespace: argocd
       spec:
-        project: default
+        project: urfu-link
         source:
           repoURL: https://github.com/ConquestSucks/urfu-link.git
-          targetRevision: HEAD
+          targetRevision: master
           path: deploy/k8s/platform/argocd/root
         destination:
           server: https://kubernetes.default.svc

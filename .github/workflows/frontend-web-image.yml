@@ -3,7 +3,7 @@ name: Frontend Web Image
 on:
   push:
     branches:
-      - main
+      - master
     paths:
       - "apps/client/**"
       - "packages/api-client/**"
@@ -50,4 +50,4 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_NAME }}:main
+            ${{ env.IMAGE_NAME }}:master
