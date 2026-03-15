@@ -1,4 +1,4 @@
-deploymentMode: SingleBinary
+﻿deploymentMode: SingleBinary
 
 gateway:
   enabled: false
@@ -30,39 +30,52 @@ loki:
 
 singleBinary:
   replicas: 1
+  affinity: {}
 
 backend:
   replicas: 0
+  affinity: {}
 
 read:
   replicas: 0
+  affinity: {}
 
 write:
   replicas: 0
+  affinity: {}
 
 ingester:
   replicas: 0
+  affinity: {}
 
 querier:
   replicas: 0
+  affinity: {}
 
 queryFrontend:
   replicas: 0
+  affinity: {}
 
 queryScheduler:
   replicas: 0
+  affinity: {}
 
 distributor:
   replicas: 0
+  affinity: {}
 
 compactor:
   replicas: 0
+  affinity: {}
 
 indexGateway:
   replicas: 0
+  affinity: {}
 
 bloomCompactor:
   replicas: 0
+  affinity: {}
 
 bloomGateway:
   replicas: 0
+  affinity: {}
