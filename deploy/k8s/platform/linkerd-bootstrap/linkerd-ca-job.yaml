@@ -4,7 +4,7 @@ metadata:
   name: linkerd-ca-job
   namespace: linkerd
   annotations:
-    argocd.argoproj.io/sync-wave: "-6"
+    argocd.argoproj.io/sync-wave: "1"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -12,7 +12,7 @@ metadata:
   name: linkerd-ca-job
   namespace: linkerd
   annotations:
-    argocd.argoproj.io/sync-wave: "-6"
+    argocd.argoproj.io/sync-wave: "1"
 rules:
   - apiGroups: [""]
     resources: ["secrets", "configmaps"]
@@ -24,7 +24,7 @@ metadata:
   name: linkerd-ca-job
   namespace: linkerd
   annotations:
-    argocd.argoproj.io/sync-wave: "-6"
+    argocd.argoproj.io/sync-wave: "1"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -40,7 +40,7 @@ metadata:
   name: linkerd-ca-bootstrap
   namespace: linkerd
   annotations:
-    argocd.argoproj.io/sync-wave: "-6"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   template:
     spec:
