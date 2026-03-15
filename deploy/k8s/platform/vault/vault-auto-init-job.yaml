@@ -56,12 +56,12 @@ spec:
                 while true; do
                   STATUS_JSON="$(vault status -format=json 2>/dev/null || true)"
 
-                  if echo "$STATUS_JSON" | grep -q '"initialized":false'; then
+                  if echo "$STATUS_JSON" | grep -Eq '"initialized":[[:space:]]*false'; then
                     echo "false"
                     return 0
                   fi
 
-                  if echo "$STATUS_JSON" | grep -q '"initialized":true'; then
+                  if echo "$STATUS_JSON" | grep -Eq '"initialized":[[:space:]]*true'; then
                     echo "true"
                     return 0
                   fi
@@ -172,7 +172,7 @@ spec:
                   ROOT_TOKEN=$(echo "$ROOT_TOKEN_B64" | base64 -d)
                   UNSEAL_KEY=$(echo "$UNSEAL_KEY_B64" | base64 -d)
                   
-                  if vault status -format=json 2>/dev/null | grep -q '"sealed":true'; then
+                  if vault status -format=json 2>/dev/null | grep -Eq '"sealed":[[:space:]]*true'; then
                     echo "Unsealing Vault..."
                     vault operator unseal "$UNSEAL_KEY"
                   else
