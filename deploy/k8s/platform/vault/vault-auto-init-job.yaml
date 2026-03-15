@@ -68,6 +68,14 @@ spec:
 
               ensure_curl
 
+              json_get_string() {
+                echo "$1" | tr -d '\r\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p"
+              }
+
+              json_get_first_array_string() {
+                echo "$1" | tr -d '\r\n' | sed -n "s/.*\"$2\"[[:space:]]*:[[:space:]]*\[[[:space:]]*\"\([^\"]*\)\".*/\1/p"
+              }
+
               wait_for_vault_status() {
                 while true; do
                   STATUS_JSON="$(vault status -format=json 2>/dev/null || true)"
@@ -122,9 +130,15 @@ spec:
               if [ "$VAULT_INITIALIZED" = "false" ]; then
                 echo "Initializing Vault..."
                 vault operator init -key-shares=1 -key-threshold=1 -format=json > /tmp/init.json
-                
-                ROOT_TOKEN=$(cat /tmp/init.json | grep root_token | awk -F '"' '{print $4}')
-                UNSEAL_KEY=$(cat /tmp/init.json | grep unseal_keys_b64 | awk -F '"' '{print $4}')
+
+                INIT_JSON="$(cat /tmp/init.json)"
+                ROOT_TOKEN="$(json_get_string "$INIT_JSON" root_token)"
+                UNSEAL_KEY="$(json_get_first_array_string "$INIT_JSON" unseal_keys_b64)"
+
+                if [ -z "$ROOT_TOKEN" ] || [ -z "$UNSEAL_KEY" ]; then
+                  echo "Could not parse Vault init output."
+                  exit 1
+                fi
                 
                 echo "Creating Kubernetes Secret with Vault credentials..."
                 cat <<EOF > /tmp/secret.yaml
@@ -181,8 +195,8 @@ spec:
                 RESPONSE=$(curl --silent --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
                      -X GET ${APISERVER}/api/v1/namespaces/vault/secrets/vault-keys)
                      
-                ROOT_TOKEN_B64=$(echo "$RESPONSE" | grep -o '"root_token":"[^"]*' | grep -o '[^"]*$')
-                UNSEAL_KEY_B64=$(echo $RESPONSE | grep -o '"unseal_key":"[^"]*' | grep -o '[^"]*$')
+                ROOT_TOKEN_B64="$(json_get_string "$RESPONSE" root_token)"
+                UNSEAL_KEY_B64="$(json_get_string "$RESPONSE" unseal_key)"
                 
                 if [ ! -z "$UNSEAL_KEY_B64" ] && [ ! -z "$ROOT_TOKEN_B64" ]; then
                   ROOT_TOKEN=$(echo "$ROOT_TOKEN_B64" | base64 -d)
