@@ -52,7 +52,7 @@ autoscaling:
   targetCPUUtilizationPercentage: 70
 
 pdb:
-  enabled: true
+  enabled: false
   minAvailable: 1
 
 networkPolicy:
@@ -70,7 +70,7 @@ serviceMonitor:
   enabled: false
   namespace: observability
   interval: 30s
-  scrapePath: /health/ready
+  scrapePath: /metrics
 
 rollout:
   enabled: true
