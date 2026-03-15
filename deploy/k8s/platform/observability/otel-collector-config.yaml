@@ -14,18 +14,13 @@ data:
             endpoint: 0.0.0.0:4318
     processors:
       batch: {}
-      attributes/loki:
-        actions:
-          - key: loki.resource.labels
-            action: insert
-            value: "app.kubernetes.io/name, app.kubernetes.io/instance"
     exporters:
       debug:
         verbosity: normal
       prometheusremotewrite:
         endpoint: "http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/api/v1/write"
-      loki:
-        endpoint: "http://loki.observability.svc.cluster.local:3100/loki/api/v1/push"
+      otlphttp/loki:
+        endpoint: "http://loki.observability.svc.cluster.local:3100/otlp"
     service:
       pipelines:
         traces:
@@ -38,5 +33,5 @@ data:
           exporters: [prometheusremotewrite]
         logs:
           receivers: [otlp]
-          processors: [batch, attributes/loki]
-          exporters: [loki]
+          processors: [batch]
+          exporters: [otlphttp/loki]
