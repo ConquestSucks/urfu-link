@@ -54,7 +54,7 @@
         annotations:
           storageclass.kubernetes.io/is-default-class: "true"
       provisioner: rancher.io/local-path
-      reclaimPolicy: Delete
+      reclaimPolicy: Retain
       volumeBindingMode: WaitForFirstConsumer
   register: sc_result
   changed_when: '"created" in sc_result.stdout or "configured" in sc_result.stdout'
