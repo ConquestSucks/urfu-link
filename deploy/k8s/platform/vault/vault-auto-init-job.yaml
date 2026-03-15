@@ -159,8 +159,11 @@ spec:
                 SERVICEACCOUNT=/var/run/secrets/kubernetes.io/serviceaccount
                 TOKEN=$(cat ${SERVICEACCOUNT}/token)
                 CACERT=${SERVICEACCOUNT}/ca.crt
-                
-                curl --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
+
+                curl --silent --output /dev/null --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
+                     -X DELETE ${APISERVER}/api/v1/namespaces/vault/secrets/vault-keys || true
+
+                curl --fail --silent --show-error --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
                      -X POST ${APISERVER}/api/v1/namespaces/vault/secrets \
                      -H 'Accept: application/json' -H 'Content-Type: application/json' \
                      -d "{
