@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://helm.linkerd.io/edge
-    targetRevision: edge-25.10.7 # Wait, let's use a stable/edge version or default
+    targetRevision: 2026.3.2
     chart: linkerd-crds
   destination:
     server: https://kubernetes.default.svc
