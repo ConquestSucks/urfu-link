@@ -8,8 +8,11 @@ resources:
   
   - wave-minus5/ingress-nginx.yaml
   - wave-minus5/cert-manager.yaml
-  - wave-minus5/linkerd-control-plane.yaml
   - wave-minus5/external-secrets.yaml
+  
+  - wave-minus4/linkerd-bootstrap.yaml
+  
+  - wave-minus3/linkerd-control-plane.yaml
   
   - wave-0/cnpg-operator.yaml
   - wave-0/mongodb-operator.yaml
