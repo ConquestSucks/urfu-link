@@ -13,7 +13,9 @@ spec:
       - name: internal
         port: 9092
         type: internal
-        tls: false
+        tls: true
+        authentication:
+          type: scram-sha-512
   entityOperator:
     topicOperator: {}
     userOperator: {}

@@ -10,14 +10,22 @@ spec:
   security:
     authentication:
       modes: ["SCRAM"]
+    tls:
+      enabled: true
+      certificateKeySecretRef:
+        name: urfu-mongo-cert
   users:
     - name: app-user
       db: admin
       passwordSecretRef:
         name: mongo-app-user-password
       roles:
-        - name: readWriteAnyDatabase
-          db: admin
+        - name: readWrite
+          db: chat_db
+        - name: readWrite
+          db: call_db
+        - name: readWrite
+          db: presence_db
       scramCredentialsSecretName: app-user-scram
   statefulSet:
     spec:
