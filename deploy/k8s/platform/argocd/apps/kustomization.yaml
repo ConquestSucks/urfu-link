@@ -20,6 +20,7 @@ resources:
   - wave-0/strimzi-operator.yaml
   - wave-0/minio-operator.yaml
   - wave-0/linkerd-viz.yaml
+  - wave-1/cnpg-webhook-bootstrap.yaml
   
   - wave-5/kube-prometheus-stack.yaml
   - wave-5/loki.yaml
