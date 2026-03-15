@@ -9,6 +9,7 @@ resources:
   - mongodb-backup-cronjob.yaml
   - redis-cluster.yaml
   - redis-backup-cronjob.yaml
+  - platform-bootstrap-job.yaml
   - minio-bootstrap-job.yaml
   - minio-tenant.yaml
   - minio-buckets-job.yaml
