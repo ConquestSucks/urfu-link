@@ -9,8 +9,16 @@ spec:
     - name: pool-0
       servers: 1
       volumesPerServer: 1
-      size: 50Gi
-      storageClassName: fast-ssd
+      volumeClaimTemplate:
+        metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 50Gi
+          storageClassName: fast-ssd
       resources:
         requests:
           memory: 1Gi
