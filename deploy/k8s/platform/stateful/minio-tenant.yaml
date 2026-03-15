@@ -24,10 +24,10 @@ spec:
       resources:
         requests:
           memory: 1Gi
-          cpu: 500m
+          cpu: 100m
         limits:
           memory: 2Gi
-          cpu: 2000m
+          cpu: 1000m
   mountPath: /export
   requestAutoCert: true
   features:
