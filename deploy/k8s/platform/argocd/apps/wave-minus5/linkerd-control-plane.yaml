@@ -11,6 +11,13 @@ spec:
     repoURL: https://helm.linkerd.io/edge
     targetRevision: 2026.3.2
     chart: linkerd-control-plane
+    helm:
+      releaseName: linkerd-control-plane
+      parameters:
+        - name: identity.externalCA
+          value: "true"
+        - name: identity.issuer.scheme
+          value: kubernetes.io/tls
   destination:
     server: https://kubernetes.default.svc
     namespace: linkerd
