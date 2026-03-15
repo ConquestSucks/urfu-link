@@ -24,3 +24,4 @@ spec:
             storage: 10Gi
   redisExporter:
     enabled: false
+    image: quay.io/opstree/redis-exporter:1.0
