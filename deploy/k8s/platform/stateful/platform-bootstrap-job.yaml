@@ -41,7 +41,7 @@ metadata:
   namespace: urfu-platform
   annotations:
     argocd.argoproj.io/sync-options: Force=true,Replace=true
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "-1"
 spec:
   template:
     spec:
