@@ -48,15 +48,58 @@ spec:
             - "/bin/sh"
             - "-c"
             - |
-              echo "Waiting for vault to be ready..."
-              while ! vault status > /dev/null 2>&1; do
-                if vault status 2>&1 | grep -q "server is not yet initialized"; then
-                  break
+              set -eu
+
+              wait_for_vault_status() {
+                while true; do
+                  STATUS_JSON="$(vault status -format=json 2>/dev/null || true)"
+
+                  if echo "$STATUS_JSON" | grep -q '"initialized":false'; then
+                    echo "false"
+                    return 0
+                  fi
+
+                  if echo "$STATUS_JSON" | grep -q '"initialized":true'; then
+                    echo "true"
+                    return 0
+                  fi
+
+                  sleep 2
+                done
+              }
+
+              configure_vault() {
+                if ! vault auth list -format=json | grep -q '"kubernetes/"'; then
+                  vault auth enable kubernetes
                 fi
-                sleep 2
-              done
+
+                vault write auth/kubernetes/config \
+                    kubernetes_host="https://kubernetes.default.svc"
+
+                if ! vault secrets list -format=json | grep -q '"kv/"'; then
+                  vault secrets enable -path=kv kv-v2
+                fi
+
+                vault policy write external-secrets - <<EOF_POL
+              path "kv/data/*" {
+                capabilities = ["read", "list"]
+              }
+              path "kv/metadata/*" {
+                capabilities = ["read", "list"]
+              }
+              EOF_POL
+
+                vault write auth/kubernetes/role/urfu-link-prod \
+                    bound_service_account_names=external-secrets \
+                    bound_service_account_namespaces=external-secrets \
+                    policies=external-secrets \
+                    ttl=24h
+              }
+
+              echo "Waiting for vault to be ready..."
+              VAULT_INITIALIZED="$(wait_for_vault_status)"
               
-              if vault status 2>&1 | grep -q "server is not yet initialized"; then
+              if [ "$VAULT_INITIALIZED" = "false" ]; then
                 echo "Initializing Vault..."
                 vault operator init -key-shares=1 -key-threshold=1 -format=json > /tmp/init.json
                 
@@ -97,33 +140,14 @@ spec:
                      }"
                 
                 echo "Unsealing Vault..."
-                vault operator unseal $UNSEAL_KEY
+                vault operator unseal "$UNSEAL_KEY"
                 
-                export VAULT_TOKEN=$ROOT_TOKEN
+                export VAULT_TOKEN="$ROOT_TOKEN"
                 echo "Setting up Kubernetes Auth Method..."
-                vault auth enable kubernetes
-                vault write auth/kubernetes/config \
-                    kubernetes_host="https://kubernetes.default.svc"
-                    
-                echo "Creating urfu-link KV engine v2..."
-                vault secrets enable -path=urfu-link kv-v2
-                
+                echo "Creating kv KV engine v2..."
                 echo "Creating External Secrets policy..."
-                vault policy write external-secrets - <<EOF_POL
-              path "urfu-link/data/*" {
-                capabilities = ["read", "list"]
-              }
-              path "urfu-link/metadata/*" {
-                capabilities = ["read", "list"]
-              }
-              EOF_POL
-              
                 echo "Binding policy to role..."
-                vault write auth/kubernetes/role/external-secrets \
-                    bound_service_account_names=external-secrets \
-                    bound_service_account_namespaces=external-secrets \
-                    policies=external-secrets \
-                    ttl=24h
+                configure_vault
                     
                 echo "Vault initialization and configuration complete!"
               else
@@ -137,17 +161,26 @@ spec:
                 RESPONSE=$(curl --silent --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
                      -X GET ${APISERVER}/api/v1/namespaces/vault/secrets/vault-keys)
                      
+                ROOT_TOKEN_B64=$(echo "$RESPONSE" | grep -o '"root_token":"[^"]*' | grep -o '[^"]*$')
                 UNSEAL_KEY_B64=$(echo $RESPONSE | grep -o '"unseal_key":"[^"]*' | grep -o '[^"]*$')
                 
-                if [ ! -z "$UNSEAL_KEY_B64" ]; then
-                  UNSEAL_KEY=$(echo $UNSEAL_KEY_B64 | base64 -d)
+                if [ ! -z "$UNSEAL_KEY_B64" ] && [ ! -z "$ROOT_TOKEN_B64" ]; then
+                  ROOT_TOKEN=$(echo "$ROOT_TOKEN_B64" | base64 -d)
+                  UNSEAL_KEY=$(echo "$UNSEAL_KEY_B64" | base64 -d)
                   
-                  if vault status 2>&1 | grep -q "Sealed.*true"; then
+                  if vault status -format=json 2>/dev/null | grep -q '"sealed":true'; then
                     echo "Unsealing Vault..."
-                    vault operator unseal $UNSEAL_KEY
+                    vault operator unseal "$UNSEAL_KEY"
                   else
                     echo "Vault is already unsealed."
                   fi
+
+                  export VAULT_TOKEN="$ROOT_TOKEN"
+                  echo "Setting up Kubernetes Auth Method..."
+                  echo "Creating kv KV engine v2..."
+                  echo "Creating External Secrets policy..."
+                  echo "Binding policy to role..."
+                  configure_vault
                 else
                   echo "Could not find vault-keys secret. Cannot unseal."
                   exit 1

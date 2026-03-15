@@ -14,23 +14,20 @@ spec:
             - /bin/sh
             - -c
             - >-
-              mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" &&
+              until [ -s /bootstrap/endpoint ] && [ -s /bootstrap/access_key ] && [ -s /bootstrap/secret_key ]; do sleep 5; done &&
+              MINIO_ENDPOINT="$(cat /bootstrap/endpoint)" &&
+              MINIO_ACCESS_KEY="$(cat /bootstrap/access_key)" &&
+              MINIO_SECRET_KEY="$(cat /bootstrap/secret_key)" &&
+              until mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do sleep 5; done &&
               mc mb -p minio/media-private || true &&
               mc mb -p minio/media-public || true &&
               mc anonymous set download minio/media-public
-          env:
-            - name: MINIO_ENDPOINT
-              valueFrom:
-                secretKeyRef:
-                  name: minio-bootstrap-secret
-                  key: endpoint
-            - name: MINIO_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: minio-bootstrap-secret
-                  key: access_key
-            - name: MINIO_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: minio-bootstrap-secret
-                  key: secret_key
+          volumeMounts:
+            - name: bootstrap-secret
+              mountPath: /bootstrap
+              readOnly: true
+      volumes:
+        - name: bootstrap-secret
+          secret:
+            secretName: minio-bootstrap-secret
+            optional: true
