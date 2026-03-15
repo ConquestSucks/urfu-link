@@ -86,6 +86,12 @@ spec:
                   "${APISERVER}/api/v1/namespaces/urfu-platform/secrets/$1" || true
               }
 
+              secret_http_code() {
+                curl --silent --output /dev/null --write-out "%{http_code}" --cacert "${CACERT}" \
+                  --header "Authorization: Bearer ${TOKEN}" \
+                  "${APISERVER}/api/v1/namespaces/urfu-platform/secrets/$1" || true
+              }
+
               create_secret_json() {
                 curl --fail --silent --show-error --cacert "${CACERT}" \
                   --header "Authorization: Bearer ${TOKEN}" \
@@ -114,7 +120,8 @@ spec:
 
               ensure_generated_secret() {
                 GENERATED_JSON="$(get_secret_json platform-bootstrap-generated)"
-                if echo "$GENERATED_JSON" | grep -q '"kind":"Status"'; then
+                GENERATED_CODE="$(secret_http_code platform-bootstrap-generated)"
+                if [ "$GENERATED_CODE" = "404" ]; then
                   GENERATED_EXISTS="false"
                 else
                   GENERATED_EXISTS="true"
@@ -154,7 +161,8 @@ spec:
 
               ensure_mongo_password_secret() {
                 MONGO_JSON="$(get_secret_json mongo-app-user-password)"
-                if echo "$MONGO_JSON" | grep -q '"kind":"Status"'; then
+                MONGO_CODE="$(secret_http_code mongo-app-user-password)"
+                if [ "$MONGO_CODE" = "404" ]; then
                   MONGO_APP_PASSWORD="$(rand 32)"
                   MONGO_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"mongo-app-user-password"},"type":"Opaque","data":{"password":"%s"}}' "$(b64 "$MONGO_APP_PASSWORD")")"
                   create_secret_json "$MONGO_CREATE"
