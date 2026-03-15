@@ -101,7 +101,6 @@ spec:
 
                 vault write auth/kubernetes/config \
                     kubernetes_host="https://kubernetes.default.svc" \
-                    token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
                     kubernetes_ca_cert="@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
                 if ! vault secrets list -format=json | grep -q '"kv/"'; then
