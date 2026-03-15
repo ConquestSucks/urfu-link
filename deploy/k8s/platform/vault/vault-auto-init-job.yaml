@@ -33,6 +33,8 @@ kind: Job
 metadata:
   name: vault-init
   namespace: vault
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
 spec:
   template:
     spec:
