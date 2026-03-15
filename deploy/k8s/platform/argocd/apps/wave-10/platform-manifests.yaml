@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/ConquestSucks/urfu-link.git
-    targetRevision: HEAD
+    targetRevision: master
     path: deploy/k8s/platform
   destination:
     server: https://kubernetes.default.svc

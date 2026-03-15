@@ -16,7 +16,7 @@ spec:
         valueFiles:
           - $values/deploy/helm/services/loki/values-prod.yaml
     - repoURL: https://github.com/ConquestSucks/urfu-link.git
-      targetRevision: HEAD
+      targetRevision: master
       ref: values
   destination:
     server: https://kubernetes.default.svc

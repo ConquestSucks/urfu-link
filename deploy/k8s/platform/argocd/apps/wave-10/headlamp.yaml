@@ -20,7 +20,7 @@ spec:
       targetRevision: 0.25.0
       chart: headlamp
     - repoURL: https://github.com/ConquestSucks/urfu-link.git
-      targetRevision: HEAD
+      targetRevision: master
       ref: values
   destination:
     server: https://kubernetes.default.svc
