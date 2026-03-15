@@ -79,3 +79,9 @@ bloomCompactor:
 bloomGateway:
   replicas: 0
   affinity: {}
+
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false

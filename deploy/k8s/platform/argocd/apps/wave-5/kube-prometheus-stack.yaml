@@ -18,6 +18,8 @@ spec:
           value: admin
         - name: prometheus.prometheusSpec.remoteWriteReceiver.enabled
           value: "true"
+        - name: prometheus-node-exporter.enabled
+          value: "false"
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
