@@ -11,7 +11,6 @@ resources:
   - ingress/minio-ingress.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
-  - vault/
   - argocd/project.yaml
   - argocd/applicationset.yaml
   - external-secrets/cluster-secret-store.yaml

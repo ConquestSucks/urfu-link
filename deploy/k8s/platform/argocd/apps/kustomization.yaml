@@ -24,6 +24,7 @@ resources:
   - wave-5/kube-prometheus-stack.yaml
   - wave-5/loki.yaml
   - wave-5/vault.yaml
+  - wave-6/vault-bootstrap.yaml
   - wave-5/platform-stateful.yaml
   
   - wave-10/headlamp.yaml
