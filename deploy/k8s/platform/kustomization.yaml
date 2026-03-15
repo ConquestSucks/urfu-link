@@ -8,6 +8,7 @@ resources:
   - ingress/frontend-web-ingress.yaml
   - ingress/vault-ingress.yaml
   - ingress/grafana-ingress.yaml
+  - ingress/minio-ingress.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
   - vault/

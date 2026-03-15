@@ -1,26 +1,27 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: argocd-server
-  namespace: argocd
+  name: minio-console
+  namespace: urfu-platform
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "off"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - argocd.ghjc.ru
-      secretName: argocd-server-tls
+        - minio.ghjc.ru
+      secretName: minio-ghjc-ru-tls
   rules:
-    - host: argocd.ghjc.ru
+    - host: minio.ghjc.ru
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: argocd-server
+                name: urfu-minio-console
                 port:
-                  number: 80
+                  number: 9090
