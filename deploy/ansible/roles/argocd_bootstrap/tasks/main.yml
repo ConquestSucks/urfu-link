@@ -69,7 +69,7 @@
         name: root-app
         namespace: argocd
       spec:
-        project: urfu-link
+        project: default
         source:
           repoURL: https://github.com/ConquestSucks/urfu-link.git
           targetRevision: master
