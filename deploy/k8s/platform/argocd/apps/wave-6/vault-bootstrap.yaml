@@ -1,25 +1,19 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: platform-stateful
+  name: vault-bootstrap
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "7"
+    argocd.argoproj.io/sync-wave: "6"
 spec:
   project: default
   source:
     repoURL: https://github.com/ConquestSucks/urfu-link.git
     targetRevision: master
-    path: deploy/k8s/platform/stateful
+    path: deploy/k8s/platform/vault
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-    retry:
-      limit: 20
-      backoff:
-        duration: 30s
-        factor: 2
-        maxDuration: 20m
