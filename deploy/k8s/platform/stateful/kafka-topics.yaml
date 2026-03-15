@@ -8,7 +8,7 @@ metadata:
 spec:
   topicName: urfu.user.events.v1
   partitions: 12
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 604800000
     cleanup.policy: delete
@@ -23,7 +23,7 @@ metadata:
 spec:
   topicName: urfu.media.events.v1
   partitions: 12
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 604800000
 ---
@@ -37,7 +37,7 @@ metadata:
 spec:
   topicName: urfu.chat.events.v1
   partitions: 12
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 1209600000
 ---
@@ -51,7 +51,7 @@ metadata:
 spec:
   topicName: urfu.presence.events.v1
   partitions: 6
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 86400000
 ---
@@ -65,7 +65,7 @@ metadata:
 spec:
   topicName: urfu.notification.events.v1
   partitions: 12
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 604800000
 ---
@@ -79,7 +79,7 @@ metadata:
 spec:
   topicName: urfu.call.events.v1
   partitions: 12
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 259200000
 ---
@@ -93,6 +93,6 @@ metadata:
 spec:
   topicName: urfu.call.events.v1.dlq
   partitions: 3
-  replicas: 3
+  replicas: 1
   config:
     retention.ms: 1209600000
