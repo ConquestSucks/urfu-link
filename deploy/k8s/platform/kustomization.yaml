@@ -25,4 +25,5 @@ resources:
   - media/coturn.yaml
   - observability/otel-collector-config.yaml
   - observability/otel-collector.yaml
+  - linkerd/certificates.yaml
   - linkerd/server-authentication.yaml
