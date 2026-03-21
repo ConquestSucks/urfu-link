@@ -10,84 +10,63 @@ stringData:
   password: "PLACEHOLDER_WILL_BE_REPLACED_BY_BOOTSTRAP"
 ---
 apiVersion: v1
-kind: ServiceAccount
+kind: Service
 metadata:
-  name: mongodb-database
+  name: urfu-mongo-svc
   namespace: urfu-platform
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  clusterIP: None
+  selector:
+    app: urfu-mongo
+  ports:
+    - port: 27017
+      targetPort: 27017
 ---
-apiVersion: mongodbcommunity.mongodb.com/v1
-kind: MongoDBCommunity
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: urfu-mongo
   namespace: urfu-platform
 spec:
-  members: 1
-  type: ReplicaSet
-  version: "8.0.5"
-  security:
-    authentication:
-      modes: ["SCRAM"]
-    tls:
-      enabled: false
-  users:
-    - name: app-user
-      db: admin
-      passwordSecretRef:
-        name: mongo-app-user-password
-      roles:
-        - name: readWrite
-          db: chat_db
-        - name: readWrite
-          db: call_db
-        - name: readWrite
-          db: presence_db
-      scramCredentialsSecretName: app-user-scram
-  statefulSet:
+  serviceName: urfu-mongo-svc
+  replicas: 1
+  selector:
+    matchLabels:
+      app: urfu-mongo
+  template:
+    metadata:
+      labels:
+        app: urfu-mongo
     spec:
-      template:
-        spec:
-          containers:
-            - name: mongod
-              resources:
-                requests:
-                  cpu: 100m
-                  memory: 256Mi
-                limits:
-                  cpu: 500m
-                  memory: 1Gi
-            - name: mongodb-agent
-              resources:
-                requests:
-                  cpu: 50m
-                  memory: 64Mi
-                limits:
-                  cpu: 250m
-                  memory: 256Mi
-          initContainers:
-            - name: mongod-posthook
-              resources:
-                requests:
-                  cpu: 50m
-                  memory: 64Mi
-                limits:
-                  cpu: 250m
-                  memory: 256Mi
-            - name: mongodb-agent-readinessprobe
-              resources:
-                requests:
-                  cpu: 50m
-                  memory: 64Mi
-                limits:
-                  cpu: 250m
-                  memory: 256Mi
-      volumeClaimTemplates:
-        - metadata:
-            name: data-volume
-          spec:
-            accessModes: ["ReadWriteOnce"]
-            resources:
-              requests:
-                storage: 100Gi
-            storageClassName: fast-ssd
+      containers:
+        - name: mongod
+          image: mongo:8.0
+          ports:
+            - containerPort: 27017
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: app-user
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-app-user-password
+                  key: password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: fast-ssd
+        resources:
+          requests:
+            storage: 10Gi
