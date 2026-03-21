@@ -12,7 +12,7 @@ spec:
           restartPolicy: OnFailure
           containers:
             - name: mongo-backup
-              image: mongo:8.0.5
+              image: mongo:8.0
               command:
                 - /bin/sh
                 - -c
