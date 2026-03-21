@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "6"
 spec:
-  project: default
+  project: urfu-link
   source:
     repoURL: https://github.com/ConquestSucks/urfu-link.git
     targetRevision: master

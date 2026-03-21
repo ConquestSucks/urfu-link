@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "5"
 spec:
-  project: default
+  project: urfu-link
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     targetRevision: 58.2.1
@@ -14,8 +14,10 @@ spec:
     helm:
       releaseName: kube-prometheus-stack
       parameters:
-        - name: grafana.adminPassword
-          value: admin
+        - name: grafana.admin.existingSecret
+          value: grafana-admin
+        - name: grafana.admin.passwordKey
+          value: admin-password
         - name: prometheus.prometheusSpec.remoteWriteReceiver.enabled
           value: "true"
         - name: prometheus-node-exporter.enabled

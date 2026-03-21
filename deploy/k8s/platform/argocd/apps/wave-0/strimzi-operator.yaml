@@ -6,10 +6,10 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 spec:
-  project: default
+  project: urfu-link
   source:
     repoURL: https://strimzi.io/charts
-    targetRevision: 0.40.0
+    targetRevision: 0.44.0
     chart: strimzi-kafka-operator
     helm:
       releaseName: strimzi-kafka

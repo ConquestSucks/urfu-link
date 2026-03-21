@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-10"
 spec:
-  project: default
+  project: urfu-link
   source:
     repoURL: https://github.com/kubernetes-sigs/gateway-api.git
     targetRevision: v1.4.0
