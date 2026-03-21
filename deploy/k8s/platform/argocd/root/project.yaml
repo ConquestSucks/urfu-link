@@ -6,14 +6,10 @@ metadata:
 spec:
   description: URFU Link environments
   sourceRepos:
-    - https://github.com/ConquestSucks/urfu-link.git
+    - '*'
   destinations:
     - namespace: "*"
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
-    - group: ""
-      kind: Namespace
-    - group: "rbac.authorization.k8s.io"
-      kind: ClusterRole
-    - group: "rbac.authorization.k8s.io"
-      kind: ClusterRoleBinding
+    - group: '*'
+      kind: '*'
