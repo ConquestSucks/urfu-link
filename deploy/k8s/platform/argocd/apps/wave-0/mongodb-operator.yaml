@@ -13,6 +13,9 @@ spec:
     chart: community-operator
     helm:
       releaseName: mongodb
+      parameters:
+        - name: operator.watchNamespace
+          value: "urfu-platform"
   destination:
     server: https://kubernetes.default.svc
     namespace: mongodb
