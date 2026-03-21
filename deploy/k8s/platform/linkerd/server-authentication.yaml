@@ -1,4 +1,4 @@
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: MeshTLSAuthentication
 metadata:
   name: cluster-authenticated
@@ -19,7 +19,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: media-service-allow-mtls
@@ -46,7 +46,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: user-service-allow-mtls
@@ -73,7 +73,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: chat-service-allow-mtls
@@ -100,7 +100,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: presence-service-allow-mtls
@@ -127,7 +127,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: notification-service-allow-mtls
@@ -154,7 +154,7 @@ spec:
   port: 8080
   proxyProtocol: HTTP/1
 ---
-apiVersion: policy.linkerd.io/v1alpha1
+apiVersion: policy.linkerd.io/v1beta1
 kind: AuthorizationPolicy
 metadata:
   name: call-service-allow-mtls
