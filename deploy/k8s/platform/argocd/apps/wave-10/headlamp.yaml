@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "10"
 spec:
-  project: default
+  project: urfu-link
   source:
     repoURL: https://kubernetes-sigs.github.io/headlamp/
     targetRevision: 0.25.0

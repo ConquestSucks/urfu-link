@@ -6,7 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-3"
 spec:
-  project: default
+  project: urfu-link
   source:
     repoURL: https://helm.linkerd.io/edge
     targetRevision: 2026.3.2
