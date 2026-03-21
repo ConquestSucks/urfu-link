@@ -1,0 +1,23 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaUser
+metadata:
+  name: urfu-services
+  namespace: urfu-platform
+  labels:
+    strimzi.io/cluster: urfu-kafka
+spec:
+  authentication:
+    type: scram-sha-512
+  authorization:
+    type: simple
+    acls:
+      - resource:
+          type: topic
+          name: urfu.
+          patternType: prefix
+        operations: [Read, Write, Describe, Create]
+      - resource:
+          type: group
+          name: ""
+          patternType: prefix
+        operations: [Read]

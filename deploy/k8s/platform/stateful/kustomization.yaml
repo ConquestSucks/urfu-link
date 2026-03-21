@@ -4,11 +4,9 @@ kind: Kustomization
 resources:
   - storageclass-fast-ssd.yaml
   - postgres-cluster.yaml
-  - postgres-scheduled-backup.yaml
   - mongodb-cluster.yaml
   - mongodb-backup-cronjob.yaml
-  - redis-cluster.yaml
-  - redis-backup-cronjob.yaml
+  - redis.yaml
   - platform-bootstrap-job.yaml
   - minio-bootstrap-job.yaml
   - minio-tenant.yaml
@@ -16,3 +14,4 @@ resources:
   - kafka-cluster.yaml
   - kafka-mixed-pool.yaml
   - kafka-topics.yaml
+  - kafka-users.yaml
