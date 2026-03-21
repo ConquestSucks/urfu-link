@@ -29,6 +29,28 @@ public static class KafkaConsumerBackgroundLoop
                 AutoOffsetReset = AutoOffsetReset.Earliest,
             };
 
+            if (Enum.TryParse<SecurityProtocol>(configuration["Kafka:SecurityProtocol"], ignoreCase: true, out var securityProtocol))
+            {
+                consumerConfig.SecurityProtocol = securityProtocol;
+            }
+
+            if (Enum.TryParse<SaslMechanism>(configuration["Kafka:SaslMechanism"], ignoreCase: true, out var saslMechanism))
+            {
+                consumerConfig.SaslMechanism = saslMechanism;
+            }
+
+            var saslUsername = configuration["Kafka:SaslUsername"];
+            if (!string.IsNullOrWhiteSpace(saslUsername))
+            {
+                consumerConfig.SaslUsername = saslUsername;
+            }
+
+            var saslPassword = configuration["Kafka:SaslPassword"];
+            if (!string.IsNullOrWhiteSpace(saslPassword))
+            {
+                consumerConfig.SaslPassword = saslPassword;
+            }
+
             using var consumer = new ConsumerBuilder<string, string>(consumerConfig).Build();
             var topic = configuration["Kafka:ConsumerTopic"] ?? defaultTopic;
             consumer.Subscribe(topic);
