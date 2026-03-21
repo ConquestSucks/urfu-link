@@ -8,11 +8,7 @@ spec:
   sourceRepos:
     - https://github.com/ConquestSucks/urfu-link.git
   destinations:
-    - namespace: urfu-prod
-      server: https://kubernetes.default.svc
-    - namespace: urfu-platform
-      server: https://kubernetes.default.svc
-    - namespace: argocd
+    - namespace: "*"
       server: https://kubernetes.default.svc
   clusterResourceWhitelist:
     - group: ""
