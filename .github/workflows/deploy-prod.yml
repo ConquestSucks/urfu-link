@@ -28,8 +28,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Argo CD CLI
+        env:
+          ARGOCD_VERSION: "v2.14.0"
         run: |
-          curl -sSL -o argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          curl -sSL -o argocd \
+            "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
+          curl -sSL -o argocd.sha256 \
+            "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64.sha256"
+          sha256sum -c argocd.sha256
           chmod +x argocd
           sudo mv argocd /usr/local/bin/argocd
 
