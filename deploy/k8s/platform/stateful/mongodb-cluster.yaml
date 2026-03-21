@@ -11,9 +11,7 @@ spec:
     authentication:
       modes: ["SCRAM"]
     tls:
-      enabled: true
-      certificateKeySecretRef:
-        name: urfu-mongo-cert
+      enabled: false
   users:
     - name: app-user
       db: admin

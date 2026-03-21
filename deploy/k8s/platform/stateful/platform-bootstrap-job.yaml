@@ -139,22 +139,27 @@ spec:
                 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ] || KEYCLOAK_ADMIN_PASSWORD="$(rand 32)"
                 [ -n "$API_GATEWAY_CLIENT_SECRET" ] || API_GATEWAY_CLIENT_SECRET="$(rand 40)"
 
-                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s"}}' \
+                GRAFANA_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" grafana_admin_password 2>/dev/null || true)"
+                [ -n "$GRAFANA_ADMIN_PASSWORD" ] || GRAFANA_ADMIN_PASSWORD="$(rand 32)"
+
+                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s"}}' \
                   "$(b64 "$USER_DB_PASSWORD")" \
                   "$(b64 "$MEDIA_DB_PASSWORD")" \
                   "$(b64 "$KEYCLOAK_DB_PASSWORD")" \
                   "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
-                  "$(b64 "$API_GATEWAY_CLIENT_SECRET")")"
+                  "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
+                  "$(b64 "$GRAFANA_ADMIN_PASSWORD")")"
 
                 if [ "$GENERATED_EXISTS" = "true" ]; then
                   patch_secret_json platform-bootstrap-generated "$GENERATED_PATCH"
                 else
-                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s"}}' \
+                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s"}}' \
                     "$(b64 "$USER_DB_PASSWORD")" \
                     "$(b64 "$MEDIA_DB_PASSWORD")" \
                     "$(b64 "$KEYCLOAK_DB_PASSWORD")" \
                     "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
-                    "$(b64 "$API_GATEWAY_CLIENT_SECRET")")"
+                    "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
+                    "$(b64 "$GRAFANA_ADMIN_PASSWORD")")"
                   create_secret_json "$GENERATED_CREATE"
                 fi
               }
@@ -234,6 +239,18 @@ spec:
                 fi
               }
 
+              wait_for_kafka_user_secret() {
+                while true; do
+                  KAFKA_SECRET_JSON="$(get_secret_json urfu-services)"
+                  KAFKA_PASSWORD_B64="$(json_get_string "$KAFKA_SECRET_JSON" password)"
+                  if [ -n "$KAFKA_PASSWORD_B64" ]; then
+                    KAFKA_PASSWORD="$(echo "$KAFKA_PASSWORD_B64" | base64 -d)"
+                    return 0
+                  fi
+                  sleep 5
+                done
+              }
+
               wait_for_vault() {
                 while true; do
                   STATUS_JSON="$(curl --silent "${VAULT_ADDR}/v1/sys/health" || true)"
@@ -267,6 +284,7 @@ spec:
               ensure_mongo_password_secret
               wait_for_postgres_superuser
               bootstrap_postgres
+              wait_for_kafka_user_secret
               wait_for_vault
               vault_login
 
@@ -274,9 +292,11 @@ spec:
               USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s"}}' "$USER_DB_PASSWORD")"
               MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
               CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
-              PRESENCE_PAYLOAD='{"data":{"primary_connection":"urfu-redis-leader.urfu-platform.svc.cluster.local:6379"}}'
+              PRESENCE_PAYLOAD='{"data":{"primary_connection":"urfu-redis.urfu-platform.svc.cluster.local:6379"}}'
               NOTIFICATION_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka-kafka-bootstrap.urfu-platform.svc.cluster.local:9092"}}'
               CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka-kafka-bootstrap.urfu-platform.svc.cluster.local:9092"}}'
+              GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
+              KAFKA_PAYLOAD="$(printf '{"data":{"username":"urfu-services","password":"%s"}}' "$KAFKA_PASSWORD")"
               API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"
 
               vault_put urfu-link/prod/keycloak "$KEYCLOAK_PAYLOAD"
@@ -286,4 +306,6 @@ spec:
               vault_put urfu-link/prod/presence-service "$PRESENCE_PAYLOAD"
               vault_put urfu-link/prod/notification-service "$NOTIFICATION_PAYLOAD"
               vault_put urfu-link/prod/call-service "$CALL_PAYLOAD"
+              vault_put urfu-link/prod/grafana "$GRAFANA_PAYLOAD"
+              vault_put urfu-link/prod/kafka "$KAFKA_PAYLOAD"
               vault_put urfu-link/prod/api-gateway "$API_GATEWAY_PAYLOAD"
