@@ -22,6 +22,7 @@ resources:
   - identity/keycloak.yaml
   - media/livekit.yaml
   - media/coturn.yaml
+  - observability/grafana-admin-secret.yaml
   - observability/otel-collector-config.yaml
   - observability/otel-collector.yaml
   - linkerd/server-authentication.yaml
