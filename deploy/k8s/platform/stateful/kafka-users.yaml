@@ -18,6 +18,6 @@ spec:
         operations: [Read, Write, Describe, Create]
       - resource:
           type: group
-          name: ""
+          name: urfu
           patternType: prefix
         operations: [Read]
