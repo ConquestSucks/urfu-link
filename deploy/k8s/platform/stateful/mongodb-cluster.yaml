@@ -39,11 +39,11 @@ spec:
             - name: mongod
               resources:
                 requests:
-                  cpu: 500m
-                  memory: 1Gi
+                  cpu: 200m
+                  memory: 512Mi
                 limits:
-                  cpu: 2000m
-                  memory: 4Gi
+                  cpu: 1000m
+                  memory: 2Gi
       volumeClaimTemplates:
         - metadata:
             name: data-volume
