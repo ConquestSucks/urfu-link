@@ -1,8 +1,21 @@
 apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-app-user-password
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+type: Opaque
+stringData:
+  password: "PLACEHOLDER_WILL_BE_REPLACED_BY_BOOTSTRAP"
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: mongodb-database
   namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
 ---
 apiVersion: mongodbcommunity.mongodb.com/v1
 kind: MongoDBCommunity

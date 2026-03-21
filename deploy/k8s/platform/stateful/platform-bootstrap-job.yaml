@@ -173,7 +173,7 @@ spec:
                   create_secret_json "$MONGO_CREATE"
                 else
                   MONGO_APP_PASSWORD="$(secret_value "$MONGO_JSON" password 2>/dev/null || true)"
-                  if [ -z "$MONGO_APP_PASSWORD" ]; then
+                  if [ -z "$MONGO_APP_PASSWORD" ] || echo "$MONGO_APP_PASSWORD" | grep -q "PLACEHOLDER"; then
                     MONGO_APP_PASSWORD="$(rand 32)"
                     MONGO_PATCH="$(printf '{"data":{"password":"%s"}}' "$(b64 "$MONGO_APP_PASSWORD")")"
                     patch_secret_json mongo-app-user-password "$MONGO_PATCH"
