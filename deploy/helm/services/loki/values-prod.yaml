@@ -80,6 +80,12 @@ bloomGateway:
   replicas: 0
   affinity: {}
 
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
 monitoring:
   selfMonitoring:
     enabled: false
