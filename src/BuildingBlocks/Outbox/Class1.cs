@@ -51,13 +51,36 @@ public static class OutboxExtensions
         services.AddSingleton<IKafkaPublisher>(_ =>
         {
             var bootstrapServers = configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
-            var producer = new ProducerBuilder<string, string>(new ProducerConfig
+            var producerConfig = new ProducerConfig
             {
                 BootstrapServers = bootstrapServers,
                 Acks = Acks.All,
                 EnableIdempotence = true,
-            }).Build();
+            };
 
+            if (Enum.TryParse<SecurityProtocol>(configuration["Kafka:SecurityProtocol"], ignoreCase: true, out var securityProtocol))
+            {
+                producerConfig.SecurityProtocol = securityProtocol;
+            }
+
+            if (Enum.TryParse<SaslMechanism>(configuration["Kafka:SaslMechanism"], ignoreCase: true, out var saslMechanism))
+            {
+                producerConfig.SaslMechanism = saslMechanism;
+            }
+
+            var saslUsername = configuration["Kafka:SaslUsername"];
+            if (!string.IsNullOrWhiteSpace(saslUsername))
+            {
+                producerConfig.SaslUsername = saslUsername;
+            }
+
+            var saslPassword = configuration["Kafka:SaslPassword"];
+            if (!string.IsNullOrWhiteSpace(saslPassword))
+            {
+                producerConfig.SaslPassword = saslPassword;
+            }
+
+            var producer = new ProducerBuilder<string, string>(producerConfig).Build();
             return new KafkaPublisher(producer);
         });
 
