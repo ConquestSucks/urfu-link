@@ -43,6 +43,17 @@
   register: argo_rollouts_install
   changed_when: '"created" in argo_rollouts_install.stdout or "configured" in argo_rollouts_install.stdout'
 
+- name: Disable argocd-server TLS redirect (ingress terminates TLS)
+  command: >-
+    k3s kubectl patch configmap argocd-cmd-params-cm -n argocd
+    --type merge -p '{"data":{"server.insecure":"true"}}'
+  register: patch_cm
+  changed_when: '"patched" in patch_cm.stdout'
+
+- name: Restart argocd-server to pick up insecure flag
+  command: k3s kubectl rollout restart deployment/argocd-server -n argocd
+  when: patch_cm.changed
+
 - name: Wait for ArgoCD server deployment
   command: k3s kubectl wait --namespace argocd --for=condition=available deployment/argocd-server --timeout=300s
   changed_when: false
