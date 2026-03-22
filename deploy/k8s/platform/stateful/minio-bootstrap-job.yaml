@@ -49,7 +49,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: minio-bootstrap
-          image: hashicorp/vault:1.16.2
+          image: hashicorp/vault:1.21.4
           env:
             - name: VAULT_ADDR
               value: "http://vault-internal.vault.svc.cluster.local:8200"
@@ -103,17 +103,16 @@ spec:
 
               SECRET_RESPONSE="$(curl --silent --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
                    -X GET ${APISERVER}/api/v1/namespaces/urfu-platform/secrets/urfu-minio-env-config || true)"
-              CONFIG_ENV_B64="$(json_get_string "$SECRET_RESPONSE" "config.env")"
+              EXISTING_USER_B64="$(json_get_string "$SECRET_RESPONSE" "root_user")"
 
-              if [ -n "$CONFIG_ENV_B64" ]; then
-                CONFIG_ENV="$(echo "$CONFIG_ENV_B64" | base64 -d)"
-                MINIO_ROOT_USER="$(echo "$CONFIG_ENV" | sed -n 's/^export MINIO_ROOT_USER=//p')"
-                MINIO_ROOT_PASSWORD="$(echo "$CONFIG_ENV" | sed -n 's/^export MINIO_ROOT_PASSWORD=//p')"
+              if [ -n "$EXISTING_USER_B64" ]; then
+                MINIO_ROOT_USER="$(echo "$EXISTING_USER_B64" | base64 -d)"
+                MINIO_ROOT_PASSWORD="$(echo "$(json_get_string "$SECRET_RESPONSE" "root_password")" | base64 -d)"
               else
                 MINIO_ROOT_USER="urfu$(rand 16)"
                 MINIO_ROOT_PASSWORD="$(rand 40)"
-                CONFIG_ENV="$(printf "export MINIO_ROOT_USER=%s\nexport MINIO_ROOT_PASSWORD=%s\n" "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD")"
-                CONFIG_ENV_B64="$(printf "%s" "$CONFIG_ENV" | base64 | tr -d '\r\n')"
+                USER_B64="$(printf "%s" "$MINIO_ROOT_USER" | base64 | tr -d '\r\n')"
+                PASS_B64="$(printf "%s" "$MINIO_ROOT_PASSWORD" | base64 | tr -d '\r\n')"
 
                 curl --fail --silent --show-error --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
                      -X POST ${APISERVER}/api/v1/namespaces/urfu-platform/secrets \
@@ -124,7 +123,8 @@ spec:
                        \"metadata\": { \"name\": \"urfu-minio-env-config\" },
                        \"type\": \"Opaque\",
                        \"data\": {
-                         \"config.env\": \"$CONFIG_ENV_B64\"
+                         \"root_user\": \"$USER_B64\",
+                         \"root_password\": \"$PASS_B64\"
                        }
                      }"
               fi
@@ -142,6 +142,6 @@ spec:
               export VAULT_TOKEN
 
               vault kv put kv/urfu-link/prod/minio \
-                  endpoint="https://urfu-minio-hl.urfu-platform.svc.cluster.local:9000" \
+                  endpoint="http://urfu-minio.urfu-platform.svc.cluster.local:9000" \
                   access_key="$MINIO_ROOT_USER" \
                   secret_key="$MINIO_ROOT_PASSWORD"

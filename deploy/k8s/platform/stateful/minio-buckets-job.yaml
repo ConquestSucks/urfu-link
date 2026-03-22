@@ -12,7 +12,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: mc
-          image: minio/mc:RELEASE.2025-02-15T10-36-16Z
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
           command:
             - /bin/sh
             - -c
@@ -21,7 +21,7 @@ spec:
               MINIO_ENDPOINT="$(cat /bootstrap/endpoint)" &&
               MINIO_ACCESS_KEY="$(cat /bootstrap/access_key)" &&
               MINIO_SECRET_KEY="$(cat /bootstrap/secret_key)" &&
-              until mc alias set --insecure minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do sleep 5; done &&
+              until mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do sleep 5; done &&
               mc mb -p minio/media-private || true &&
               mc mb -p minio/media-public || true &&
               mc anonymous set download minio/media-public
