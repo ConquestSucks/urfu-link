@@ -24,6 +24,10 @@ spec:
           value: ClusterIP
         - name: controller.kind
           value: DaemonSet
+        - name: controller.config.custom-http-errors
+          value: "400,401,403,404,405,408,429,500,502,503,504"
+        - name: controller.extraArgs.default-backend-service
+          value: ingress-nginx/custom-error-pages
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx
