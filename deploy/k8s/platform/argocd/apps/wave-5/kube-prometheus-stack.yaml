@@ -22,6 +22,22 @@ spec:
           value: "true"
         - name: prometheus-node-exporter.enabled
           value: "false"
+        - name: prometheus.prometheusSpec.retention
+          value: 3d
+        - name: prometheus.prometheusSpec.resources.requests.cpu
+          value: 100m
+        - name: prometheus.prometheusSpec.resources.requests.memory
+          value: 512Mi
+        - name: prometheus.prometheusSpec.resources.limits.memory
+          value: 1Gi
+        - name: grafana.resources.requests.cpu
+          value: 50m
+        - name: grafana.resources.requests.memory
+          value: 128Mi
+        - name: grafana.resources.limits.memory
+          value: 256Mi
+        - name: alertmanager.enabled
+          value: "false"
   destination:
     server: https://kubernetes.default.svc
     namespace: observability

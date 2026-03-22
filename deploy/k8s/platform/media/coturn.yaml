@@ -17,7 +17,7 @@ spec:
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: coturn
-          image: coturn/coturn:4.8.0-r0
+          image: coturn/coturn:4.9.0-r0
           args: ["-c", "/etc/coturn/turnserver.conf"]
           ports:
             - name: turn-udp
@@ -37,11 +37,11 @@ spec:
               mountPath: /etc/coturn
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
+              cpu: 50m
+              memory: 64Mi
             limits:
-              cpu: 500m
-              memory: 512Mi
+              cpu: 250m
+              memory: 256Mi
       volumes:
         - name: coturn-config
           configMap:

@@ -9,7 +9,7 @@ spec:
   project: urfu-link
   source:
     repoURL: https://charts.jetstack.io
-    targetRevision: v1.14.4
+    targetRevision: v1.17.2
     chart: cert-manager
     helm:
       releaseName: cert-manager

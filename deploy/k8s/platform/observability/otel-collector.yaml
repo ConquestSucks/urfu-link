@@ -4,7 +4,7 @@ metadata:
   name: otel-collector
   namespace: observability
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: otel-collector
@@ -15,13 +15,20 @@ spec:
     spec:
       containers:
         - name: otel-collector
-          image: otel/opentelemetry-collector-contrib:0.147.0
+          image: otel/opentelemetry-collector-contrib:0.148.0
           args: ["--config=/etc/otelcol-contrib/config.yaml"]
           ports:
             - containerPort: 4317
               name: grpc
             - containerPort: 4318
               name: http
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
           volumeMounts:
             - name: config
               mountPath: /etc/otelcol-contrib
