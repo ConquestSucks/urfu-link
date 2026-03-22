@@ -18,7 +18,7 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.5.6
-          args: ["start", "--http-enabled=true", "--hostname-strict=false"]
+          args: ["start", "--http-enabled=true", "--hostname-strict=false", "--proxy-headers=xforwarded"]
           env:
             - name: KC_DB
               value: postgres
@@ -55,17 +55,22 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+          startupProbe:
+            httpGet:
+              path: /realms/master
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /realms/master
               port: http
-            initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /realms/master
               port: http
-            initialDelaySeconds: 40
             periodSeconds: 20
           resources:
             requests:
