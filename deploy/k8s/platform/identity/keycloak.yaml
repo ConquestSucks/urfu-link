@@ -18,7 +18,12 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.5.6
-          args: ["start", "--http-enabled=true", "--hostname-strict=false", "--proxy-headers=xforwarded"]
+          args:
+            - "start"
+            - "--http-enabled=true"
+            - "--hostname=https://id.ghjc.ru"
+            - "--proxy-headers=xforwarded"
+            - "--cache=local"
           env:
             - name: KC_DB
               value: postgres
@@ -74,11 +79,11 @@ spec:
             periodSeconds: 20
           resources:
             requests:
-              cpu: 100m
-              memory: 384Mi
+              cpu: 200m
+              memory: 512Mi
             limits:
-              cpu: 500m
-              memory: 768Mi
+              cpu: 1000m
+              memory: 1280Mi
 ---
 apiVersion: v1
 kind: Service
