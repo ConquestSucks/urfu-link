@@ -181,17 +181,36 @@ spec:
                 fi
               }
 
-              wait_for_postgres_superuser() {
+              ensure_postgres_superuser_secret() {
                 while true; do
                   POSTGRES_SECRET_JSON="$(get_secret_json urfu-postgres-superuser)"
                   POSTGRES_PASSWORD="$(secret_value "$POSTGRES_SECRET_JSON" password 2>/dev/null || true)"
                   if [ -n "$POSTGRES_PASSWORD" ]; then
                     POSTGRES_USER="$(secret_value "$POSTGRES_SECRET_JSON" username 2>/dev/null || true)"
                     [ -n "$POSTGRES_USER" ] || POSTGRES_USER="postgres"
-                    return 0
+                    break
                   fi
                   sleep 5
                 done
+
+                if echo "$POSTGRES_PASSWORD" | grep -q "PLACEHOLDER"; then
+                  NEW_PG_PASSWORD="$(rand 32)"
+
+                  until PGPASSWORD="$POSTGRES_PASSWORD" pg_isready \
+                    -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
+                    -U "$POSTGRES_USER" -d postgres >/dev/null 2>&1; do
+                    sleep 3
+                  done
+
+                  PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 \
+                    -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
+                    -U "$POSTGRES_USER" -d postgres \
+                    -c "ALTER ROLE $POSTGRES_USER WITH PASSWORD '$NEW_PG_PASSWORD'" >/dev/null
+
+                  PG_PATCH="$(printf '{"data":{"password":"%s"}}' "$(b64 "$NEW_PG_PASSWORD")")"
+                  patch_secret_json urfu-postgres-superuser "$PG_PATCH"
+                  POSTGRES_PASSWORD="$NEW_PG_PASSWORD"
+                fi
               }
 
               pg_exec() {
@@ -239,17 +258,6 @@ spec:
                 fi
               }
 
-              wait_for_kafka_user_secret() {
-                while true; do
-                  KAFKA_SECRET_JSON="$(get_secret_json urfu-services)"
-                  KAFKA_PASSWORD_B64="$(json_get_string "$KAFKA_SECRET_JSON" password)"
-                  if [ -n "$KAFKA_PASSWORD_B64" ]; then
-                    KAFKA_PASSWORD="$(echo "$KAFKA_PASSWORD_B64" | base64 -d)"
-                    return 0
-                  fi
-                  sleep 5
-                done
-              }
 
               wait_for_vault() {
                 while true; do
@@ -282,9 +290,8 @@ spec:
 
               ensure_generated_secret
               ensure_mongo_password_secret
-              wait_for_postgres_superuser
+              ensure_postgres_superuser_secret
               bootstrap_postgres
-              wait_for_kafka_user_secret
               wait_for_vault
               vault_login
 
@@ -293,11 +300,11 @@ spec:
               MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
               CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
               PRESENCE_PAYLOAD='{"data":{"primary_connection":"urfu-redis.urfu-platform.svc.cluster.local:6379"}}'
-              NOTIFICATION_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka-kafka-bootstrap.urfu-platform.svc.cluster.local:9092"}}'
-              CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka-kafka-bootstrap.urfu-platform.svc.cluster.local:9092"}}'
+              NOTIFICATION_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
+              CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
               GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
-              KAFKA_PAYLOAD="$(printf '{"data":{"username":"urfu-services","password":"%s"}}' "$KAFKA_PASSWORD")"
-              API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"
+              KAFKA_PAYLOAD='{"data":{"bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
+              API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"  
 
               vault_put urfu-link/prod/keycloak "$KEYCLOAK_PAYLOAD"
               vault_put urfu-link/prod/user-service "$USER_PAYLOAD"
