@@ -6,6 +6,7 @@ resources:
   - wave-minus10/gateway-api.yaml
   - wave-minus10/linkerd-crds.yaml
   
+  - wave-minus5/custom-error-pages.yaml
   - wave-minus5/ingress-nginx.yaml
   - wave-minus5/cert-manager.yaml
   - wave-minus5/external-secrets.yaml
