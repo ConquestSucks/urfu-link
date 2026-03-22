@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: custom-error-pages
+  namespace: ingress-nginx
+data:
+  nginx.conf: |
+    server {
+        listen 8080;
+        server_name _;
+        root /usr/share/nginx/html;
+
+        location / {
+            try_files $uri /error-pages.html =404;
+        }
+
+        location /healthz {
+            access_log off;
+            return 200 "ok";
+            add_header Content-Type text/plain;
+        }
+    }
+  error-pages.html: |
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Error — GHJC</title>
+    <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#0a0a0f;--accent:#6366f1;--accent2:#818cf8;--text:#e2e8f0;--muted:#64748b}
+    html,body{height:100%;font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+    body{display:flex;align-items:center;justify-content:center}
+
+    .code{font-size:clamp(6rem,20vw,11rem);font-weight:900;letter-spacing:-.04em;line-height:1;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:float 4s ease-in-out infinite;position:relative}
+    .code::after{content:'';position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:60%;height:6px;border-radius:3px;background:var(--accent);opacity:.25;filter:blur(8px);animation:shadow 4s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes shadow{0%,100%{width:60%;opacity:.25}50%{width:50%;opacity:.15}}
+
+    .divider{width:48px;height:3px;border-radius:2px;background:var(--accent);margin:1.5rem auto;animation:expandLine .8s ease-out forwards;transform-origin:center}
+    @keyframes expandLine{from{width:0;opacity:0}to{width:48px;opacity:1}}
+
+    .title{font-size:clamp(1rem,3vw,1.25rem);font-weight:600;margin-bottom:.5rem;animation:fadeUp .6s ease-out .2s both}
+    .subtitle{font-size:clamp(.85rem,2vw,1rem);color:var(--muted);max-width:380px;margin:0 auto 2rem;line-height:1.6;animation:fadeUp .6s ease-out .35s both}
+    @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.75rem 1.75rem;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:.9rem;font-weight:600;cursor:pointer;text-decoration:none;transition:all .25s ease;animation:fadeUp .6s ease-out .5s both}
+    .btn:hover{background:var(--accent2);transform:translateY(-2px);box-shadow:0 8px 24px rgba(99,102,241,.3)}
+    .btn svg{width:18px;height:18px;flex-shrink:0}
+
+    .brand{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);font-size:.75rem;font-weight:700;letter-spacing:.15em;color:var(--muted);text-transform:uppercase;animation:fadeUp .6s ease-out .7s both}
+
+    .scene{position:relative;text-align:center;padding:2rem;z-index:1}
+
+    .orb{position:fixed;border-radius:50%;filter:blur(80px);opacity:.12;pointer-events:none;animation:drift 12s ease-in-out infinite}
+    .orb--1{width:400px;height:400px;background:var(--accent);top:-10%;left:-5%}
+    .orb--2{width:300px;height:300px;background:#a78bfa;bottom:-10%;right:-5%;animation-delay:-4s}
+    @keyframes drift{0%,100%{transform:translate(0,0)}33%{transform:translate(30px,-20px)}66%{transform:translate(-20px,15px)}}
+
+    .particles{position:fixed;inset:0;pointer-events:none;overflow:hidden}
+    .p{position:absolute;width:2px;height:2px;background:var(--accent2);border-radius:50%;opacity:0;animation:rise linear infinite}
+    @keyframes rise{0%{opacity:0;transform:translateY(100vh) scale(0)}10%{opacity:.5}90%{opacity:.5}100%{opacity:0;transform:translateY(-10vh) scale(1)}}
+
+    @media(prefers-reduced-motion:reduce){
+      .code,.code::after,.orb,.p{animation:none!important}
+      .code{transform:none}
+      .orb{display:none}
+      .particles{display:none}
+    }
+    </style>
+    </head>
+    <body>
+    <div class="orb orb--1"></div>
+    <div class="orb orb--2"></div>
+    <div class="particles" id="pts"></div>
+    <div class="scene">
+      <div class="code" id="code">error</div>
+      <div class="divider"></div>
+      <p class="title" id="title">Something went wrong</p>
+      <p class="subtitle" id="subtitle">An unexpected error occurred while processing your request.</p>
+      <a href="/" class="btn">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.126 1.126 0 0 1 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+        Go Home
+      </a>
+    </div>
+    <div class="brand">GHJC</div>
+    <script>
+    !function(){
+      var e=document.getElementById('pts');
+      for(var i=0;i<20;i++){var p=document.createElement('div');p.className='p';p.style.left=Math.random()*100+'%';p.style.animationDuration=6+Math.random()*8+'s';p.style.animationDelay=Math.random()*8+'s';p.style.width=p.style.height=1+Math.random()*2+'px';e.appendChild(p)}
+      var map={
+        '400':['400','Bad Request','The server could not understand the request due to invalid syntax.'],
+        '401':['401','Unauthorized','Authentication is required to access this resource.'],
+        '403':['403','Forbidden','You don\u2019t have permission to access this resource.'],
+        '404':['404','Page Not Found','The requested resource doesn\u2019t exist or has been moved.'],
+        '405':['405','Method Not Allowed','The request method is not supported for this resource.'],
+        '408':['408','Request Timeout','The server timed out waiting for the request.'],
+        '429':['429','Too Many Requests','You\u2019ve sent too many requests. Please slow down.'],
+        '500':['500','Internal Server Error','Something went wrong on our end. We\u2019re working on it.'],
+        '502':['502','Bad Gateway','The server received an invalid response from the upstream server.'],
+        '503':['503','Service Unavailable','The service is temporarily unavailable. Please try again later.'],
+        '504':['504','Gateway Timeout','The upstream server did not respond in time.']
+      };
+      var path=window.location.pathname.replace(/\//g,'');
+      var info=map[path]||map['500'];
+      document.getElementById('code').textContent=info[0];
+      document.getElementById('title').textContent=info[1];
+      document.getElementById('subtitle').textContent=info[2];
+      document.title=info[0]+' \u2014 GHJC';
+    }();
+    </script>
+    </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: custom-error-pages
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: custom-error-pages
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: custom-error-pages
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: custom-error-pages
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: nginx.conf
+              readOnly: true
+            - name: error-page
+              mountPath: /usr/share/nginx/html/error-pages.html
+              subPath: error-pages.html
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          securityContext:
+            readOnlyRootFilesystem: false
+            allowPrivilegeEscalation: false
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: custom-error-pages
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: error-page
+          configMap:
+            name: custom-error-pages
+            items:
+              - key: error-pages.html
+                path: error-pages.html
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: custom-error-pages
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: custom-error-pages
+spec:
+  selector:
+    app.kubernetes.io/name: custom-error-pages
+  ports:
+    - port: 80
+      targetPort: 8080
+      protocol: TCP

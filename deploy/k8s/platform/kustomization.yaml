@@ -10,6 +10,7 @@ resources:
   - ingress/grafana-ingress.yaml
   - ingress/minio-ingress.yaml
   - ingress/linkerd-viz-ingress.yaml
+  - ingress/custom-errors/custom-error-pages.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
   - argocd/applicationset.yaml
