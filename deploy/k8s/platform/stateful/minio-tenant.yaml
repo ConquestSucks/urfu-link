@@ -1,34 +1,97 @@
-apiVersion: minio.min.io/v2
-kind: Tenant
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: urfu-minio
   namespace: urfu-platform
 spec:
-  image: quay.io/minio/minio:RELEASE.2025-01-20T14-49-07Z
-  configuration:
-    name: urfu-minio-env-config
-  pools:
-    - name: pool-0
-      servers: 1
-      volumesPerServer: 1
-      volumeClaimTemplate:
-        metadata:
-          name: data
-        spec:
-          accessModes:
-            - ReadWriteOnce
+  serviceName: urfu-minio-hl
+  replicas: 1
+  selector:
+    matchLabels:
+      app: urfu-minio
+  template:
+    metadata:
+      labels:
+        app: urfu-minio
+    spec:
+      containers:
+        - name: minio
+          image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          env:
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-minio-env-config
+                  key: root_user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-minio-env-config
+                  key: root_password
           resources:
             requests:
-              storage: 50Gi
-          storageClassName: fast-ssd
-      resources:
-        requests:
-          memory: 1Gi
-          cpu: 100m
-        limits:
-          memory: 2Gi
-          cpu: 1000m
-  mountPath: /export
-  requestAutoCert: true
-  features:
-    bucketDNS: false
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 20
+            periodSeconds: 20
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: fast-ssd
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: urfu-minio
+  namespace: urfu-platform
+spec:
+  selector:
+    app: urfu-minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api
+    - name: console
+      port: 9001
+      targetPort: console
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: urfu-minio-hl
+  namespace: urfu-platform
+spec:
+  clusterIP: None
+  selector:
+    app: urfu-minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: api

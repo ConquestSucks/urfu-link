@@ -7,11 +7,8 @@ resources:
   - mongodb-cluster.yaml
   - mongodb-backup-cronjob.yaml
   - redis.yaml
-  - platform-bootstrap-job.yaml
-  - minio-bootstrap-job.yaml
-  - minio-tenant.yaml
-  - minio-buckets-job.yaml
   - kafka-cluster.yaml
-  - kafka-mixed-pool.yaml
-  - kafka-topics.yaml
-  - kafka-users.yaml
+  - minio-tenant.yaml
+  - minio-bootstrap-job.yaml
+  - minio-buckets-job.yaml
+  - platform-bootstrap-job.yaml
