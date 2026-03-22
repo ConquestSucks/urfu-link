@@ -9,6 +9,7 @@ resources:
   - ingress/vault-ingress.yaml
   - ingress/grafana-ingress.yaml
   - ingress/minio-ingress.yaml
+  - ingress/linkerd-viz-ingress.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
   - argocd/applicationset.yaml
