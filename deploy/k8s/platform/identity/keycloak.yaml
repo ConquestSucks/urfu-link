@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: keycloak
-          image: quay.io/keycloak/keycloak:26.5.3
+          image: quay.io/keycloak/keycloak:26.5.6
           args: ["start", "--http-enabled=true", "--hostname-strict=false"]
           env:
             - name: KC_DB
@@ -70,10 +70,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 512Mi
+              memory: 384Mi
             limits:
-              cpu: 1000m
-              memory: 1Gi
+              cpu: 500m
+              memory: 768Mi
 ---
 apiVersion: v1
 kind: Service

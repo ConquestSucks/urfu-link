@@ -9,7 +9,7 @@ spec:
   project: urfu-link
   source:
     repoURL: https://kubernetes.github.io/ingress-nginx
-    targetRevision: 4.10.0 # Use stable chart version
+    targetRevision: 4.12.0
     chart: ingress-nginx
     helm:
       releaseName: ingress-nginx

@@ -48,7 +48,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: linkerd-ca-bootstrap
-          image: alpine:3.19
+          image: alpine:3.21
           command:
             - /bin/sh
             - -c
