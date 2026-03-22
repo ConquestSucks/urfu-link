@@ -11,6 +11,10 @@ spec:
     repoURL: https://helm.linkerd.io/edge
     targetRevision: 2026.3.2
     chart: linkerd-viz
+    helm:
+      parameters:
+        - name: dashboard.enforcedHostRegexp
+          value: ".*"
   destination:
     server: https://kubernetes.default.svc
     namespace: linkerd-viz

@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: linkerd-viz-dashboard
+  namespace: linkerd-viz
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: HTTP
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - linkerd.ghjc.ru
+      secretName: linkerd-viz-tls
+  rules:
+    - host: linkerd.ghjc.ru
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8084
