@@ -9,9 +9,10 @@ data:
         listen 8080;
         server_name _;
         root /usr/share/nginx/html;
+        ssi on;
 
         location / {
-            try_files $uri /error-pages.html =404;
+            try_files /error-pages.html =404;
         }
 
         location /healthz {
@@ -102,8 +103,8 @@ data:
         '503':['503','Service Unavailable','The service is temporarily unavailable. Please try again later.'],
         '504':['504','Gateway Timeout','The upstream server did not respond in time.']
       };
-      var path=window.location.pathname.replace(/\//g,'');
-      var info=map[path]||map['500'];
+      var errorCode='<!--# echo var="http_x_code" default="500" -->';
+      var info=map[errorCode]||map['500'];
       document.getElementById('code').textContent=info[0];
       document.getElementById('title').textContent=info[1];
       document.getElementById('subtitle').textContent=info[2];

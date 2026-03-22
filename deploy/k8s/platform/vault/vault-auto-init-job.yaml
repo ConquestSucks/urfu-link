@@ -156,6 +156,9 @@ spec:
               path "kv/data/urfu-link/prod/grafana" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/linkerd-viz" {
+                capabilities = ["create", "update", "read"]
+              }
               path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
