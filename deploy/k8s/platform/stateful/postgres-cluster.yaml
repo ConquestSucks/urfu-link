@@ -1,25 +1,114 @@
-apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
+apiVersion: v1
+kind: Secret
+metadata:
+  name: urfu-postgres-superuser
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+type: Opaque
+stringData:
+  username: postgres
+  password: "PLACEHOLDER_WILL_BE_REPLACED_BY_BOOTSTRAP"
+---
+apiVersion: apps/v1
+kind: StatefulSet
 metadata:
   name: urfu-postgres
   namespace: urfu-platform
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
 spec:
-  instances: 1
-  enableSuperuserAccess: true
-  storage:
-    size: 100Gi
-    storageClass: fast-ssd
-  backup:
-    retentionPolicy: "14d"
-  resources:
-    requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 2000m
-      memory: 4Gi
-  postgresql:
-    parameters:
-      shared_buffers: "512MB"
+  serviceName: urfu-postgres-hl
+  replicas: 1
+  selector:
+    matchLabels:
+      app: urfu-postgres
+  template:
+    metadata:
+      labels:
+        app: urfu-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-postgres-superuser
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-postgres-superuser
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          args:
+            - -c
+            - shared_buffers=256MB
+            - -c
+            - max_connections=100
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: fast-ssd
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: urfu-postgres-rw
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  selector:
+    app: urfu-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: urfu-postgres-hl
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  clusterIP: None
+  selector:
+    app: urfu-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
