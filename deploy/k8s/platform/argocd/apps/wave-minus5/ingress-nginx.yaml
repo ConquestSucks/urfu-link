@@ -16,6 +16,14 @@ spec:
       parameters:
         - name: controller.admissionWebhooks.certManager.enabled
           value: "true"
+        - name: controller.hostNetwork
+          value: "true"
+        - name: controller.dnsPolicy
+          value: ClusterFirstWithHostNet
+        - name: controller.service.type
+          value: ClusterIP
+        - name: controller.kind
+          value: DaemonSet
   destination:
     server: https://kubernetes.default.svc
     namespace: ingress-nginx
