@@ -6,7 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: oauth2-proxy
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   replicas: 1
   selector:
@@ -88,7 +88,7 @@ metadata:
   labels:
     app.kubernetes.io/name: oauth2-proxy
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   selector:
     app.kubernetes.io/name: oauth2-proxy
