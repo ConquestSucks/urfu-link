@@ -284,46 +284,50 @@ spec:
                 echo "Vault initialization and configuration complete!"
               else
                 echo "Vault is already initialized."
-                # Retrieve unseal key if needed
                 APISERVER=https://kubernetes.default.svc
                 SERVICEACCOUNT=/var/run/secrets/kubernetes.io/serviceaccount
                 TOKEN=$(cat ${SERVICEACCOUNT}/token)
                 CACERT=${SERVICEACCOUNT}/ca.crt
-                
+
                 RESPONSE=$(curl --silent --cacert ${CACERT} --header "Authorization: Bearer ${TOKEN}" \
                      -X GET ${APISERVER}/api/v1/namespaces/vault/secrets/vault-keys)
-                     
-                ROOT_TOKEN_B64="$(json_get_string "$RESPONSE" root_token)"
+
                 UNSEAL_KEY_B64="$(json_get_string "$RESPONSE" unseal_key)"
-                
-                if [ ! -z "$UNSEAL_KEY_B64" ] && [ ! -z "$ROOT_TOKEN_B64" ]; then
-                  ROOT_TOKEN=$(echo "$ROOT_TOKEN_B64" | base64 -d)
-                  UNSEAL_KEY=$(echo "$UNSEAL_KEY_B64" | base64 -d)
-                  
-                  if vault status -format=json 2>/dev/null | grep -Eq '"sealed":[[:space:]]*true'; then
-                    echo "Unsealing Vault..."
-                    vault operator unseal "$UNSEAL_KEY"
-                  else
-                    echo "Vault is already unsealed."
-                  fi
 
-                  export VAULT_TOKEN="$ROOT_TOKEN"
-                  echo "Setting up Kubernetes Auth Method..."
-                  echo "Creating kv KV engine v2..."
-                  echo "Creating External Secrets policy..."
-                  echo "Binding policy to role..."
-                  configure_vault
-
-                  echo "Revoking root token and removing from vault-keys secret..."
-                  vault token revoke -self || true
-                  curl --silent --cacert "${CACERT}" \
-                    --header "Authorization: Bearer ${TOKEN}" \
-                    --header "Content-Type: application/strategic-merge-patch+json" \
-                    --request PATCH \
-                    -d '{"data":{"root_token":null}}' \
-                    "${APISERVER}/api/v1/namespaces/vault/secrets/vault-keys" >/dev/null || true
-                else
-                  echo "Could not find vault-keys secret. Cannot unseal."
+                if [ -z "$UNSEAL_KEY_B64" ]; then
+                  echo "Could not find vault-keys secret. Cannot proceed."
                   exit 1
                 fi
+
+                UNSEAL_KEY=$(echo "$UNSEAL_KEY_B64" | base64 -d)
+
+                if vault status -format=json 2>/dev/null | grep -Eq '"sealed":[[:space:]]*true'; then
+                  echo "Unsealing Vault..."
+                  vault operator unseal "$UNSEAL_KEY"
+                else
+                  echo "Vault is already unsealed."
+                fi
+
+                echo "Generating new root token for reconfiguration..."
+                INIT_JSON="$(vault operator generate-root -init -format=json)"
+                OTP="$(echo "$INIT_JSON" | sed -n 's/.*"otp"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+                NONCE="$(echo "$INIT_JSON" | sed -n 's/.*"nonce"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+                PROVIDE_JSON="$(vault operator generate-root -nonce="$NONCE" -format=json "$UNSEAL_KEY")"
+                ENCODED_TOKEN="$(echo "$PROVIDE_JSON" | sed -n 's/.*"encoded_root_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+                DECODE_JSON="$(vault operator generate-root -decode="$ENCODED_TOKEN" -otp="$OTP" -format=json)"
+                ROOT_TOKEN="$(echo "$DECODE_JSON" | sed -n 's/.*"token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+
+                if [ -z "$ROOT_TOKEN" ]; then
+                  echo "Failed to generate root token."
+                  exit 1
+                fi
+
+                export VAULT_TOKEN="$ROOT_TOKEN"
+                echo "Reconfiguring Vault policies and roles..."
+                configure_vault
+
+                echo "Revoking root token..."
+                vault token revoke -self || true
               fi
