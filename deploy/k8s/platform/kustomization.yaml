@@ -17,11 +17,13 @@ resources:
   - external-secrets/api-gateway-external-secret.yaml
   - external-secrets/services-external-secrets.yaml
   - external-secrets/minio-bootstrap-external-secret.yaml
+  - external-secrets/mongo-backup-external-secret.yaml
   - identity/keycloak-external-secret.yaml
   - identity/headlamp-external-secret.yaml
   - identity/linkerd-viz-external-secret.yaml
   - identity/linkerd-viz-oauth2-proxy.yaml
   - identity/keycloak.yaml
+  - identity/keycloak-bootstrap-job.yaml
   - media/livekit.yaml
   - media/coturn.yaml
   - observability/grafana-admin-secret.yaml

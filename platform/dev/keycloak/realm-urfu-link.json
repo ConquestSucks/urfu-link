@@ -36,6 +36,30 @@
       "protocol": "openid-connect",
       "redirectUris": ["http://localhost:3000/*"],
       "webOrigins": ["http://localhost:3000"]
+    },
+    {
+      "clientId": "linkerd-viz",
+      "name": "Linkerd Viz Dashboard",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://linkerd.ghjc.ru/oauth2/callback"],
+      "webOrigins": ["https://linkerd.ghjc.ru"]
+    },
+    {
+      "clientId": "headlamp",
+      "name": "Headlamp Dashboard",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://k8s.ghjc.ru/oidc-callback"],
+      "webOrigins": ["https://k8s.ghjc.ru"]
     }
   ]
 }
