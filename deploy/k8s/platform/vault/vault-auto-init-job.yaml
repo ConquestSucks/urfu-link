@@ -159,6 +159,27 @@ spec:
               path "kv/data/urfu-link/prod/linkerd-viz" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/mongo-backup" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/minio" {
+                capabilities = ["read"]
+              }
+              path "kv/metadata/urfu-link/prod/*" {
+                capabilities = ["read", "list"]
+              }
+              EOF_POL
+
+                vault policy write keycloak-bootstrap - <<EOF_POL
+              path "kv/data/urfu-link/prod/linkerd-viz" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/headlamp" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/keycloak" {
+                capabilities = ["read"]
+              }
               path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
@@ -180,6 +201,12 @@ spec:
                     bound_service_account_names=platform-bootstrap \
                     bound_service_account_namespaces=urfu-platform \
                     policies=platform-bootstrap \
+                    ttl=24h
+
+                vault write auth/kubernetes/role/keycloak-bootstrap \
+                    bound_service_account_names=keycloak-bootstrap \
+                    bound_service_account_namespaces=urfu-platform \
+                    policies=keycloak-bootstrap \
                     ttl=24h
               }
 

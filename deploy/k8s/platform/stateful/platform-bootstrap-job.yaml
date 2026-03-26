@@ -295,6 +295,12 @@ spec:
               wait_for_vault
               vault_login
 
+              MINIO_VAULT_RESPONSE="$(curl --silent \
+                --header "X-Vault-Token: ${VAULT_TOKEN}" \
+                "${VAULT_ADDR}/v1/kv/data/urfu-link/prod/minio")"
+              MINIO_ACCESS_KEY="$(json_get_string "$MINIO_VAULT_RESPONSE" access_key)"
+              MINIO_SECRET_KEY="$(json_get_string "$MINIO_VAULT_RESPONSE" secret_key)"
+
               KEYCLOAK_PAYLOAD="$(printf '{"data":{"admin_username":"admin","admin_password":"%s","db_host":"urfu-postgres-rw.urfu-platform.svc.cluster.local","db_name":"keycloak","db_username":"keycloak","db_password":"%s"}}' "$KEYCLOAK_ADMIN_PASSWORD" "$KEYCLOAK_DB_PASSWORD")"
               USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s"}}' "$USER_DB_PASSWORD")"
               MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
@@ -304,7 +310,9 @@ spec:
               CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
               GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
               KAFKA_PAYLOAD='{"data":{"bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
-              API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"  
+              API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"
+              MONGO_BACKUP_PAYLOAD="$(printf '{"data":{"mongo_uri":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin","minio_endpoint":"http://urfu-minio.urfu-platform.svc.cluster.local:9000","minio_access_key":"%s","minio_secret_key":"%s"}}' \
+                "$MONGO_APP_PASSWORD" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY")"  
 
               vault_put urfu-link/prod/keycloak "$KEYCLOAK_PAYLOAD"
               vault_put urfu-link/prod/user-service "$USER_PAYLOAD"
@@ -316,3 +324,4 @@ spec:
               vault_put urfu-link/prod/grafana "$GRAFANA_PAYLOAD"
               vault_put urfu-link/prod/kafka "$KAFKA_PAYLOAD"
               vault_put urfu-link/prod/api-gateway "$API_GATEWAY_PAYLOAD"
+              vault_put urfu-link/prod/mongo-backup "$MONGO_BACKUP_PAYLOAD"
