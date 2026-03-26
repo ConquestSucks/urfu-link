@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
 
       - name: Lint shared chart
         run: helm lint deploy/helm/charts/urfu-service
