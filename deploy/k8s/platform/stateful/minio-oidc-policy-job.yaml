@@ -27,6 +27,16 @@ spec:
                 secretKeyRef:
                   name: urfu-minio-env-config
                   key: root_password
+            - name: OIDC_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-oidc
+                  key: client_id
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: minio-oidc
+                  key: client_secret
           command:
             - /bin/sh
             - -c
@@ -41,5 +51,16 @@ spec:
 
               echo "Attaching consoleAdmin policy to admin group..."
               mc admin policy attach myminio consoleAdmin --group="admin" || true
+
+              echo "Configuring Keycloak OIDC provider..."
+              mc idp openid remove myminio keycloak 2>/dev/null || true
+              mc idp openid add myminio keycloak \
+                config_url="https://id.ghjc.ru/realms/urfu-link/.well-known/openid-configuration" \
+                client_id="${OIDC_CLIENT_ID}" \
+                client_secret="${OIDC_CLIENT_SECRET}" \
+                claim_name="groups" \
+                display_name="Keycloak SSO" \
+                scopes="openid,profile,email,roles" \
+                redirect_uri="https://minio.ghjc.ru/oauth_callback"
 
               echo "MinIO OIDC policy configuration complete!"
