@@ -13,7 +13,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: minio-oidc-policy
-          image: minio/mc:RELEASE.2025-09-07T15-25-11Z
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
           env:
             - name: MINIO_ENDPOINT
               value: "http://urfu-minio.urfu-platform.svc.cluster.local:9000"
