@@ -63,4 +63,13 @@ spec:
                 scopes="openid,profile,email,roles" \
                 redirect_uri="https://minio.ghjc.ru/oauth_callback"
 
+              echo "Restarting MinIO to apply OIDC config..."
+              mc admin service restart myminio
+
+              echo "Waiting for MinIO to come back..."
+              sleep 10
+              until mc alias set myminio "${MINIO_ENDPOINT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do
+                sleep 5
+              done
+
               echo "MinIO OIDC policy configuration complete!"
