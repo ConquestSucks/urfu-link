@@ -36,25 +36,25 @@ spec:
                   key: root_password
             - name: MINIO_BROWSER_REDIRECT_URL
               value: "https://minio.ghjc.ru"
-            - name: MINIO_IDENTITY_OPENID_CONFIG_URL_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_CONFIG_URL
               value: "https://id.ghjc.ru/realms/urfu-link/.well-known/openid-configuration"
-            - name: MINIO_IDENTITY_OPENID_CLIENT_ID_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_CLIENT_ID
               valueFrom:
                 secretKeyRef:
                   name: minio-oidc
                   key: client_id
-            - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
               valueFrom:
                 secretKeyRef:
                   name: minio-oidc
                   key: client_secret
-            - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME
               value: "Keycloak SSO"
-            - name: MINIO_IDENTITY_OPENID_CLAIM_NAME_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_CLAIM_NAME
               value: "groups"
-            - name: MINIO_IDENTITY_OPENID_SCOPES_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_SCOPES
               value: "openid,profile,email,roles"
-            - name: MINIO_IDENTITY_OPENID_REDIRECT_URI_KEYCLOAK
+            - name: MINIO_IDENTITY_OPENID_REDIRECT_URI
               value: "https://minio.ghjc.ru/oauth_callback"
           resources:
             requests:
