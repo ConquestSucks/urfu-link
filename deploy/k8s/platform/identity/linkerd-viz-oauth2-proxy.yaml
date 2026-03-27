@@ -34,6 +34,7 @@ spec:
             - --skip-provider-button=true
             - --redirect-url=https://linkerd.ghjc.ru/oauth2/callback
             - --allowed-role=realm:admin
+            - --scope=openid email profile roles
             - --code-challenge-method=S256
             - --silence-ping-logging=true
           env:
