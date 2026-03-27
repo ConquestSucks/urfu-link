@@ -1,0 +1,45 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-oidc-policy
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-oidc-policy
+          image: minio/mc:RELEASE.2025-09-07T15-25-11Z
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://urfu-minio.urfu-platform.svc.cluster.local:9000"
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-minio-env-config
+                  key: root_user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-minio-env-config
+                  key: root_password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              echo "Waiting for MinIO..."
+              until mc alias set myminio "${MINIO_ENDPOINT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do
+                sleep 5
+              done
+              echo "MinIO is ready."
+
+              echo "Attaching consoleAdmin policy to admin group..."
+              mc idp openid policy attach myminio consoleAdmin --group="admin" || true
+
+              echo "MinIO OIDC policy configuration complete!"

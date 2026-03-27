@@ -38,6 +38,26 @@ spec:
           value: 256Mi
         - name: alertmanager.enabled
           value: "false"
+        - name: grafana.envFromSecret
+          value: grafana-oidc
+        - name: grafana.grafana\.ini.server.root_url
+          value: https://grafana.ghjc.ru
+        - name: grafana.grafana\.ini.auth.generic_oauth.enabled
+          value: "true"
+        - name: grafana.grafana\.ini.auth.generic_oauth.name
+          value: Keycloak
+        - name: grafana.grafana\.ini.auth.generic_oauth.allow_sign_up
+          value: "true"
+        - name: grafana.grafana\.ini.auth.generic_oauth.scopes
+          value: openid profile email roles
+        - name: grafana.grafana\.ini.auth.generic_oauth.auth_url
+          value: https://id.ghjc.ru/realms/urfu-link/protocol/openid-connect/auth
+        - name: grafana.grafana\.ini.auth.generic_oauth.token_url
+          value: https://id.ghjc.ru/realms/urfu-link/protocol/openid-connect/token
+        - name: grafana.grafana\.ini.auth.generic_oauth.api_url
+          value: https://id.ghjc.ru/realms/urfu-link/protocol/openid-connect/userinfo
+        - name: grafana.grafana\.ini.auth.generic_oauth.role_attribute_path
+          value: "contains(groups[*], 'admin') && 'Admin' || ''"
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
