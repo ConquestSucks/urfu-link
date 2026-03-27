@@ -208,6 +208,36 @@ spec:
               # Linkerd Viz OAuth2 client
               ensure_client "linkerd-viz" "https://linkerd.ghjc.ru/oauth2/callback" "https://linkerd.ghjc.ru"
               LINKERD_VIZ_SECRET="$CLIENT_SECRET"
+              LINKERD_VIZ_UUID="$CLIENT_UUID"
+
+              # Add realm-roles-to-groups mapper for oauth2-proxy
+              echo "Ensuring groups mapper on linkerd-viz client..."
+              EXISTING_MAPPERS="$(curl --silent --fail \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${LINKERD_VIZ_UUID}/protocol-mappers/models")"
+              if ! echo "$EXISTING_MAPPERS" | jq -e '.[] | select(.name=="realm roles to groups")' >/dev/null 2>&1; then
+                curl --fail --silent --show-error \
+                  -X POST \
+                  -H "Authorization: Bearer ${KC_TOKEN}" \
+                  -H "Content-Type: application/json" \
+                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${LINKERD_VIZ_UUID}/protocol-mappers/models" \
+                  -d '{
+                    "name": "realm roles to groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-usermodel-realm-role-mapper",
+                    "config": {
+                      "multivalued": "true",
+                      "id.token.claim": "true",
+                      "access.token.claim": "true",
+                      "userinfo.token.claim": "true",
+                      "claim.name": "groups",
+                      "jsonType.label": "String"
+                    }
+                  }' >/dev/null
+                echo "Groups mapper created."
+              else
+                echo "Groups mapper already exists."
+              fi
 
               # Headlamp OIDC client
               ensure_client "headlamp" "https://k8s.ghjc.ru/oidc-callback" "https://k8s.ghjc.ru"
