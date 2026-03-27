@@ -34,26 +34,6 @@ spec:
                 secretKeyRef:
                   name: urfu-minio-env-config
                   key: root_password
-            - name: MINIO_IDENTITY_OPENID_CONFIG_URL_KEYCLOAK
-              value: "https://id.ghjc.ru/realms/urfu-link/.well-known/openid-configuration"
-            - name: MINIO_IDENTITY_OPENID_CLIENT_ID_KEYCLOAK
-              valueFrom:
-                secretKeyRef:
-                  name: minio-oidc
-                  key: MINIO_IDENTITY_OPENID_CLIENT_ID_KEYCLOAK
-            - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET_KEYCLOAK
-              valueFrom:
-                secretKeyRef:
-                  name: minio-oidc
-                  key: MINIO_IDENTITY_OPENID_CLIENT_SECRET_KEYCLOAK
-            - name: MINIO_IDENTITY_OPENID_CLAIM_NAME_KEYCLOAK
-              value: "groups"
-            - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME_KEYCLOAK
-              value: "Keycloak SSO"
-            - name: MINIO_IDENTITY_OPENID_SCOPES_KEYCLOAK
-              value: "openid,profile,email,roles"
-            - name: MINIO_IDENTITY_OPENID_REDIRECT_URI_KEYCLOAK
-              value: "https://minio.ghjc.ru/oauth_callback"
           resources:
             requests:
               cpu: 100m
