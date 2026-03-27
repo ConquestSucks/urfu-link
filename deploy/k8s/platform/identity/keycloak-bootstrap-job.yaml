@@ -137,53 +137,97 @@ spec:
                 fi
               }
 
-              # ensure_client <clientId> <redirectUri> <webOrigin>
-              # Sets CLIENT_SECRET as output
+              # ensure_client <clientId> <redirectUrisJson> <webOriginsJson>
+              # Sets CLIENT_SECRET and CLIENT_UUID as output
+              # redirectUrisJson/webOriginsJson are JSON arrays, e.g. '["https://example.com/cb"]'
               ensure_client() {
-                CLIENT_ID="$1"
-                REDIRECT_URI="$2"
-                WEB_ORIGIN="$3"
+                local CL_ID="$1"
+                local REDIRECT_URIS_JSON="$2"
+                local WEB_ORIGINS_JSON="$3"
+                local IS_PUBLIC="${4:-false}"
 
-                echo "Ensuring client '${CLIENT_ID}'..."
+                echo "Ensuring client '${CL_ID}'..."
 
                 CLIENTS_JSON="$(curl --silent --fail \
                   -H "Authorization: Bearer ${KC_TOKEN}" \
-                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients?clientId=${CLIENT_ID}")"
+                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients?clientId=${CL_ID}")"
 
                 CLIENT_UUID="$(echo "$CLIENTS_JSON" | jq -r '.[0].id // empty')"
 
                 if [ -z "$CLIENT_UUID" ]; then
-                  echo "Creating client '${CLIENT_ID}'..."
+                  echo "Creating client '${CL_ID}'..."
                   curl --fail --silent --show-error \
                     -X POST \
                     -H "Authorization: Bearer ${KC_TOKEN}" \
                     -H "Content-Type: application/json" \
                     "${KEYCLOAK_URL}/admin/realms/urfu-link/clients" \
-                    -d "$(printf '{
-                      "clientId": "%s",
-                      "enabled": true,
-                      "publicClient": false,
-                      "standardFlowEnabled": true,
-                      "directAccessGrantsEnabled": false,
-                      "serviceAccountsEnabled": false,
-                      "protocol": "openid-connect",
-                      "redirectUris": ["%s"],
-                      "webOrigins": ["%s"]
-                    }' "$CLIENT_ID" "$REDIRECT_URI" "$WEB_ORIGIN")" >/dev/null
+                    -d "$(jq -n \
+                      --arg clientId "$CL_ID" \
+                      --argjson redirectUris "$REDIRECT_URIS_JSON" \
+                      --argjson webOrigins "$WEB_ORIGINS_JSON" \
+                      --argjson publicClient "$IS_PUBLIC" \
+                      '{
+                        clientId: $clientId,
+                        enabled: true,
+                        publicClient: $publicClient,
+                        standardFlowEnabled: true,
+                        directAccessGrantsEnabled: false,
+                        serviceAccountsEnabled: false,
+                        protocol: "openid-connect",
+                        redirectUris: $redirectUris,
+                        webOrigins: $webOrigins
+                      }')" >/dev/null
 
                   CLIENTS_JSON="$(curl --silent --fail \
                     -H "Authorization: Bearer ${KC_TOKEN}" \
-                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients?clientId=${CLIENT_ID}")"
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients?clientId=${CL_ID}")"
                   CLIENT_UUID="$(echo "$CLIENTS_JSON" | jq -r '.[0].id')"
                   echo "Client created with UUID: ${CLIENT_UUID}"
                 else
-                  echo "Client '${CLIENT_ID}' already exists (UUID: ${CLIENT_UUID})"
+                  echo "Client '${CL_ID}' already exists (UUID: ${CLIENT_UUID})"
                 fi
 
-                SECRET_JSON="$(curl --silent --fail \
+                if [ "$IS_PUBLIC" = "false" ]; then
+                  SECRET_JSON="$(curl --silent --fail \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CLIENT_UUID}/client-secret")"
+                  CLIENT_SECRET="$(echo "$SECRET_JSON" | jq -r '.value')"
+                else
+                  CLIENT_SECRET=""
+                fi
+              }
+
+              # ensure_groups_mapper <clientUuid>
+              # Adds realm-roles-to-groups protocol mapper if not present
+              ensure_groups_mapper() {
+                local CL_UUID="$1"
+                echo "Ensuring groups mapper on client ${CL_UUID}..."
+                EXISTING_MAPPERS="$(curl --silent --fail \
                   -H "Authorization: Bearer ${KC_TOKEN}" \
-                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CLIENT_UUID}/client-secret")"
-                CLIENT_SECRET="$(echo "$SECRET_JSON" | jq -r '.value')"
+                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CL_UUID}/protocol-mappers/models")"
+                if ! echo "$EXISTING_MAPPERS" | jq -e '.[] | select(.name=="realm roles to groups")' >/dev/null 2>&1; then
+                  curl --fail --silent --show-error \
+                    -X POST \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CL_UUID}/protocol-mappers/models" \
+                    -d '{
+                      "name": "realm roles to groups",
+                      "protocol": "openid-connect",
+                      "protocolMapper": "oidc-usermodel-realm-role-mapper",
+                      "config": {
+                        "multivalued": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups",
+                        "jsonType.label": "String"
+                      }
+                    }' >/dev/null
+                  echo "Groups mapper created."
+                else
+                  echo "Groups mapper already exists."
+                fi
               }
 
               # --- Main ---
@@ -205,43 +249,37 @@ spec:
               get_admin_token
               ensure_realm
 
-              # Linkerd Viz OAuth2 client
-              ensure_client "linkerd-viz" "https://linkerd.ghjc.ru/oauth2/callback" "https://linkerd.ghjc.ru"
+              # --- Linkerd Viz ---
+              ensure_client "linkerd-viz" '["https://linkerd.ghjc.ru/oauth2/callback"]' '["https://linkerd.ghjc.ru"]'
               LINKERD_VIZ_SECRET="$CLIENT_SECRET"
-              LINKERD_VIZ_UUID="$CLIENT_UUID"
+              ensure_groups_mapper "$CLIENT_UUID"
 
-              # Add realm-roles-to-groups mapper for oauth2-proxy
-              echo "Ensuring groups mapper on linkerd-viz client..."
-              EXISTING_MAPPERS="$(curl --silent --fail \
-                -H "Authorization: Bearer ${KC_TOKEN}" \
-                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${LINKERD_VIZ_UUID}/protocol-mappers/models")"
-              if ! echo "$EXISTING_MAPPERS" | jq -e '.[] | select(.name=="realm roles to groups")' >/dev/null 2>&1; then
-                curl --fail --silent --show-error \
-                  -X POST \
-                  -H "Authorization: Bearer ${KC_TOKEN}" \
-                  -H "Content-Type: application/json" \
-                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${LINKERD_VIZ_UUID}/protocol-mappers/models" \
-                  -d '{
-                    "name": "realm roles to groups",
-                    "protocol": "openid-connect",
-                    "protocolMapper": "oidc-usermodel-realm-role-mapper",
-                    "config": {
-                      "multivalued": "true",
-                      "id.token.claim": "true",
-                      "access.token.claim": "true",
-                      "userinfo.token.claim": "true",
-                      "claim.name": "groups",
-                      "jsonType.label": "String"
-                    }
-                  }' >/dev/null
-                echo "Groups mapper created."
-              else
-                echo "Groups mapper already exists."
-              fi
-
-              # Headlamp OIDC client
-              ensure_client "headlamp" "https://k8s.ghjc.ru/oidc-callback" "https://k8s.ghjc.ru"
+              # --- Headlamp ---
+              ensure_client "headlamp" '["https://k8s.ghjc.ru/oidc-callback"]' '["https://k8s.ghjc.ru"]'
               HEADLAMP_SECRET="$CLIENT_SECRET"
+
+              # --- ArgoCD ---
+              ensure_client "argocd" '["https://argocd.ghjc.ru/auth/callback"]' '["https://argocd.ghjc.ru"]'
+              ARGOCD_SECRET="$CLIENT_SECRET"
+              ensure_groups_mapper "$CLIENT_UUID"
+
+              # --- Vault OIDC ---
+              ensure_client "vault-oidc" '["https://vault.ghjc.ru/ui/vault/auth/oidc/oidc/callback","http://localhost:8250/oidc/callback"]' '["https://vault.ghjc.ru"]'
+              VAULT_OIDC_SECRET="$CLIENT_SECRET"
+              ensure_groups_mapper "$CLIENT_UUID"
+
+              # --- Grafana ---
+              ensure_client "grafana" '["https://grafana.ghjc.ru/login/generic_oauth"]' '["https://grafana.ghjc.ru"]'
+              GRAFANA_OIDC_SECRET="$CLIENT_SECRET"
+              ensure_groups_mapper "$CLIENT_UUID"
+
+              # --- MinIO Console ---
+              ensure_client "minio-console" '["https://minio.ghjc.ru/oauth_callback"]' '["https://minio.ghjc.ru"]'
+              MINIO_OIDC_SECRET="$CLIENT_SECRET"
+              ensure_groups_mapper "$CLIENT_UUID"
+
+              # --- Frontend Web (public client) ---
+              ensure_client "urfu-link-web" '["https://app.ghjc.ru/*"]' '["https://app.ghjc.ru"]' "true"
 
               # Cookie secret: reuse existing or generate new
               echo "Checking for existing cookie secret..."
@@ -254,15 +292,39 @@ spec:
                 echo "Reusing existing cookie secret."
               fi
 
-              # Write to Vault
-              echo "Writing linkerd-viz secrets to Vault..."
+              # --- Write secrets to Vault ---
+              echo "Writing secrets to Vault..."
               vault_put urfu-link/prod/linkerd-viz \
                 "$(printf '{"data":{"client_id":"linkerd-viz","client_secret":"%s","cookie_secret":"%s"}}' \
                   "$LINKERD_VIZ_SECRET" "$COOKIE_SECRET")"
 
-              echo "Writing headlamp secrets to Vault..."
               vault_put urfu-link/prod/headlamp \
                 "$(printf '{"data":{"client_id":"headlamp","client_secret":"%s","issuer_url":"https://id.ghjc.ru/realms/urfu-link","scopes":"openid profile email","use_pkce":"true"}}' \
                   "$HEADLAMP_SECRET")"
+
+              vault_put urfu-link/prod/argocd \
+                "$(printf '{"data":{"client_id":"argocd","client_secret":"%s"}}' \
+                  "$ARGOCD_SECRET")"
+
+              vault_put urfu-link/prod/vault-oidc \
+                "$(printf '{"data":{"client_id":"vault-oidc","client_secret":"%s"}}' \
+                  "$VAULT_OIDC_SECRET")"
+
+              vault_put urfu-link/prod/grafana-oidc \
+                "$(printf '{"data":{"client_id":"grafana","client_secret":"%s"}}' \
+                  "$GRAFANA_OIDC_SECRET")"
+
+              vault_put urfu-link/prod/minio-oidc \
+                "$(printf '{"data":{"client_id":"minio-console","client_secret":"%s"}}' \
+                  "$MINIO_OIDC_SECRET")"
+
+              # --- Update Vault OIDC config with real client secret ---
+              echo "Updating Vault OIDC auth config..."
+              curl --fail --silent --show-error \
+                --header "X-Vault-Token: ${VAULT_TOKEN}" \
+                --header "Content-Type: application/json" \
+                --request POST \
+                --data "$(printf '{"oidc_discovery_url":"https://id.ghjc.ru/realms/urfu-link","oidc_client_id":"vault-oidc","oidc_client_secret":"%s","default_role":"admin"}' "$VAULT_OIDC_SECRET")" \
+                "${VAULT_ADDR}/v1/auth/oidc/config" >/dev/null
 
               echo "Keycloak bootstrap complete!"
