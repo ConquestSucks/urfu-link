@@ -7,17 +7,24 @@ export type BackendHealth = {
 
 type ApiClientConfig = {
   baseUrl: string;
+  getAccessToken?: () => string | undefined;
 };
 
-export function createApiClient({ baseUrl }: ApiClientConfig) {
+export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
   const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
+
+  function authHeaders(): Record<string, string> {
+    const token = getAccessToken?.();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
 
   return {
     async health(): Promise<BackendHealth> {
       try {
         const response = await fetch(`${normalizedBaseUrl}/health/ready`, {
           headers: {
-            Accept: "text/plain"
+            Accept: "text/plain",
+            ...authHeaders(),
           }
         });
         const body = await response.text();

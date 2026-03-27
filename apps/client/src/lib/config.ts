@@ -8,6 +8,8 @@ export type { AppEnv } from "./env";
 export type RuntimeConfig = {
   appEnv: AppEnv;
   apiUrl: string;
+  oidcAuthority?: string;
+  oidcClientId?: string;
 };
 
 declare global {
@@ -28,6 +30,8 @@ function getRawConfig(): Partial<RuntimeConfig> {
   return {
     appEnv: webConfig.appEnv ?? extra.appEnv ?? defaultConfig.appEnv,
     apiUrl: webConfig.apiUrl ?? extra.apiUrl ?? defaultConfig.apiUrl,
+    oidcAuthority: webConfig.oidcAuthority ?? extra.oidcAuthority,
+    oidcClientId: webConfig.oidcClientId ?? extra.oidcClientId,
   };
 }
 
