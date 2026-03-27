@@ -40,7 +40,8 @@ spec:
               echo "MinIO is ready."
 
               echo "Creating admin policy for OIDC group mapping..."
-              mc admin policy create myminio admin '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*","admin:*"],"Resource":["arn:aws:s3:::*"]}]}' || true
+              printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::*"]},{"Effect":"Allow","Action":["admin:*"],"Resource":["arn:aws:s3:::*"]}]}' > /tmp/admin-policy.json
+              mc admin policy create myminio admin /tmp/admin-policy.json || true
 
               echo "Removing any stored OIDC config (env vars used instead)..."
               mc idp openid remove myminio keycloak 2>/dev/null || true
