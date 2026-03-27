@@ -40,6 +40,6 @@ spec:
               echo "MinIO is ready."
 
               echo "Attaching consoleAdmin policy to admin group..."
-              mc idp openid policy attach myminio consoleAdmin --group="admin" || true
+              mc admin policy attach myminio consoleAdmin --group="admin" || true
 
               echo "MinIO OIDC policy configuration complete!"
