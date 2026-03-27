@@ -15,6 +15,7 @@ data:
     issuer: https://id.ghjc.ru/realms/urfu-link
     clientID: argocd
     clientSecret: $argocd-oidc:oidc.keycloak.clientSecret
+    insecureSkipVerify: true
     requestedScopes:
       - openid
       - profile
