@@ -8,6 +8,8 @@ export const appEnvSchema = z.enum(APP_ENVS);
 export const runtimeConfigSchema = z.object({
   appEnv: appEnvSchema,
   apiUrl: z.string().url(),
+  oidcAuthority: z.string().url().optional(),
+  oidcClientId: z.string().optional(),
 });
 
 export type RuntimeConfigInput = z.infer<typeof runtimeConfigSchema>;
