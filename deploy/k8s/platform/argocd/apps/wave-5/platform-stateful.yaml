@@ -11,12 +11,21 @@ spec:
     repoURL: https://github.com/ConquestSucks/urfu-link.git
     targetRevision: master
     path: deploy/k8s/platform/stateful
+  ignoreDifferences:
+    - kind: Secret
+      name: urfu-postgres-superuser
+      namespace: urfu-platform
+      jsonPointers:
+        - /data/password
+        - /stringData
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
+    syncOptions:
+      - RespectIgnoreDifferences=true
     retry:
       limit: 20
       backoff:
