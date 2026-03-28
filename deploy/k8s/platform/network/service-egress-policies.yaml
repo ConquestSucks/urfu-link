@@ -141,3 +141,10 @@ spec:
           port: 8080
         - protocol: TCP
           port: 6379
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 443
