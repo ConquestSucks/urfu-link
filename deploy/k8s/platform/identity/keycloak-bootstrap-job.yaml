@@ -279,7 +279,7 @@ spec:
               ensure_groups_mapper "$CLIENT_UUID"
 
               # --- Frontend Web (public client) ---
-              ensure_client "urfu-link-web" '["https://app.ghjc.ru/*"]' '["https://app.ghjc.ru"]' "true"
+              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true"
 
               # Cookie secret: reuse existing or generate new
               echo "Checking for existing cookie secret..."
