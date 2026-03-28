@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -246,3 +246,46 @@ jobs:
         with:
           name: image-digests-${{ matrix.service }}
           path: dist/digests/${{ matrix.service }}.txt
+
+  promote-prod:
+    if: github.event_name != 'pull_request' && needs.detect-changes.outputs.any_changed == 'true'
+    needs: [build-images, detect-changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote built services
+        shell: bash
+        env:
+          MATRIX: ${{ needs.detect-changes.outputs.matrix }}
+        run: |
+          IMAGE_TAG="sha-${GITHUB_SHA::7}"
+          SERVICES=$(echo "$MATRIX" | jq -r '.include[].service')
+          for svc in $SERVICES; do
+            FILE="deploy/helm/services/${svc}/values-prod.yaml"
+            python3 -c "
+          import re, sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          tag = sys.argv[2]
+          content = path.read_text()
+          updated = re.sub(r'(^\s*tag:\s*).*$', rf'\g<1>{tag}', content, count=1, flags=re.MULTILINE)
+          if updated == content:
+              raise SystemExit(f'Failed to update tag in {path}')
+          path.write_text(updated)
+          print(f'Updated {path} -> {tag}')
+          " "$FILE" "$IMAGE_TAG"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/helm/services/*/values-prod.yaml
+          git commit -m "promote(ci): prod -> sha-${GITHUB_SHA::7}" || exit 0
+          git pull --rebase
+          git push
