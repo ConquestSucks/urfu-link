@@ -18,7 +18,8 @@ COPY apps/client/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/apps/client/dist /usr/share/nginx/html
 COPY apps/client/docker-entrypoint.sh /docker-entrypoint.sh
 USER root
-RUN chmod +x /docker-entrypoint.sh && chown -R 101:101 /usr/share/nginx/html
+RUN apk update --no-cache && apk upgrade --no-cache \
+    && chmod +x /docker-entrypoint.sh && chown -R 101:101 /usr/share/nginx/html
 USER 101
 EXPOSE 8080
 ENTRYPOINT ["/docker-entrypoint.sh"]
