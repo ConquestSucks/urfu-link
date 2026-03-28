@@ -20,16 +20,6 @@
         <div class="login-card">
             <div class="login-card-header">
                 <h1 class="login-card-title"><#nested "header"></h1>
-                <#if client?? && client.name?has_content>
-                    <div class="client-info">
-                        <span>&rarr;</span>
-                        <#if client.baseUrl?has_content>
-                            <a href="${client.baseUrl}">${client.name}</a>
-                        <#else>
-                            <span>${client.name}</span>
-                        </#if>
-                    </div>
-                </#if>
             </div>
 
             <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
@@ -48,7 +38,11 @@
         </#if>
 
         <div class="login-footer">
-            <span class="login-footer-text">urfu-link.ghjc.ru</span>
+            <#if client?? && client.baseUrl?has_content>
+                <a href="${client.baseUrl}" class="login-footer-link">${client.name!client.clientId}</a>
+            <#else>
+                <span class="login-footer-text">${(realm.displayName!'URFU Link')}</span>
+            </#if>
         </div>
     </div>
 </body>
