@@ -5,6 +5,8 @@ metadata:
   namespace: urfu-platform
   annotations:
     argocd.argoproj.io/sync-wave: "-2"
+    argocd.argoproj.io/sync-options: "Prune=false"
+    argocd.argoproj.io/compare-options: "IgnoreExtraneous"
 type: Opaque
 stringData:
   username: postgres
