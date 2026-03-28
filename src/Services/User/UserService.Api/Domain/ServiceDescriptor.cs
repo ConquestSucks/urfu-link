@@ -1,4 +1,4 @@
-namespace Urfu.Link.Services.User.Domain;
+namespace UserService.Api.Domain;
 
 public sealed record ServiceProfile(
     string ServiceName,
