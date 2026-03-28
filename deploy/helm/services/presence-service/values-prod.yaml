@@ -1,7 +1,7 @@
 nameOverride: presence-service
 fullnameOverride: presence-service
 image:
-  repository: ghcr.io/horexdev/urfu-link/presence-service
+  repository: ghcr.io/conquestsucks/urfu-link/presence-service
   pullPolicy: Always
   tag: stable
 

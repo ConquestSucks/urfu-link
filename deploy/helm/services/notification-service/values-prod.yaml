@@ -1,7 +1,7 @@
 nameOverride: notification-service
 fullnameOverride: notification-service
 image:
-  repository: ghcr.io/horexdev/urfu-link/notification-service
+  repository: ghcr.io/conquestsucks/urfu-link/notification-service
   pullPolicy: Always
   tag: stable
 
