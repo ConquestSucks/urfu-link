@@ -115,22 +115,17 @@ body {
 }
 
 /* --- Client Info --- */
-.client-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  font-size: 0.8125rem;
+.login-footer-link {
+  font-size: 0.6875rem;
   color: var(--text-muted);
-}
-
-.client-info a {
-  color: var(--accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   text-decoration: none;
+  transition: color var(--transition);
 }
 
-.client-info a:hover {
-  text-decoration: underline;
+.login-footer-link:hover {
+  color: var(--accent);
 }
 
 /* --- Form --- */

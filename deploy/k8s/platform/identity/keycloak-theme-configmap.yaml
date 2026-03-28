@@ -37,16 +37,6 @@ data:
             <div class="login-card">
                 <div class="login-card-header">
                     <h1 class="login-card-title"><#nested "header"></h1>
-                    <#if client?? && client.name?has_content>
-                        <div class="client-info">
-                            <span>&rarr;</span>
-                            <#if client.baseUrl?has_content>
-                                <a href="${client.baseUrl}">${client.name}</a>
-                            <#else>
-                                <span>${client.name}</span>
-                            </#if>
-                        </div>
-                    </#if>
                 </div>
     
                 <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
@@ -65,7 +55,11 @@ data:
             </#if>
     
             <div class="login-footer">
-                <span class="login-footer-text">urfu-link.ghjc.ru</span>
+                <#if client?? && client.baseUrl?has_content>
+                    <a href="${client.baseUrl}" class="login-footer-link">${client.name!client.clientId}</a>
+                <#else>
+                    <span class="login-footer-text">${(realm.displayName!'URFU Link')}</span>
+                </#if>
             </div>
         </div>
     </body>
@@ -545,22 +539,17 @@ data:
     }
     
     /* --- Client Info --- */
-    .client-info {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 8px;
-      font-size: 0.8125rem;
+    .login-footer-link {
+      font-size: 0.6875rem;
       color: var(--text-muted);
-    }
-    
-    .client-info a {
-      color: var(--accent);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
       text-decoration: none;
+      transition: color var(--transition);
     }
     
-    .client-info a:hover {
-      text-decoration: underline;
+    .login-footer-link:hover {
+      color: var(--accent);
     }
     
     /* --- Form --- */
