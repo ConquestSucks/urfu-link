@@ -22,6 +22,10 @@ spec:
             - --provider=keycloak-oidc
             - --oidc-issuer-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
             - --insecure-oidc-skip-issuer-verification=true
+            - --redeem-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/token
+            - --oidc-jwks-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/certs
+            - --profile-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/userinfo
+            - --validate-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/userinfo
             - --client-id=$(CLIENT_ID)
             - --client-secret=$(CLIENT_SECRET)
             - --cookie-secret=$(COOKIE_SECRET)
