@@ -22,7 +22,7 @@ secrets:
 
 rollout:
   enabled: true
-  autoPromotionEnabled: false
+  autoPromotionEnabled: true
 
 autoscaling:
   enabled: false
