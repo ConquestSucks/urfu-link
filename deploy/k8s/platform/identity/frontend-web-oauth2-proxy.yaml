@@ -27,7 +27,7 @@ spec:
             - --cookie-secret=$(COOKIE_SECRET)
             - --cookie-secure=true
             - --cookie-httponly=true
-            - --cookie-samesite=Lax
+            - --cookie-samesite=lax
             - --cookie-name=_urfu_link_oauth2
             - --cookie-expire=1h
             - --cookie-refresh=5m
