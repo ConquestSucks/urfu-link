@@ -8,15 +8,13 @@ export const appEnvSchema = z.enum(APP_ENVS);
 export const runtimeConfigSchema = z.object({
   appEnv: appEnvSchema,
   apiUrl: z.string().url(),
-  oidcAuthority: z.string().url().optional(),
-  oidcClientId: z.string().optional(),
 });
 
 export type RuntimeConfigInput = z.infer<typeof runtimeConfigSchema>;
 
 export const DEFAULT_API_URLS: Record<AppEnv, string> = {
   dev: "https://api.dev.127.0.0.1.nip.io",
-  prod: "https://api.ghjc.ru",
+  prod: "https://api.urfu-link.ghjc.ru",
 };
 
 export const ENV_KEYS = {

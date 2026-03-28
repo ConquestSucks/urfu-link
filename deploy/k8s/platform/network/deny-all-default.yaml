@@ -48,6 +48,7 @@ spec:
         values:
           - api-gateway
           - frontend-web
+          - frontend-web-oauth2-proxy
   policyTypes:
     - Ingress
   ingress:

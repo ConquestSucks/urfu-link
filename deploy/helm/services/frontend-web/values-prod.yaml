@@ -26,8 +26,6 @@ service:
 env:
   APP_ENV: prod
   EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru
-  OIDC_AUTHORITY: https://id.ghjc.ru/realms/urfu-link
-  OIDC_CLIENT_ID: urfu-link-web
 
 rollout:
   enabled: true
