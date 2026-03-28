@@ -18,4 +18,7 @@ window.__APP_CONFIG__ = {
 };
 EOF
 
+# Inject app-config.js into index.html before the closing </head> tag
+sed -i 's|</head>|<script src="/app-config.js"></script></head>|' /usr/share/nginx/html/index.html
+
 exec nginx -g 'daemon off;'
