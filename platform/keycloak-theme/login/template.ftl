@@ -11,18 +11,25 @@
 </head>
 <body>
     <div class="login-bg"></div>
-    <div class="login-bg-grid"></div>
 
     <div class="login-page">
         <div class="login-logo">
-            <a href="${properties.logoUrl!'/'}">
-                <img src="${url.resourcesPath}/img/logo.svg" alt="${realm.displayName!''}" height="36">
-            </a>
+            <img src="${url.resourcesPath}/img/logo.svg" alt="${realm.displayName!''}" height="40">
         </div>
 
         <div class="login-card">
             <div class="login-card-header">
                 <h1 class="login-card-title"><#nested "header"></h1>
+                <#if client?? && client.name?has_content>
+                    <div class="client-info">
+                        <span>&rarr;</span>
+                        <#if client.baseUrl?has_content>
+                            <a href="${client.baseUrl}">${client.name}</a>
+                        <#else>
+                            <span>${client.name}</span>
+                        </#if>
+                    </div>
+                </#if>
             </div>
 
             <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
@@ -32,12 +39,6 @@
             </#if>
 
             <#nested "form">
-
-            <#if displayInfo>
-                <div class="login-info" style="margin-top: 16px;">
-                    <#nested "info">
-                </div>
-            </#if>
         </div>
 
         <#if displayInfo>

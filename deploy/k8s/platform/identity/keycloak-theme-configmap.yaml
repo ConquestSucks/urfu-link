@@ -7,11 +7,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "-1"
 data:
   theme.properties: |
-    parent=keycloak
+    parent=base
     import=common/keycloak
+    
     locales=ru,en
+    
     styles=css/login.css
-
+    
   template.ftl: |
     <#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
     <!DOCTYPE html>
@@ -26,35 +28,42 @@ data:
     </head>
     <body>
         <div class="login-bg"></div>
-        <div class="login-bg-grid"></div>
-
+    
         <div class="login-page">
             <div class="login-logo">
-                <a href="${properties.logoUrl!'/'}">
-                    <img src="${url.resourcesPath}/img/logo.svg" alt="${realm.displayName!''}" height="36">
-                </a>
+                <img src="${url.resourcesPath}/img/logo.svg" alt="${realm.displayName!''}" height="40">
             </div>
-
+    
             <div class="login-card">
                 <div class="login-card-header">
                     <h1 class="login-card-title"><#nested "header"></h1>
+                    <#if client?? && client.name?has_content>
+                        <div class="client-info">
+                            <span>&rarr;</span>
+                            <#if client.baseUrl?has_content>
+                                <a href="${client.baseUrl}">${client.name}</a>
+                            <#else>
+                                <span>${client.name}</span>
+                            </#if>
+                        </div>
+                    </#if>
                 </div>
-
+    
                 <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
                     <div class="alert alert-${message.type}">
                         ${kcSanitize(message.summary)?no_esc}
                     </div>
                 </#if>
-
+    
                 <#nested "form">
             </div>
-
+    
             <#if displayInfo>
                 <div class="login-info">
                     <#nested "info">
                 </div>
             </#if>
-
+    
             <div class="login-footer">
                 <span class="login-footer-text">urfu-link.ghjc.ru</span>
             </div>
@@ -62,7 +71,7 @@ data:
     </body>
     </html>
     </#macro>
-
+    
   login.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password'); section>
@@ -94,7 +103,7 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <div class="form-group">
                     <label for="password" class="form-label">${msg("password")}</label>
                     <div class="form-input-wrapper form-input-password">
@@ -110,7 +119,7 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <div class="form-actions">
                     <#if realm.rememberMe && !usernameHidden??>
                         <div class="form-checkbox-wrapper">
@@ -119,12 +128,12 @@ data:
                             <label for="rememberMe">${msg("rememberMe")}</label>
                         </div>
                     </#if>
-
+    
                     <#if realm.resetPasswordAllowed>
                         <a href="${url.loginResetCredentialsUrl}" class="form-link">${msg("doForgotPassword")}</a>
                     </#if>
                 </div>
-
+    
                 <input name="credentialId" type="hidden" value="${(auth.selectedCredential!'')}">
                 <button id="kc-login" name="login" type="submit" class="btn-primary">
                     ${msg("doLogIn")}
@@ -132,7 +141,7 @@ data:
             </form>
         </#if>
     </@layout.registrationLayout>
-
+    
   login-reset-password.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayInfo=true displayMessage=!messagesPerField.existsError('username'); section>
@@ -164,7 +173,7 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <button type="submit" class="btn-primary">${msg("doSubmit")}</button>
                     <a href="${url.loginUrl}" class="form-link" style="text-align: center;">${msg("backToLogin")}</a>
@@ -178,7 +187,7 @@ data:
             </#if>
         </#if>
     </@layout.registrationLayout>
-
+    
   login-update-password.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayMessage=!messagesPerField.existsError('password','password-confirm'); section>
@@ -201,7 +210,7 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <div class="form-group">
                     <label for="password-confirm" class="form-label">${msg("passwordConfirm")}</label>
                     <div class="form-input-wrapper form-input-password">
@@ -217,7 +226,7 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <#if isAppInitiatedAction??>
                     <div class="btn-group">
                         <button name="login" type="submit" class="btn-primary">${msg("doSubmit")}</button>
@@ -229,7 +238,7 @@ data:
             </form>
         </#if>
     </@layout.registrationLayout>
-
+    
   login-otp.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp'); section>
@@ -250,7 +259,7 @@ data:
                         </#list>
                     </div>
                 </#if>
-
+    
                 <div class="form-group">
                     <label for="otp" class="form-label">${msg("loginOtpOneTime")}</label>
                     <div class="form-input-wrapper">
@@ -267,14 +276,14 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <button name="login" id="kc-login" type="submit" class="btn-primary">
                     ${msg("doLogIn")}
                 </button>
             </form>
         </#if>
     </@layout.registrationLayout>
-
+    
   login-config-totp.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp','userLabel'); section>
@@ -287,7 +296,7 @@ data:
                     <li>${msg("loginTotpStep2")}</li>
                     <li>${msg("loginTotpStep3")}</li>
                 </ol>
-
+    
                 <#if mode?? && mode = "manual">
                     <div class="totp-secret">${totp.totpSecretEncoded}</div>
                     <div class="totp-params">
@@ -308,7 +317,7 @@ data:
                     <a href="${totp.manualUrl}" class="form-link">${msg("loginTotpUnableToScan")}</a>
                 </#if>
             </div>
-
+    
             <form id="kc-totp-settings-form" action="${url.loginAction}" method="post" style="margin-top: 24px;">
                 <div class="form-group">
                     <label for="totp" class="form-label">${msg("authenticatorCode")}</label>
@@ -326,7 +335,7 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <div class="form-group">
                     <label for="userLabel" class="form-label">${msg("loginTotpDeviceName")}</label>
                     <div class="form-input-wrapper">
@@ -341,10 +350,10 @@ data:
                         </span>
                     </#if>
                 </div>
-
+    
                 <input type="hidden" name="totpSecret" value="${totp.totpSecret}">
                 <#if mode??><input type="hidden" name="mode" value="${mode}"></#if>
-
+    
                 <#if isAppInitiatedAction??>
                     <div class="btn-group">
                         <button type="submit" class="btn-primary">${msg("doSubmit")}</button>
@@ -356,7 +365,7 @@ data:
             </form>
         </#if>
     </@layout.registrationLayout>
-
+    
   error.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayMessage=false; section>
@@ -380,7 +389,7 @@ data:
             </#if>
         </#if>
     </@layout.registrationLayout>
-
+    
   info.ftl: |
     <#import "template.ftl" as layout>
     <@layout.registrationLayout displayMessage=false; section>
@@ -417,198 +426,465 @@ data:
             </#if>
         </#if>
     </@layout.registrationLayout>
-
-  messages_ru.properties: |
-    loginAccountTitle=\u0412\u0445\u043E\u0434 \u0432 \u0430\u043A\u043A\u0430\u0443\u043D\u0442
-    emailForgotTitle=\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0430\u0440\u043E\u043B\u044F
-    updatePasswordTitle=\u041D\u043E\u0432\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C
-    errorTitle=\u041E\u0448\u0438\u0431\u043A\u0430
-
-  messages_en.properties: |
-    loginAccountTitle=Sign in to your account
-    emailForgotTitle=Reset your password
-    updatePasswordTitle=New password
-    errorTitle=Error
-
-  logo.svg: |
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 40" fill="none">
-      <rect x="0" y="8" width="24" height="24" rx="6" fill="#3b82f6"/>
-      <path d="M7 20l4 4 6-8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <text x="32" y="27" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" font-size="20" font-weight="700" letter-spacing="-0.5">
-        <tspan fill="currentColor">URFU</tspan>
-        <tspan fill="#3b82f6" dx="4">Link</tspan>
-      </text>
-    </svg>
-
+    
   login.css: |
     /* ============================================================
        URFU Link — Keycloak Login Theme
+       Dark design matching the main application
        ============================================================ */
-
+    
+    /* --- Tokens --- */
     :root {
-      --bg-primary: #f0f4f8;
-      --bg-gradient-1: rgba(59, 130, 246, 0.08);
-      --bg-gradient-2: rgba(99, 102, 241, 0.06);
-      --bg-surface: rgba(255, 255, 255, 0.75);
-      --bg-surface-hover: rgba(255, 255, 255, 0.9);
-      --bg-input: rgba(255, 255, 255, 0.8);
-      --text-primary: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
+      --bg-page: #080b14;
+      --bg-card: #0f1320;
+      --bg-input: #151928;
+      --bg-input-focus: #1a1f32;
+      --text-primary: #f0f2f5;
+      --text-secondary: #8b95a8;
+      --text-muted: #505a6e;
       --accent: #3b82f6;
-      --accent-hover: #2563eb;
-      --accent-glow: rgba(59, 130, 246, 0.25);
-      --border: rgba(15, 23, 42, 0.08);
-      --border-input: rgba(15, 23, 42, 0.12);
+      --accent-hover: #5b9aff;
+      --accent-glow: rgba(59, 130, 246, 0.2);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-input: rgba(255, 255, 255, 0.08);
       --border-input-focus: rgba(59, 130, 246, 0.5);
-      --glass-blur: 20px;
-      --glass-border: rgba(255, 255, 255, 0.5);
-      --shadow-card: 0 8px 40px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+      --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4);
       --shadow-input-focus: 0 0 0 3px var(--accent-glow);
-      --error-bg: rgba(239, 68, 68, 0.08);
-      --error-border: rgba(239, 68, 68, 0.3);
-      --error-text: #dc2626;
-      --success-bg: rgba(16, 185, 129, 0.08);
-      --success-border: rgba(16, 185, 129, 0.3);
-      --success-text: #059669;
-      --warning-bg: rgba(245, 158, 11, 0.08);
-      --warning-border: rgba(245, 158, 11, 0.3);
-      --warning-text: #d97706;
-      --info-bg: rgba(59, 130, 246, 0.08);
-      --info-border: rgba(59, 130, 246, 0.3);
-      --info-text: #2563eb;
-      --logo-color: #0f172a;
+      --error-bg: rgba(239, 68, 68, 0.1);
+      --error-border: rgba(239, 68, 68, 0.2);
+      --error-text: #f87171;
+      --success-bg: rgba(34, 197, 94, 0.1);
+      --success-border: rgba(34, 197, 94, 0.2);
+      --success-text: #4ade80;
+      --warning-bg: rgba(234, 179, 8, 0.1);
+      --warning-border: rgba(234, 179, 8, 0.2);
+      --warning-text: #facc15;
+      --info-bg: rgba(59, 130, 246, 0.1);
+      --info-border: rgba(59, 130, 246, 0.2);
+      --info-text: #60a5fa;
+      --radius: 12px;
       --radius-sm: 8px;
-      --radius-md: 12px;
-      --radius-lg: 16px;
-      --radius-xl: 20px;
-      --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-      --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+      --transition: 150ms ease;
     }
-
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg-primary: #020617;
-        --bg-gradient-1: rgba(59, 130, 246, 0.12);
-        --bg-gradient-2: rgba(99, 102, 241, 0.08);
-        --bg-surface: rgba(15, 23, 42, 0.65);
-        --bg-surface-hover: rgba(15, 23, 42, 0.8);
-        --bg-input: rgba(15, 23, 42, 0.5);
-        --text-primary: #f8fafc;
-        --text-secondary: #94a3b8;
-        --text-muted: #64748b;
-        --accent: #3b82f6;
-        --accent-hover: #60a5fa;
-        --accent-glow: rgba(59, 130, 246, 0.3);
-        --border: rgba(248, 250, 252, 0.06);
-        --border-input: rgba(248, 250, 252, 0.1);
-        --border-input-focus: rgba(59, 130, 246, 0.6);
-        --glass-border: rgba(248, 250, 252, 0.08);
-        --shadow-card: 0 8px 40px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.2);
-        --error-bg: rgba(239, 68, 68, 0.12);
-        --error-border: rgba(239, 68, 68, 0.25);
-        --error-text: #f87171;
-        --success-bg: rgba(16, 185, 129, 0.12);
-        --success-border: rgba(16, 185, 129, 0.25);
-        --success-text: #34d399;
-        --warning-bg: rgba(245, 158, 11, 0.12);
-        --warning-border: rgba(245, 158, 11, 0.25);
-        --warning-text: #fbbf24;
-        --info-bg: rgba(59, 130, 246, 0.12);
-        --info-border: rgba(59, 130, 246, 0.25);
-        --info-text: #60a5fa;
-        --logo-color: #f8fafc;
-      }
-    }
-
+    
+    /* --- Reset --- */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--text-primary); background: var(--bg-primary); line-height: 1.6; min-height: 100vh; overflow-x: hidden; }
-
-    .login-bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: var(--bg-primary); }
-    .login-bg::before, .login-bg::after { content: ""; position: absolute; border-radius: 50%; filter: blur(80px); animation: float 20s ease-in-out infinite; }
-    .login-bg::before { width: 600px; height: 600px; background: var(--bg-gradient-1); top: -200px; right: -100px; }
-    .login-bg::after { width: 500px; height: 500px; background: var(--bg-gradient-2); bottom: -150px; left: -100px; animation-delay: -10s; }
-
-    .login-bg-grid { position: fixed; inset: 0; z-index: 0; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 60px 60px; mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse at center, black 0%, transparent 70%); opacity: 0.5; }
-
-    .login-page { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
-
-    .login-logo { margin-bottom: 32px; animation: fadeIn 0.6s ease-out; }
-    .login-logo svg, .login-logo img { height: 36px; width: auto; color: var(--logo-color); }
-
-    .login-card { width: 100%; max-width: 420px; background: var(--bg-surface); backdrop-filter: blur(var(--glass-blur)); -webkit-backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-border); border-radius: var(--radius-xl); padding: 36px; box-shadow: var(--shadow-card); animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
-
-    .login-card-header { text-align: center; margin-bottom: 28px; }
-    .login-card-title { font-size: 1.375rem; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; margin-bottom: 6px; }
-
-    .form-group { margin-bottom: 20px; }
-    .form-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; letter-spacing: 0.01em; }
-    .form-input-wrapper { position: relative; }
-    .form-input { width: 100%; height: 44px; padding: 0 14px; background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.9375rem; font-family: inherit; transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast); outline: none; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-primary);
+      background: var(--bg-page);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    
+    /* --- Background --- */
+    .login-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59, 130, 246, 0.08), transparent 60%),
+        var(--bg-page);
+    }
+    
+    .login-bg-grid { display: none; }
+    
+    /* --- Page Layout --- */
+    .login-page {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    
+    /* --- Logo --- */
+    .login-logo {
+      margin-bottom: 40px;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    .login-logo img {
+      height: 40px;
+      width: auto;
+    }
+    
+    /* --- Card --- */
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      box-shadow: var(--shadow-card);
+      animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    /* --- Card Header --- */
+    .login-card-header {
+      margin-bottom: 24px;
+    }
+    
+    .login-card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    
+    .login-card-subtitle {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    
+    /* --- Client Info --- */
+    .client-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+    
+    .client-info a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    
+    .client-info a:hover {
+      text-decoration: underline;
+    }
+    
+    /* --- Form --- */
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    
+    .form-input {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      font-family: inherit;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+      outline: none;
+    }
+    
     .form-input::placeholder { color: var(--text-muted); }
-    .form-input:hover { border-color: var(--border-input-focus); }
-    .form-input:focus { border-color: var(--accent); box-shadow: var(--shadow-input-focus); background: var(--bg-surface-hover); }
-    .form-input[aria-invalid="true"] { border-color: var(--error-border); box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15); }
-
-    .form-input-password { position: relative; }
-    .form-input-password .form-input { padding-right: 44px; }
-
-    .input-error { display: block; font-size: 0.8125rem; color: var(--error-text); margin-top: 6px; animation: fadeIn 0.2s ease-out; }
-
-    .form-actions { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 8px; }
-
-    .form-checkbox-wrapper { display: flex; align-items: center; gap: 8px; }
-    .form-checkbox-wrapper input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); border-radius: 4px; cursor: pointer; }
-    .form-checkbox-wrapper label { font-size: 0.8125rem; color: var(--text-secondary); cursor: pointer; user-select: none; }
-
-    .form-link { font-size: 0.8125rem; color: var(--accent); text-decoration: none; font-weight: 500; transition: color var(--transition-fast); }
-    .form-link:hover { color: var(--accent-hover); text-decoration: underline; }
-
-    .btn-primary { width: 100%; height: 44px; background: var(--accent); color: #fff; border: none; border-radius: var(--radius-md); font-size: 0.9375rem; font-weight: 600; font-family: inherit; cursor: pointer; transition: background var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast); position: relative; overflow: hidden; }
-    .btn-primary:hover { background: var(--accent-hover); box-shadow: 0 4px 16px var(--accent-glow); }
+    .form-input:hover { border-color: rgba(255, 255, 255, 0.12); }
+    
+    .form-input:focus {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-input-focus);
+      background: var(--bg-input-focus);
+    }
+    
+    .form-input[aria-invalid="true"] {
+      border-color: var(--error-border);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+    
+    /* --- Password --- */
+    .form-input-wrapper { position: relative; }
+    .form-input-password .form-input { padding-right: 42px; }
+    
+    /* --- Input Error --- */
+    .input-error {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--error-text);
+      margin-top: 4px;
+    }
+    
+    /* --- Form Actions (remember me + forgot) --- */
+    .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .form-checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .form-checkbox-wrapper input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    
+    .form-checkbox-wrapper label {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    /* --- Links --- */
+    .form-link {
+      font-size: 0.8125rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color var(--transition);
+    }
+    
+    .form-link:hover {
+      color: var(--accent-hover);
+    }
+    
+    /* --- Primary Button --- */
+    .btn-primary {
+      width: 100%;
+      height: 42px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), transform 100ms ease, box-shadow var(--transition);
+    }
+    
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    
     .btn-primary:active { transform: scale(0.98); }
-    .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
-
-    .btn-secondary { width: 100%; height: 44px; background: transparent; color: var(--text-secondary); border: 1px solid var(--border-input); border-radius: var(--radius-md); font-size: 0.9375rem; font-weight: 500; font-family: inherit; cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast); }
-    .btn-secondary:hover { background: var(--border); border-color: var(--border-input-focus); color: var(--text-primary); }
-
-    .btn-group { display: flex; gap: 12px; margin-top: 4px; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    
+    /* --- Secondary Button --- */
+    .btn-secondary {
+      width: 100%;
+      height: 42px;
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    
+    .btn-group { display: flex; gap: 10px; }
     .btn-group > * { flex: 1; }
-
-    .alert { padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.8125rem; line-height: 1.5; margin-bottom: 20px; border: 1px solid; animation: slideDown 0.3s ease-out; }
+    
+    /* --- Alerts --- */
+    .alert {
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      border: 1px solid;
+    }
+    
     .alert-error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); }
     .alert-success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
     .alert-warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
     .alert-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
-
-    .login-info { max-width: 420px; width: 100%; text-align: center; margin-top: 16px; padding: 0 16px; animation: fadeIn 0.6s ease-out 0.2s both; }
-    .login-info p { font-size: 0.8125rem; color: var(--text-muted); }
-    .login-info a { color: var(--accent); text-decoration: none; font-weight: 500; }
-    .login-info a:hover { text-decoration: underline; }
-
-    .login-footer { margin-top: 32px; text-align: center; animation: fadeIn 0.6s ease-out 0.3s both; }
-    .login-footer-text { font-size: 0.75rem; color: var(--text-muted); letter-spacing: 0.03em; }
-
-    .otp-credentials { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-    .otp-credential { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-md); cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast); }
-    .otp-credential:hover { border-color: var(--border-input-focus); background: var(--bg-surface-hover); }
+    
+    /* --- Info Block --- */
+    .login-info {
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      margin-top: 12px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+    
+    .login-info a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    
+    /* --- Footer --- */
+    .login-footer {
+      margin-top: 24px;
+      text-align: center;
+      animation: fadeIn 0.5s ease-out 0.2s both;
+    }
+    
+    .login-footer-text {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    
+    /* --- OTP --- */
+    .otp-credentials { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    
+    .otp-credential {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+    
+    .otp-credential:hover { border-color: rgba(255, 255, 255, 0.12); }
     .otp-credential input[type="radio"] { accent-color: var(--accent); }
-    .otp-credential.selected { border-color: var(--accent); background: var(--info-bg); }
-    .otp-credential-label { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); }
-
+    .otp-credential.selected { border-color: var(--accent); }
+    .otp-credential-label { font-size: 0.875rem; color: var(--text-primary); }
+    
+    /* --- TOTP --- */
     .totp-setup { text-align: center; }
-    .totp-qr { display: inline-block; padding: 16px; background: #fff; border-radius: var(--radius-md); margin: 16px 0; }
-    .totp-secret { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.875rem; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); padding: 8px 12px; word-break: break-all; margin: 12px 0; }
-    .totp-params { font-size: 0.8125rem; color: var(--text-muted); margin: 8px 0; }
-
-    .instruction { font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6; }
-
-    @keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes float { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(30px, -30px) scale(1.05); } 66% { transform: translate(-20px, 20px) scale(0.95); } }
-
-    @media (max-width: 480px) { .login-card { padding: 28px 20px; border-radius: var(--radius-lg); } .login-card-title { font-size: 1.25rem; } }
-
+    .totp-qr { display: inline-block; padding: 12px; background: #fff; border-radius: var(--radius-sm); margin: 12px 0; }
+    .totp-secret { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); padding: 8px 12px; word-break: break-all; margin: 10px 0; }
+    .totp-params { font-size: 0.75rem; color: var(--text-muted); margin: 6px 0; }
+    
+    .instruction { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; }
+    
+    /* --- Animations --- */
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* --- Mobile --- */
+    @media (max-width: 480px) {
+      .login-card { padding: 24px 20px; }
+    }
+    
+    /* --- Kill default Keycloak chrome --- */
     #kc-header, #kc-header-wrapper, .pf-v5-c-brand, .pf-v5-c-login__header, .pf-v5-c-login__footer { display: none !important; }
+    
+  logo.svg: |
+    <svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 38C29.9411 38 38 29.9411 38 20C38 10.0589 29.9411 2 20 2C10.0589 2 2 10.0589 2 20C2 29.9411 10.0589 38 20 38Z" stroke="url(#logo_g0)" stroke-width="2"/>
+      <path d="M13 19C14.6569 19 16 17.6569 16 16C16 14.3431 14.6569 13 13 13C11.3431 13 10 14.3431 10 16C10 17.6569 11.3431 19 13 19Z" fill="url(#logo_g1)"/>
+      <path d="M27 19C28.6569 19 30 17.6569 30 16C30 14.3431 28.6569 13 27 13C25.3431 13 24 14.3431 24 16C24 17.6569 25.3431 19 27 19Z" fill="url(#logo_g1)"/>
+      <path d="M20 29C21.6569 29 23 27.6569 23 26C23 24.3431 21.6569 23 20 23C18.3431 23 17 24.3431 17 26C17 27.6569 18.3431 29 20 29Z" fill="url(#logo_g1)"/>
+      <path d="M15 17.5L18 24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M25 17.5L22 24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M16 15H24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+      <text x="48" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.3" fill="#f8fafc">URFU <tspan fill="#3b82f6">LINK</tspan></text>
+      <defs>
+        <linearGradient id="logo_g0" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#60A5FA"/>
+        </linearGradient>
+        <linearGradient id="logo_g1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#60A5FA"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    
+  messages_ru.properties: |
+    loginTitle={0} — \u0412\u0445\u043E\u0434
+    loginAccountTitle=\u0412\u043E\u0439\u0442\u0438 \u0432 \u0430\u043A\u043A\u0430\u0443\u043D\u0442
+    loginSubtitle=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0434\u0430\u043D\u043D\u044B\u0435 \u0434\u043B\u044F \u0432\u0445\u043E\u0434\u0430
+    username=\u0418\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F
+    usernameOrEmail=\u0418\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 email
+    email=Email
+    password=\u041F\u0430\u0440\u043E\u043B\u044C
+    passwordNew=\u041D\u043E\u0432\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C
+    passwordConfirm=\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C
+    rememberMe=\u0417\u0430\u043F\u043E\u043C\u043D\u0438\u0442\u044C \u043C\u0435\u043D\u044F
+    doLogIn=\u0412\u043E\u0439\u0442\u0438
+    doSubmit=\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C
+    doCancel=\u041E\u0442\u043C\u0435\u043D\u0430
+    doForgotPassword=\u0417\u0430\u0431\u044B\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C?
+    backToLogin=\u041D\u0430\u0437\u0430\u0434 \u043A\u043E \u0432\u0445\u043E\u0434\u0443
+    backToApplication=\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435
+    proceedWithAction=\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C
+    emailForgotTitle=\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0430\u0440\u043E\u043B\u044F
+    emailInstruction=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 email, \u043D\u0430 \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043C\u044B \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u043C \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044E \u043F\u043E \u0441\u0431\u0440\u043E\u0441\u0443.
+    emailInstructionUsername=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F, \u043D\u0430 email \u043A\u043E\u0442\u043E\u0440\u043E\u0433\u043E \u043C\u044B \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u043C \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044E.
+    updatePasswordTitle=\u0421\u043C\u0435\u043D\u0430 \u043F\u0430\u0440\u043E\u043B\u044F
+    errorTitle=\u041E\u0448\u0438\u0431\u043A\u0430
+    loginOtpOneTime=\u041E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u044B\u0439 \u043A\u043E\u0434
+    loginTotpTitle=\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430 \u0434\u0432\u0443\u0445\u0444\u0430\u043A\u0442\u043E\u0440\u043D\u043E\u0439 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u0438
+    loginTotpStep1=\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435-\u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440
+    loginTotpStep2=\u041E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u0443\u0439\u0442\u0435 QR-\u043A\u043E\u0434 \u0438\u043B\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043B\u044E\u0447 \u0432\u0440\u0443\u0447\u043D\u0443\u044E
+    loginTotpStep3=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 \u0438\u0437 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F
+    authenticatorCode=\u041A\u043E\u0434 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430
+    loginTotpDeviceName=\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430
+    loginTotpUnableToScan=\u041D\u0435 \u043C\u043E\u0436\u0435\u0442\u0435 \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C?
+    loginTotpScanBarcode=\u041E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C QR-\u043A\u043E\u0434
+    showPassword=\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C
+    hidePassword=\u0421\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C
+    signInTo=\u0412\u0445\u043E\u0434 \u0432 {0}
+    
+  messages_en.properties: |
+    loginTitle={0} — Sign in
+    loginAccountTitle=Sign in to your account
+    loginSubtitle=Enter your credentials to continue
+    username=Username
+    usernameOrEmail=Username or email
+    email=Email
+    password=Password
+    passwordNew=New password
+    passwordConfirm=Confirm password
+    rememberMe=Remember me
+    doLogIn=Sign in
+    doSubmit=Submit
+    doCancel=Cancel
+    doForgotPassword=Forgot password?
+    backToLogin=Back to sign in
+    backToApplication=Back to application
+    proceedWithAction=Continue
+    emailForgotTitle=Reset password
+    emailInstruction=Enter your email and we will send you reset instructions.
+    emailInstructionUsername=Enter your username and we will send reset instructions to your email.
+    updatePasswordTitle=Change password
+    errorTitle=Error
+    loginOtpOneTime=One-time code
+    loginTotpTitle=Set up two-factor authentication
+    loginTotpStep1=Install an authenticator app
+    loginTotpStep2=Scan the QR code or enter the key manually
+    loginTotpStep3=Enter the code from the app
+    authenticatorCode=Authenticator code
+    loginTotpDeviceName=Device name
+    loginTotpUnableToScan=Unable to scan?
+    loginTotpScanBarcode=Scan QR code
+    showPassword=Show password
+    hidePassword=Hide password
+    signInTo=Sign in to {0}
+    
