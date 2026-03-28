@@ -19,11 +19,13 @@ spec:
         - name: oauth2-proxy
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.9.0
           args:
-            - --provider=keycloak-oidc
-            - --oidc-issuer-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
+            - --provider=oidc
+            - --oidc-issuer-url=https://id.ghjc.ru/realms/urfu-link
             - --login-url=https://id.ghjc.ru/realms/urfu-link/protocol/openid-connect/auth
+            - --redeem-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/token
+            - --oidc-jwks-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/certs
+            - --profile-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/userinfo
             - --insecure-oidc-skip-issuer-verification=true
-            - --insecure-oidc-skip-nonce=false
             - --client-id=$(CLIENT_ID)
             - --client-secret=$(CLIENT_SECRET)
             - --cookie-secret=$(COOKIE_SECRET)
