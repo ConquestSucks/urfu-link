@@ -21,6 +21,10 @@ spec:
           args:
             - --provider=keycloak-oidc
             - --oidc-issuer-url=https://id.ghjc.ru/realms/urfu-link
+            - --redeem-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/token
+            - --oidc-jwks-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/certs
+            - --profile-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/userinfo
+            - --insecure-oidc-skip-issuer-verification=true
             - --client-id=$(CLIENT_ID)
             - --client-secret=$(CLIENT_SECRET)
             - --cookie-secret=$(COOKIE_SECRET)
