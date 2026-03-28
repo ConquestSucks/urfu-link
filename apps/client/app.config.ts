@@ -12,7 +12,9 @@ const runtimeConfigSchema = z.object({
   apiUrl: z.string().url(),
 });
 
-export default ({ config }: ConfigContext): ExpoConfig => {
+type AppExpoConfig = ExpoConfig & { newArchEnabled?: boolean };
+
+export default ({ config }: ConfigContext): AppExpoConfig => {
   const appEnvResult = appEnvSchema.safeParse(process.env.APP_ENV);
   const appEnv = appEnvResult.success ? appEnvResult.data : "dev";
   const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URLS[appEnv];
