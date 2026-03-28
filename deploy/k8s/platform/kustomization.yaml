@@ -14,7 +14,6 @@ resources:
   - ingress/linkerd-viz-ingress.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
-  - network/coredns-custom.yaml
   - argocd/applicationset.yaml
   - external-secrets/cluster-secret-store.yaml
   - external-secrets/api-gateway-external-secret.yaml
