@@ -16,6 +16,7 @@ resources:
   - external-secrets/cluster-secret-store.yaml
   - external-secrets/api-gateway-external-secret.yaml
   - external-secrets/services-external-secrets.yaml
+  - external-secrets/ghcr-pull-secret.yaml
   - external-secrets/minio-bootstrap-external-secret.yaml
   - external-secrets/mongo-backup-external-secret.yaml
   - identity/keycloak-external-secret.yaml
