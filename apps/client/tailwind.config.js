@@ -1,11 +1,16 @@
 module.exports = {
   content: [
-    "./app/**/*.{ts,tsx}",
-    "./src/**/*.{ts,tsx}",
-    "../../packages/ui/src/**/*.{ts,tsx}"
+    "./app/**/*.{js,jsx,ts,tsx}",
+    "./src/**/*.{js,jsx,ts,tsx}",
   ],
+  presets: [require("nativewind/preset")],
   theme: {
-    extend: {}
+    extend: {
+      colors: {
+        brand: {
+        }
+      }
+    },
   },
-  plugins: []
+  plugins: [],
 };
