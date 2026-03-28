@@ -3,7 +3,7 @@ fullnameOverride: frontend-web
 image:
   repository: ghcr.io/conquestsucks/urfu-link/frontend-web
   pullPolicy: IfNotPresent
-  tag: sha-53007b5
+  tag: sha-c6be9f4
 
 imagePullSecrets:
   - name: ghcr-pull-secret
