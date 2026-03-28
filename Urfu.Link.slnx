@@ -31,11 +31,14 @@
     <Project Path="src/Services/User/UserService.Api/UserService.Api.csproj" />
   </Folder>
   <Folder Name="/tests/" />
+  <Folder Name="/tests/unit/">
+    <Project Path="tests/unit/UserService.UnitTests/UserService.UnitTests.csproj" />
+  </Folder>
   <Folder Name="/tests/contract/">
     <Project Path="tests/contract/ContractTests/ContractTests.csproj" />
   </Folder>
   <Folder Name="/tests/integration/">
-    <Project Path="tests/integration/IntegrationTests/IntegrationTests.csproj" />
+    <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/smoke/">
     <Project Path="tests/smoke/SmokeTests/SmokeTests.csproj" />

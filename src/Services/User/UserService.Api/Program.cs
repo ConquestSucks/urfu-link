@@ -1,45 +1,45 @@
-using Urfu.Link.BuildingBlocks.Idempotency;
+using FastEndpoints;
+using FastEndpoints.Swagger;
+using Scalar.AspNetCore;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
-using Urfu.Link.Services.User.Application;
-using Urfu.Link.Services.User.Domain;
-using Urfu.Link.Services.User.Infrastructure;
-using Urfu.Link.Services.User.Messaging;
-using Urfu.Link.Services.User.Services;
+using UserService.Api.Application.Contracts;
+using UserService.Api.Infrastructure;
+using UserService.Api.Infrastructure.OpenApi;
+using UserService.Api.Messaging;
+using UserService.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
+builder.Services.AddFastEndpoints();
+builder.Services.SwaggerDocument(o =>
+{
+    o.DocumentSettings = s =>
+    {
+        s.Title = "UserService API";
+        s.Version = "v1";
+        s.SchemaSettings.SchemaProcessors.Add(new OptionalNSwagSchemaProcessor());
+    };
+});
 builder.Services.AddServiceDefaults(builder.Configuration, "user-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
-builder.Services.AddUserModule();
+builder.Services.AddUserModule(builder.Configuration);
 
 var app = builder.Build();
 
 app.MapServiceDefaults();
+app.UseFastEndpoints(c =>
+{
+    c.Endpoints.RoutePrefix = "api/v1";
+    c.Serializer.Options.Converters.Add(new OptionalJsonConverterFactory());
+});
+app.UseSwaggerGen();
+// Point Scalar at FastEndpoints/NSwag — avoids JsonSchemaExporter crashing on Optional<T>.
+app.MapScalarApiReference(o =>
+    o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
 app.MapGrpcService<InternalApiService>();
 
-app.MapGet("/", (ServiceProfile descriptor) => Results.Ok(new
-{
-    service = descriptor.ServiceName,
-    datastore = descriptor.Datastore,
-    utc = DateTimeOffset.UtcNow,
-}));
-
-app.MapPost("/api/v1/integration/publish", async (
-    PublishSampleEventRequest request,
-    SampleEventDispatcher dispatcher,
-    CancellationToken cancellationToken) =>
-{
-    var messageId = await dispatcher.PublishAsync(request, cancellationToken).ConfigureAwait(false);
-    return Results.Accepted($"/api/v1/integration/messages/{messageId}", new { MessageId = messageId });
-})
-.RequireAuthorization()
-.AddEndpointFilter<IdempotencyEndpointFilter>();
-
 app.Run();
-
-public partial class Program;
-

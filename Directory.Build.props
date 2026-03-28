@@ -9,6 +9,6 @@
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591;CA1515;CA1848;CA1812;CA2007;CA1716</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;CA1515;CA1848;CA1812;CA2007;CA1716;CA1054;CA1056</NoWarn>
   </PropertyGroup>
 </Project>
