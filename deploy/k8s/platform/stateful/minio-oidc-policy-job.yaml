@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-oidc-policy
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  activeDeadlineSeconds: 600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-oidc-policy
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          env:
+            - name: MINIO_ENDPOINT
+              value: "http://urfu-minio.urfu-platform.svc.cluster.local:9000"
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-minio-env-config
+                  key: root_user
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: urfu-minio-env-config
+                  key: root_password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              echo "Waiting for MinIO..."
+              until mc alias set myminio "${MINIO_ENDPOINT}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" >/dev/null 2>&1; do
+                sleep 5
+              done
+              echo "MinIO is ready."
+
+              echo "Creating admin policy for OIDC group mapping..."
+              printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::*"]},{"Effect":"Allow","Action":["admin:*"],"Resource":["arn:aws:s3:::*"]}]}' > /tmp/admin-policy.json
+              mc admin policy create myminio admin /tmp/admin-policy.json || true
+
+              echo "Removing any stored OIDC config (env vars used instead)..."
+              mc idp openid remove myminio keycloak 2>/dev/null || true
+
+              echo "MinIO OIDC policy configuration complete!"

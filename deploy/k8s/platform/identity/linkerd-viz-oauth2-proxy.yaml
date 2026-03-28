@@ -6,7 +6,7 @@ metadata:
   labels:
     app.kubernetes.io/name: oauth2-proxy
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   replicas: 1
   selector:
@@ -21,8 +21,14 @@ spec:
         - name: oauth2-proxy
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.9.0
           args:
-            - --provider=keycloak-oidc
+            - --provider=oidc
+            - --skip-oidc-discovery=true
             - --oidc-issuer-url=https://id.ghjc.ru/realms/urfu-link
+            - --login-url=https://id.ghjc.ru/realms/urfu-link/protocol/openid-connect/auth
+            - --redeem-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/token
+            - --oidc-jwks-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/certs
+            - --profile-url=http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/userinfo
+            - --insecure-oidc-skip-issuer-verification=true
             - --client-id=$(CLIENT_ID)
             - --client-secret=$(CLIENT_SECRET)
             - --cookie-secret=$(COOKIE_SECRET)
@@ -33,7 +39,9 @@ spec:
             - --email-domain=*
             - --skip-provider-button=true
             - --redirect-url=https://linkerd.ghjc.ru/oauth2/callback
-            - --allowed-role=realm:admin
+            - --oidc-groups-claim=groups
+            - --allowed-group=admin
+            - --scope=openid email profile roles
             - --code-challenge-method=S256
             - --silence-ping-logging=true
           env:
@@ -88,7 +96,7 @@ metadata:
   labels:
     app.kubernetes.io/name: oauth2-proxy
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   selector:
     app.kubernetes.io/name: oauth2-proxy

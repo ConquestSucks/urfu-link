@@ -1,9 +1,12 @@
 nameOverride: frontend-web
 fullnameOverride: frontend-web
 image:
-  repository: ghcr.io/horexdev/urfu-link/frontend-web
-  pullPolicy: Always
-  tag: stable
+  repository: ghcr.io/conquestsucks/urfu-link/frontend-web
+  pullPolicy: IfNotPresent
+  tag: sha-375beb5
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
 
 replicaCount: 1
 
@@ -22,11 +25,11 @@ service:
 
 env:
   APP_ENV: prod
-  EXPO_PUBLIC_API_URL: https://api.ghjc.ru
+  EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru
 
 rollout:
   enabled: true
-  autoPromotionEnabled: false
+  autoPromotionEnabled: true
 
 autoscaling:
   enabled: false
@@ -36,7 +39,7 @@ serviceMonitor:
 
 resources:
   requests:
-    cpu: 50m
+    cpu: 25m
     memory: 64Mi
   limits:
     cpu: 200m

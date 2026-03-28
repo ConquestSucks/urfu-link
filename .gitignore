@@ -10,6 +10,7 @@
 *.user
 *.userosscache
 *.sln.docstates
+*.sln
 
 # Test artifacts
 TestResults/
@@ -35,6 +36,8 @@ artifacts/
 # Tooling
 **/.toolstarget
 node_modules/
+package-lock.json
+yarn.lock
 .pnpm-store/
 .expo/
 apps/client/dist/

@@ -18,8 +18,9 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v5
@@ -37,17 +38,63 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Resolve image metadata
         shell: bash
         run: |
-          echo "IMAGE_NAME=ghcr.io/horexdev/urfu-link/frontend-web" >> "$GITHUB_ENV"
-          echo "IMAGE_TAG=sha-${GITHUB_SHA::12}" >> "$GITHUB_ENV"
-      - uses: docker/build-push-action@v7
+          echo "IMAGE_NAME=ghcr.io/conquestsucks/urfu-link/frontend-web" >> "$GITHUB_ENV"
+          echo "IMAGE_TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: apps/client/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-            ${{ env.IMAGE_NAME }}:master
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: 1
+          ignore-unfixed: true
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.1
+
+      - name: Sign image
+        env:
+          COSIGN_YES: "true"
+        run: cosign sign "${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
+
+      - name: Promote frontend-web to prod
+        run: |
+          IMAGE_TAG="sha-${GITHUB_SHA::7}"
+          FILE="deploy/helm/services/frontend-web/values-prod.yaml"
+          python3 -c "
+          import re, sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          tag = sys.argv[2]
+          content = path.read_text()
+          updated = re.sub(r'(^\s*tag:\s*).*$', rf'\g<1>{tag}', content, count=1, flags=re.MULTILINE)
+          if updated == content:
+              raise SystemExit(f'Failed to update tag in {path}')
+          path.write_text(updated)
+          print(f'Updated {path} -> {tag}')
+          " "$FILE" "$IMAGE_TAG"
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/helm/services/frontend-web/values-prod.yaml
+          git commit -m "promote(frontend-web): prod -> sha-${GITHUB_SHA::7}" || exit 0
+          git pull --rebase
+          git push

@@ -2,6 +2,7 @@
   "realm": "urfu-link",
   "enabled": true,
   "registrationAllowed": false,
+  "loginTheme": "urfu-link",
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
@@ -36,6 +37,141 @@
       "protocol": "openid-connect",
       "redirectUris": ["http://localhost:3000/*"],
       "webOrigins": ["http://localhost:3000"]
+    },
+    {
+      "clientId": "linkerd-viz",
+      "name": "Linkerd Viz Dashboard",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://linkerd.ghjc.ru/oauth2/callback"],
+      "webOrigins": ["https://linkerd.ghjc.ru"]
+    },
+    {
+      "clientId": "headlamp",
+      "name": "Headlamp Dashboard",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://k8s.ghjc.ru/oidc-callback"],
+      "webOrigins": ["https://k8s.ghjc.ru"]
+    },
+    {
+      "clientId": "argocd",
+      "name": "ArgoCD",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://argocd.ghjc.ru/auth/callback"],
+      "webOrigins": ["https://argocd.ghjc.ru"],
+      "protocolMappers": [
+        {
+          "name": "realm roles to groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "vault-oidc",
+      "name": "Vault OIDC",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": [
+        "https://vault.ghjc.ru/ui/vault/auth/oidc/oidc/callback",
+        "http://localhost:8250/oidc/callback"
+      ],
+      "webOrigins": ["https://vault.ghjc.ru"],
+      "protocolMappers": [
+        {
+          "name": "realm roles to groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "grafana",
+      "name": "Grafana",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://grafana.ghjc.ru/login/generic_oauth"],
+      "webOrigins": ["https://grafana.ghjc.ru"],
+      "protocolMappers": [
+        {
+          "name": "realm roles to groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "minio-console",
+      "name": "MinIO Console",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "CHANGE_ME_IN_PROD",
+      "redirectUris": ["https://minio.ghjc.ru/oauth_callback"],
+      "webOrigins": ["https://minio.ghjc.ru"],
+      "protocolMappers": [
+        {
+          "name": "realm roles to groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     }
   ]
 }

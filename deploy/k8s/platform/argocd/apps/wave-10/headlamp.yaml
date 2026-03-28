@@ -7,18 +7,14 @@ metadata:
     argocd.argoproj.io/sync-wave: "10"
 spec:
   project: urfu-link
-  source:
-    repoURL: https://kubernetes-sigs.github.io/headlamp/
-    targetRevision: 0.25.0
-    chart: headlamp
-    helm:
-      releaseName: headlamp
-      valueFiles:
-        - $values/deploy/helm/services/headlamp/values-prod.yaml
   sources:
     - repoURL: https://kubernetes-sigs.github.io/headlamp/
       targetRevision: 0.25.0
       chart: headlamp
+      helm:
+        releaseName: headlamp
+        valueFiles:
+          - $values/deploy/helm/services/headlamp/values-prod.yaml
     - repoURL: https://github.com/ConquestSucks/urfu-link.git
       targetRevision: master
       ref: values

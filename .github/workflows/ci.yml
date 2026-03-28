@@ -5,9 +5,19 @@ on:
     branches: [master]
   push:
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      force_all:
+        description: "Build all service images regardless of changes"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
   packages: write
   id-token: write
 
@@ -39,7 +49,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Setup Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@v5
 
       - name: Lint shared chart
         run: helm lint deploy/helm/charts/urfu-service
@@ -56,41 +66,119 @@ jobs:
             presence-service
             notification-service
             call-service
+            frontend-web
           )
           for service in "${services[@]}"; do
             helm template "$service" deploy/helm/charts/urfu-service -f "deploy/helm/services/$service/values-dev.yaml" > /tmp/"$service"-dev.yaml
             helm template "$service" deploy/helm/charts/urfu-service -f "deploy/helm/services/$service/values-prod.yaml" > /tmp/"$service"-prod.yaml
           done
 
+  detect-changes:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+      any_changed: ${{ steps.build-matrix.outputs.any_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect changed paths
+        if: inputs.force_all != true
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared:
+              - 'src/BuildingBlocks/**'
+              - 'Directory.Build.props'
+              - 'Directory.Packages.props'
+              - 'NuGet.Config'
+            api-gateway:
+              - 'src/Gateway/ApiGateway/**'
+            media-service:
+              - 'src/Services/Media/**'
+            user-service:
+              - 'src/Services/User/**'
+            chat-service:
+              - 'src/Services/Chat/**'
+            presence-service:
+              - 'src/Services/Presence/**'
+            notification-service:
+              - 'src/Services/Notification/**'
+            call-service:
+              - 'src/Services/Call/**'
+
+      - name: Build service matrix
+        id: build-matrix
+        shell: bash
+        run: |
+          declare -A SERVICE_MAP
+          SERVICE_MAP[api-gateway]="src/Gateway/ApiGateway/Dockerfile"
+          SERVICE_MAP[media-service]="src/Services/Media/MediaService.Api/Dockerfile"
+          SERVICE_MAP[user-service]="src/Services/User/UserService.Api/Dockerfile"
+          SERVICE_MAP[chat-service]="src/Services/Chat/ChatService.Api/Dockerfile"
+          SERVICE_MAP[presence-service]="src/Services/Presence/PresenceService.Api/Dockerfile"
+          SERVICE_MAP[notification-service]="src/Services/Notification/NotificationService.Api/Dockerfile"
+          SERVICE_MAP[call-service]="src/Services/Call/CallService.Api/Dockerfile"
+
+          ALL_SERVICES=(api-gateway media-service user-service chat-service presence-service notification-service call-service)
+
+          FORCE_ALL="${{ inputs.force_all }}"
+          SHARED_CHANGED="${{ steps.filter.outputs.shared }}"
+
+          includes="[]"
+
+          if [[ "$FORCE_ALL" == "true" || "$SHARED_CHANGED" == "true" ]]; then
+            includes=$(jq -n '[
+              {"service":"api-gateway","dockerfile":"src/Gateway/ApiGateway/Dockerfile","context":"."},
+              {"service":"media-service","dockerfile":"src/Services/Media/MediaService.Api/Dockerfile","context":"."},
+              {"service":"user-service","dockerfile":"src/Services/User/UserService.Api/Dockerfile","context":"."},
+              {"service":"chat-service","dockerfile":"src/Services/Chat/ChatService.Api/Dockerfile","context":"."},
+              {"service":"presence-service","dockerfile":"src/Services/Presence/PresenceService.Api/Dockerfile","context":"."},
+              {"service":"notification-service","dockerfile":"src/Services/Notification/NotificationService.Api/Dockerfile","context":"."},
+              {"service":"call-service","dockerfile":"src/Services/Call/CallService.Api/Dockerfile","context":"."}
+            ]')
+          else
+            includes="[]"
+            for svc in "${ALL_SERVICES[@]}"; do
+              changed="${{ steps.filter.outputs.changes }}"
+              # Check individual service filter output
+              svc_changed=""
+              case "$svc" in
+                api-gateway) svc_changed="${{ steps.filter.outputs.api-gateway }}" ;;
+                media-service) svc_changed="${{ steps.filter.outputs.media-service }}" ;;
+                user-service) svc_changed="${{ steps.filter.outputs.user-service }}" ;;
+                chat-service) svc_changed="${{ steps.filter.outputs.chat-service }}" ;;
+                presence-service) svc_changed="${{ steps.filter.outputs.presence-service }}" ;;
+                notification-service) svc_changed="${{ steps.filter.outputs.notification-service }}" ;;
+                call-service) svc_changed="${{ steps.filter.outputs.call-service }}" ;;
+              esac
+
+              if [[ "$svc_changed" == "true" ]]; then
+                dockerfile="${SERVICE_MAP[$svc]}"
+                includes=$(echo "$includes" | jq --arg s "$svc" --arg d "$dockerfile" '. + [{"service":$s,"dockerfile":$d,"context":"."}]')
+              fi
+            done
+          fi
+
+          count=$(echo "$includes" | jq 'length')
+          if [[ "$count" -gt 0 ]]; then
+            matrix=$(jq -nc --argjson inc "$includes" '{"include":$inc}')
+            echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+            echo "any_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+            echo "any_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build-images:
-    if: github.event_name == 'push'
-    needs: [build-test, helm-validate]
+    if: github.event_name != 'pull_request' && needs.detect-changes.outputs.any_changed == 'true'
+    needs: [build-test, helm-validate, detect-changes]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - service: api-gateway
-            dockerfile: src/Gateway/ApiGateway/Dockerfile
-            context: .
-          - service: media-service
-            dockerfile: src/Services/Media/MediaService.Api/Dockerfile
-            context: .
-          - service: user-service
-            dockerfile: src/Services/User/UserService.Api/Dockerfile
-            context: .
-          - service: chat-service
-            dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
-            context: .
-          - service: presence-service
-            dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
-            context: .
-          - service: notification-service
-            dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
-            context: .
-          - service: call-service
-            dockerfile: src/Services/Call/CallService.Api/Dockerfile
-            context: .
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
 
     steps:
       - name: Checkout
@@ -103,15 +191,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute image name
+        run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/urfu-link/${{ matrix.service }}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}
+          images: ${{ env.IMAGE_NAME }}
           tags: |
             type=sha
             type=raw,value=stable,enable={{is_default_branch}}
-            type=raw,value=dev-local,enable={{is_default_branch}}
 
       - name: Build and push
         id: build
@@ -122,23 +215,25 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Scan image
         uses: aquasecurity/trivy-action@0.35.0
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}@${{ steps.build.outputs.digest }}
+          image-ref: ${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
           format: table
           severity: CRITICAL,HIGH
           exit-code: 1
           ignore-unfixed: true
 
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.1.0
+        uses: sigstore/cosign-installer@v4.1.1
 
       - name: Sign image
         env:
           COSIGN_YES: "true"
-        run: cosign sign "ghcr.io/${{ github.repository_owner }}/${{ matrix.service }}@${{ steps.build.outputs.digest }}"
+        run: cosign sign "${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
 
       - name: Export image digest
         shell: bash
@@ -151,3 +246,46 @@ jobs:
         with:
           name: image-digests-${{ matrix.service }}
           path: dist/digests/${{ matrix.service }}.txt
+
+  promote-prod:
+    if: github.event_name != 'pull_request' && needs.detect-changes.outputs.any_changed == 'true'
+    needs: [build-images, detect-changes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: master
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Promote built services
+        shell: bash
+        env:
+          MATRIX: ${{ needs.detect-changes.outputs.matrix }}
+        run: |
+          IMAGE_TAG="sha-${GITHUB_SHA::7}"
+          SERVICES=$(echo "$MATRIX" | jq -r '.include[].service')
+          for svc in $SERVICES; do
+            FILE="deploy/helm/services/${svc}/values-prod.yaml"
+            python3 -c "
+          import re, sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          tag = sys.argv[2]
+          content = path.read_text()
+          updated = re.sub(r'(^\s*tag:\s*).*$', rf'\g<1>{tag}', content, count=1, flags=re.MULTILINE)
+          if updated == content:
+              raise SystemExit(f'Failed to update tag in {path}')
+          path.write_text(updated)
+          print(f'Updated {path} -> {tag}')
+          " "$FILE" "$IMAGE_TAG"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deploy/helm/services/*/values-prod.yaml
+          git commit -m "promote(ci): prod -> sha-${GITHUB_SHA::7}" || exit 0
+          git pull --rebase
+          git push

@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-web-api
+  namespace: urfu-prod
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-url: "https://urfu-link.ghjc.ru/oauth2/auth"
+    nginx.ingress.kubernetes.io/auth-signin: "https://urfu-link.ghjc.ru/oauth2/start?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/auth-response-headers: "Authorization"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - urfu-link.ghjc.ru
+      secretName: urfu-link-ghjc-ru-tls
+  rules:
+    - host: urfu-link.ghjc.ru
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 8080

@@ -1,9 +1,12 @@
 nameOverride: api-gateway
 fullnameOverride: api-gateway
 image:
-  repository: ghcr.io/horexdev/urfu-link/api-gateway
-  pullPolicy: Always
-  tag: stable
+  repository: ghcr.io/conquestsucks/urfu-link/api-gateway
+  pullPolicy: IfNotPresent
+  tag: sha-706332a
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
 
 replicaCount: 1
 
@@ -19,21 +22,18 @@ secrets:
 
 rollout:
   enabled: true
-  autoPromotionEnabled: false
+  autoPromotionEnabled: true
 
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
+  enabled: false
 
 serviceMonitor:
   enabled: true
 
 resources:
   requests:
-    cpu: 200m
-    memory: 256Mi
+    cpu: 25m
+    memory: 64Mi
   limits:
-    cpu: 1000m
-    memory: 1Gi
+    cpu: 250m
+    memory: 256Mi

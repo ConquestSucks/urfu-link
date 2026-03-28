@@ -3,10 +3,10 @@ kind: Namespace
 metadata:
   name: urfu-platform
   labels:
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest
-    pod-security.kubernetes.io/audit: restricted
-    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
@@ -14,8 +14,10 @@ metadata:
   name: urfu-prod
   labels:
     linkerd.io/inject: enabled
-    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
@@ -30,5 +32,7 @@ metadata:
   name: observability
   labels:
     linkerd.io/inject: enabled
-    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
 

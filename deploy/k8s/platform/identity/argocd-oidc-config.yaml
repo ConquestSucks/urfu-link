@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  url: https://argocd.ghjc.ru
+  oidc.config: |
+    name: Keycloak
+    issuer: https://id.ghjc.ru/realms/urfu-link
+    clientID: argocd
+    clientSecret: $argocd-oidc:oidc.keycloak.clientSecret
+    insecureSkipVerify: true
+    requestedScopes:
+      - openid
+      - profile
+      - email
+      - roles
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-rbac-cm
+    app.kubernetes.io/part-of: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+data:
+  scopes: '[groups]'
+  policy.default: ''
+  policy.csv: |
+    g, admin, role:admin
