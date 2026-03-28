@@ -145,14 +145,15 @@ spec:
                 fi
               }
 
-              # ensure_client <clientId> <redirectUrisJson> <webOriginsJson>
+              # ensure_client <clientId> <redirectUrisJson> <webOriginsJson> [isPublic] [displayName] [baseUrl]
               # Sets CLIENT_SECRET and CLIENT_UUID as output
-              # redirectUrisJson/webOriginsJson are JSON arrays, e.g. '["https://example.com/cb"]'
               ensure_client() {
                 local CL_ID="$1"
                 local REDIRECT_URIS_JSON="$2"
                 local WEB_ORIGINS_JSON="$3"
                 local IS_PUBLIC="${4:-false}"
+                local DISPLAY_NAME="${5:-}"
+                local BASE_URL="${6:-}"
 
                 echo "Ensuring client '${CL_ID}'..."
 
@@ -164,18 +165,16 @@ spec:
 
                 if [ -z "$CLIENT_UUID" ]; then
                   echo "Creating client '${CL_ID}'..."
-                  curl --fail --silent --show-error \
-                    -X POST \
-                    -H "Authorization: Bearer ${KC_TOKEN}" \
-                    -H "Content-Type: application/json" \
-                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients" \
-                    -d "$(jq -n \
+                  CLIENT_JSON="$(jq -n \
                       --arg clientId "$CL_ID" \
+                      --arg name "${DISPLAY_NAME:-$CL_ID}" \
+                      --arg baseUrl "$BASE_URL" \
                       --argjson redirectUris "$REDIRECT_URIS_JSON" \
                       --argjson webOrigins "$WEB_ORIGINS_JSON" \
                       --argjson publicClient "$IS_PUBLIC" \
                       '{
                         clientId: $clientId,
+                        name: $name,
                         enabled: true,
                         publicClient: $publicClient,
                         standardFlowEnabled: true,
@@ -184,7 +183,13 @@ spec:
                         protocol: "openid-connect",
                         redirectUris: $redirectUris,
                         webOrigins: $webOrigins
-                      }')" >/dev/null
+                      } | if $baseUrl != "" then . + {baseUrl: $baseUrl} else . end')"
+                  curl --fail --silent --show-error \
+                    -X POST \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients" \
+                    -d "$CLIENT_JSON" >/dev/null
 
                   CLIENTS_JSON="$(curl --silent --fail \
                     -H "Authorization: Bearer ${KC_TOKEN}" \
@@ -192,7 +197,15 @@ spec:
                   CLIENT_UUID="$(echo "$CLIENTS_JSON" | jq -r '.[0].id')"
                   echo "Client created with UUID: ${CLIENT_UUID}"
                 else
-                  echo "Client '${CL_ID}' already exists (UUID: ${CLIENT_UUID})"
+                  echo "Client '${CL_ID}' already exists (UUID: ${CLIENT_UUID}), updating display info..."
+                  UPDATE_JSON="$(jq -n --arg name "${DISPLAY_NAME:-$CL_ID}" --arg baseUrl "$BASE_URL" \
+                    '{ name: $name } | if $baseUrl != "" then . + {baseUrl: $baseUrl} else . end')"
+                  curl --fail --silent --show-error \
+                    -X PUT \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CLIENT_UUID}" \
+                    -d "$UPDATE_JSON" >/dev/null 2>&1 || true
                 fi
 
                 if [ "$IS_PUBLIC" = "false" ]; then
@@ -258,39 +271,39 @@ spec:
               ensure_realm
 
               # --- Linkerd Viz ---
-              ensure_client "linkerd-viz" '["https://linkerd.ghjc.ru/oauth2/callback"]' '["https://linkerd.ghjc.ru"]'
+              ensure_client "linkerd-viz" '["https://linkerd.ghjc.ru/oauth2/callback"]' '["https://linkerd.ghjc.ru"]' "false" "Linkerd Dashboard" "https://linkerd.ghjc.ru"
               LINKERD_VIZ_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
               # --- Headlamp ---
-              ensure_client "headlamp" '["https://k8s.ghjc.ru/oidc-callback"]' '["https://k8s.ghjc.ru"]'
+              ensure_client "headlamp" '["https://k8s.ghjc.ru/oidc-callback"]' '["https://k8s.ghjc.ru"]' "false" "Headlamp" "https://k8s.ghjc.ru"
               HEADLAMP_SECRET="$CLIENT_SECRET"
 
               # --- ArgoCD ---
-              ensure_client "argocd" '["https://argocd.ghjc.ru/auth/callback"]' '["https://argocd.ghjc.ru"]'
+              ensure_client "argocd" '["https://argocd.ghjc.ru/auth/callback"]' '["https://argocd.ghjc.ru"]' "false" "Argo CD" "https://argocd.ghjc.ru"
               ARGOCD_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
               # --- Vault OIDC ---
-              ensure_client "vault-oidc" '["https://vault.ghjc.ru/ui/vault/auth/oidc/oidc/callback","http://localhost:8250/oidc/callback"]' '["https://vault.ghjc.ru"]'
+              ensure_client "vault-oidc" '["https://vault.ghjc.ru/ui/vault/auth/oidc/oidc/callback","http://localhost:8250/oidc/callback"]' '["https://vault.ghjc.ru"]' "false" "Vault" "https://vault.ghjc.ru"
               VAULT_OIDC_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
               # --- Grafana ---
-              ensure_client "grafana" '["https://grafana.ghjc.ru/login/generic_oauth"]' '["https://grafana.ghjc.ru"]'
+              ensure_client "grafana" '["https://grafana.ghjc.ru/login/generic_oauth"]' '["https://grafana.ghjc.ru"]' "false" "Grafana" "https://grafana.ghjc.ru"
               GRAFANA_OIDC_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
               # --- MinIO Console ---
-              ensure_client "minio-console" '["https://minio.ghjc.ru/oauth_callback"]' '["https://minio.ghjc.ru"]'
+              ensure_client "minio-console" '["https://minio.ghjc.ru/oauth_callback"]' '["https://minio.ghjc.ru"]' "false" "MinIO Console" "https://minio.ghjc.ru"
               MINIO_OIDC_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
               # --- Frontend Web (public client for mobile) ---
-              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true"
+              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
 
               # --- Frontend Web BFF (confidential client for oauth2-proxy) ---
-              ensure_client "urfu-link-web-bff" '["https://urfu-link.ghjc.ru/oauth2/callback"]' '["https://urfu-link.ghjc.ru"]'
+              ensure_client "urfu-link-web-bff" '["https://urfu-link.ghjc.ru/oauth2/callback"]' '["https://urfu-link.ghjc.ru"]' "false" "URFU Link" "https://urfu-link.ghjc.ru"
               FRONTEND_BFF_SECRET="$CLIENT_SECRET"
 
               # Store frontend BFF oauth2-proxy secrets in Vault
