@@ -291,10 +291,9 @@ spec:
               if [ -z "$FRONTEND_COOKIE" ]; then
                 FRONTEND_COOKIE="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | head -c 32)"
               fi
-              vault_write urfu-link/prod/frontend-web-oauth2 \
-                "client_id=urfu-link-web-bff" \
-                "client_secret=$FRONTEND_BFF_SECRET" \
-                "cookie_secret=$FRONTEND_COOKIE"
+              vault_put urfu-link/prod/frontend-web-oauth2 \
+                "$(printf '{"data":{"client_id":"urfu-link-web-bff","client_secret":"%s","cookie_secret":"%s"}}' \
+                  "$FRONTEND_BFF_SECRET" "$FRONTEND_COOKIE")"
 
               # Cookie secret: reuse existing or generate new
               echo "Checking for existing cookie secret..."
