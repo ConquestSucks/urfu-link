@@ -12,15 +12,56 @@ data:
             endpoint: 0.0.0.0:4317
           http:
             endpoint: 0.0.0.0:4318
+
+      filelog:
+        include:
+          - /var/log/pods/*/*/*.log
+        exclude:
+          - /var/log/pods/observability_otel-collector*/**
+        start_at: end
+        include_file_path: true
+        include_file_name: false
+        operators:
+          - type: container
+            id: container-parser
+
     processors:
-      batch: {}
+      batch:
+        send_batch_size: 1000
+        timeout: 5s
+
+      k8sattributes:
+        auth_type: serviceAccount
+        extract:
+          metadata:
+            - k8s.namespace.name
+            - k8s.pod.name
+            - k8s.container.name
+            - k8s.deployment.name
+            - k8s.daemonset.name
+            - k8s.statefulset.name
+            - k8s.job.name
+        pod_association:
+          - sources:
+              - from: resource_attribute
+                name: k8s.pod.uid
+
+      resource/loki:
+        attributes:
+          - key: loki.attribute.labels
+            action: insert
+            value: k8s.namespace.name, k8s.pod.name, k8s.container.name
+
     exporters:
       debug:
         verbosity: normal
+
       prometheusremotewrite:
         endpoint: "http://kube-prometheus-stack-prometheus.observability.svc.cluster.local:9090/api/v1/write"
+
       otlphttp/loki:
         endpoint: "http://loki.observability.svc.cluster.local:3100/otlp"
+
     service:
       pipelines:
         traces:
@@ -31,7 +72,11 @@ data:
           receivers: [otlp]
           processors: [batch]
           exporters: [prometheusremotewrite]
-        logs:
+        logs/otlp:
           receivers: [otlp]
-          processors: [batch]
+          processors: [batch, k8sattributes, resource/loki]
+          exporters: [otlphttp/loki]
+        logs/filelog:
+          receivers: [filelog]
+          processors: [batch, k8sattributes, resource/loki]
           exporters: [otlphttp/loki]
