@@ -1,7 +1,7 @@
 nameOverride: chat-service
 fullnameOverride: chat-service
 image:
-  repository: ghcr.io/horexdev/urfu-link/chat-service
+  repository: ghcr.io/conquestsucks/urfu-link/chat-service
   pullPolicy: Always
   tag: stable
 

@@ -1,7 +1,7 @@
 nameOverride: frontend-web
 fullnameOverride: frontend-web
 image:
-  repository: ghcr.io/urfu-link/frontend-web
+  repository: ghcr.io/conquestsucks/urfu-link/frontend-web
   pullPolicy: IfNotPresent
   tag: dev-local
 

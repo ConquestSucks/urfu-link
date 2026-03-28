@@ -1,7 +1,7 @@
 nameOverride: call-service
 fullnameOverride: call-service
 image:
-  repository: ghcr.io/horexdev/urfu-link/call-service
+  repository: ghcr.io/conquestsucks/urfu-link/call-service
   pullPolicy: Always
   tag: stable
 

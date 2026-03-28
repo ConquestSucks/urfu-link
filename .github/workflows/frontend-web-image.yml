@@ -42,7 +42,7 @@ jobs:
       - name: Resolve image metadata
         shell: bash
         run: |
-          echo "IMAGE_NAME=ghcr.io/horexdev/urfu-link/frontend-web" >> "$GITHUB_ENV"
+          echo "IMAGE_NAME=ghcr.io/conquestsucks/urfu-link/frontend-web" >> "$GITHUB_ENV"
           echo "IMAGE_TAG=sha-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
       - name: Build and push
         id: build
