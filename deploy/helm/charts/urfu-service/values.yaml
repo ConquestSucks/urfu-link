@@ -9,6 +9,8 @@ image:
   tag: "latest"
   digest: ""
 
+imagePullSecrets: []
+
 serviceAccount:
   create: true
   annotations: {}

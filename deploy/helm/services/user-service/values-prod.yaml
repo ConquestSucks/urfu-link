@@ -5,6 +5,9 @@ image:
   pullPolicy: Always
   tag: stable
 
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
 replicaCount: 1
 
 env:
