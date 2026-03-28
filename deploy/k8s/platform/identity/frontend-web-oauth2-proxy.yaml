@@ -29,7 +29,6 @@ spec:
             - --cookie-httponly=true
             - --cookie-samesite=Lax
             - --cookie-name=_urfu_link_oauth2
-            - --cookie-domains=urfu-link.ghjc.ru
             - --cookie-expire=1h
             - --cookie-refresh=5m
             - --http-address=0.0.0.0:4180
