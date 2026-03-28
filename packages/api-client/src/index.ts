@@ -18,6 +18,13 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  function handleUnauthorized(response: Response): void {
+    if (response.status === 401 && typeof window !== "undefined") {
+      const rd = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/oauth2/start?rd=${rd}`;
+    }
+  }
+
   return {
     async health(): Promise<BackendHealth> {
       try {
@@ -25,8 +32,12 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
           headers: {
             Accept: "text/plain",
             ...authHeaders(),
-          }
+          },
+          credentials: "same-origin",
         });
+
+        handleUnauthorized(response);
+
         const body = await response.text();
 
         return {

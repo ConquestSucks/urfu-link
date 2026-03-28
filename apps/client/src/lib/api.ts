@@ -1,14 +1,10 @@
 import { createApiClient } from "@urfu-link/api-client";
+import { Platform } from "react-native";
 
 import { appConfig } from "./config";
 
-let tokenAccessor: (() => string | undefined) | undefined;
+// On web, API calls go through same-origin /api/* path (oauth2-proxy adds Authorization header).
+// On native, API calls go to the external API URL with Bearer token.
+const baseUrl = Platform.OS === "web" ? "" : appConfig.apiUrl;
 
-export function setTokenAccessor(fn: () => string | undefined) {
-  tokenAccessor = fn;
-}
-
-export const apiClient = createApiClient({
-  baseUrl: appConfig.apiUrl,
-  getAccessToken: () => tokenAccessor?.(),
-});
+export const apiClient = createApiClient({ baseUrl });

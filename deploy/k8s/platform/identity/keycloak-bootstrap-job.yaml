@@ -278,8 +278,23 @@ spec:
               MINIO_OIDC_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
-              # --- Frontend Web (public client) ---
+              # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true"
+
+              # --- Frontend Web BFF (confidential client for oauth2-proxy) ---
+              ensure_client "urfu-link-web-bff" '["https://urfu-link.ghjc.ru/oauth2/callback"]' '["https://urfu-link.ghjc.ru"]'
+              FRONTEND_BFF_SECRET="$CLIENT_SECRET"
+
+              # Store frontend BFF oauth2-proxy secrets in Vault
+              EXISTING_FRONTEND="$(vault_read urfu-link/prod/frontend-web-oauth2 || true)"
+              FRONTEND_COOKIE="$(echo "$EXISTING_FRONTEND" | jq -r '.data.data.cookie_secret // empty' 2>/dev/null || true)"
+              if [ -z "$FRONTEND_COOKIE" ]; then
+                FRONTEND_COOKIE="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | head -c 32)"
+              fi
+              vault_write urfu-link/prod/frontend-web-oauth2 \
+                "client_id=urfu-link-web-bff" \
+                "client_secret=$FRONTEND_BFF_SECRET" \
+                "cookie_secret=$FRONTEND_COOKIE"
 
               # Cookie secret: reuse existing or generate new
               echo "Checking for existing cookie secret..."
