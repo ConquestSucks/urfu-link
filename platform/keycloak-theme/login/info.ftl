@@ -4,11 +4,11 @@
         <#if messageHeader??>
             ${kcSanitize(msg("${messageHeader}"))?no_esc}
         <#else>
-            ${message.summary}
+            ${(message.summary)!''}
         </#if>
     <#elseif section = "form">
         <div class="alert alert-info">
-            ${message.summary}
+            ${(message.summary)!''}
             <#if requiredActions??>
                 <#list requiredActions>
                     : <strong><#items as reqActionItem>${kcSanitize(msg("requiredAction.${reqActionItem}"))?no_esc}<#sep>, </#items></strong>

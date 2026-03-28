@@ -15,7 +15,7 @@ data:
   template.ftl: |
     <#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
     <!DOCTYPE html>
-    <html lang="${locale.currentLanguageTag!'ru'}">
+    <html lang="${(locale.currentLanguageTag)!'ru'}">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -364,7 +364,11 @@ data:
             ${kcSanitize(msg("errorTitle"))?no_esc}
         <#elseif section = "form">
             <div class="alert alert-error">
-                ${kcSanitize(message.summary)?no_esc}
+                <#if message?? && message.summary??>
+                    ${kcSanitize(message.summary)?no_esc}
+                <#else>
+                    ${msg("errorTitle")}
+                </#if>
             </div>
             <#if skipLink??>
             <#else>
@@ -384,11 +388,11 @@ data:
             <#if messageHeader??>
                 ${kcSanitize(msg("${messageHeader}"))?no_esc}
             <#else>
-                ${message.summary}
+                ${(message.summary)!''}
             </#if>
         <#elseif section = "form">
             <div class="alert alert-info">
-                ${message.summary}
+                ${(message.summary)!''}
                 <#if requiredActions??>
                     <#list requiredActions>
                         : <strong><#items as reqActionItem>${kcSanitize(msg("requiredAction.${reqActionItem}"))?no_esc}<#sep>, </#items></strong>
