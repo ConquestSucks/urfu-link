@@ -49,6 +49,18 @@ data:
               - from: resource_attribute
                 name: k8s.namespace.name
 
+      resource/service-name:
+        attributes:
+          - key: service.name
+            from_attribute: k8s.deployment.name
+            action: upsert
+          - key: service.name
+            from_attribute: k8s.daemonset.name
+            action: upsert
+          - key: service.name
+            from_attribute: k8s.statefulset.name
+            action: upsert
+
       resource/loki:
         attributes:
           - key: loki.attribute.labels
@@ -81,5 +93,5 @@ data:
           exporters: [otlphttp/loki]
         logs/filelog:
           receivers: [filelog]
-          processors: [batch, k8sattributes, resource/loki]
+          processors: [batch, k8sattributes, resource/service-name, resource/loki]
           exporters: [otlphttp/loki]
