@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
-    <title>${msg("loginTitle", (realm.displayName!''))}</title>
+    <title><#if client?? && client.name?has_content>${client.name}<#else>${realm.displayName!''}</#if> — ${msg("loginTitle", '')}</title>
     <link rel="icon" href="${url.resourcesPath}/img/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="${url.resourcesPath}/css/login.css">
 </head>
