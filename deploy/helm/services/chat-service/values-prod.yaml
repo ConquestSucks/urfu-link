@@ -3,7 +3,7 @@ fullnameOverride: chat-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/chat-service
   pullPolicy: IfNotPresent
-  tag: sha-24bdc9c
+  tag: sha-706332a
 
 imagePullSecrets:
   - name: ghcr-pull-secret
