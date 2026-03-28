@@ -58,6 +58,14 @@ spec:
           value: https://id.ghjc.ru/realms/urfu-link/protocol/openid-connect/userinfo
         - name: grafana.grafana\.ini.auth\.generic_oauth.role_attribute_path
           value: "contains(groups[*], 'admin') && 'Admin' || ''"
+      values: |
+        grafana:
+          additionalDataSources:
+            - name: Loki
+              type: loki
+              url: http://loki.observability.svc.cluster.local:3100
+              access: proxy
+              isDefault: false
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
