@@ -42,6 +42,13 @@ data:
             - k8s.daemonset.name
             - k8s.statefulset.name
             - k8s.job.name
+          labels:
+            - tag_name: app
+              key: app
+              from: pod
+            - tag_name: app_name
+              key: app.kubernetes.io/name
+              from: pod
         pod_association:
           - sources:
               - from: resource_attribute
@@ -49,17 +56,17 @@ data:
               - from: resource_attribute
                 name: k8s.namespace.name
 
-      resource/service-name:
-        attributes:
-          - key: service.name
-            from_attribute: k8s.deployment.name
-            action: upsert
-          - key: service.name
-            from_attribute: k8s.daemonset.name
-            action: upsert
-          - key: service.name
-            from_attribute: k8s.statefulset.name
-            action: upsert
+      transform/service-name:
+        log_statements:
+          - context: resource
+            statements:
+              - set(attributes["service.name"], attributes["k8s.deployment.name"]) where attributes["k8s.deployment.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.daemonset.name"]) where attributes["k8s.daemonset.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.statefulset.name"]) where attributes["k8s.statefulset.name"] != nil
+              - set(attributes["service.name"], attributes["k8s.job.name"]) where attributes["k8s.job.name"] != nil
+              - set(attributes["service.name"], attributes["app_name"]) where attributes["service.name"] == "unknown_service" and attributes["app_name"] != nil
+              - set(attributes["service.name"], attributes["app"]) where attributes["service.name"] == "unknown_service" and attributes["app"] != nil
+              - set(attributes["service.name"], attributes["k8s.container.name"]) where attributes["service.name"] == "unknown_service" and attributes["k8s.container.name"] != nil
 
       resource/loki:
         attributes:
@@ -93,5 +100,5 @@ data:
           exporters: [otlphttp/loki]
         logs/filelog:
           receivers: [filelog]
-          processors: [batch, k8sattributes, resource/service-name, resource/loki]
+          processors: [batch, k8sattributes, transform/service-name, resource/loki]
           exporters: [otlphttp/loki]
