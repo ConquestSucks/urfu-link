@@ -1,9 +1,12 @@
 nameOverride: notification-service
 fullnameOverride: notification-service
 image:
-  repository: ghcr.io/horexdev/urfu-link/notification-service
-  pullPolicy: Always
-  tag: stable
+  repository: ghcr.io/conquestsucks/urfu-link/notification-service
+  pullPolicy: IfNotPresent
+  tag: sha-706332a
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
 
 replicaCount: 1
 
@@ -11,9 +14,7 @@ env:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: http://+:8080
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
-  Kafka__BootstrapServers: urfu-kafka-kafka-bootstrap.urfu-platform.svc.cluster.local:9092
-  Kafka__SecurityProtocol: SaslSsl
-  Kafka__SaslMechanism: ScramSha512
+  Kafka__BootstrapServers: urfu-kafka.urfu-platform.svc.cluster.local:9092
   Auth__Authority: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
 
@@ -23,21 +24,18 @@ secrets:
 
 rollout:
   enabled: true
-  autoPromotionEnabled: false
+  autoPromotionEnabled: true
 
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
+  enabled: false
 
 serviceMonitor:
   enabled: true
 
 resources:
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 25m
+    memory: 64Mi
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 250m
+    memory: 256Mi

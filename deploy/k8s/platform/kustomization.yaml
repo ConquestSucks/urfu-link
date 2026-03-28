@@ -6,22 +6,38 @@ resources:
   - ingress/argocd-ingress.yaml
   - ingress/api-gateway-ingress.yaml
   - ingress/frontend-web-ingress.yaml
+  - ingress/frontend-web-oauth2-ingress.yaml
+  - ingress/frontend-web-api-ingress.yaml
   - ingress/vault-ingress.yaml
   - ingress/grafana-ingress.yaml
   - ingress/minio-ingress.yaml
   - ingress/linkerd-viz-ingress.yaml
   - network/deny-all-default.yaml
   - network/service-egress-policies.yaml
+  - network/coredns-custom.yaml
   - argocd/applicationset.yaml
   - external-secrets/cluster-secret-store.yaml
   - external-secrets/api-gateway-external-secret.yaml
   - external-secrets/services-external-secrets.yaml
+  - external-secrets/ghcr-pull-secret.yaml
   - external-secrets/minio-bootstrap-external-secret.yaml
+  - external-secrets/mongo-backup-external-secret.yaml
   - identity/keycloak-external-secret.yaml
   - identity/headlamp-external-secret.yaml
   - identity/linkerd-viz-external-secret.yaml
+  - identity/argocd-oidc-external-secret.yaml
+  - identity/vault-oidc-external-secret.yaml
+  - identity/grafana-oidc-external-secret.yaml
+  - identity/minio-oidc-external-secret.yaml
+  - identity/argocd-oidc-config.yaml
   - identity/linkerd-viz-oauth2-proxy.yaml
+  - identity/frontend-web-oauth2-proxy.yaml
+  - identity/frontend-web-oauth2-proxy-svc.yaml
+  - external-secrets/frontend-web-oauth2-external-secret.yaml
+  - identity/keycloak-theme-configmap.yaml
   - identity/keycloak.yaml
+  - identity/keycloak-bootstrap-job.yaml
+  - stateful/minio-oidc-policy-job.yaml
   - media/livekit.yaml
   - media/coturn.yaml
   - observability/grafana-admin-secret.yaml

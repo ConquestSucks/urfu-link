@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: minio
-          image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+          image: minio/minio:RELEASE.2025-04-22T22-12-26Z
           args: ["server", "/data", "--console-address", ":9001"]
           ports:
             - containerPort: 9000
@@ -34,6 +34,28 @@ spec:
                 secretKeyRef:
                   name: urfu-minio-env-config
                   key: root_password
+            - name: MINIO_BROWSER_REDIRECT_URL
+              value: "https://minio.ghjc.ru"
+            - name: MINIO_IDENTITY_OPENID_CONFIG_URL
+              value: "https://id.ghjc.ru/realms/urfu-link/.well-known/openid-configuration"
+            - name: MINIO_IDENTITY_OPENID_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: minio-oidc
+                  key: client_id
+            - name: MINIO_IDENTITY_OPENID_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: minio-oidc
+                  key: client_secret
+            - name: MINIO_IDENTITY_OPENID_DISPLAY_NAME
+              value: "Keycloak SSO"
+            - name: MINIO_IDENTITY_OPENID_CLAIM_NAME
+              value: "groups"
+            - name: MINIO_IDENTITY_OPENID_SCOPES
+              value: "openid,profile,email,roles"
+            - name: MINIO_IDENTITY_OPENID_REDIRECT_URI
+              value: "https://minio.ghjc.ru/oauth_callback"
           resources:
             requests:
               cpu: 100m

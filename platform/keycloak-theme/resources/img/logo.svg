@@ -1,0 +1,18 @@
+<svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M20 38C29.9411 38 38 29.9411 38 20C38 10.0589 29.9411 2 20 2C10.0589 2 2 10.0589 2 20C2 29.9411 10.0589 38 20 38Z" stroke="url(#logo_g0)" stroke-width="2"/>
+  <path d="M13 19C14.6569 19 16 17.6569 16 16C16 14.3431 14.6569 13 13 13C11.3431 13 10 14.3431 10 16C10 17.6569 11.3431 19 13 19Z" fill="url(#logo_g1)"/>
+  <path d="M27 19C28.6569 19 30 17.6569 30 16C30 14.3431 28.6569 13 27 13C25.3431 13 24 14.3431 24 16C24 17.6569 25.3431 19 27 19Z" fill="url(#logo_g1)"/>
+  <path d="M20 29C21.6569 29 23 27.6569 23 26C23 24.3431 21.6569 23 20 23C18.3431 23 17 24.3431 17 26C17 27.6569 18.3431 29 20 29Z" fill="url(#logo_g1)"/>
+  <path d="M15 17.5L18 24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M25 17.5L22 24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+  <path d="M16 15H24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+  <text x="48" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.3" fill="#f8fafc">URFU <tspan fill="#3b82f6">LINK</tspan></text>
+  <defs>
+    <linearGradient id="logo_g0" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#60A5FA"/>
+    </linearGradient>
+    <linearGradient id="logo_g1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#60A5FA"/>
+    </linearGradient>
+  </defs>
+</svg>

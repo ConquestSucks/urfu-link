@@ -2,15 +2,20 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "noEmit": true
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
+  },
+  "expo-router": {
+    "typedRoutes": true
   },
   "include": [
-    "app",
-    "src",
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
     "expo-env.d.ts",
-    "../../packages/ui/src/**/*",
-    "../../packages/api-client/src/**/*"
+    "nativewind-env.d.ts"
   ]
 }

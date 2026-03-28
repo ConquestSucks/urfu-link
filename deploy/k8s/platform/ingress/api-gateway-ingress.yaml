@@ -10,10 +10,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - api.ghjc.ru
-      secretName: api-ghjc-ru-tls
+        - api.urfu-link.ghjc.ru
+      secretName: api-urfu-link-ghjc-ru-tls
   rules:
-    - host: api.ghjc.ru
+    - host: api.urfu-link.ghjc.ru
       http:
         paths:
           - path: /

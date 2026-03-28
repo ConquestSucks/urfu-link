@@ -9,6 +9,8 @@ metadata:
     nginx.ingress.kubernetes.io/backend-protocol: HTTP
     nginx.ingress.kubernetes.io/auth-url: "https://linkerd.ghjc.ru/oauth2/auth"
     nginx.ingress.kubernetes.io/auth-signin: "https://linkerd.ghjc.ru/oauth2/start?rd=$escaped_request_uri"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
 spec:
   ingressClassName: nginx
   tls:
@@ -35,6 +37,8 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
 spec:
   ingressClassName: nginx
   tls:

@@ -15,6 +15,33 @@ spec:
       labels:
         app: keycloak
     spec:
+      initContainers:
+        - name: theme-init
+          image: busybox:1.37
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /theme/login/resources/css /theme/login/resources/img /theme/login/messages
+              cp /theme-src/theme.properties /theme/theme.properties
+              cp /theme-src/template.ftl /theme/login/template.ftl
+              cp /theme-src/login.ftl /theme/login/login.ftl
+              cp /theme-src/login-reset-password.ftl /theme/login/login-reset-password.ftl
+              cp /theme-src/login-update-password.ftl /theme/login/login-update-password.ftl
+              cp /theme-src/login-otp.ftl /theme/login/login-otp.ftl
+              cp /theme-src/login-config-totp.ftl /theme/login/login-config-totp.ftl
+              cp /theme-src/error.ftl /theme/login/error.ftl
+              cp /theme-src/info.ftl /theme/login/info.ftl
+              cp /theme-src/login.css /theme/login/resources/css/login.css
+              cp /theme-src/logo.svg /theme/login/resources/img/logo.svg
+              cp /theme-src/messages_ru.properties /theme/login/messages/messages_ru.properties
+              cp /theme-src/messages_en.properties /theme/login/messages/messages_en.properties
+          volumeMounts:
+            - name: theme-src
+              mountPath: /theme-src
+              readOnly: true
+            - name: theme
+              mountPath: /theme
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.5.6
@@ -77,6 +104,10 @@ spec:
               path: /realms/master
               port: http
             periodSeconds: 20
+          volumeMounts:
+            - name: theme
+              mountPath: /opt/keycloak/themes/urfu-link
+              readOnly: true
           resources:
             requests:
               cpu: 200m
@@ -84,6 +115,12 @@ spec:
             limits:
               cpu: 1000m
               memory: 1280Mi
+      volumes:
+        - name: theme-src
+          configMap:
+            name: keycloak-theme-urfu-link
+        - name: theme
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

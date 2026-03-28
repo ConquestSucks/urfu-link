@@ -1,0 +1,1043 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-theme-urfu-link
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  theme.properties: |
+    parent=base
+    import=common/keycloak
+    
+    locales=ru,en
+    
+    styles=css/login.css
+    
+  template.ftl: |
+    <#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
+    <!DOCTYPE html>
+    <html lang="${(locale.currentLanguageTag)!'ru'}">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noindex, nofollow">
+        <title><#if client?? && client.name?has_content>${client.name}<#else>${realm.displayName!''}</#if> — ${msg("loginTitle", '')}</title>
+        <link rel="icon" href="${url.resourcesPath}/img/logo.svg" type="image/svg+xml">
+        <link rel="stylesheet" href="${url.resourcesPath}/css/login.css">
+    </head>
+    <body>
+        <div class="login-bg"></div>
+    
+        <div class="login-page">
+            <div class="login-logo">
+                <img src="${url.resourcesPath}/img/logo.svg" alt="${realm.displayName!''}" height="40">
+            </div>
+    
+            <div class="login-card">
+                <div class="login-card-header">
+                    <h1 class="login-card-title"><#nested "header"></h1>
+                </div>
+    
+                <#if displayMessage && message?has_content && (message.type != 'warning' || !isAppInitiatedAction??)>
+                    <div class="alert alert-${message.type}">
+                        ${kcSanitize(message.summary)?no_esc}
+                    </div>
+                </#if>
+    
+                <#nested "form">
+            </div>
+    
+            <#if displayInfo>
+                <div class="login-info">
+                    <#nested "info">
+                </div>
+            </#if>
+    
+            <div class="login-footer">
+                <#if client?? && client.baseUrl?has_content>
+                    <a href="${client.baseUrl}" class="login-footer-link">${client.name!client.clientId}</a>
+                <#else>
+                    <span class="login-footer-text">${(realm.displayName!'URFU Link')}</span>
+                </#if>
+            </div>
+        </div>
+    </body>
+    </html>
+    </#macro>
+    
+  login.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayMessage=!messagesPerField.existsError('username','password'); section>
+        <#if section = "header">
+            ${msg("loginAccountTitle")}
+        <#elseif section = "form">
+            <form id="kc-form-login" action="${url.loginAction}" method="post">
+                <div class="form-group">
+                    <label for="username" class="form-label">
+                        <#if !realm.loginWithEmailAllowed>
+                            ${msg("username")}
+                        <#elseif !realm.registrationEmailAsUsername>
+                            ${msg("usernameOrEmail")}
+                        <#else>
+                            ${msg("email")}
+                        </#if>
+                    </label>
+                    <div class="form-input-wrapper">
+                        <input id="username" name="username" type="text"
+                               class="form-input"
+                               value="${(login.username!'')}"
+                               autofocus autocomplete="username"
+                               aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('username')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('username'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <div class="form-group">
+                    <label for="password" class="form-label">${msg("password")}</label>
+                    <div class="form-input-wrapper form-input-password">
+                        <input id="password" name="password" type="password"
+                               class="form-input"
+                               autocomplete="current-password"
+                               aria-invalid="<#if messagesPerField.existsError('password')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('password')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('password'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <div class="form-actions">
+                    <#if realm.rememberMe && !usernameHidden??>
+                        <div class="form-checkbox-wrapper">
+                            <input id="rememberMe" name="rememberMe" type="checkbox"
+                                   <#if login.rememberMe??>checked</#if>>
+                            <label for="rememberMe">${msg("rememberMe")}</label>
+                        </div>
+                    </#if>
+    
+                    <#if realm.resetPasswordAllowed>
+                        <a href="${url.loginResetCredentialsUrl}" class="form-link">${msg("doForgotPassword")}</a>
+                    </#if>
+                </div>
+    
+                <input name="credentialId" type="hidden" value="${(auth.selectedCredential!'')}">
+                <button id="kc-login" name="login" type="submit" class="btn-primary">
+                    ${msg("doLogIn")}
+                </button>
+            </form>
+        </#if>
+    </@layout.registrationLayout>
+    
+  login-reset-password.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayInfo=true displayMessage=!messagesPerField.existsError('username'); section>
+        <#if section = "header">
+            ${msg("emailForgotTitle")}
+        <#elseif section = "form">
+            <form id="kc-reset-password-form" action="${url.loginAction}" method="post">
+                <div class="form-group">
+                    <label for="username" class="form-label">
+                        <#if !realm.loginWithEmailAllowed>
+                            ${msg("username")}
+                        <#elseif !realm.registrationEmailAsUsername>
+                            ${msg("usernameOrEmail")}
+                        <#else>
+                            ${msg("email")}
+                        </#if>
+                    </label>
+                    <div class="form-input-wrapper">
+                        <input id="username" name="username" type="text"
+                               class="form-input"
+                               value="${(auth.attemptedUsername!'')}"
+                               autofocus autocomplete="username"
+                               aria-invalid="<#if messagesPerField.existsError('username')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('username')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('username'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button type="submit" class="btn-primary">${msg("doSubmit")}</button>
+                    <a href="${url.loginUrl}" class="form-link" style="text-align: center;">${msg("backToLogin")}</a>
+                </div>
+            </form>
+        <#elseif section = "info">
+            <#if realm.duplicateEmailsAllowed>
+                ${msg("emailInstructionUsername")}
+            <#else>
+                ${msg("emailInstruction")}
+            </#if>
+        </#if>
+    </@layout.registrationLayout>
+    
+  login-update-password.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayMessage=!messagesPerField.existsError('password','password-confirm'); section>
+        <#if section = "header">
+            ${msg("updatePasswordTitle")}
+        <#elseif section = "form">
+            <form id="kc-passwd-update-form" action="${url.loginAction}" method="post">
+                <div class="form-group">
+                    <label for="password-new" class="form-label">${msg("passwordNew")}</label>
+                    <div class="form-input-wrapper form-input-password">
+                        <input id="password-new" name="password-new" type="password"
+                               class="form-input"
+                               autofocus autocomplete="new-password"
+                               aria-invalid="<#if messagesPerField.existsError('password','password-confirm')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('password')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('password'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <div class="form-group">
+                    <label for="password-confirm" class="form-label">${msg("passwordConfirm")}</label>
+                    <div class="form-input-wrapper form-input-password">
+                        <input id="password-confirm" name="password-confirm" type="password"
+                               class="form-input"
+                               autocomplete="new-password"
+                               aria-invalid="<#if messagesPerField.existsError('password-confirm')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('password-confirm')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('password-confirm'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <#if isAppInitiatedAction??>
+                    <div class="btn-group">
+                        <button name="login" type="submit" class="btn-primary">${msg("doSubmit")}</button>
+                        <button type="submit" name="cancel-aia" value="true" class="btn-secondary">${msg("doCancel")}</button>
+                    </div>
+                <#else>
+                    <button name="login" type="submit" class="btn-primary">${msg("doSubmit")}</button>
+                </#if>
+            </form>
+        </#if>
+    </@layout.registrationLayout>
+    
+  login-otp.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp'); section>
+        <#if section = "header">
+            ${msg("doLogIn")}
+        <#elseif section = "form">
+            <form id="kc-otp-login-form" action="${url.loginAction}" method="post">
+                <#if otpLogin.userOtpCredentials?size gt 1>
+                    <div class="otp-credentials">
+                        <#list otpLogin.userOtpCredentials as otpCredential>
+                            <label class="otp-credential <#if otpCredential.id == otpLogin.selectedCredentialId>selected</#if>">
+                                <input id="kc-otp-credential-${otpCredential?index}"
+                                       type="radio" name="selectedCredentialId"
+                                       value="${otpCredential.id}"
+                                       <#if otpCredential.id == otpLogin.selectedCredentialId>checked</#if>>
+                                <span class="otp-credential-label">${otpCredential.userLabel}</span>
+                            </label>
+                        </#list>
+                    </div>
+                </#if>
+    
+                <div class="form-group">
+                    <label for="otp" class="form-label">${msg("loginOtpOneTime")}</label>
+                    <div class="form-input-wrapper">
+                        <input id="otp" name="otp" type="text"
+                               class="form-input"
+                               autocomplete="one-time-code" inputmode="numeric"
+                               autofocus
+                               aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('totp')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('totp'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <button name="login" id="kc-login" type="submit" class="btn-primary">
+                    ${msg("doLogIn")}
+                </button>
+            </form>
+        </#if>
+    </@layout.registrationLayout>
+    
+  login-config-totp.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayMessage=!messagesPerField.existsError('totp','userLabel'); section>
+        <#if section = "header">
+            ${msg("loginTotpTitle")}
+        <#elseif section = "form">
+            <div class="totp-setup">
+                <ol class="instruction" style="text-align: left; padding-left: 20px; margin-bottom: 20px;">
+                    <li>${msg("loginTotpStep1")}</li>
+                    <li>${msg("loginTotpStep2")}</li>
+                    <li>${msg("loginTotpStep3")}</li>
+                </ol>
+    
+                <#if mode?? && mode = "manual">
+                    <div class="totp-secret">${totp.totpSecretEncoded}</div>
+                    <div class="totp-params">
+                        ${msg("loginTotpType")}: ${msg("loginTotp." + totp.policy.type)}
+                        <br>${msg("loginTotpAlgorithm")}: ${totp.policy.getAlgorithmKey()}
+                        <br>${msg("loginTotpDigits")}: ${totp.policy.digits}
+                        <#if totp.policy.type = "totp">
+                            <br>${msg("loginTotpInterval")}: ${totp.policy.period}
+                        <#elseif totp.policy.type = "hotp">
+                            <br>${msg("loginTotpCounter")}: ${totp.policy.initialCounter}
+                        </#if>
+                    </div>
+                    <a href="${totp.qrUrl}" class="form-link">${msg("loginTotpScanBarcode")}</a>
+                <#else>
+                    <div class="totp-qr">
+                        <img src="data:image/png;base64, ${totp.totpSecretQrCode}" alt="QR Code" width="200" height="200">
+                    </div>
+                    <a href="${totp.manualUrl}" class="form-link">${msg("loginTotpUnableToScan")}</a>
+                </#if>
+            </div>
+    
+            <form id="kc-totp-settings-form" action="${url.loginAction}" method="post" style="margin-top: 24px;">
+                <div class="form-group">
+                    <label for="totp" class="form-label">${msg("authenticatorCode")}</label>
+                    <div class="form-input-wrapper">
+                        <input id="totp" name="totp" type="text"
+                               class="form-input"
+                               autocomplete="off" inputmode="numeric"
+                               autofocus
+                               aria-invalid="<#if messagesPerField.existsError('totp')>true</#if>"
+                               dir="ltr" />
+                    </div>
+                    <#if messagesPerField.existsError('totp')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('totp'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <div class="form-group">
+                    <label for="userLabel" class="form-label">${msg("loginTotpDeviceName")}</label>
+                    <div class="form-input-wrapper">
+                        <input id="userLabel" name="userLabel" type="text"
+                               class="form-input"
+                               autocomplete="off"
+                               aria-invalid="<#if messagesPerField.existsError('userLabel')>true</#if>" />
+                    </div>
+                    <#if messagesPerField.existsError('userLabel')>
+                        <span class="input-error" aria-live="polite">
+                            ${kcSanitize(messagesPerField.get('userLabel'))?no_esc}
+                        </span>
+                    </#if>
+                </div>
+    
+                <input type="hidden" name="totpSecret" value="${totp.totpSecret}">
+                <#if mode??><input type="hidden" name="mode" value="${mode}"></#if>
+    
+                <#if isAppInitiatedAction??>
+                    <div class="btn-group">
+                        <button type="submit" class="btn-primary">${msg("doSubmit")}</button>
+                        <button type="submit" name="cancel-aia" value="true" class="btn-secondary">${msg("doCancel")}</button>
+                    </div>
+                <#else>
+                    <button type="submit" class="btn-primary">${msg("doSubmit")}</button>
+                </#if>
+            </form>
+        </#if>
+    </@layout.registrationLayout>
+    
+  error.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayMessage=false; section>
+        <#if section = "header">
+            ${kcSanitize(msg("errorTitle"))?no_esc}
+        <#elseif section = "form">
+            <div class="alert alert-error">
+                <#if message?? && message.summary??>
+                    ${kcSanitize(message.summary)?no_esc}
+                <#else>
+                    ${msg("errorTitle")}
+                </#if>
+            </div>
+            <#if skipLink??>
+            <#else>
+                <#if client?? && client.baseUrl?has_content>
+                    <a href="${client.baseUrl}" class="btn-primary" style="display: block; text-align: center; text-decoration: none; line-height: 44px;">
+                        ${msg("backToApplication")}
+                    </a>
+                </#if>
+            </#if>
+        </#if>
+    </@layout.registrationLayout>
+    
+  info.ftl: |
+    <#import "template.ftl" as layout>
+    <@layout.registrationLayout displayMessage=false; section>
+        <#if section = "header">
+            <#if messageHeader??>
+                ${kcSanitize(msg("${messageHeader}"))?no_esc}
+            <#else>
+                ${(message.summary)!''}
+            </#if>
+        <#elseif section = "form">
+            <div class="alert alert-info">
+                ${(message.summary)!''}
+                <#if requiredActions??>
+                    <#list requiredActions>
+                        : <strong><#items as reqActionItem>${kcSanitize(msg("requiredAction.${reqActionItem}"))?no_esc}<#sep>, </#items></strong>
+                    </#list>
+                </#if>
+            </div>
+            <#if skipLink??>
+            <#else>
+                <#if pageRedirectUri?has_content>
+                    <a href="${pageRedirectUri}" class="btn-primary" style="display: block; text-align: center; text-decoration: none; line-height: 44px;">
+                        ${msg("backToApplication")}
+                    </a>
+                <#elseif actionUri?has_content>
+                    <a href="${actionUri}" class="btn-primary" style="display: block; text-align: center; text-decoration: none; line-height: 44px;">
+                        ${msg("proceedWithAction")}
+                    </a>
+                <#elseif (client.baseUrl)?has_content>
+                    <a href="${client.baseUrl}" class="btn-primary" style="display: block; text-align: center; text-decoration: none; line-height: 44px;">
+                        ${msg("backToApplication")}
+                    </a>
+                </#if>
+            </#if>
+        </#if>
+    </@layout.registrationLayout>
+    
+  login.css: |
+    /* ============================================================
+       URFU Link — Keycloak Login Theme
+       Dark design matching the main application
+       ============================================================ */
+    
+    /* --- Tokens --- */
+    :root {
+      --bg-page: #080b14;
+      --bg-card: #0f1320;
+      --bg-input: #151928;
+      --bg-input-focus: #1a1f32;
+      --text-primary: #f0f2f5;
+      --text-secondary: #8b95a8;
+      --text-muted: #505a6e;
+      --accent: #3b82f6;
+      --accent-hover: #5b9aff;
+      --accent-glow: rgba(59, 130, 246, 0.2);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-input: rgba(255, 255, 255, 0.08);
+      --border-input-focus: rgba(59, 130, 246, 0.5);
+      --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4);
+      --shadow-input-focus: 0 0 0 3px var(--accent-glow);
+      --error-bg: rgba(239, 68, 68, 0.1);
+      --error-border: rgba(239, 68, 68, 0.2);
+      --error-text: #f87171;
+      --success-bg: rgba(34, 197, 94, 0.1);
+      --success-border: rgba(34, 197, 94, 0.2);
+      --success-text: #4ade80;
+      --warning-bg: rgba(234, 179, 8, 0.1);
+      --warning-border: rgba(234, 179, 8, 0.2);
+      --warning-text: #facc15;
+      --info-bg: rgba(59, 130, 246, 0.1);
+      --info-border: rgba(59, 130, 246, 0.2);
+      --info-text: #60a5fa;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --transition: 150ms ease;
+    }
+    
+    /* --- Reset --- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-primary);
+      background: var(--bg-page);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    
+    /* --- Background --- */
+    .login-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(59, 130, 246, 0.08), transparent 60%),
+        var(--bg-page);
+    }
+    
+    .login-bg-grid { display: none; }
+    
+    /* --- Page Layout --- */
+    .login-page {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    
+    /* --- Logo --- */
+    .login-logo {
+      margin-bottom: 40px;
+      animation: fadeIn 0.5s ease-out;
+    }
+    
+    .login-logo img {
+      height: 40px;
+      width: auto;
+    }
+    
+    /* --- Card --- */
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px;
+      box-shadow: var(--shadow-card);
+      animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    
+    /* --- Card Header --- */
+    .login-card-header {
+      margin-bottom: 24px;
+    }
+    
+    .login-card-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+    
+    .login-card-subtitle {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+    
+    /* --- Client Info --- */
+    .login-footer-link {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+    
+    .login-footer-link:hover {
+      color: var(--accent);
+    }
+    
+    /* --- Form --- */
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    .form-label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    
+    .form-input {
+      width: 100%;
+      height: 42px;
+      padding: 0 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      font-family: inherit;
+      transition: border-color var(--transition), box-shadow var(--transition), background var(--transition);
+      outline: none;
+    }
+    
+    .form-input::placeholder { color: var(--text-muted); }
+    .form-input:hover { border-color: rgba(255, 255, 255, 0.12); }
+    
+    .form-input:focus {
+      border-color: var(--accent);
+      box-shadow: var(--shadow-input-focus);
+      background: var(--bg-input-focus);
+    }
+    
+    .form-input[aria-invalid="true"] {
+      border-color: var(--error-border);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+    
+    /* --- Password --- */
+    .form-input-wrapper { position: relative; }
+    .form-input-password .form-input { padding-right: 42px; }
+    
+    /* --- Input Error --- */
+    .input-error {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--error-text);
+      margin-top: 4px;
+    }
+    
+    /* --- Form Actions (remember me + forgot) --- */
+    .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    
+    .form-checkbox-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .form-checkbox-wrapper input[type="checkbox"] {
+      width: 14px;
+      height: 14px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    
+    .form-checkbox-wrapper label {
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      user-select: none;
+    }
+    
+    /* --- Links --- */
+    .form-link {
+      font-size: 0.8125rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color var(--transition);
+    }
+    
+    .form-link:hover {
+      color: var(--accent-hover);
+    }
+    
+    /* --- Primary Button --- */
+    .btn-primary {
+      width: 100%;
+      height: 42px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), transform 100ms ease, box-shadow var(--transition);
+    }
+    
+    .btn-primary:hover {
+      background: var(--accent-hover);
+      box-shadow: 0 0 20px var(--accent-glow);
+    }
+    
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    
+    /* --- Secondary Button --- */
+    .btn-secondary {
+      width: 100%;
+      height: 42px;
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background var(--transition), border-color var(--transition);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+    
+    .btn-group { display: flex; gap: 10px; }
+    .btn-group > * { flex: 1; }
+    
+    /* --- Alerts --- */
+    .alert {
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      margin-bottom: 16px;
+      border: 1px solid;
+    }
+    
+    .alert-error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); }
+    .alert-success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
+    .alert-warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
+    .alert-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
+    
+    /* --- Info Block --- */
+    .login-info {
+      max-width: 400px;
+      width: 100%;
+      text-align: center;
+      margin-top: 12px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+    
+    .login-info a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    
+    /* --- Footer --- */
+    .login-footer {
+      margin-top: 24px;
+      text-align: center;
+      animation: fadeIn 0.5s ease-out 0.2s both;
+    }
+    
+    .login-footer-text {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    
+    /* --- OTP --- */
+    .otp-credentials { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    
+    .otp-credential {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-input);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: border-color var(--transition);
+    }
+    
+    .otp-credential:hover { border-color: rgba(255, 255, 255, 0.12); }
+    .otp-credential input[type="radio"] { accent-color: var(--accent); }
+    .otp-credential.selected { border-color: var(--accent); }
+    .otp-credential-label { font-size: 0.875rem; color: var(--text-primary); }
+    
+    /* --- TOTP --- */
+    .totp-setup { text-align: center; }
+    .totp-qr { display: inline-block; padding: 12px; background: #fff; border-radius: var(--radius-sm); margin: 12px 0; }
+    .totp-secret { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); padding: 8px 12px; word-break: break-all; margin: 10px 0; }
+    .totp-params { font-size: 0.75rem; color: var(--text-muted); margin: 6px 0; }
+    
+    .instruction { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; }
+    
+    /* --- Animations --- */
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    /* --- Mobile --- */
+    @media (max-width: 480px) {
+      .login-card { padding: 24px 20px; }
+    }
+    
+    /* --- Kill default Keycloak chrome --- */
+    #kc-header, #kc-header-wrapper, .pf-v5-c-brand, .pf-v5-c-login__header, .pf-v5-c-login__footer { display: none !important; }
+    
+  logo.svg: |
+    <svg width="160" height="40" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20 38C29.9411 38 38 29.9411 38 20C38 10.0589 29.9411 2 20 2C10.0589 2 2 10.0589 2 20C2 29.9411 10.0589 38 20 38Z" stroke="url(#logo_g0)" stroke-width="2"/>
+      <path d="M13 19C14.6569 19 16 17.6569 16 16C16 14.3431 14.6569 13 13 13C11.3431 13 10 14.3431 10 16C10 17.6569 11.3431 19 13 19Z" fill="url(#logo_g1)"/>
+      <path d="M27 19C28.6569 19 30 17.6569 30 16C30 14.3431 28.6569 13 27 13C25.3431 13 24 14.3431 24 16C24 17.6569 25.3431 19 27 19Z" fill="url(#logo_g1)"/>
+      <path d="M20 29C21.6569 29 23 27.6569 23 26C23 24.3431 21.6569 23 20 23C18.3431 23 17 24.3431 17 26C17 27.6569 18.3431 29 20 29Z" fill="url(#logo_g1)"/>
+      <path d="M15 17.5L18 24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M25 17.5L22 24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M16 15H24" stroke="url(#logo_g1)" stroke-width="2" stroke-linecap="round"/>
+      <text x="48" y="26" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="18" font-weight="700" letter-spacing="-0.3" fill="#f8fafc">URFU <tspan fill="#3b82f6">LINK</tspan></text>
+      <defs>
+        <linearGradient id="logo_g0" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#60A5FA"/>
+        </linearGradient>
+        <linearGradient id="logo_g1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#3B82F6"/><stop offset="1" stop-color="#60A5FA"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    
+  messages_ru.properties: |
+    # --- Page titles ---
+    loginTitle=\u0412\u0445\u043E\u0434
+    loginAccountTitle=\u0412\u043E\u0439\u0442\u0438 \u0432 \u0430\u043A\u043A\u0430\u0443\u043D\u0442
+    emailForgotTitle=\u0412\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0430\u0440\u043E\u043B\u044F
+    updatePasswordTitle=\u0421\u043C\u0435\u043D\u0430 \u043F\u0430\u0440\u043E\u043B\u044F
+    errorTitle=\u041E\u0448\u0438\u0431\u043A\u0430
+    loginTotpTitle=\u041D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430
+    loginProfileTitle=\u041E\u0431\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u043F\u0440\u043E\u0444\u0438\u043B\u044F
+    emailVerifyTitle=\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 email
+    termsTitle=\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C\u0441\u043A\u043E\u0435 \u0441\u043E\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u0435
+    pageExpiredTitle=\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u0443\u0441\u0442\u0430\u0440\u0435\u043B\u0430
+    
+    # --- Form fields ---
+    username=\u0418\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F
+    usernameOrEmail=\u0418\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 email
+    email=Email
+    password=\u041F\u0430\u0440\u043E\u043B\u044C
+    passwordNew=\u041D\u043E\u0432\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C
+    passwordConfirm=\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C
+    passwordNewConfirm=\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u043D\u043E\u0432\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C
+    firstName=\u0418\u043C\u044F
+    lastName=\u0424\u0430\u043C\u0438\u043B\u0438\u044F
+    rememberMe=\u0417\u0430\u043F\u043E\u043C\u043D\u0438\u0442\u044C \u043C\u0435\u043D\u044F
+    authenticatorCode=\u041A\u043E\u0434 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430
+    loginOtpOneTime=\u041E\u0434\u043D\u043E\u0440\u0430\u0437\u043E\u0432\u044B\u0439 \u043A\u043E\u0434
+    loginTotpDeviceName=\u041D\u0430\u0437\u0432\u0430\u043D\u0438\u0435 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430
+    
+    # --- Buttons ---
+    doLogIn=\u0412\u043E\u0439\u0442\u0438
+    doSubmit=\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C
+    doCancel=\u041E\u0442\u043C\u0435\u043D\u0430
+    doBack=\u041D\u0430\u0437\u0430\u0434
+    doContinue=\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C
+    doAccept=\u041F\u0440\u0438\u043D\u044F\u0442\u044C
+    doDecline=\u041E\u0442\u043A\u043B\u043E\u043D\u0438\u0442\u044C
+    doForgotPassword=\u0417\u0430\u0431\u044B\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C?
+    doClickHere=\u041D\u0430\u0436\u043C\u0438\u0442\u0435 \u0437\u0434\u0435\u0441\u044C
+    doTryAgain=\u041F\u043E\u043F\u0440\u043E\u0431\u043E\u0432\u0430\u0442\u044C \u0441\u043D\u043E\u0432\u0430
+    doTryAnotherWay=\u0412\u043E\u0439\u0442\u0438 \u0434\u0440\u0443\u0433\u0438\u043C \u0441\u043F\u043E\u0441\u043E\u0431\u043E\u043C
+    doLogout=\u0412\u044B\u0439\u0442\u0438
+    doYes=\u0414\u0430
+    doNo=\u041D\u0435\u0442
+    
+    # --- Links ---
+    backToLogin=\u041D\u0430\u0437\u0430\u0434 \u043A\u043E \u0432\u0445\u043E\u0434\u0443
+    backToApplication=\u0412\u0435\u0440\u043D\u0443\u0442\u044C\u0441\u044F \u0432 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435
+    proceedWithAction=\u041F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C
+    
+    # --- Info/instruction messages ---
+    updatePasswordMessage=\u041D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C.
+    resetPasswordMessage=\u041D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C.
+    configureTotpMessage=\u041D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u043D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440.
+    updateProfileMessage=\u041D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0440\u043E\u0444\u0438\u043B\u044C.
+    verifyEmailMessage=\u041D\u0435\u043E\u0431\u0445\u043E\u0434\u0438\u043C\u043E \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C email.
+    emailInstruction=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 email, \u0438 \u043C\u044B \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u043C \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044E \u043F\u043E \u0441\u0431\u0440\u043E\u0441\u0443.
+    emailInstructionUsername=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F, \u0438 \u043C\u044B \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u043C \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044E \u043D\u0430 \u0432\u0430\u0448 email.
+    emailSentMessage=\u041F\u0438\u0441\u044C\u043C\u043E \u0441 \u0438\u043D\u0441\u0442\u0440\u0443\u043A\u0446\u0438\u044F\u043C\u0438 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E.
+    emailSendErrorMessage=\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E, \u043F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.
+    logoutOtherSessions=\u0412\u044B\u0439\u0442\u0438 \u043D\u0430 \u0434\u0440\u0443\u0433\u0438\u0445 \u0443\u0441\u0442\u0440\u043E\u0439\u0441\u0442\u0432\u0430\u0445
+    loginTimeout=\u0412\u0440\u0435\u043C\u044F \u0441\u0435\u0441\u0441\u0438\u0438 \u0438\u0441\u0442\u0435\u043A\u043B\u043E. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0432\u043E\u0439\u0442\u0438 \u0441\u043D\u043E\u0432\u0430.
+    reauthenticate=\u041F\u043E\u0436\u0430\u043B\u0443\u0439\u0441\u0442\u0430, \u0432\u043E\u0439\u0434\u0438\u0442\u0435 \u0441\u043D\u043E\u0432\u0430 \u0434\u043B\u044F \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0435\u043D\u0438\u044F.
+    requiredFields=\u041E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u043F\u043E\u043B\u044F
+    
+    # --- Error messages ---
+    invalidUserMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u043E\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C.
+    invalidUsernameMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u043E\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F.
+    invalidUsernameOrEmailMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u043E\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 email.
+    invalidPasswordMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043F\u0430\u0440\u043E\u043B\u044C.
+    invalidEmailMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 email.
+    invalidTotpMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043A\u043E\u0434 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430.
+    accountDisabledMessage=\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043D. \u041E\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044C \u043A \u0430\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0442\u043E\u0440\u0443.
+    accountTemporarilyDisabledMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u043E\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C.
+    accountPermanentlyDisabledMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u043E\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C.
+    expiredCodeMessage=\u0412\u0440\u0435\u043C\u044F \u0441\u0435\u0441\u0441\u0438\u0438 \u0438\u0441\u0442\u0435\u043A\u043B\u043E. \u0412\u043E\u0439\u0434\u0438\u0442\u0435 \u0441\u043D\u043E\u0432\u0430.
+    expiredActionMessage=\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u0443\u0441\u0442\u0430\u0440\u0435\u043B\u043E. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0432\u043E\u0439\u0442\u0438 \u0441\u043D\u043E\u0432\u0430.
+    missingUsernameMessage=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F.
+    missingPasswordMessage=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C.
+    missingEmailMessage=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 email.
+    missingFirstNameMessage=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0438\u043C\u044F.
+    missingLastNameMessage=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0444\u0430\u043C\u0438\u043B\u0438\u044E.
+    missingTotpMessage=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 \u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440\u0430.
+    notMatchPasswordMessage=\u041F\u0430\u0440\u043E\u043B\u0438 \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u044E\u0442.
+    usernameExistsMessage=\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442.
+    emailExistsMessage=Email \u0443\u0436\u0435 \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043E\u0432\u0430\u043D.
+    invalidPasswordExistingMessage=\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0442\u0435\u043A\u0443\u0449\u0438\u0439 \u043F\u0430\u0440\u043E\u043B\u044C.
+    invalidPasswordConfirmMessage=\u041F\u0430\u0440\u043E\u043B\u0438 \u043D\u0435 \u0441\u043E\u0432\u043F\u0430\u0434\u0430\u044E\u0442.
+    invalidPasswordMinLengthMessage=\u041F\u0430\u0440\u043E\u043B\u044C \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u043A\u043E\u0440\u043E\u0442\u043A\u0438\u0439: \u043C\u0438\u043D\u0438\u043C\u0443\u043C {0} \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.
+    invalidPasswordGenericMessage=\u041F\u0430\u0440\u043E\u043B\u044C \u043D\u0435 \u0441\u043E\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0443\u0435\u0442 \u0442\u0440\u0435\u0431\u043E\u0432\u0430\u043D\u0438\u044F\u043C \u0431\u0435\u0437\u043E\u043F\u0430\u0441\u043D\u043E\u0441\u0442\u0438.
+    pageNotFound=\u0421\u0442\u0440\u0430\u043D\u0438\u0446\u0430 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430
+    internalServerError=\u0412\u043D\u0443\u0442\u0440\u0435\u043D\u043D\u044F\u044F \u043E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430
+    noAccessMessage=\u0414\u043E\u0441\u0442\u0443\u043F \u0437\u0430\u043F\u0440\u0435\u0449\u0451\u043D
+    
+    # --- Logout ---
+    successLogout=\u0412\u044B \u0432\u044B\u0448\u043B\u0438 \u0438\u0437 \u0441\u0438\u0441\u0442\u0435\u043C\u044B
+    logoutConfirmTitle=\u0412\u044B\u0445\u043E\u0434
+    logoutConfirmHeader=\u0412\u044B \u0443\u0432\u0435\u0440\u0435\u043D\u044B, \u0447\u0442\u043E \u0445\u043E\u0442\u0438\u0442\u0435 \u0432\u044B\u0439\u0442\u0438?
+    
+    # --- TOTP setup ---
+    loginTotpStep1=\u0423\u0441\u0442\u0430\u043D\u043E\u0432\u0438\u0442\u0435 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u0435-\u0430\u0443\u0442\u0435\u043D\u0442\u0438\u0444\u0438\u043A\u0430\u0442\u043E\u0440
+    loginTotpStep2=\u041E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u0443\u0439\u0442\u0435 QR-\u043A\u043E\u0434 \u0438\u043B\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043B\u044E\u0447 \u0432\u0440\u0443\u0447\u043D\u0443\u044E
+    loginTotpStep3=\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043A\u043E\u0434 \u0438\u0437 \u043F\u0440\u0438\u043B\u043E\u0436\u0435\u043D\u0438\u044F \u0438 \u043D\u0430\u0436\u043C\u0438\u0442\u0435 \u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C.
+    loginTotpUnableToScan=\u041D\u0435 \u043C\u043E\u0436\u0435\u0442\u0435 \u043E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C?
+    loginTotpScanBarcode=\u041E\u0442\u0441\u043A\u0430\u043D\u0438\u0440\u043E\u0432\u0430\u0442\u044C QR-\u043A\u043E\u0434
+    showPassword=\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C
+    hidePassword=\u0421\u043A\u0440\u044B\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C
+    
+    # --- Page expired ---
+    pageExpiredMsg1=\u0427\u0442\u043E\u0431\u044B \u043D\u0430\u0447\u0430\u0442\u044C \u0437\u0430\u043D\u043E\u0432\u043E
+    pageExpiredMsg2=\u0427\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C
+    
+    # --- Required actions ---
+    requiredAction.CONFIGURE_TOTP=\u041D\u0430\u0441\u0442\u0440\u043E\u0438\u0442\u044C OTP
+    requiredAction.UPDATE_PASSWORD=\u0421\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C
+    requiredAction.UPDATE_PROFILE=\u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043F\u0440\u043E\u0444\u0438\u043B\u044C
+    requiredAction.VERIFY_EMAIL=\u041F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u044C email
+    requiredAction.TERMS_AND_CONDITIONS=\u041F\u0440\u0438\u043D\u044F\u0442\u044C \u0443\u0441\u043B\u043E\u0432\u0438\u044F
+    
+  messages_en.properties: |
+    # --- Page titles ---
+    loginTitle=Sign in
+    loginAccountTitle=Sign in to your account
+    emailForgotTitle=Reset password
+    updatePasswordTitle=Change password
+    errorTitle=Error
+    loginTotpTitle=Set up authenticator
+    loginProfileTitle=Update profile
+    emailVerifyTitle=Verify email
+    termsTitle=Terms and Conditions
+    pageExpiredTitle=Page expired
+    
+    # --- Form fields ---
+    username=Username
+    usernameOrEmail=Username or email
+    email=Email
+    password=Password
+    passwordNew=New password
+    passwordConfirm=Confirm password
+    passwordNewConfirm=Confirm new password
+    firstName=First name
+    lastName=Last name
+    rememberMe=Remember me
+    authenticatorCode=Authenticator code
+    loginOtpOneTime=One-time code
+    loginTotpDeviceName=Device name
+    
+    # --- Buttons ---
+    doLogIn=Sign in
+    doSubmit=Submit
+    doCancel=Cancel
+    doBack=Back
+    doContinue=Continue
+    doAccept=Accept
+    doDecline=Decline
+    doForgotPassword=Forgot password?
+    doClickHere=Click here
+    doTryAgain=Try again
+    doTryAnotherWay=Try another way
+    doLogout=Sign out
+    doYes=Yes
+    doNo=No
+    
+    # --- Links ---
+    backToLogin=Back to sign in
+    backToApplication=Back to application
+    proceedWithAction=Continue
+    
+    # --- Info/instruction messages ---
+    updatePasswordMessage=You need to change your password.
+    resetPasswordMessage=You need to change your password.
+    configureTotpMessage=You need to set up an authenticator.
+    updateProfileMessage=You need to update your profile.
+    verifyEmailMessage=You need to verify your email address.
+    emailInstruction=Enter your username or email and we will send you reset instructions.
+    emailInstructionUsername=Enter your username and we will send reset instructions to your email.
+    emailSentMessage=An email with instructions has been sent.
+    emailSendErrorMessage=Failed to send email, please try again later.
+    logoutOtherSessions=Sign out from other devices
+    loginTimeout=Session timed out. Please sign in again.
+    reauthenticate=Please sign in again to continue.
+    requiredFields=Required fields
+    
+    # --- Error messages ---
+    invalidUserMessage=Invalid username or password.
+    invalidUsernameMessage=Invalid username.
+    invalidUsernameOrEmailMessage=Invalid username or email.
+    invalidPasswordMessage=Invalid password.
+    invalidEmailMessage=Invalid email address.
+    invalidTotpMessage=Invalid authenticator code.
+    accountDisabledMessage=Account is disabled. Contact your administrator.
+    accountTemporarilyDisabledMessage=Invalid username or password.
+    accountPermanentlyDisabledMessage=Invalid username or password.
+    expiredCodeMessage=Session timed out. Please sign in again.
+    expiredActionMessage=Action expired. Please sign in again.
+    missingUsernameMessage=Please enter your username.
+    missingPasswordMessage=Please enter your password.
+    missingEmailMessage=Please enter your email.
+    missingFirstNameMessage=Please enter your first name.
+    missingLastNameMessage=Please enter your last name.
+    missingTotpMessage=Please enter the authenticator code.
+    notMatchPasswordMessage=Passwords do not match.
+    usernameExistsMessage=Username already exists.
+    emailExistsMessage=Email already exists.
+    invalidPasswordExistingMessage=Invalid current password.
+    invalidPasswordConfirmMessage=Passwords do not match.
+    invalidPasswordMinLengthMessage=Password too short: minimum {0} characters.
+    invalidPasswordGenericMessage=Password does not meet security requirements.
+    pageNotFound=Page not found
+    internalServerError=Internal server error
+    noAccessMessage=Access denied
+    
+    # --- Logout ---
+    successLogout=You have been signed out
+    logoutConfirmTitle=Sign out
+    logoutConfirmHeader=Are you sure you want to sign out?
+    
+    # --- TOTP setup ---
+    loginTotpStep1=Install an authenticator app
+    loginTotpStep2=Scan the QR code or enter the key manually
+    loginTotpStep3=Enter the code from the app and click Submit.
+    loginTotpUnableToScan=Unable to scan?
+    loginTotpScanBarcode=Scan QR code
+    showPassword=Show password
+    hidePassword=Hide password
+    
+    # --- Page expired ---
+    pageExpiredMsg1=To restart the login process
+    pageExpiredMsg2=To continue the login process
+    
+    # --- Required actions ---
+    requiredAction.CONFIGURE_TOTP=Set up OTP
+    requiredAction.UPDATE_PASSWORD=Change password
+    requiredAction.UPDATE_PROFILE=Update profile
+    requiredAction.VERIFY_EMAIL=Verify email
+    requiredAction.TERMS_AND_CONDITIONS=Accept terms
+    
