@@ -81,6 +81,7 @@ services:
       KC_DB_PASSWORD: postgres
     volumes:
       - ./keycloak/realm-urfu-link.json:/opt/keycloak/data/import/realm-urfu-link.json:ro
+      - ../keycloak-theme:/opt/keycloak/themes/urfu-link/login:ro
     depends_on:
       - postgres
     ports:

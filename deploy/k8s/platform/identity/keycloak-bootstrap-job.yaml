@@ -123,6 +123,7 @@ spec:
                       "registrationAllowed": false,
                       "loginWithEmailAllowed": true,
                       "resetPasswordAllowed": true,
+                      "loginTheme": "urfu-link",
                       "roles": {
                         "realm": [
                           {"name": "admin"},
@@ -133,7 +134,14 @@ spec:
                     }' >/dev/null
                   echo "Realm created."
                 else
-                  echo "Realm already exists."
+                  echo "Realm already exists, ensuring login theme..."
+                  curl --fail --silent --show-error \
+                    -X PUT \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link" \
+                    -d '{"loginTheme": "urfu-link"}' >/dev/null
+                  echo "Login theme set."
                 fi
               }
 

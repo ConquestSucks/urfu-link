@@ -34,6 +34,7 @@ resources:
   - identity/frontend-web-oauth2-proxy.yaml
   - identity/frontend-web-oauth2-proxy-svc.yaml
   - external-secrets/frontend-web-oauth2-external-secret.yaml
+  - identity/keycloak-theme-configmap.yaml
   - identity/keycloak.yaml
   - identity/keycloak-bootstrap-job.yaml
   - stateful/minio-oidc-policy-job.yaml

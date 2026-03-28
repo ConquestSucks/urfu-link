@@ -2,6 +2,7 @@
   "realm": "urfu-link",
   "enabled": true,
   "registrationAllowed": false,
+  "loginTheme": "urfu-link",
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": true,
