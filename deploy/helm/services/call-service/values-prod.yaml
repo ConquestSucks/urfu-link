@@ -14,9 +14,7 @@ env:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: http://+:8080
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
-  Kafka__BootstrapServers: urfu-kafka-kafka-bootstrap.urfu-platform.svc.cluster.local:9092
-  Kafka__SecurityProtocol: SaslSsl
-  Kafka__SaslMechanism: ScramSha512
+  Kafka__BootstrapServers: urfu-kafka.urfu-platform.svc.cluster.local:9092
   Auth__Authority: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
 
@@ -39,8 +37,8 @@ serviceMonitor:
 
 resources:
   requests:
-    cpu: 200m
-    memory: 256Mi
+    cpu: 50m
+    memory: 128Mi
   limits:
-    cpu: 1000m
-    memory: 1Gi
+    cpu: 500m
+    memory: 512Mi
