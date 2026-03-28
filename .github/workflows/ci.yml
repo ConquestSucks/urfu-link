@@ -31,7 +31,7 @@ jobs:
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 10.0.103
+          dotnet-version: 10.0.104
 
       - name: Restore
         run: dotnet restore Urfu.Link.slnx
