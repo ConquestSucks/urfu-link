@@ -2,8 +2,8 @@ nameOverride: api-gateway
 fullnameOverride: api-gateway
 image:
   repository: ghcr.io/conquestsucks/urfu-link/api-gateway
-  pullPolicy: Always
-  tag: stable
+  pullPolicy: IfNotPresent
+  tag: sha-7dfb27f
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -25,10 +25,7 @@ rollout:
   autoPromotionEnabled: false
 
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
+  enabled: false
 
 serviceMonitor:
   enabled: true

@@ -2,8 +2,8 @@ nameOverride: frontend-web
 fullnameOverride: frontend-web
 image:
   repository: ghcr.io/conquestsucks/urfu-link/frontend-web
-  pullPolicy: Always
-  tag: stable
+  pullPolicy: IfNotPresent
+  tag: sha-9c0bffd
 
 imagePullSecrets:
   - name: ghcr-pull-secret
