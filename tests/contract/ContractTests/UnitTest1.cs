@@ -27,7 +27,7 @@ public class UnitTest1
         var prodValues = File.ReadAllText(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "deploy", "helm", "services", "user-service", "values-prod.yaml")));
         var devValues = File.ReadAllText(Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "deploy", "helm", "services", "user-service", "values-dev.yaml")));
 
-        Assert.Contains("tag: stable", prodValues, StringComparison.Ordinal);
+        Assert.Matches(@"tag:\s+sha-[0-9a-f]{7}", prodValues);
         Assert.Contains("tag: dev-local", devValues, StringComparison.Ordinal);
         Assert.Contains("secrets:", prodValues, StringComparison.Ordinal);
         Assert.Contains("secrets:", devValues, StringComparison.Ordinal);
