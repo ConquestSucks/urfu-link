@@ -2,8 +2,8 @@ nameOverride: chat-service
 fullnameOverride: chat-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/chat-service
-  pullPolicy: Always
-  tag: stable
+  pullPolicy: IfNotPresent
+  tag: sha-24bdc9c
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -27,10 +27,7 @@ rollout:
   autoPromotionEnabled: false
 
 autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
+  enabled: false
 
 serviceMonitor:
   enabled: true
