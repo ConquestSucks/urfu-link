@@ -2,22 +2,21 @@ import React from "react";
 import { View } from "react-native";
 
 export const InboxNotificationSkeleton = () => {
-  return (
-    <View className="flex-row gap-4 p-4 bg-white/5 border border-white/5 rounded-2xl">
-      <View className="w-10 h-10 bg-white/10 rounded-xl animate-pulse" />
+    return (
+        <View className="flex-row gap-3 px-4 py-3 md:rounded-2xl select-none border-b md:border border-white/5 md:bg-white/5">
+            <View className="flex-shrink-0 flex items-center justify-center text-white bg-[#1A1D27] shadow-sm w-12 h-12 rounded-[14px]">
+                <View className="h-6 w-6 rounded bg-white/10 animate-pulse" />
+            </View>
 
-      <View className="gap-1 flex-1">
-        <View className="flex-row justify-between">
-          <View className="h-[14px] w-32 bg-white/10 rounded animate-pulse" />
-
-          <View className="h-[10px] w-8 bg-white/5 rounded mt-[2.5px] shrink-0 animate-pulse" />
+            <View className="min-w-0 flex-1 gap-2">
+                <View className="flex-row justify-between gap-2">
+                    <View className="h-4 min-w-0 flex-1 rounded bg-white/10 animate-pulse" />
+                    <View className="h-3 w-10 shrink-0 rounded bg-white/5 animate-pulse" />
+                </View>
+                <View className="min-h-[39px] justify-center">
+                    <View className="h-3 w-full rounded bg-white/5 animate-pulse" />
+                </View>
+            </View>
         </View>
-
-        <View className="h-[39px] justify-center gap-1.5 mr-1">
-          <View className="h-3 w-full bg-white/5 rounded animate-pulse" />
-          <View className="h-3 w-4/5 bg-white/5 rounded animate-pulse" />
-        </View>
-      </View>
-    </View>
-  );
+    );
 };

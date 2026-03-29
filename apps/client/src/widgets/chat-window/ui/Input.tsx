@@ -1,54 +1,34 @@
-import { Paperclip, Send } from "lucide-react-native";
+import { PaperPlaneRightIcon, PlusIcon, PlusCircleIcon, SmileyIcon } from "phosphor-react-native";
 import { useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
-
 interface ChatInputProps {
-  placeholder?: string;
-  onSearch?: (text: string) => void;
+    placeholder?: string;
+    onSearch?: (text: string) => void;
 }
+export const ChatInput = ({ placeholder = "Сообщение", onSearch, }: ChatInputProps) => {
+    const [query, setQuery] = useState("");
+    const handleChangeText = (text: string) => {
+        setQuery(text);
+        if (onSearch) {
+            onSearch(text);
+        }
+    };
+    return (<View className="px-6 py-4 border-t border-white/5">
+      <View className="flex-row items-center gap-3">
+        <Pressable className="rounded-full items-center justify-center active:bg-white/5">
+        <PlusCircleIcon size={28} color="#8B8FA8" weight="regular"/>
+        </Pressable>
 
-export const ChatInput = ({
-  placeholder = "Написать сообщение...",
-  onSearch,
-}: ChatInputProps) => {
-  const [query, setQuery] = useState("");
-
-  const handleChangeText = (text: string) => {
-    setQuery(text);
-    if (onSearch) {
-      onSearch(text);
-    }
-  };
-
-  return (
-    <View className="px-8 py-6">
-      <View className="flex-row items-center bg-white/5 rounded-3xl px-5 py-2">
-        <View className="flex-row gap-3 flex-1 h-full items-center">
-          <Pressable className="p-2 rounded-2xl">
-            {({ pressed, hovered }) => (
-              <Paperclip
-                size={20}
-                color={pressed ? "#2B7FFF" : hovered ? "#51a2ff" : "#62748E"}
-                className="transition-all duration-[50ms]"
-              />
-            )}
+        <View className="flex-1 flex-row items-center bg-white/5 rounded-full px-4 min-h-[44px]">
+          <TextInput className="text-white outline-none text-[15px] flex-1" placeholder={placeholder} placeholderTextColor="#62748E" value={query} onChangeText={handleChangeText} underlineColorAndroid="transparent" cursorColor="#2B7FFF" returnKeyType="default"/>
+          <Pressable hitSlop={8} className="p-1">
+            <SmileyIcon size={24} color="#8B8FA8" weight="regular"/>
           </Pressable>
-
-          <TextInput
-            className="text-white outline-none text-[15px] h-full grow"
-            placeholder={placeholder}
-            placeholderTextColor="#62748E"
-            value={query}
-            onChangeText={handleChangeText}
-            underlineColorAndroid="transparent"
-            cursorColor="#2B7FFF"
-            returnKeyType="search"
-          />
         </View>
-        <Pressable className="p-[10px] bg-white/5 rounded-2xl">
-          <Send size={18} color="#62748E" />
+
+        <Pressable className="w-11 h-11 rounded-full bg-[#2B7FFF] items-center justify-center active:opacity-90">
+          <PaperPlaneRightIcon size={22} color="#FFFFFF" weight="fill"/>
         </Pressable>
       </View>
-    </View>
-  );
+    </View>);
 };
