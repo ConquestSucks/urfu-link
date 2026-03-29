@@ -1,6 +1,30 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --app-bg: #080d1d;
+  color-scheme: dark;
+}
+html,
+body,
+#root {
+  background-color: var(--app-bg);
+}
+html {
+  overscroll-behavior: none;
+}
+body {
+  overscroll-behavior: none;
+}
+@supports (min-height: 100dvh) {
+  html,
+  body,
+  #root {
+    min-height: 100dvh;
+  }
+}
+
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
