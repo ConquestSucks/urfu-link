@@ -1,20 +1,15 @@
-import { X } from "lucide-react-native";
+import { XIcon } from "phosphor-react-native";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-
 interface HeaderProps {
-  onClose: () => void;
+    onClose: () => void;
 }
-
 const Header = ({ onClose }: HeaderProps) => {
-  return (
-    <View className="flex-row items-center justify-between">
+    return (<View className="flex-row items-center justify-between">
       <Text className="text-white text-xl leading-none">Настройки</Text>
       <Pressable className="p-2" onPress={onClose}>
-        <X size={20} color="#90A1B9" />
+        <XIcon size={20} color="#90A1B9"/>
       </Pressable>
-    </View>
-  );
+    </View>);
 };
-
 export default Header;

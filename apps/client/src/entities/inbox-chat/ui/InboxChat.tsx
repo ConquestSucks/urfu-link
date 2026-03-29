@@ -1,48 +1,66 @@
 import { Avatar } from "@/shared/ui";
+import { ChecksIcon } from "phosphor-react-native";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { InboxChatProps } from "../model/types";
 
 export const InboxChat = ({
-  avatarUrl,
-  name,
-  message,
-  time,
-  isActive,
-  onPress,
+    avatarUrl,
+    name,
+    message,
+    time,
+    isActive,
+    onPress,
+    unreadCount = 0,
+    lastMessageFromSelf,
+    lastMessageRead,
 }: InboxChatProps) => {
-  return (
-    <Pressable className="select-none" onPress={onPress}>
-      <View
-        className={`p-[14px] flex-row items-center gap-3 rounded-2xl active:bg-[#2B7FFF]/10 transition-all duration-300 ${
-          isActive ? "bg-[#2B7FFF]/10" : "hover:bg-white/5"
-        }`}
-      >
-        <Avatar size={48} src={avatarUrl} />
+    const hasUnread = unreadCount > 0;
+    const showChecks = Boolean(lastMessageFromSelf);
 
-        <View className="flex-1 gap-[2.5px]">
-          <View className="flex-row justify-between">
-            <Text
-              numberOfLines={1}
-              className={`flex-1 text-sm leading-[21px] font-medium ${
-                isActive ? "text-white" : "text-[#E2E8F0]"
-              }`}
+    return (
+        <Pressable className="select-none" onPress={onPress}>
+            <View
+                className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-[#2B7FFF]/10 transition-all duration-300 ${isActive ? "bg-[#2B7FFF]/10" : "hover:bg-white/5"}`}
             >
-              {name}
-            </Text>
-            <Text className="text-[10px] font-medium text-[#62748E] mt-1 shrink-0">
-              {time}
-            </Text>
-          </View>
+                <Avatar size={48} src={avatarUrl} />
 
-          <Text
-            numberOfLines={1}
-            className="text-xs leading-[20px] text-[#90A1B9]"
-          >
-            {message}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
-  );
+                <View className="flex-1 gap-2 min-w-0">
+                    <View className="flex-row justify-between items-start gap-2">
+                        <Text numberOfLines={1} className="leading-none flex-1 text-base font-semibold text-white">
+                            {name}
+                        </Text>
+                        <Text className="leading-none text-xs font-medium text-[#8B8FA8]">
+                            {time}
+                        </Text>
+                    </View>
+
+                    <View className="flex-row items-center gap-2 min-w-0">
+                        <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
+                            {showChecks && (
+                                <ChecksIcon
+                                    size={16}
+                                    color={lastMessageRead ? "#2B7FFF" : "#62748E"}
+                                    weight="bold"
+                                />
+                            )}
+                            <Text
+                                numberOfLines={1}
+                                className={`leading-none text-sm font-medium flex-1 min-w-0 text-[#8B8FA8]`}
+                            >
+                                {message}
+                            </Text>
+                        </View>
+                        {hasUnread && (
+                            <View className="bg-[#2B7FFF] min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0">
+                                <Text className="text-white text-[10px] font-bold">
+                                    {unreadCount > 99 ? "99+" : String(unreadCount)}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </View>
+            </View>
+        </Pressable>
+    );
 };
