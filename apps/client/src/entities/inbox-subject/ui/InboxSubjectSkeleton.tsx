@@ -3,16 +3,16 @@ import React from "react";
 import { View } from "react-native";
 
 export const InboxSubjectSkeleton = () => {
-  return (
-    <View className="gap-1 mb-2">
-      <View className="h-12 px-4 justify-center">
-        <View className="h-[10px] w-32 bg-white/10 rounded animate-pulse" />
-      </View>
+    return (
+        <View>
+            <View className="px-4 py-3">
+                <View className="h-[10px] w-40 max-w-[85%] rounded bg-white/10 animate-pulse" />
+            </View>
 
-      <View className="gap-2">
-        <InboxChatSkeleton />
-        <InboxChatSkeleton />
-      </View>
-    </View>
-  );
+            <View className="gap-0 md:gap-1">
+                <InboxChatSkeleton />
+                <InboxChatSkeleton />
+            </View>
+        </View>
+    );
 };
