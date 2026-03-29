@@ -29,6 +29,7 @@ public static class AuthenticationExtensions
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateAudience = true,
+                    ValidAudience = audience,
                     ValidateIssuer = true,
                     NameClaimType = "preferred_username",
                     RoleClaimType = "roles",
