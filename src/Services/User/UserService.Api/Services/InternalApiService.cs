@@ -1,7 +1,7 @@
 using Grpc.Core;
 using Urfu.Link.Services.User.Grpc;
 
-namespace Urfu.Link.Services.User.Services;
+namespace UserService.Api.Services;
 
 public sealed class InternalApiService : InternalApi.InternalApiBase
 {
