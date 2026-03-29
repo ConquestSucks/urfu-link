@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
-using Urfu.Link.Services.User.Domain;
+using UserService.Api.Domain;
 
-namespace Urfu.Link.Services.User.Application;
+namespace UserService.Api.Application;
 
 public sealed record PublishSampleEventRequest(string Name);
 
