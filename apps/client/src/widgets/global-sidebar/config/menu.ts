@@ -1,7 +1,6 @@
 import { Href } from "expo-router";
-import { BookOpen, MessageSquare } from "lucide-react-native";
-
+import { BookOpenIcon, ChatCircleTextIcon   } from "phosphor-react-native";
 export const MENU_ITEMS = [
-  { icon: MessageSquare, label: "Личные чаты", href: "/chats" as Href },
-  { icon: BookOpen, label: "Дисциплины", href: "/subjects" as Href },
+    { icon: ChatCircleTextIcon  , label: "Личные чаты", href: "/chats" as Href },
+    { icon: BookOpenIcon, label: "Дисциплины", href: "/subjects" as Href },
 ];
