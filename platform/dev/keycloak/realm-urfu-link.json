@@ -25,7 +25,19 @@
       "protocol": "openid-connect",
       "secret": "CHANGE_ME_IN_PROD",
       "redirectUris": ["http://localhost:3000/*", "http://localhost:8081/*"],
-      "webOrigins": ["*"]
+      "webOrigins": ["*"],
+      "protocolMappers": [
+        {
+          "name": "urfu-link-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "urfu-link-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "urfu-link-web",
@@ -36,7 +48,19 @@
       "directAccessGrantsEnabled": true,
       "protocol": "openid-connect",
       "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"]
+      "webOrigins": ["http://localhost:3000"],
+      "protocolMappers": [
+        {
+          "name": "urfu-link-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "urfu-link-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "linkerd-viz",
@@ -147,6 +171,17 @@
       ]
     },
     {
+      "clientId": "user-service-admin",
+      "name": "User Service Admin",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "user-service-admin-dev-secret"
+    },
+    {
       "clientId": "minio-console",
       "name": "MinIO Console",
       "enabled": true,
@@ -172,6 +207,28 @@
           }
         }
       ]
+    }
+  ],
+  "users": [
+    {
+      "username": "devuser",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "dev@urfu.link",
+      "firstName": "Dev",
+      "lastName": "User",
+      "credentials": [
+        { "type": "password", "value": "devpass", "temporary": false }
+      ],
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "service-account-user-service-admin",
+      "enabled": true,
+      "serviceAccountClientId": "user-service-admin",
+      "clientRoles": {
+        "realm-management": ["view-users", "manage-users", "query-users"]
+      }
     }
   ]
 }
