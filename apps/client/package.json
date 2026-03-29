@@ -28,7 +28,7 @@
     "expo-symbols": "~55.0.5",
     "expo-web-browser": "~55.0.10",
     "nativewind": "^4.2.2",
-    "phosphor-react-native": "^3.0.3",
+    "phosphor-react-native": "^3.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.4",

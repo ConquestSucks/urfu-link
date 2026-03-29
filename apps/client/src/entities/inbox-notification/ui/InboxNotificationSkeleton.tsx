@@ -4,9 +4,7 @@ import { View } from "react-native";
 export const InboxNotificationSkeleton = () => {
     return (
         <View className="flex-row gap-3 px-4 py-3 md:rounded-2xl select-none border-b md:border border-white/5 md:bg-white/5">
-            <View className="flex-shrink-0 flex items-center justify-center text-white bg-[#1A1D27] shadow-sm w-12 h-12 rounded-[14px]">
-                <View className="h-6 w-6 rounded bg-white/10 animate-pulse" />
-            </View>
+            <View className="flex-shrink-0 flex items-center justify-center text-white bg-[#1A1D27] shadow-sm w-12 h-12 rounded-[14px]"></View>
 
             <View className="min-w-0 flex-1 gap-2">
                 <View className="flex-row justify-between gap-2">
