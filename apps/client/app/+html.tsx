@@ -5,7 +5,7 @@ const APP_THEME_BG = "#080D1D";
 
 export default function Root({ children }: PropsWithChildren) {
     return (
-        <html lang="ru" style={{ backgroundColor: APP_THEME_BG }}>
+        <html lang="ru">
             <head>
                 <meta charSet="utf-8" />
                 <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -14,11 +14,11 @@ export default function Root({ children }: PropsWithChildren) {
                     content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
                 />
                 <meta name="theme-color" content={APP_THEME_BG} />
-                <meta name="color-scheme" content="dark" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
                 <title>URFU Link</title>
                 <ScrollViewStyleReset />
             </head>
-            <body style={{ backgroundColor: APP_THEME_BG, minHeight: "100%" }}>{children}</body>
+            <body>{children}</body>
         </html>
     );
 }
