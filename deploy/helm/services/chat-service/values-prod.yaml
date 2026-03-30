@@ -16,6 +16,8 @@ env:
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
   Kafka__BootstrapServers: urfu-kafka.urfu-platform.svc.cluster.local:9092
   Auth__Authority: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
+  Auth__MetadataAddress: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/.well-known/openid-configuration
+  Auth__ValidIssuer: https://id.ghjc.ru/realms/urfu-link
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
 
 secrets:
