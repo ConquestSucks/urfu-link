@@ -1,6 +1,7 @@
-import { CaretDownIcon, CheckIcon } from "phosphor-react-native";
+import { ActivityIndicator } from "@/shared/ui/activity-indicator";
+import { CaretDownIcon, CheckIcon } from "@/shared/ui/phosphor";
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, Modal, Pressable, ScrollView, Text, View, } from "react-native";
+import { Dimensions, Modal, Pressable, ScrollView, Text, View, } from "react-native";
 import Animated, { FadeIn, useAnimatedStyle, withTiming, } from "react-native-reanimated";
 interface Option {
     label: string;
@@ -52,17 +53,17 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
     return (<View ref={triggerRef} collapsable={false} className={`w-full ${className}`}>
       <Pressable onPress={openDropdown} disabled={disabled} className={`
           flex-row items-center justify-between
-          bg-[#0B1225] border px-4 py-3.5 rounded-xl
+          bg-app-card border px-4 py-3.5 rounded-xl
           transition-colors duration-300
-          ${isOpen ? "border-[#2B7FFF]" : "border-white/10"}
+          ${isOpen ? "border-brand-600" : "border-white/10"}
           ${disabled ? "opacity-50" : "hover:border-white/20"}
         `}>
-        <Text className={`text-[15px] transition-colors duration-300 ${selectedOption ? "text-white" : "text-[#45556C]"}`}>
+        <Text className={`text-[15px] transition-colors duration-300 ${selectedOption ? "text-white" : "text-text-disabled"}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
 
         <Animated.View style={chevronStyle}>
-          <CaretDownIcon size={20} color={isOpen ? "#2B7FFF" : "#45556C"}/>
+          <CaretDownIcon size={20} className={isOpen ? "text-brand-600" : "text-text-disabled"}/>
         </Animated.View>
       </Pressable>
 
@@ -75,12 +76,12 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
             width: dropdownCoords.width,
             zIndex: 50,
         }}>
-            <View className="bg-[#0B1225] border border-white/10 rounded-xl overflow-hidden max-h-60 shadow-[0_10px_25px_-5px_rgba(0,0,0,0.5)]">
+            <View className="bg-app-card border border-white/10 rounded-xl overflow-hidden max-h-60 shadow-modal">
               <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
                 {loading ? (<View className="px-4 py-5 items-center justify-center">
-                    <ActivityIndicator size="small" color="#2B7FFF"/>
+                    <ActivityIndicator size="small" className="text-brand-600"/>
                   </View>) : options.length === 0 ? (<View className="px-4 py-5 items-center justify-center">
-                    <Text className="text-[#45556C] text-[15px]">
+                    <Text className="text-text-disabled text-[15px]">
                       {emptyMessage}
                     </Text>
                   </View>) : (options.map((option, index) => {
@@ -93,15 +94,15 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
                           transition-colors duration-200
                           ${index !== options.length - 1 ? "border-b border-white/5" : ""}
                           ${isSelected
-                    ? "bg-[#2B7FFF]/10"
+                    ? "bg-brand-600/10"
                     : "bg-transparent hover:bg-white/5 active:bg-white/10"}
                         `}>
                         <Text className={`text-[15px] transition-colors duration-200 ${isSelected
-                    ? "text-[#2B7FFF] font-medium"
-                    : "text-[#CAD5E2]"}`}>
+                    ? "text-brand-600 font-medium"
+                    : "text-text-secondary"}`}>
                           {option.label}
                         </Text>
-                        {isSelected && <CheckIcon size={18} color="#2B7FFF"/>}
+                        {isSelected && <CheckIcon size={18} className="text-brand-600"/>}
                       </Pressable>);
         }))}
               </ScrollView>

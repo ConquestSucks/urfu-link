@@ -1,4 +1,4 @@
-import { ChatCircleTextIcon , UserCircleIcon } from "phosphor-react-native";
+import { ChatCircleTextIcon , UserCircleIcon } from "@/shared/ui/phosphor";
 import { TabConfig } from "../model/types";
 export const MOBILE_TABS: TabConfig[] = [
     {

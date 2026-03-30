@@ -1,3 +1,4 @@
+import "@/shared/lib/nativewind-interop";
 import { AppProviders } from "@/providers/app-providers";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
