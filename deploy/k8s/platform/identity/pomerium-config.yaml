@@ -5,29 +5,6 @@ metadata:
   namespace: urfu-platform
 data:
   config.yaml: |
-    authenticate_service_url: https://auth.ghjc.ru
-
-    idp_provider: oidc
-    idp_provider_url: https://id.ghjc.ru/realms/urfu-link
-    idp_scopes:
-      - openid
-      - email
-      - profile
-      - roles
-
-    cookie_domain: .ghjc.ru
-    cookie_secure: true
-    cookie_http_only: true
-    cookie_same_site: lax
-    cookie_name: _pomerium
-    cookie_expire: 1h
-
-    databroker_storage_type: redis
-    databroker_storage_connection_string: redis://urfu-redis.urfu-platform.svc.cluster.local:6379
-
-    code_challenge_method: S256
-    log_level: info
-
     routes:
       # Frontend — any authenticated user
       - from: https://urfu-link.ghjc.ru
