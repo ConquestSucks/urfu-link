@@ -43,9 +43,9 @@ spec:
             - --redirect-url=https://urfu-link.ghjc.ru/oauth2/callback
             - --scope=openid email profile
             - --code-challenge-method=S256
-            - --set-authorization-header=true
             - --set-xauthrequest=true
-            - --pass-access-token=false
+            - --pass-access-token=true
+            - --alpha-config=/etc/oauth2-proxy/alpha-config.yaml
             - --silence-ping-logging=true
             - --skip-jwt-bearer-tokens=true
             - --session-store-type=redis
@@ -89,6 +89,10 @@ spec:
             limits:
               cpu: 100m
               memory: 64Mi
+          volumeMounts:
+            - name: alpha-config
+              mountPath: /etc/oauth2-proxy
+              readOnly: true
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -96,3 +100,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: alpha-config
+          configMap:
+            name: frontend-web-oauth2-proxy-alpha-config
