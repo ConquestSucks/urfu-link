@@ -2,7 +2,7 @@ import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar, StatusIndicator } from "@/shared/ui";
 import { useInboxStore } from "@/store/useInboxStore";
-import { CaretLeftIcon } from "phosphor-react-native";
+import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ChatHeaderActions } from "./ChatHeaderActions";
@@ -22,7 +22,7 @@ export const ChatHeader = ({ chatId }: { chatId: string }) => {
               hitSlop={8}
               className="p-2 rounded-xl"
             >
-              <CaretLeftIcon size={24} color="#8B8FA8" weight="bold" />
+              <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
             </Pressable>
           )}
           <View className="flex-row gap-3 items-center">
@@ -44,7 +44,7 @@ export const ChatHeader = ({ chatId }: { chatId: string }) => {
               </Text>
               <Text
                 numberOfLines={1}
-                className="text-[#00BC7D] leading-none text-xs font-medium"
+                className="text-success-600 leading-none text-xs font-medium"
               >
                 В сети
               </Text>

@@ -11,7 +11,7 @@ type InboxSubjectGroupProps = {
 export function InboxSubjectGroup({ subject, activeChatId, onChatPress }: InboxSubjectGroupProps) {
     return (
         <View>
-            <Text className="px-4 py-3 text-[11px] leading-1 font-bold text-[#8B8FA8] uppercase tracking-[0.1em] opacity-80">
+            <Text className="px-4 py-3 text-[11px] leading-1 font-bold text-text-subtle uppercase tracking-[0.1em] opacity-80">
                 {subject.title}
             </Text>
             <View className="md:gap-1">
