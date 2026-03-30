@@ -38,7 +38,7 @@ spec:
       project: urfu-link
       source:
         repoURL: https://github.com/ConquestSucks/urfu-link.git
-        targetRevision: HEAD
+        targetRevision: master
         path: deploy/helm/charts/urfu-service
         helm:
           releaseName: "{{service}}"
