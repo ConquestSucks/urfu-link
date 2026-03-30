@@ -16,7 +16,7 @@ export const ProfileCard = ({ textAnimatedStyle, userName, userDescription, avat
           <Text numberOfLines={1} className="text-white text-sm leading-none">
             {userName}
           </Text>
-          <Text numberOfLines={1} className="text-[#90A1B9] text-[11px] leading-none">
+          <Text numberOfLines={1} className="text-text-muted text-[11px] leading-none">
             {userDescription}
           </Text>
         </View>

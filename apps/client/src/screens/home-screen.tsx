@@ -4,19 +4,19 @@ export function HomeScreen() {
     return (<AppScreen>
       <View style={styles.container}>
         <View style={styles.content}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>URFU Link</Text>
+          <View className="border border-effects-brandOverlay40 rounded-full px-3.5 py-[5px] bg-effects-brandOverlay08">
+            <Text style={styles.badgeText} className="text-brand-300">URFU Link</Text>
           </View>
 
-          <Text style={styles.heading}>Скоро здесь{"\n"}что-то будет</Text>
+          <Text style={styles.heading} className="text-slate-50">Скоро здесь{"\n"}что-то будет</Text>
 
-          <Text style={styles.subheading}>
+          <Text style={styles.subheading} className="text-slate-500">
             Мы работаем над чем-то новым.{"\n"}Следите за обновлениями.
           </Text>
 
-          <View style={styles.divider}/>
+          <View style={styles.divider} className="bg-effects-slateOverlay20"/>
 
-          <Text style={styles.footer}>urfu-link.ghjc.ru</Text>
+          <Text style={styles.footer} className="text-slate-700">urfu-link.ghjc.ru</Text>
         </View>
       </View>
     </AppScreen>);
@@ -34,23 +34,13 @@ const styles = StyleSheet.create({
         maxWidth: 480,
         width: "100%"
     },
-    badge: {
-        borderWidth: 1,
-        borderColor: "rgba(59, 130, 246, 0.4)",
-        borderRadius: 100,
-        paddingHorizontal: 14,
-        paddingVertical: 5,
-        backgroundColor: "rgba(59, 130, 246, 0.08)"
-    },
     badgeText: {
-        color: "#60a5fa",
         fontSize: 12,
         fontWeight: "600",
         letterSpacing: 1.5,
         textTransform: "uppercase"
     },
     heading: {
-        color: "#f8fafc",
         fontSize: 48,
         fontWeight: "700",
         textAlign: "center",
@@ -58,7 +48,6 @@ const styles = StyleSheet.create({
         letterSpacing: -0.5
     },
     subheading: {
-        color: "#64748b",
         fontSize: 16,
         lineHeight: 26,
         textAlign: "center"
@@ -66,11 +55,9 @@ const styles = StyleSheet.create({
     divider: {
         width: 40,
         height: 1,
-        backgroundColor: "rgba(148, 163, 184, 0.2)",
         marginVertical: 4
     },
     footer: {
-        color: "#334155",
         fontSize: 13,
         letterSpacing: 0.5
     }

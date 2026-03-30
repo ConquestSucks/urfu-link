@@ -8,12 +8,12 @@ interface StatusIndicatorProps {
 }
 export const StatusIndicator = ({ status, size = 12, className = "", }: StatusIndicatorProps) => {
     const statusColors = {
-        online: "bg-[#00BC7D]",
-        offline: "bg-[#62748E]",
+        online: "bg-success-600",
+        offline: "bg-text-placeholder",
     };
     const sizeStyles = {
         width: size,
         height: size,
     };
-    return (<View style={sizeStyles} className={`absolute rounded-full border-2 border-[#0B1225] ${statusColors[status]} ${className}`}/>);
+    return (<View style={sizeStyles} className={`absolute rounded-full border-2 border-app-card ${statusColors[status]} ${className}`}/>);
 };
