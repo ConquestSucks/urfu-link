@@ -15,7 +15,7 @@ data:
               or:
                 - authenticated_user: true
         set_request_headers:
-          Authorization: "Bearer ${pomerium.access_token}"
+          Authorization: "Bearer $pomerium.access_token"
 
       # Frontend — any authenticated user
       - from: https://urfu-link.ghjc.ru
