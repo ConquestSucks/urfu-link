@@ -6,15 +6,7 @@ metadata:
 data:
   config.yaml: |
     routes:
-      # Frontend — any authenticated user
-      - from: https://urfu-link.ghjc.ru
-        to: http://frontend-web.urfu-prod.svc.cluster.local:8080
-        policy:
-          - allow:
-              or:
-                - authenticated_user: true
-
-      # Frontend API — inject Bearer token for YARP API Gateway
+      # Frontend API — inject Bearer token for YARP API Gateway (must be before / catch-all)
       - from: https://urfu-link.ghjc.ru
         to: http://api-gateway.urfu-prod.svc.cluster.local:8080
         prefix: /api
@@ -24,6 +16,14 @@ data:
                 - authenticated_user: true
         set_request_headers:
           Authorization: "Bearer ${pomerium.access_token}"
+
+      # Frontend — any authenticated user
+      - from: https://urfu-link.ghjc.ru
+        to: http://frontend-web.urfu-prod.svc.cluster.local:8080
+        policy:
+          - allow:
+              or:
+                - authenticated_user: true
 
       # Linkerd Viz — admin group only
       - from: https://linkerd.ghjc.ru
