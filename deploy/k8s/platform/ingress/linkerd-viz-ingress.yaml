@@ -2,16 +2,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: linkerd-viz-dashboard
-  namespace: linkerd-viz
+  namespace: urfu-platform
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-production
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: HTTP
-    nginx.ingress.kubernetes.io/auth-url: "http://pomerium.urfu-platform.svc.cluster.local/verify"
-    nginx.ingress.kubernetes.io/auth-signin: "https://auth.ghjc.ru/.pomerium/sign_in?pomerium_redirect_uri=$scheme://$host$escaped_request_uri"
-    nginx.ingress.kubernetes.io/auth-snippet: |
-      proxy_set_header Host $host;
-      proxy_set_header X-Original-URL $scheme://$host$request_uri;
     nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
     nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
 spec:
@@ -28,6 +22,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: web
+                name: pomerium
                 port:
-                  number: 8084
+                  number: 80
