@@ -5,6 +5,21 @@ export type BackendHealth = {
   checkedAt: string;
 };
 
+export type {
+  UserProfile,
+  UserIdentity,
+  UserAccount,
+  UserPrivacy,
+  UserNotifications,
+  UserSoundVideo,
+  DeviceSession,
+  UpdateAccountDto,
+  UpdatePrivacyDto,
+  UpdateNotificationsDto,
+} from "./users";
+
+import { createUsersApi } from "./users";
+
 type ApiClientConfig = {
   baseUrl: string;
   getAccessToken?: () => string | undefined;
@@ -26,6 +41,8 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
   }
 
   return {
+    users: createUsersApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+
     async health(): Promise<BackendHealth> {
       try {
         const response = await fetch(`${normalizedBaseUrl}/health/ready`, {
