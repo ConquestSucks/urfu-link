@@ -1,7 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import { Defs, LinearGradient, Path, Svg } from "react-native-svg";
-import { SvgStop } from "./svg-stop";
+import { Defs, LinearGradient, Path, Stop, Svg } from "react-native-svg";
 export const Logo = ({ size }: {
     size: number;
 }) => (<View style={{ width: size, height: size }}>
@@ -15,32 +14,32 @@ export const Logo = ({ size }: {
       <Path d="M19.2 18H28.8" stroke="url(#paint6_linear)" strokeWidth="2.4" strokeLinecap="round"/>
       <Defs>
         <LinearGradient id="paint0_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
         <LinearGradient id="paint1_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
         <LinearGradient id="paint2_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
         <LinearGradient id="paint3_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
         <LinearGradient id="paint4_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
         <LinearGradient id="paint5_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
         <LinearGradient id="paint6_linear" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
-          <SvgStop className="stop-brand-500"/>
-          <SvgStop offset="1" className="stop-brand-300"/>
+          <Stop stopColor={"#3B82F6"}/>
+          <Stop offset="1" stopColor={"#60A5FA"}/>
         </LinearGradient>
       </Defs>
     </Svg>
