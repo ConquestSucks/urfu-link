@@ -26,6 +26,8 @@ spec:
           value: DaemonSet
         - name: controller.config.allow-snippet-annotations
           value: "true"
+        - name: controller.extraArgs.enable-annotation-validation
+          value: "false"
 
   destination:
     server: https://kubernetes.default.svc
