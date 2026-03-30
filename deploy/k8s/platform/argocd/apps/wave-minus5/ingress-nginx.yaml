@@ -14,8 +14,8 @@ spec:
     helm:
       releaseName: ingress-nginx
       parameters:
-        - name: controller.admissionWebhooks.enabled
-          value: "false"
+        - name: controller.admissionWebhooks.certManager.enabled
+          value: "true"
         - name: controller.hostNetwork
           value: "true"
         - name: controller.dnsPolicy
@@ -24,8 +24,6 @@ spec:
           value: ClusterIP
         - name: controller.kind
           value: DaemonSet
-        - name: controller.config.allow-snippet-annotations
-          value: "true"
 
   destination:
     server: https://kubernetes.default.svc
