@@ -2,7 +2,7 @@ import { InboxNotification } from "@/entities/inbox-notification";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useInboxStore } from "@/store/useInboxStore";
-import { CaretLeftIcon } from "phosphor-react-native";
+import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import { type Href, router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -32,10 +32,10 @@ export default function NotificationsScreen() {
     }
 
     return (
-        <View className="flex-1 bg-[#080D1D]">
+        <View className="flex-1 bg-app-bg">
             <View className="flex-row items-center px-6 py-4 border-b border-white/5">
                 <Pressable onPress={() => safeGoBack("/chats")} hitSlop={8}>
-                    <CaretLeftIcon size={24} color="#FFFFFF" />
+                    <CaretLeftIcon size={24} className="text-white" />
                 </Pressable>
                 <Text className="text-white text-xl font-bold ml-4">Уведомления</Text>
             </View>
@@ -43,11 +43,11 @@ export default function NotificationsScreen() {
             <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
                 {isLoading
                     ? (
-                        <Text className="text-[#62748E] text-center py-8">Загрузка…</Text>
+                        <Text className="text-text-placeholder text-center py-8">Загрузка…</Text>
                     )
                     : notifications.length === 0
                         ? (
-                            <Text className="text-[#62748E] text-center py-8">Нет уведомлений</Text>
+                            <Text className="text-text-placeholder text-center py-8">Нет уведомлений</Text>
                         )
                         : (
                             notifications.map((n) => <InboxNotification key={n.id} {...n} />)

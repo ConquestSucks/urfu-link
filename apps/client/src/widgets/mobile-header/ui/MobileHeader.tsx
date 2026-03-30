@@ -1,5 +1,5 @@
 import { Logo } from "@/shared/ui";
-import { BellIcon, ChatCircleTextIcon   } from "phosphor-react-native";
+import { BellIcon, ChatCircleTextIcon   } from "@/shared/ui/phosphor";
 import { router, type Href } from "expo-router";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
@@ -37,9 +37,9 @@ export const MobileHeader = ({
                     accessibilityState={{ selected: messagesActive }}
                     className="p-2.5"
                 >
-                    <ChatCircleTextIcon  
+                    <ChatCircleTextIcon
                         size={24}
-                        color={messagesActive ? "#FFFFFF" : "#8b8fa8"}
+                        className={messagesActive ? "text-white" : "text-text-subtle"}
                         weight={messagesActive ? "fill" : "regular"}
                     />
                 </Pressable>
@@ -57,10 +57,10 @@ export const MobileHeader = ({
                     <View className="relative">
                         <BellIcon
                             size={24}
-                            color={notificationsActive ? "#FFFFFF" : "#8b8fa8"}
+                            className={notificationsActive ? "text-white" : "text-text-subtle"}
                             weight={notificationsActive ? "fill" : "regular"}
                         />
-                        <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-[#080D1D]" />
+                        <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" />
                     </View>
                 </Pressable>
             </View>

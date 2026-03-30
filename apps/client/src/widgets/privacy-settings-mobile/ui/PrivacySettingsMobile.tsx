@@ -1,7 +1,7 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { MOBILE_TAB_BAR_HEIGHT } from "@/widgets/mobile-bottom-tabs/config/layout";
 import { SwitchCard } from "@/shared/ui";
-import { CaretLeftIcon } from "phosphor-react-native";
+import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useState } from "react";
 import { Pressable, Text, View, ScrollView } from "react-native";
 export const PrivacySettingsMobile = () => {
@@ -11,10 +11,10 @@ export const PrivacySettingsMobile = () => {
         whoCanWrite: true,
         showGroups: true,
     });
-    return (<View className="flex-1 bg-[#080D1D]">
+    return (<View className="flex-1 bg-app-bg">
       <View className="flex-row items-center px-6 py-8 border-b border-white/5">
         <Pressable onPress={() => safeGoBack("/profile")} className="mr-6">
-          <CaretLeftIcon size={24} color="#FFFFFF"/>
+          <CaretLeftIcon size={24} className="text-white"/>
         </Pressable>
         <Text className="text-white text-2xl font-bold">Приватность</Text>
       </View>
@@ -28,8 +28,8 @@ export const PrivacySettingsMobile = () => {
 
         <SwitchCard label="Показывать мои группы" description="Другие пользователи смогут видеть ваши группы" value={settings.showGroups} onValueChange={(val) => setSettings({ ...settings, showGroups: val })}/>
 
-        <View className="bg-[#111827] rounded-3xl p-6 mt-4">
-          <Text className="text-[#62748E] text-[13px] leading-[20px]">
+        <View className="bg-zinc-900 rounded-3xl p-6 mt-4">
+          <Text className="text-text-placeholder text-[13px] leading-[20px]">
             Эти настройки помогут вам контролировать, какую информацию о вас могут видеть другие пользователи URFU LINK. Изменения применяются мгновенно.
           </Text>
         </View>

@@ -14,7 +14,7 @@ export const Sidebar = ({ activeTab, onTabChange, onClose }: SidebarProps) => {
   const { data: profile } = useCurrentUser();
 
   return (
-    <View className="bg-[#080D1D] h-full flex-col border-r border-white/10 p-6 gap-2 w-[calc(256/896*100%)]">
+    <View className="bg-app-bg h-full flex-col border-r border-white/10 p-6 gap-2 w-[calc(256/896*100%)]">
       <View className="gap-8 flex-1">
         <Header onClose={onClose} />
         <Menu activeTab={activeTab} onTabChange={onTabChange} />
