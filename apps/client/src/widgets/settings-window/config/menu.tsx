@@ -3,7 +3,7 @@ import { ManageDevices } from "@/features/manage-devices";
 import { ManageMedia } from "@/features/manage-media";
 import { ManageNotifications } from "@/features/manage-notifications";
 import { ManagePrivacy } from "@/features/manage-privacy";
-import { BellIcon, DeviceMobileIcon, LockIcon, UserIcon, VideoCameraIcon, } from "phosphor-react-native";
+import { BellIcon, DeviceMobileIcon, LockIcon, UserIcon, VideoCameraIcon, } from "@/shared/ui/phosphor";
 export const MENU_ITEMS = [
     {
         icon: UserIcon,

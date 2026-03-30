@@ -1,5 +1,5 @@
 import { Avatar } from "@/shared/ui";
-import { ChecksIcon } from "phosphor-react-native";
+import { ChecksIcon } from "@/shared/ui/phosphor";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { InboxChatProps } from "../model/types";
@@ -21,7 +21,7 @@ export const InboxChat = ({
     return (
         <Pressable className="select-none" onPress={onPress}>
             <View
-                className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-[#2B7FFF]/10 transition-all duration-300 ${isActive ? "bg-[#2B7FFF]/10" : "hover:bg-white/5"}`}
+                className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-brand-600/10 transition-all duration-300 ${isActive ? "bg-brand-600/10" : "hover:bg-white/5"}`}
             >
                 <Avatar size={48} src={avatarUrl} />
 
@@ -30,7 +30,7 @@ export const InboxChat = ({
                         <Text numberOfLines={1} className="leading-none flex-1 text-base font-semibold text-white">
                             {name}
                         </Text>
-                        <Text className="leading-none text-xs font-medium text-[#8B8FA8]">
+                        <Text className="leading-none text-xs font-medium text-text-subtle">
                             {time}
                         </Text>
                     </View>
@@ -40,19 +40,19 @@ export const InboxChat = ({
                             {showChecks && (
                                 <ChecksIcon
                                     size={16}
-                                    color={lastMessageRead ? "#2B7FFF" : "#62748E"}
+                                    className={lastMessageRead ? "text-brand-600" : "text-text-placeholder"}
                                     weight="bold"
                                 />
                             )}
                             <Text
                                 numberOfLines={1}
-                                className={`leading-none text-sm font-medium flex-1 min-w-0 text-[#8B8FA8]`}
+                                className={`leading-none text-sm font-medium flex-1 min-w-0 text-text-subtle`}
                             >
                                 {message}
                             </Text>
                         </View>
                         {hasUnread && (
-                            <View className="bg-[#2B7FFF] min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0">
+                            <View className="bg-brand-600 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0">
                                 <Text className="text-white text-[10px] font-bold">
                                     {unreadCount > 99 ? "99+" : String(unreadCount)}
                                 </Text>

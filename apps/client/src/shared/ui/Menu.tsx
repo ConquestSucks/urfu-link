@@ -7,7 +7,7 @@ export interface MenuRef {
 export interface MenuItem {
     separator?: boolean;
     icon?: React.ElementType;
-    iconColor?: string;
+    iconClassName?: string;
     iconSize?: number;
     label?: string;
     command?: () => void;
@@ -24,7 +24,7 @@ export const Menu = forwardRef<MenuRef, MenuProps>(({ model }, ref) => {
     }));
     return (<Modal visible={isVisible} transparent={true} animationType="fade" onRequestClose={() => setIsVisible(false)}>
       <Pressable className="flex-1 cursor-default" onPress={() => setIsVisible(false)}>
-        <Pressable className="absolute top-16 right-[33px] bg-[#0F172B] rounded-2xl overflow-hidden border border-white/10 py-2" onPress={(e) => e.stopPropagation()}>
+        <Pressable className="absolute top-16 right-[33px] bg-app-panel rounded-2xl overflow-hidden border border-white/10 py-2" onPress={(e) => e.stopPropagation()}>
           {model.map((item, index) => {
             if (item.separator) {
                 return (<View key={index} className="h-[1px] bg-white/5 my-1 mx-2"/>);
@@ -34,8 +34,8 @@ export const Menu = forwardRef<MenuRef, MenuProps>(({ model }, ref) => {
                         item.command();
                     setIsVisible(false);
                 }}>
-                {item.icon && (<item.icon color={item.iconColor} size={item.iconSize ?? 18}/>)}
-                {item.label && (<Text className={`text-sm leading-none select-none ${item.danger ? "text-[#FF637E]" : "text-[#CAD5E2]"}`}>
+                {item.icon && (<item.icon className={item.iconClassName} size={item.iconSize ?? 18}/>)}
+                {item.label && (<Text className={`text-sm leading-none select-none ${item.danger ? "text-danger-300" : "text-text-secondary"}`}>
                     {item.label}
                   </Text>)}
               </Pressable>);

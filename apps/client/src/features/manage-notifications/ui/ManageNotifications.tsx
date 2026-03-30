@@ -31,7 +31,7 @@ export const ManageNotifications = () => {
     };
     return (<ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
       {Object.values(NOTIFICATIONS_SETTINGS).map((section, sectionIndex) => (<View key={sectionIndex} className="gap-3">
-          <Text className="text-[#CAD5E2] text-sm font-semibold">
+          <Text className="text-text-secondary text-sm font-semibold">
             {section.label}
           </Text>
           <View className="gap-3">

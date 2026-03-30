@@ -1,13 +1,14 @@
 import type { Href } from "expo-router";
-import { IconProps } from "phosphor-react-native";
+import type { IconProps } from "@/shared/ui/phosphor";
+import type { ComponentType } from "react";
 export interface TabItemProps {
-    icon: React.FC<IconProps>;
+    icon: ComponentType<IconProps>;
     label: string;
     isActive: boolean;
     onPress: () => void;
 }
 export interface TabConfig {
-    icon: React.FC<IconProps>;
+    icon: ComponentType<IconProps>;
     label: string;
     href: Href;
 }

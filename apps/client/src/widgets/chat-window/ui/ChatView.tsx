@@ -9,7 +9,7 @@ interface ChatViewProps {
     type: "chat" | "subject";
 }
 export const ChatView = ({ chatId, type }: ChatViewProps) => {
-    return (<View className="bg-[#0B1225] flex-1">
+    return (<View className="bg-app-card flex-1">
       {type === "chat" ? (<ChatHeader chatId={chatId}/>) : (<SubjectHeader subjectId={chatId}/>)}
       <MessagesList chatId={chatId} type={type}/>
       <ChatInput />

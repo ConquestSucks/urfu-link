@@ -9,7 +9,7 @@ export interface GlobalSidebarProps {
 }
 export const GlobalSidebar = ({ onSettingsPress }: GlobalSidebarProps) => {
     const { handleToggle, sidebarStyle, textAnimatedStyle, chevronAnimatedStyle, } = useSidebarAnimation();
-    return (<Animated.View style={sidebarStyle} className="h-full bg-[#080D1D]">
+    return (<Animated.View style={sidebarStyle} className="h-full bg-app-bg">
       <Header textAnimatedStyle={textAnimatedStyle}/>
 
       <View className="w-full grow px-4 gap-y-2">
