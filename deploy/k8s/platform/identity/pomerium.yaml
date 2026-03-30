@@ -41,6 +41,8 @@ spec:
               value: "_pomerium"
             - name: COOKIE_EXPIRE
               value: "1h"
+            - name: DATABROKER_STORAGE_TYPE
+              value: "redis"
             - name: DATABROKER_STORAGE_CONNECTION_STRING
               value: "redis://urfu-redis.urfu-platform.svc.cluster.local:6379"
             - name: LOG_LEVEL
