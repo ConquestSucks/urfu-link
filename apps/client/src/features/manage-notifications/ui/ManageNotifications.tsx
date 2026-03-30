@@ -1,42 +1,53 @@
-import { useUIStore } from "@/shared/model";
+import { useCurrentUser, useUpdateNotifications } from "@/entities/user";
 import { SwitchCard } from "@/shared/ui";
-import { useState } from "react";
-import { ScrollView, Text, View } from "react-native";
-import { NOTIFICATIONS_SETTINGS } from "../config/settings";
-type NotificationKeys = (typeof NOTIFICATIONS_SETTINGS.directMessages.items)[number]["key"];
-type NotificationForm = Record<NotificationKeys, boolean>;
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { NOTIFICATIONS_SETTINGS, type NotificationField } from "../config/settings";
+
 export const ManageNotifications = () => {
-    const [form, setForm] = useState<NotificationForm>({
-        showOnlineStatus: true,
-        ShowLastSeen: false,
-        allowDirectMessages: true,
+  const { data: profile, isLoading } = useCurrentUser();
+  const updateNotifications = useUpdateNotifications();
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  const notifications = profile?.notifications;
+
+  const handleToggle = (field: NotificationField) => (newValue: boolean) => {
+    if (!notifications) return;
+    updateNotifications.mutate({
+      newMessages: field === "newMessages" ? newValue : notifications.newMessages,
+      notificationSound: field === "notificationSound" ? newValue : notifications.notificationSound,
+      disciplineChatMessages: field === "disciplineChatMessages" ? newValue : notifications.disciplineChatMessages,
+      mentions: field === "mentions" ? newValue : notifications.mentions,
     });
-    const { isPending, setPending } = useUIStore();
-    const handleToggle = (field: NotificationKeys) => async (newValue: boolean) => {
-        if (isPending)
-            return;
-        setPending(true);
-        const previousValue = form[field];
-        setForm((prev) => ({ ...prev, [field]: newValue }));
-        try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-        }
-        catch (error) {
-            console.error("Ошибка обновления уведомлений", error);
-            setForm((prev) => ({ ...prev, [field]: previousValue }));
-        }
-        finally {
-            setPending(false);
-        }
-    };
-    return (<ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
-      {Object.values(NOTIFICATIONS_SETTINGS).map((section, sectionIndex) => (<View key={sectionIndex} className="gap-3">
+  };
+
+  return (
+    <ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
+      {Object.values(NOTIFICATIONS_SETTINGS).map((section, sectionIndex) => (
+        <View key={sectionIndex} className="gap-3">
           <Text className="text-text-secondary text-sm font-semibold">
             {section.label}
           </Text>
           <View className="gap-3">
-            {section.items.map((item) => (<SwitchCard key={item.key} label={item.label} description={item.description} value={form[item.key as NotificationKeys]} onValueChange={handleToggle(item.key as NotificationKeys)} disabled={isPending}/>))}
+            {section.items.map((item) => (
+              <SwitchCard
+                key={item.key}
+                label={item.label}
+                description={item.description}
+                value={notifications?.[item.key as NotificationField] ?? true}
+                onValueChange={handleToggle(item.key as NotificationField)}
+                disabled={updateNotifications.isPending}
+              />
+            ))}
           </View>
-        </View>))}
-    </ScrollView>);
+        </View>
+      ))}
+    </ScrollView>
+  );
 };

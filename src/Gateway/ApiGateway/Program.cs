@@ -8,6 +8,20 @@ builder.Services
     .AddPlatformJwtAuthentication(builder.Configuration)
     .AddPlatformObservability(builder.Configuration, "api-gateway");
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        var origins = builder.Configuration
+            .GetSection("Cors:AllowedOrigins")
+            .Get<string[]>() ?? [];
+        policy.WithOrigins(origins)
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
@@ -39,6 +53,7 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 app.UseRateLimiter();
+app.UseCors();
 
 app.Use((context, next) =>
 {

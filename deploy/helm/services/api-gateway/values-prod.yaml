@@ -15,6 +15,7 @@ env:
   ASPNETCORE_URLS: http://+:8080
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
   Auth__Authority: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
+  Cors__AllowedOrigins__0: https://urfu-link.ghjc.ru
 
 secrets:
   enabled: true
