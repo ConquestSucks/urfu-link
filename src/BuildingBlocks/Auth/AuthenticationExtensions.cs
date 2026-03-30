@@ -16,12 +16,16 @@ public static class AuthenticationExtensions
 
         var authority = configuration["Auth:Authority"] ?? "http://localhost:8080/realms/urfu-link";
         var audience = configuration["Auth:Audience"] ?? "urfu-link-api";
+        var metadataAddress = configuration["Auth:MetadataAddress"];
+        var validIssuer = configuration["Auth:ValidIssuer"];
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
                 options.Authority = authority;
+                if (!string.IsNullOrEmpty(metadataAddress))
+                    options.MetadataAddress = metadataAddress;
                 options.Audience = audience;
                 options.MapInboundClaims = false;
                 options.RequireHttpsMetadata = Uri.TryCreate(authority, UriKind.Absolute, out var authorityUri)
@@ -31,6 +35,7 @@ public static class AuthenticationExtensions
                     ValidateAudience = true,
                     ValidAudience = audience,
                     ValidateIssuer = true,
+                    ValidIssuer = validIssuer ?? authority,
                     NameClaimType = "preferred_username",
                     RoleClaimType = "roles",
                 };
