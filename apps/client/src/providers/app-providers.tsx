@@ -8,7 +8,11 @@ export function AppProviders({ children }: PropsWithChildren) {
     const [queryClient] = useState(() => new QueryClient({
         defaultOptions: {
             queries: {
-                retry: 1,
+                retry: (failureCount, error) => {
+                    if (error instanceof Response && error.status === 401) return false;
+                    if (typeof error === "object" && error !== null && "status" in error && (error as { status: number }).status === 401) return false;
+                    return failureCount < 1;
+                },
                 refetchOnWindowFocus: false,
             },
         },

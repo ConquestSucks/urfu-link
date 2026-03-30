@@ -33,8 +33,10 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  let redirecting = false;
   function handleUnauthorized(response: Response): void {
-    if (response.status === 401 && typeof window !== "undefined") {
+    if (response.status === 401 && typeof window !== "undefined" && !redirecting) {
+      redirecting = true;
       const rd = encodeURIComponent(window.location.pathname + window.location.search);
       window.location.href = `/oauth2/start?rd=${rd}`;
     }
