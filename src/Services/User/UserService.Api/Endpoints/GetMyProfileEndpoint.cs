@@ -31,10 +31,14 @@ public sealed class GetMyProfileEndpoint(IUserRepository userRepository)
         await HttpContext.Response.SendAsync(MapToResponse(user), cancellation: ct).ConfigureAwait(false);
     }
 
-    private static UserProfileResponse MapToResponse(UserProfile user)
+    private UserProfileResponse MapToResponse(UserProfile user)
     {
         return new UserProfileResponse(
             UserId: user.Id,
+            Identity: new IdentityResponse(
+                Name: HttpContext.User.GetDisplayName(),
+                Email: HttpContext.User.GetEmail(),
+                Username: HttpContext.User.GetUsername()),
             Account: new AccountResponse(user.Account.AvatarUrl, user.Account.AboutMe),
             Privacy: new PrivacyResponse(user.Privacy.ShowOnlineStatus, user.Privacy.ShowLastVisitTime),
             Notifications: new NotificationsResponse(

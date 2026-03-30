@@ -1,35 +1,44 @@
-import { useUIStore } from "@/shared/model";
+import { useCurrentUser, useUpdatePrivacy } from "@/entities/user";
 import { SwitchCard } from "@/shared/ui";
-import React, { useState } from "react";
-import { ScrollView, View } from "react-native";
-import { PRIVACY_SETTINGS, PrivacyForm } from "../config/settings";
+import { ActivityIndicator, View, ScrollView } from "react-native";
+import { PRIVACY_SETTINGS, type PrivacyField } from "../config/settings";
+
 export const ManagePrivacy = () => {
-    const [form, setForm] = useState<PrivacyForm>({
-        showOnlineStatus: true,
-        ShowLastSeen: false,
-        allowDirectMessages: true,
+  const { data: profile, isLoading } = useCurrentUser();
+  const updatePrivacy = useUpdatePrivacy();
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator />
+      </View>
+    );
+  }
+
+  const privacy = profile?.privacy;
+
+  const handleToggle = (field: PrivacyField) => (newValue: boolean) => {
+    if (!privacy) return;
+    updatePrivacy.mutate({
+      showOnlineStatus: field === "showOnlineStatus" ? newValue : privacy.showOnlineStatus,
+      showLastVisitTime: field === "showLastVisitTime" ? newValue : privacy.showLastVisitTime,
     });
-    const { isPending, setPending } = useUIStore();
-    const handleToggle = (field: keyof PrivacyForm) => async (newValue: boolean) => {
-        if (isPending)
-            return;
-        setPending(true);
-        const previousValue = form[field];
-        setForm((prev) => ({ ...prev, [field]: newValue }));
-        try {
-            await new Promise((resolve) => setTimeout(resolve, 1500));
-        }
-        catch (error) {
-            console.error("Ошибка обновления:", error);
-            setForm((prev) => ({ ...prev, [field]: previousValue }));
-        }
-        finally {
-            setPending(false);
-        }
-    };
-    return (<View className="flex-1">
+  };
+
+  return (
+    <View className="flex-1">
       <ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
-        {PRIVACY_SETTINGS.map((item) => (<SwitchCard key={item.key} label={item.label} description={item.description} value={form[item.key]} onValueChange={handleToggle(item.key)} disabled={isPending}/>))}
+        {PRIVACY_SETTINGS.map((item) => (
+          <SwitchCard
+            key={item.key}
+            label={item.label}
+            description={item.description}
+            value={privacy?.[item.key] ?? true}
+            onValueChange={handleToggle(item.key)}
+            disabled={updatePrivacy.isPending}
+          />
+        ))}
       </ScrollView>
-    </View>);
+    </View>
+  );
 };
