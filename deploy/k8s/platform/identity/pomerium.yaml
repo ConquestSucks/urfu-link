@@ -27,6 +27,24 @@ spec:
               value: "true"
             - name: ADDRESS
               value: ":80"
+            - name: AUTHENTICATE_SERVICE_URL
+              value: "https://auth.ghjc.ru"
+            - name: IDP_PROVIDER
+              value: "oidc"
+            - name: IDP_PROVIDER_URL
+              value: "https://id.ghjc.ru/realms/urfu-link"
+            - name: IDP_SCOPES
+              value: "openid,email,profile,roles"
+            - name: COOKIE_DOMAIN
+              value: ".ghjc.ru"
+            - name: COOKIE_NAME
+              value: "_pomerium"
+            - name: COOKIE_EXPIRE
+              value: "1h"
+            - name: DATABROKER_STORAGE_CONNECTION_STRING
+              value: "redis://urfu-redis.urfu-platform.svc.cluster.local:6379"
+            - name: LOG_LEVEL
+              value: "info"
             - name: IDP_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -61,13 +79,13 @@ spec:
             httpGet:
               path: /ping
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /ping
               port: http
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 5
           resources:
             requests:
@@ -78,8 +96,6 @@ spec:
               memory: 128Mi
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
             capabilities:
               drop:
                 - ALL

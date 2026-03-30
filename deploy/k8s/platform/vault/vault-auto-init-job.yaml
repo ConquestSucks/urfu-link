@@ -171,7 +171,7 @@ spec:
               EOF_POL
 
                 vault policy write keycloak-bootstrap - <<EOF_POL
-              path "kv/data/urfu-link/prod/frontend-web-oauth2" {
+              path "kv/data/urfu-link/prod/pomerium" {
                 capabilities = ["create", "update", "read"]
               }
               path "kv/data/urfu-link/prod/linkerd-viz" {
