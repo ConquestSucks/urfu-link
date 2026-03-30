@@ -55,3 +55,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: urfu-platform
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: pomerium
