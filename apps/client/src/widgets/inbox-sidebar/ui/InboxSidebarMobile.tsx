@@ -15,7 +15,7 @@ interface InboxSidebarMobileProps<T> extends InboxSidebarListProps<T> {
   listMode?: "messages" | "notifications";
   onListModeChange?: (mode: "messages" | "notifications") => void;
 }
-export const InboxSidebarMobile = <T,>({ data, renderItem, activeTab, onTabChange, isLoading, listMode = "messages", onListModeChange, }: InboxSidebarMobileProps<T>) => (<View className="flex-1 bg-[#080D1D]">
+export const InboxSidebarMobile = <T,>({ data, renderItem, activeTab, onTabChange, isLoading, listMode = "messages", onListModeChange, }: InboxSidebarMobileProps<T>) => (<View className="flex-1 bg-app-bg">
   <MobileHeader inboxListMode={listMode} onInboxListModeChange={onListModeChange} />
 
   <View className="px-4 py-2">

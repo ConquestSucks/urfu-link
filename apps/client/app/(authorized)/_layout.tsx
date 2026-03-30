@@ -22,7 +22,7 @@ export default function AuthLayout() {
         : ["top", "left", "right"];
 
     return (
-        <SafeAreaView className="flex-1 bg-[#080D1D]" edges={safeAreaEdges}>
+        <SafeAreaView className="flex-1 bg-app-bg" edges={safeAreaEdges}>
             <View className="flex-1 flex-row">
                 {isDesktop && (<GlobalSidebar onSettingsPress={() => setIsSettingsOpen(true)} />)}
 
