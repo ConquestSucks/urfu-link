@@ -24,16 +24,15 @@ export const LinearProgress = ({ isVisible }: {
         };
     });
     if (!isVisible)
-        return <View style={{ height: 4, width: "100%" }}/>;
-    return (<View className="overflow-hidden w-full" style={{ height: 4 }}>
+        return <View className="h-1 w-full"/>;
+    return (<View className="overflow-hidden w-full h-1">
       <Animated.View style={[
             animatedStyle,
             {
                 height: "100%",
                 width: "100%",
-                backgroundColor: "#2B7FFF",
                 borderRadius: 999,
             },
-        ]}/>
+        ]} className="bg-brand-600"/>
     </View>);
 };

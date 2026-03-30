@@ -13,7 +13,7 @@ interface InboxSidebarProps<T> extends InboxSidebarListProps<T> {
     isLoading?: boolean;
     variant?: "chats" | "subjects";
 }
-export const InboxSidebar = <T,>({ title, data, renderItem, activeTab, onTabChange, isLoading, variant = "chats", }: InboxSidebarProps<T>) => (<View className="bg-[#0F172B] w-[calc(384/1359*100vw)] h-full gap-4 border-r border-white/5">
+export const InboxSidebar = <T,>({ title, data, renderItem, activeTab, onTabChange, isLoading, variant = "chats", }: InboxSidebarProps<T>) => (<View className="bg-app-panel w-[calc(384/1359*100vw)] h-full gap-4 border-r border-white/5">
     <Header title={title} activeTab={activeTab} onTabChange={onTabChange}/>
 
     {isLoading ? (<View className="px-3 gap-2 overflow-hidden">

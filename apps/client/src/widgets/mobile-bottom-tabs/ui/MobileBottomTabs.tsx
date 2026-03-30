@@ -1,6 +1,5 @@
 import { router, usePathname } from "expo-router";
 import React, { useEffect } from "react";
-import { StyleSheet } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming, } from "react-native-reanimated";
 import { MOBILE_TAB_BAR_HEIGHT } from "../config/layout";
 import { MOBILE_TABS } from "../config/tabs";
@@ -49,18 +48,12 @@ export const MobileBottomTabs = () => {
 
     return (
         <Animated.View style={containerStyle} pointerEvents={hideTabs ? "none" : "auto"}>
-            <Animated.View style={[styles.row, { height: MOBILE_TAB_BAR_HEIGHT }, rowStyle]}>
+            <Animated.View
+                className="flex-row bg-app-bg border-t border-effects-white05 pb-[2px]"
+                style={[{ height: MOBILE_TAB_BAR_HEIGHT }, rowStyle]}
+            >
                 <TabItems pathname={pathname} />
             </Animated.View>
         </Animated.View>
     );
 };
-const styles = StyleSheet.create({
-    row: {
-        flexDirection: "row",
-        backgroundColor: "#080D1D",
-        borderTopWidth: 1,
-        borderTopColor: "rgba(255,255,255,0.05)",
-        paddingBottom: 2,
-    },
-});

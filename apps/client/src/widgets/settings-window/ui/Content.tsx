@@ -17,7 +17,7 @@ const Content = ({ activeTab }: ContentProps) => {
             <Text className="text-2xl text-white font-bold">
               {activeItem.label}
             </Text>
-            <Text className="text-sm text-[#90A1B9]">
+            <Text className="text-sm text-text-muted">
               {activeItem.description}
             </Text>
           </View>

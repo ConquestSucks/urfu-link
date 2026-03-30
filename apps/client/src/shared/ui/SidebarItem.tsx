@@ -11,13 +11,13 @@ interface SidebarItemProps {
 }
 export const SidebarItem = ({ icon: Icon, label, isActive, textAnimatedStyle, onPress, }: SidebarItemProps) => {
     return (<Pressable className={`flex-row gap-3 items-center px-[17.5] py-[14px] rounded-xl transition-colors duration-300 select-none ${isActive
-            ? "bg-[#2B7FFF] shadow-[0_10px_15px_-3px_rgba(43,127,255,0.2),0_4px_6px_-3px_rgba(43,127,255,0.2)]"
+            ? "bg-brand-600 shadow-brand-soft"
             : "bg-transparent hover:bg-white/5"}`} onPress={onPress}>
       <View>
-        <Icon size={20} color={isActive ? "#FFFFFF" : "#90A1B9"}/>
+        <Icon size={20} className={isActive ? "text-white" : "text-text-muted"}/>
       </View>
       <Animated.View style={textAnimatedStyle ?? {}}>
-        <Text numberOfLines={1} className={`text-[15px] font-medium ${isActive ? "text-white" : "text-[#90A1B9]"}`}>
+        <Text numberOfLines={1} className={`text-[15px] font-medium ${isActive ? "text-white" : "text-text-muted"}`}>
           {label}
         </Text>
       </Animated.View>

@@ -1,42 +1,42 @@
-import { BellSlashIcon, MagnifyingGlassIcon, ProhibitIcon, PushPinIcon, TrashIcon, UserCircleIcon, } from "phosphor-react-native";
+import { BellSlashIcon, MagnifyingGlassIcon, ProhibitIcon, PushPinIcon, TrashIcon, UserCircleIcon, } from "@/shared/ui/phosphor";
 export const getChatHeaderActions = (callbacks: {
     onOpenProfile: () => void;
 }) => [
     {
         icon: UserCircleIcon,
-        iconColor: "#51A2FF",
+        iconClassName: "text-brand-400",
         label: "Профиль пользователя",
         command: callbacks.onOpenProfile,
     },
     {
         icon: MagnifyingGlassIcon,
-        iconColor: "#00D492",
+        iconClassName: "text-success-500",
         label: "Поиск по сообщениям",
         command: () => console.log("Ищем..."),
     },
     {
         icon: PushPinIcon,
-        iconColor: "#FFB900",
+        iconClassName: "text-warning-500",
         label: "Закрепленные",
         command: () => console.log("Закрепленные..."),
     },
     { separator: true },
     {
         icon: BellSlashIcon,
-        iconColor: "#90A1B9",
+        iconClassName: "text-text-muted",
         label: "Отключить уведомления",
         command: () => console.log("Уведомления..."),
     },
     {
         icon: TrashIcon,
-        iconColor: "#FF8904",
+        iconClassName: "text-warning-600",
         label: "Очистить историю",
         command: () => console.log("Чистим..."),
     },
     { separator: true },
     {
         icon: ProhibitIcon,
-        iconColor: "#FF637E",
+        iconClassName: "text-danger-300",
         label: "Заблокировать",
         command: () => console.log("Блокируем..."),
         danger: true,
@@ -47,26 +47,26 @@ export const getSubjectHeaderActions = (callbacks: {
 }) => [
     {
         icon: UserCircleIcon,
-        iconColor: "#51A2FF",
+        iconClassName: "text-brand-400",
         label: "Участники",
         command: callbacks.onOpenMembers,
     },
     {
         icon: MagnifyingGlassIcon,
-        iconColor: "#00D492",
+        iconClassName: "text-success-500",
         label: "Поиск по сообщениям",
         command: () => console.log("Ищем..."),
     },
     {
         icon: PushPinIcon,
-        iconColor: "#FFB900",
+        iconClassName: "text-warning-500",
         label: "Закрепленные",
         command: () => console.log("Закрепленные..."),
     },
     { separator: true },
     {
         icon: BellSlashIcon,
-        iconColor: "#90A1B9",
+        iconClassName: "text-text-muted",
         label: "Отключить уведомления",
         command: () => console.log("Уведомления..."),
     },

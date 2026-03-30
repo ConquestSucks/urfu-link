@@ -1,5 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator } from "@/shared/ui/activity-indicator";
+import { Pressable, Text, View } from "react-native";
 interface ButtonProps {
     onPress: () => void;
     label: string;
@@ -10,14 +11,14 @@ interface ButtonProps {
 }
 export const Button = ({ onPress, label, icon, variant = "primary", isLoading, className, }: ButtonProps) => {
     const variantStyles = {
-        primary: "bg-[#2B7FFF] hover:bg-[#3D8BFF] active:bg-[#1A6EEB] active:scale-[0.98] active:opacity-90",
-        secondary: "bg-[#1D293D]/40 hover:bg-[#1D293D]/60 active:bg-[#1D293D]/80 active:scale-[0.98] active:opacity-90",
-        danger: "bg-[#FB2C36]/10 hover:bg-[#FB2C36]/20 active:bg-red-500/20  active:scale-[0.98] active:opacity-90",
+        primary: "bg-brand-600 hover:bg-brand-400 active:bg-brand-700 active:scale-[0.98] active:opacity-90",
+        secondary: "bg-slate-800/40 hover:bg-slate-800/60 active:bg-slate-800/80 active:scale-[0.98] active:opacity-90",
+        danger: "bg-danger-500/10 hover:bg-danger-500/20 active:bg-red-500/20  active:scale-[0.98] active:opacity-90",
     };
     const textStyles = {
         primary: "text-white",
-        secondary: "text-[#CAD5E2]",
-        danger: "text-[#FF6467]",
+        secondary: "text-text-secondary",
+        danger: "text-danger-400",
     };
     return (<Pressable onPress={onPress} disabled={isLoading} className={`
         flex-row items-center justify-center h-fit 
@@ -26,7 +27,7 @@ export const Button = ({ onPress, label, icon, variant = "primary", isLoading, c
         ${isLoading ? "opacity-70" : ""} 
         ${className || ""}
       `}>
-      {isLoading ? (<ActivityIndicator color={variant === "primary" ? "white" : "#90A1B9"}/>) : (<>
+      {isLoading ? (<ActivityIndicator className={variant === "primary" ? "text-white" : "text-text-muted"}/>) : (<>
           {icon && <View>{icon}</View>}
           <Text className={`font-medium text-sm select-none ${textStyles[variant]}`}>
             {label}

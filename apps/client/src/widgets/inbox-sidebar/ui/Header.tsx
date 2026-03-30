@@ -1,5 +1,5 @@
 import { SearchBar } from "@/shared/ui";
-import { BellIcon, ChatCircleTextIcon   } from "phosphor-react-native";
+import { BellIcon, ChatCircleTextIcon   } from "@/shared/ui/phosphor";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { TabType } from "../model/components";
@@ -15,17 +15,17 @@ export const Header = ({ title, activeTab, onTabChange }: HeaderProps) => {
           {title}
         </Text>
 
-        <View className="bg-[#FFFFFF]/5 border gap-1 border-[#FFFFFF]/5 rounded-2xl flex-row w-fit p-[5px]">
+        <View className="bg-white/5 border gap-1 border-white/5 rounded-2xl flex-row w-fit p-[5px]">
           <Pressable className={`p-2 rounded-xl transition-colors duration-300 ${activeTab === "chats"
-            ? "bg-[#2B7FFF] shadow-[0_10px_15px_-3px_rgba(43,127,255,0.2),0_4px_6px_-3px_rgba(43,127,255,0.2)]"
+            ? "bg-brand-600 shadow-brand-soft"
             : "hover:bg-white/5"}`} onPress={() => onTabChange("chats")}>
-            <ChatCircleTextIcon   size={18} color={activeTab === "chats" ? "#FFFFFF" : "#62748E"}/>
+            <ChatCircleTextIcon   size={18} className={activeTab === "chats" ? "text-white" : "text-text-placeholder"}/>
           </Pressable>
 
           <Pressable className={`p-2 rounded-xl transition-colors duration-300 ${activeTab === "notifications"
-            ? "bg-[#2B7FFF] shadow-[0_10px_15px_-3px_rgba(43,127,255,0.2),0_4px_6px_-3px_rgba(43,127,255,0.2)]"
+            ? "bg-brand-600 shadow-brand-soft"
             : "hover:bg-white/5"}`} onPress={() => onTabChange("notifications")}>
-            <BellIcon size={18} color={activeTab === "notifications" ? "#FFFFFF" : "#62748E"}/>
+            <BellIcon size={18} className={activeTab === "notifications" ? "text-white" : "text-text-placeholder"}/>
           </Pressable>
         </View>
       </View>

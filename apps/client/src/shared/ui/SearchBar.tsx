@@ -1,4 +1,4 @@
-import { MagnifyingGlassIcon, XIcon } from "phosphor-react-native";
+import { MagnifyingGlassIcon, XIcon } from "@/shared/ui/phosphor";
 import { useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 interface SearchBarProps {
@@ -20,12 +20,12 @@ export const SearchBar = ({ placeholder = "Поиск...", onSearch, }: SearchBa
         }
     };
     return (<View className="flex-row gap-2 px-3 h-10 items-center bg-white/5 rounded-[10px] border border-white/[0.03]">
-        <MagnifyingGlassIcon size={20} color="#8B8FA8" weight="bold"/>
+        <MagnifyingGlassIcon size={20} className="text-text-subtle" weight="bold"/>
 
-      <TextInput className="text-white outline-none text-sm h-full grow" placeholder={placeholder} placeholderTextColor="#8B8FA8" value={query} onChangeText={handleChangeText} underlineColorAndroid="transparent" cursorColor="#8B8FA8" returnKeyType="search"/>
+      <TextInput className="text-white outline-none text-sm h-full grow placeholder:text-text-subtle selection:text-text-subtle caret-text-subtle" placeholder={placeholder} value={query} onChangeText={handleChangeText} underlineColorAndroid="transparent" returnKeyType="search"/>
 
       {query.length > 0 && (<Pressable onPress={handleClear} className="px-4 py-[13px]">
-          <XIcon size={16} color="#62748E"/>
+          <XIcon size={16} className="text-text-placeholder"/>
         </Pressable>)}
     </View>);
 };
