@@ -34,7 +34,7 @@ spec:
             - |
               set -eu
 
-              apk add --no-cache curl jq >/dev/null 2>&1
+              apk add --no-cache curl jq openssl >/dev/null 2>&1
 
               SERVICEACCOUNT="/var/run/secrets/kubernetes.io/serviceaccount"
 
@@ -251,6 +251,37 @@ spec:
                 fi
               }
 
+              # ensure_audience_mapper <clientUuid> <audience>
+              # Adds audience protocol mapper if not present
+              ensure_audience_mapper() {
+                local CL_UUID="$1"
+                local AUDIENCE="$2"
+                echo "Ensuring audience mapper '${AUDIENCE}' on client ${CL_UUID}..."
+                EXISTING_MAPPERS="$(curl --silent --fail \
+                  -H "Authorization: Bearer ${KC_TOKEN}" \
+                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CL_UUID}/protocol-mappers/models")"
+                if ! echo "$EXISTING_MAPPERS" | jq -e --arg aud "$AUDIENCE" '.[] | select(.name=="audience-" + $aud)' >/dev/null 2>&1; then
+                  curl --fail --silent --show-error \
+                    -X POST \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CL_UUID}/protocol-mappers/models" \
+                    -d "$(jq -n --arg aud "$AUDIENCE" '{
+                      name: ("audience-" + $aud),
+                      protocol: "openid-connect",
+                      protocolMapper: "oidc-audience-mapper",
+                      config: {
+                        "included.client.audience": $aud,
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                      }
+                    }')" >/dev/null
+                  echo "Audience mapper created."
+                else
+                  echo "Audience mapper already exists."
+                fi
+              }
+
               # --- Main ---
 
               wait_for_vault
@@ -302,19 +333,29 @@ spec:
               # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
 
-              # --- Frontend Web BFF (confidential client for oauth2-proxy) ---
-              ensure_client "urfu-link-web-bff" '["https://urfu-link.ghjc.ru/oauth2/callback"]' '["https://urfu-link.ghjc.ru"]' "false" "URFU Link" "https://urfu-link.ghjc.ru"
-              FRONTEND_BFF_SECRET="$CLIENT_SECRET"
+              # --- Pomerium (centralized auth proxy) ---
+              ensure_client "pomerium" '["https://auth.ghjc.ru/.pomerium/callback"]' '["https://*.ghjc.ru"]' "false" "Pomerium Auth Proxy" "https://auth.ghjc.ru"
+              POMERIUM_SECRET="$CLIENT_SECRET"
+              ensure_groups_mapper "$CLIENT_UUID"
+              ensure_audience_mapper "$CLIENT_UUID" "urfu-link-api"
 
-              # Store frontend BFF oauth2-proxy secrets in Vault
-              EXISTING_FRONTEND="$(vault_read urfu-link/prod/frontend-web-oauth2 || true)"
-              FRONTEND_COOKIE="$(echo "$EXISTING_FRONTEND" | jq -r '.data.data.cookie_secret // empty' 2>/dev/null || true)"
-              if [ -z "$FRONTEND_COOKIE" ]; then
-                FRONTEND_COOKIE="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | head -c 32)"
+              # Store Pomerium secrets in Vault
+              EXISTING_POMERIUM="$(vault_read urfu-link/prod/pomerium || true)"
+              POMERIUM_COOKIE="$(echo "$EXISTING_POMERIUM" | jq -r '.data.data.cookie_secret // empty' 2>/dev/null || true)"
+              POMERIUM_SHARED="$(echo "$EXISTING_POMERIUM" | jq -r '.data.data.shared_secret // empty' 2>/dev/null || true)"
+              POMERIUM_SIGNING="$(echo "$EXISTING_POMERIUM" | jq -r '.data.data.signing_key // empty' 2>/dev/null || true)"
+              if [ -z "$POMERIUM_COOKIE" ]; then
+                POMERIUM_COOKIE="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | head -c 32)"
               fi
-              vault_put urfu-link/prod/frontend-web-oauth2 \
-                "$(printf '{"data":{"client_id":"urfu-link-web-bff","client_secret":"%s","cookie_secret":"%s"}}' \
-                  "$FRONTEND_BFF_SECRET" "$FRONTEND_COOKIE")"
+              if [ -z "$POMERIUM_SHARED" ]; then
+                POMERIUM_SHARED="$(head -c 32 /dev/urandom | base64 | tr '+/' '-_' | head -c 32)"
+              fi
+              if [ -z "$POMERIUM_SIGNING" ]; then
+                POMERIUM_SIGNING="$(openssl ecparam -genkey -name prime256v1 -noout 2>/dev/null | openssl ec 2>/dev/null | base64 | tr -d '\n')"
+              fi
+              vault_put urfu-link/prod/pomerium \
+                "$(printf '{"data":{"client_id":"pomerium","client_secret":"%s","cookie_secret":"%s","shared_secret":"%s","signing_key":"%s"}}' \
+                  "$POMERIUM_SECRET" "$POMERIUM_COOKIE" "$POMERIUM_SHARED" "$POMERIUM_SIGNING")"
 
               # Cookie secret: reuse existing or generate new
               echo "Checking for existing cookie secret..."

@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pomerium
+  namespace: urfu-platform
+  labels:
+    app.kubernetes.io/name: pomerium
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pomerium
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pomerium
+    spec:
+      containers:
+        - name: pomerium
+          image: cr.pomerium.com/pomerium/pomerium:v0.27.2
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+          env:
+            - name: INSECURE_SERVER
+              value: "true"
+            - name: ADDRESS
+              value: ":80"
+            - name: IDP_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: client-id
+            - name: IDP_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: client-secret
+            - name: COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: cookie-secret
+            - name: SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: shared-secret
+            - name: SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: signing-key
+          volumeMounts:
+            - name: config
+              mountPath: /pomerium/config.yaml
+              subPath: config.yaml
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config
+          configMap:
+            name: pomerium-config
