@@ -43,3 +43,5 @@ app.MapScalarApiReference(o =>
 app.MapGrpcService<InternalApiService>();
 
 app.Run();
+
+public partial class Program;
