@@ -1,6 +1,7 @@
-import { AnimatedPressable } from "@/shared/lib/nativewind-interop";
+import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
 import React from "react";
-import Animated, {
+import { View } from "react-native";
+import {
   interpolateColor,
   useAnimatedStyle,
   useDerivedValue,
@@ -22,13 +23,17 @@ export const Switch = ({ value, onValueChange, disabled }: SwitchProps) => {
     });
   });
 
-  const animatedTrackStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      progress.value, 
-      [0, 1], 
-      ["rgba(255, 255, 255, 0.1)", "#2B7FFF"]
-    ),
-  }));
+  const animatedTrackStyle = useAnimatedStyle(
+    () => ({
+      backgroundColor: interpolateColor(
+        progress.value,
+        [0, 1],
+        ["rgba(255, 255, 255, 0.1)", "#2B7FFF"],
+      ),
+      opacity: disabled ? 0.5 : 1,
+    }),
+    [disabled],
+  );
 
   const animatedHandleStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: progress.value * 24 }],
@@ -38,16 +43,13 @@ export const Switch = ({ value, onValueChange, disabled }: SwitchProps) => {
     <AnimatedPressable
       onPress={() => !disabled && onValueChange(!value)}
       disabled={disabled}
-      className="w-12 h-6 rounded-full p-0.5 justify-center"
-      style={[
-        animatedTrackStyle,
-        { opacity: disabled ? 0.5 : 1 }
-      ]}
+      style={animatedTrackStyle}
     >
-      <Animated.View
-        className="w-5 h-5 bg-white rounded-full shadow-sm elevation-2"
-        style={animatedHandleStyle}
-      />
+      <View className="w-12 h-6 rounded-full p-0.5 justify-center">
+        <AnimatedView style={animatedHandleStyle}>
+          <View className="w-5 h-5 bg-white rounded-full shadow-sm elevation-2" />
+        </AnimatedView>
+      </View>
     </AnimatedPressable>
   );
 };

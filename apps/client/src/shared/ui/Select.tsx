@@ -1,8 +1,9 @@
+import { AnimatedView } from "@/shared/lib/nativewind-interop";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { CaretDownIcon, CheckIcon } from "@/shared/ui/phosphor";
 import React, { useEffect, useRef, useState } from "react";
 import { Dimensions, Modal, Pressable, ScrollView, Text, View, } from "react-native";
-import Animated, { FadeIn, useAnimatedStyle, withTiming, } from "react-native-reanimated";
+import { FadeIn, useAnimatedStyle, withTiming, } from "react-native-reanimated";
 interface Option {
     label: string;
     value: string | number;
@@ -62,14 +63,14 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
 
-        <Animated.View style={chevronStyle}>
+        <AnimatedView style={chevronStyle}>
           <CaretDownIcon size={20} className={isOpen ? "text-brand-600" : "text-text-disabled"}/>
-        </Animated.View>
+        </AnimatedView>
       </Pressable>
 
       <Modal visible={isOpen} transparent animationType="none">
         <Pressable className="flex-1 bg-transparent cursor-default" onPress={() => setIsOpen(false)}>
-          <Animated.View entering={FadeIn.duration(200)} style={{
+          <AnimatedView entering={FadeIn.duration(200)} style={{
             position: "absolute",
             top: dropdownCoords.top,
             left: dropdownCoords.left,
@@ -107,7 +108,7 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
         }))}
               </ScrollView>
             </View>
-          </Animated.View>
+          </AnimatedView>
         </Pressable>
       </Modal>
     </View>);

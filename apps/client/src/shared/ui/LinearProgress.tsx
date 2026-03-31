@@ -1,6 +1,7 @@
+import { AnimatedView } from "@/shared/lib/nativewind-interop";
 import React, { useEffect } from "react";
 import { View } from "react-native";
-import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming, } from "react-native-reanimated";
+import { Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming, } from "react-native-reanimated";
 export const LinearProgress = ({ isVisible }: {
     isVisible: boolean;
 }) => {
@@ -26,13 +27,15 @@ export const LinearProgress = ({ isVisible }: {
     if (!isVisible)
         return <View className="h-1 w-full"/>;
     return (<View className="overflow-hidden w-full h-1">
-      <Animated.View style={[
+      <AnimatedView style={[
             animatedStyle,
             {
                 height: "100%",
                 width: "100%",
                 borderRadius: 999,
             },
-        ]} className="bg-brand-600"/>
+        ]}>
+        <View className="bg-brand-600 w-full h-full"/>
+      </AnimatedView>
     </View>);
 };

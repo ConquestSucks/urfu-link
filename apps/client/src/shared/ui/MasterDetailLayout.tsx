@@ -1,10 +1,11 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
-import { Slot, Stack, usePathname } from "expo-router";
+import { Slot, Stack } from "expo-router";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
 interface MasterDetailLayoutProps {
     sidebar: React.ReactNode;
+    isDetailView: boolean;
 }
 
 const inboxDetailStackOptions = {
@@ -13,11 +14,9 @@ const inboxDetailStackOptions = {
     presentation: "card" as const,
 };
 
-export const MasterDetailLayout = ({ sidebar }: MasterDetailLayoutProps) => {
+export const MasterDetailLayout = ({ sidebar, isDetailView }: MasterDetailLayoutProps) => {
     const isWeb = Platform.OS === "web";
     const { isMobile } = useWindowSize();
-    const pathname = usePathname();
-    const isDetailView = /\/chats\/[^/]+/.test(pathname) || /\/subjects\/[^/]+/.test(pathname);
 
     const stack = (
         <Stack screenOptions={{ headerShown: false }}>
