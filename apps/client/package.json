@@ -4,6 +4,8 @@
   "version": "1.0.0",
   "scripts": {
     "start": "pnpm exec expo start",
+    "start:tunnel": "pnpm exec expo start --tunnel",
+    "start:localhost": "pnpm exec expo start --localhost",
     "android": "pnpm exec expo start --android",
     "ios": "pnpm exec expo start --ios",
     "web": "pnpm exec expo start --web",
@@ -43,6 +45,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@expo/ngrok": "^4.1.0",
     "@babel/core": "^7.28.5",
     "@types/node": "^24.10.0",
     "@types/react": "~19.2.2",
