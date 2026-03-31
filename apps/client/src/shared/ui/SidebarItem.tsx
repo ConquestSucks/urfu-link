@@ -1,6 +1,6 @@
+import { AnimatedView } from "@/shared/lib/nativewind-interop";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated from "react-native-reanimated";
 import { AnimatedViewStyle } from "../types";
 interface SidebarItemProps {
     icon: React.ComponentType<any>;
@@ -16,10 +16,10 @@ export const SidebarItem = ({ icon: Icon, label, isActive, textAnimatedStyle, on
       <View>
         <Icon size={20} className={isActive ? "text-white" : "text-text-muted"}/>
       </View>
-      <Animated.View style={textAnimatedStyle ?? {}}>
+      <AnimatedView style={textAnimatedStyle ?? {}}>
         <Text numberOfLines={1} className={`text-[15px] font-medium ${isActive ? "text-white" : "text-text-muted"}`}>
           {label}
         </Text>
-      </Animated.View>
+      </AnimatedView>
     </Pressable>);
 };
