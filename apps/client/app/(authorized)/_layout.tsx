@@ -1,30 +1,32 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
-import { GlobalSidebar } from "@/widgets/global-sidebar";
-import { MobileBottomTabs } from "@/widgets/mobile-bottom-tabs";
-import { SettingsWindow } from "@/widgets/settings-window";
-import { Slot, usePathname } from "expo-router";
-import { useState } from "react";
+import { SidebarDesktop } from "@/widgets/sidebar-desktop";
+import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
+import { SettingsDesktop } from "@/widgets/settings-desktop";
+import { Slot, useSegments } from "expo-router";
+import { useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-function isThreadDetailPath(pathname: string) {
-    return /\/chats\/[^/]+/.test(pathname) || /\/subjects\/[^/]+/.test(pathname);
-}
-
 export default function AuthLayout() {
-    const pathname = usePathname();
-    const isThreadDetail = isThreadDetailPath(pathname);
+    const segments = useSegments() as string[];
+    const isThreadDetail =
+        (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
     const safeAreaEdges: Edge[] = isMobile
         ? ["top", "left", "right", "bottom"]
         : ["top", "left", "right"];
 
+    useEffect(() => {
+        if (isMobile && isSettingsOpen) setIsSettingsOpen(false);
+    }, [isMobile, isSettingsOpen]);
+
     return (
-        <SafeAreaView className="flex-1 bg-[#080D1D]" edges={safeAreaEdges}>
+        <SafeAreaView className="flex-1 bg-app-bg" edges={safeAreaEdges}>
             <View className="flex-1 flex-row">
-                {isDesktop && (<GlobalSidebar onSettingsPress={() => setIsSettingsOpen(true)} />)}
+                {isDesktop && <SidebarDesktop onSettingsPress={() => setIsSettingsOpen(true)} />}
 
                 <View
                     className="flex-1 min-w-0"
@@ -53,7 +55,9 @@ export default function AuthLayout() {
                 </View>
             )}
 
-            <SettingsWindow isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+            {isDesktop && (
+                <SettingsDesktop isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+            )}
         </SafeAreaView>
     );
 }

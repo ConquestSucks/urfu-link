@@ -1,7 +1,10 @@
 namespace UserService.Api.Application.Contracts.Responses;
 
+public sealed record IdentityResponse(string Name, string Email, string Username);
+
 public sealed record UserProfileResponse(
     Guid UserId,
+    IdentityResponse Identity,
     AccountResponse Account,
     PrivacyResponse Privacy,
     NotificationsResponse Notifications,

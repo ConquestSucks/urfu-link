@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { ScrollViewStyleReset } from "expo-router/html";
+const APP_THEME_BG = "#080D1D";
 
 const APP_THEME_BG = "#080D1D";
 

@@ -5,6 +5,21 @@ export type BackendHealth = {
   checkedAt: string;
 };
 
+export type {
+  UserProfile,
+  UserIdentity,
+  UserAccount,
+  UserPrivacy,
+  UserNotifications,
+  UserSoundVideo,
+  DeviceSession,
+  UpdateAccountDto,
+  UpdatePrivacyDto,
+  UpdateNotificationsDto,
+} from "./users";
+
+import { createUsersApi } from "./users";
+
 type ApiClientConfig = {
   baseUrl: string;
   getAccessToken?: () => string | undefined;
@@ -18,14 +33,18 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
 
+  let redirecting = false;
   function handleUnauthorized(response: Response): void {
-    if (response.status === 401 && typeof window !== "undefined") {
-      const rd = encodeURIComponent(window.location.pathname + window.location.search);
-      window.location.href = `/oauth2/start?rd=${rd}`;
+    if (response.status === 401 && typeof window !== "undefined" && !redirecting) {
+      redirecting = true;
+      const rd = encodeURIComponent(window.location.href);
+      window.location.href = `/.pomerium/sign_in?pomerium_redirect_uri=${rd}`;
     }
   }
 
   return {
+    users: createUsersApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+
     async health(): Promise<BackendHealth> {
       try {
         const response = await fetch(`${normalizedBaseUrl}/health/ready`, {
