@@ -1,11 +1,13 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using UserService.Api.Application.Contracts;
 using UserService.Api.Infrastructure;
 using UserService.Api.Infrastructure.OpenApi;
+using UserService.Api.Infrastructure.Persistence;
 using UserService.Api.Messaging;
 using UserService.Api.Services;
 
@@ -30,6 +32,12 @@ builder.Services.AddUserModule(builder.Configuration);
 
 var app = builder.Build();
 
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 app.MapServiceDefaults();
 app.UseFastEndpoints(c =>
 {
@@ -42,6 +50,6 @@ app.MapScalarApiReference(o =>
     o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
 app.MapGrpcService<InternalApiService>();
 
-app.Run();
+await app.RunAsync();
 
 public partial class Program;
