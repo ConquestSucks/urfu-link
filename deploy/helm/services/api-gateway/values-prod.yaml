@@ -36,6 +36,10 @@ autoscaling:
 serviceMonitor:
   enabled: true
 
+networkPolicy:
+  allowedIngressNamespaces:
+    - urfu-platform
+
 resources:
   requests:
     cpu: 25m
