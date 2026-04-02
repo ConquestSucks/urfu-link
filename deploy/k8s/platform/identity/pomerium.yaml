@@ -86,12 +86,15 @@ spec:
               port: http
             initialDelaySeconds: 15
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /ping
               port: http
             initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 3
           resources:
             requests:
               cpu: 50m
