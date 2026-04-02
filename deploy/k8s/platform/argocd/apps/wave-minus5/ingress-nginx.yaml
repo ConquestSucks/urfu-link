@@ -24,6 +24,8 @@ spec:
           value: ClusterIP
         - name: controller.kind
           value: DaemonSet
+        - name: controller.allowSnippetAnnotations
+          value: "true"
 
   destination:
     server: https://kubernetes.default.svc
