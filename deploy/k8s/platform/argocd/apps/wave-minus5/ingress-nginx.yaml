@@ -24,6 +24,17 @@ spec:
           value: ClusterIP
         - name: controller.kind
           value: DaemonSet
+      values: |
+        controller:
+          config:
+            server-snippet: |
+              location = /.pomerium/sign_in {
+                proxy_pass http://pomerium.urfu-platform.svc.cluster.local:80;
+                proxy_set_header Host auth.ghjc.ru;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+              }
 
   destination:
     server: https://kubernetes.default.svc
