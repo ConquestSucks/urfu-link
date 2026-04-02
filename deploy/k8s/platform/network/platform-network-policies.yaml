@@ -207,6 +207,34 @@ spec:
         - protocol: UDP
           port: 3478
 ---
+# Bootstrap jobs: allow egress to Vault and Keycloak
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bootstrap-egress-vault
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchExpressions:
+      - key: job-name
+        operator: In
+        values:
+          - keycloak-bootstrap
+          - platform-bootstrap
+          - minio-bootstrap
+          - minio-bootstrap-buckets
+          - minio-oidc-policy
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: vault
+      ports:
+        - protocol: TCP
+          port: 8200
+---
 # Keycloak: allow egress to external (HTTPS for OIDC federation, email, etc.)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
