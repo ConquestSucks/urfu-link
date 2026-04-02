@@ -35,7 +35,8 @@ var app = builder.Build();
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
-    await db.Database.MigrateAsync();
+    if (db.Database.IsRelational())
+        await db.Database.MigrateAsync();
 }
 
 app.MapServiceDefaults();
