@@ -23,7 +23,6 @@ resources:
   - external-secrets/mongo-backup-external-secret.yaml
   - identity/keycloak-external-secret.yaml
   - identity/headlamp-external-secret.yaml
-  - identity/linkerd-viz-external-secret.yaml
   - identity/argocd-oidc-external-secret.yaml
   - identity/vault-oidc-external-secret.yaml
   - identity/grafana-oidc-external-secret.yaml
@@ -42,4 +41,6 @@ resources:
   - observability/grafana-admin-secret.yaml
   - observability/otel-collector-config.yaml
   - observability/otel-collector.yaml
+  - network/platform-network-policies.yaml
+  - security/headlamp-clusterrole.yaml
   - linkerd/server-authentication.yaml
