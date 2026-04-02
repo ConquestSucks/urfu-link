@@ -9,7 +9,7 @@ namespace UserService.Api.Infrastructure.Keycloak;
 
 public sealed class KeycloakSessionClient(
     HttpClient httpClient,
-    IOptions<KeycloakAdminOptions> options) : ISessionManager
+    IOptions<KeycloakAdminOptions> options) : ISessionManager, IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -73,6 +73,8 @@ public sealed class KeycloakSessionClient(
     }
 
     private readonly SemaphoreSlim _tokenLock = new(1, 1);
+
+    public void Dispose() => _tokenLock.Dispose();
 
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
