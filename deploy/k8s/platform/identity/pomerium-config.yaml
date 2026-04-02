@@ -6,9 +6,9 @@ metadata:
 data:
   config.yaml: |
     routes:
-      # Frontend API — Pomerium passes identity JWT to upstream
+      # Frontend API — Pomerium passes X-Pomerium-Jwt-Assertion to upstream
       - from: https://urfu-link.ghjc.ru
-        to: http://echo-test.urfu-prod.svc.cluster.local:8080
+        to: http://api-gateway.urfu-prod.svc.cluster.local:8080
         prefix: /api
         policy:
           - allow:

@@ -4,7 +4,6 @@ kind: Kustomization
 resources:
   - cert-manager/cluster-issuer.yaml
   - ingress/argocd-ingress.yaml
-  - ingress/api-gateway-ingress.yaml
   - ingress/frontend-web-ingress.yaml
   - ingress/pomerium-auth-ingress.yaml
   - ingress/vault-ingress.yaml
@@ -29,7 +28,6 @@ resources:
   - identity/minio-oidc-external-secret.yaml
   - identity/argocd-oidc-config.yaml
   - identity/pomerium-config.yaml
-  - identity/echo-test.yaml
   - identity/pomerium.yaml
   - identity/pomerium-svc.yaml
   - external-secrets/pomerium-external-secret.yaml

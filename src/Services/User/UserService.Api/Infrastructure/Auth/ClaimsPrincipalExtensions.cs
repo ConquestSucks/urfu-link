@@ -42,6 +42,8 @@ public static class ClaimsPrincipalExtensions
     {
         ArgumentNullException.ThrowIfNull(principal);
 
-        return principal.FindFirstValue("preferred_username") ?? string.Empty;
+        return principal.FindFirstValue("preferred_username")
+            ?? principal.FindFirstValue("email")
+            ?? string.Empty;
     }
 }

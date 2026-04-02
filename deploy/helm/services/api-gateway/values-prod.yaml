@@ -14,9 +14,12 @@ env:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: http://+:8080
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
-  Auth__Authority: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
-  Auth__MetadataAddress: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/.well-known/openid-configuration
-  Auth__ValidIssuer: https://id.ghjc.ru/realms/urfu-link
+  Auth__TokenHeader: X-Pomerium-Jwt-Assertion
+  Auth__JwksUrl: http://pomerium.urfu-platform.svc.cluster.local/.well-known/pomerium/jwks.json
+  Auth__Audience: urfu-link.ghjc.ru
+  Auth__ValidIssuer: urfu-link.ghjc.ru
+  Auth__NameClaim: email
+  Auth__RoleClaim: groups
   Cors__AllowedOrigins__0: https://urfu-link.ghjc.ru
 
 secrets:
