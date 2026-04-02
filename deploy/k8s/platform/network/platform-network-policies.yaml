@@ -94,7 +94,7 @@ spec:
         - protocol: TCP
           port: 80
 ---
-# Pomerium: allow egress to Keycloak (OIDC) and urfu-prod (upstream services)
+# Pomerium: allow egress to urfu-prod (upstream services) and external HTTPS (OIDC discovery)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -114,10 +114,12 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
-    # Egress to external Keycloak (HTTPS for OIDC discovery)
+    # Egress to external (HTTPS for OIDC discovery via id.ghjc.ru)
     - ports:
         - protocol: TCP
           port: 443
+    # Egress to PostgreSQL databroker (within urfu-platform, covered by intra-namespace)
+    # Egress to Keycloak internal (within urfu-platform, covered by intra-namespace)
 ---
 # Data stores: allow ingress from urfu-prod services
 apiVersion: networking.k8s.io/v1
