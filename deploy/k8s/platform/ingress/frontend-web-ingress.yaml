@@ -8,10 +8,6 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
     nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      location ~ ^/\.pomerium(/.*)?$ {
-        return 302 https://auth.ghjc.ru/.pomerium$1$is_args$args;
-      }
 spec:
   ingressClassName: nginx
   tls:
