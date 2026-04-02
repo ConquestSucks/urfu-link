@@ -3,7 +3,7 @@ fullnameOverride: user-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/user-service
   pullPolicy: IfNotPresent
-  tag: sha-9fbe5d4
+  tag: sha-cac96a8
 
 imagePullSecrets:
   - name: ghcr-pull-secret
