@@ -41,7 +41,7 @@ serviceAccount:
 
 clusterRoleBinding:
   create: true
-  clusterRoleName: cluster-admin
+  clusterRoleName: headlamp-viewer
 
 podSecurityContext:
   fsGroup: 2000

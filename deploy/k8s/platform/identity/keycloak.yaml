@@ -51,7 +51,11 @@ spec:
             - "--hostname=https://id.ghjc.ru"
             - "--proxy-headers=xforwarded"
             - "--cache=local"
+            - "--health-enabled=true"
+            - "--metrics-enabled=true"
           env:
+            - name: JAVA_OPTS_KC_HEAP
+              value: "-Xms256m -Xmx768m"
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL_HOST
@@ -89,19 +93,19 @@ spec:
               name: http
           startupProbe:
             httpGet:
-              path: /realms/master
+              path: /health/started
               port: http
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 30
           readinessProbe:
             httpGet:
-              path: /realms/master
+              path: /health/ready
               port: http
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /realms/master
+              path: /health/live
               port: http
             periodSeconds: 20
           volumeMounts:

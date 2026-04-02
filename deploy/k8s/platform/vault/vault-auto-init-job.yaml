@@ -108,10 +108,10 @@ spec:
                 fi
 
                 vault policy write external-secrets - <<EOF_POL
-              path "kv/data/*" {
+              path "kv/data/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
-              path "kv/metadata/*" {
+              path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
               EOF_POL

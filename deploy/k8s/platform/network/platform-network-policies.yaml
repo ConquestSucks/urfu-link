@@ -1,0 +1,225 @@
+# Default deny all traffic in urfu-platform
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: urfu-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# Allow DNS resolution for all pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: urfu-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Allow intra-namespace communication (platform services need each other)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: urfu-platform
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+---
+# Keycloak: allow ingress from ingress-nginx (external access) and urfu-prod (JWKS/metadata)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-ingress
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: urfu-prod
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+# Pomerium: allow ingress from ingress-nginx
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pomerium-ingress
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: pomerium
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+---
+# Pomerium: allow egress to Keycloak (OIDC) and urfu-prod (upstream services)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: pomerium-egress
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: pomerium
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: urfu-prod
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Egress to external Keycloak (HTTPS for OIDC discovery)
+    - ports:
+        - protocol: TCP
+          port: 443
+---
+# Data stores: allow ingress from urfu-prod services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: datastores-ingress-from-services
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - postgresql
+          - mongodb
+          - redis
+          - kafka
+          - minio
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: urfu-prod
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 27017
+        - protocol: TCP
+          port: 6379
+        - protocol: TCP
+          port: 9092
+        - protocol: TCP
+          port: 9000
+---
+# MinIO: allow ingress from ingress-nginx (console UI)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-ingress-external
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: minio
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9000
+---
+# LiveKit + CoTURN: allow ingress from urfu-prod (call-service)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: media-ingress-from-services
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - livekit
+          - coturn
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: urfu-prod
+      ports:
+        - protocol: TCP
+          port: 7880
+        - protocol: UDP
+          port: 3478
+---
+# Keycloak: allow egress to external (HTTPS for OIDC federation, email, etc.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-egress-external
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 587
