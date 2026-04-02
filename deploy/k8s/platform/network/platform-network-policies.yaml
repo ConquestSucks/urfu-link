@@ -90,6 +90,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: ingress-nginx
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: urfu-prod
       ports:
         - protocol: TCP
           port: 80
@@ -133,11 +136,11 @@ spec:
       - key: app
         operator: In
         values:
-          - postgresql
-          - mongodb
-          - redis
-          - kafka
-          - minio
+          - urfu-postgres
+          - urfu-mongo
+          - urfu-redis
+          - urfu-kafka
+          - urfu-minio
   policyTypes:
     - Ingress
   ingress:
