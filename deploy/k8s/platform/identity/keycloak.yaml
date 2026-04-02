@@ -91,22 +91,24 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+            - containerPort: 9000
+              name: management
           startupProbe:
             httpGet:
               path: /health/started
-              port: http
+              port: management
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: http
+              port: management
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health/live
-              port: http
+              port: management
             periodSeconds: 20
           volumeMounts:
             - name: theme
