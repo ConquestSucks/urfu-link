@@ -29,6 +29,7 @@ resources:
   - identity/minio-oidc-external-secret.yaml
   - identity/argocd-oidc-config.yaml
   - identity/pomerium-config.yaml
+  - identity/echo-test.yaml
   - identity/pomerium.yaml
   - identity/pomerium-svc.yaml
   - external-secrets/pomerium-external-secret.yaml
