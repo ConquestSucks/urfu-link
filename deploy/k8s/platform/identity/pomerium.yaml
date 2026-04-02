@@ -42,9 +42,12 @@ spec:
             - name: COOKIE_EXPIRE
               value: "1h"
             - name: DATABROKER_STORAGE_TYPE
-              value: "redis"
+              value: "postgres"
             - name: DATABROKER_STORAGE_CONNECTION_STRING
-              value: "redis://urfu-redis.urfu-platform.svc.cluster.local:6379"
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: databroker-connection-string
             - name: LOG_LEVEL
               value: "info"
             - name: IDP_CLIENT_ID

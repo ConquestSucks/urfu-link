@@ -132,34 +132,38 @@ spec:
                 KEYCLOAK_DB_PASSWORD="$(secret_value "$GENERATED_JSON" keycloak_db_password 2>/dev/null || true)"
                 KEYCLOAK_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" keycloak_admin_password 2>/dev/null || true)"
                 API_GATEWAY_CLIENT_SECRET="$(secret_value "$GENERATED_JSON" api_gateway_client_secret 2>/dev/null || true)"
+                POMERIUM_DB_PASSWORD="$(secret_value "$GENERATED_JSON" pomerium_db_password 2>/dev/null || true)"
 
                 [ -n "$USER_DB_PASSWORD" ] || USER_DB_PASSWORD="$(rand 32)"
                 [ -n "$MEDIA_DB_PASSWORD" ] || MEDIA_DB_PASSWORD="$(rand 32)"
                 [ -n "$KEYCLOAK_DB_PASSWORD" ] || KEYCLOAK_DB_PASSWORD="$(rand 32)"
                 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ] || KEYCLOAK_ADMIN_PASSWORD="$(rand 32)"
                 [ -n "$API_GATEWAY_CLIENT_SECRET" ] || API_GATEWAY_CLIENT_SECRET="$(rand 40)"
+                [ -n "$POMERIUM_DB_PASSWORD" ] || POMERIUM_DB_PASSWORD="$(rand 32)"
 
                 GRAFANA_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" grafana_admin_password 2>/dev/null || true)"
                 [ -n "$GRAFANA_ADMIN_PASSWORD" ] || GRAFANA_ADMIN_PASSWORD="$(rand 32)"
 
-                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s"}}' \
+                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
                   "$(b64 "$USER_DB_PASSWORD")" \
                   "$(b64 "$MEDIA_DB_PASSWORD")" \
                   "$(b64 "$KEYCLOAK_DB_PASSWORD")" \
                   "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
                   "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
-                  "$(b64 "$GRAFANA_ADMIN_PASSWORD")")"
+                  "$(b64 "$GRAFANA_ADMIN_PASSWORD")" \
+                  "$(b64 "$POMERIUM_DB_PASSWORD")")"
 
                 if [ "$GENERATED_EXISTS" = "true" ]; then
                   patch_secret_json platform-bootstrap-generated "$GENERATED_PATCH"
                 else
-                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s"}}' \
+                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
                     "$(b64 "$USER_DB_PASSWORD")" \
                     "$(b64 "$MEDIA_DB_PASSWORD")" \
                     "$(b64 "$KEYCLOAK_DB_PASSWORD")" \
                     "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
                     "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
-                    "$(b64 "$GRAFANA_ADMIN_PASSWORD")")"
+                    "$(b64 "$GRAFANA_ADMIN_PASSWORD")" \
+                    "$(b64 "$POMERIUM_DB_PASSWORD")")"
                   create_secret_json "$GENERATED_CREATE"
                 fi
               }
@@ -232,6 +236,7 @@ spec:
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'user') THEN CREATE ROLE \"user\" LOGIN PASSWORD '$USER_DB_PASSWORD'; ELSE ALTER ROLE \"user\" WITH LOGIN PASSWORD '$USER_DB_PASSWORD'; END IF; END \$\$;"
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'media') THEN CREATE ROLE \"media\" LOGIN PASSWORD '$MEDIA_DB_PASSWORD'; ELSE ALTER ROLE \"media\" WITH LOGIN PASSWORD '$MEDIA_DB_PASSWORD'; END IF; END \$\$;"
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'keycloak') THEN CREATE ROLE keycloak LOGIN PASSWORD '$KEYCLOAK_DB_PASSWORD'; ELSE ALTER ROLE keycloak WITH LOGIN PASSWORD '$KEYCLOAK_DB_PASSWORD'; END IF; END \$\$;"
+                pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pomerium') THEN CREATE ROLE pomerium LOGIN PASSWORD '$POMERIUM_DB_PASSWORD'; ELSE ALTER ROLE pomerium WITH LOGIN PASSWORD '$POMERIUM_DB_PASSWORD'; END IF; END \$\$;"
 
                 if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -At \
                   -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
@@ -255,6 +260,14 @@ spec:
                   -d postgres \
                   -c "SELECT 1 FROM pg_database WHERE datname = 'keycloak'" | grep -q 1; then
                   pg_exec "CREATE DATABASE keycloak OWNER keycloak"
+                fi
+
+                if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -At \
+                  -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
+                  -U "$POSTGRES_USER" \
+                  -d postgres \
+                  -c "SELECT 1 FROM pg_database WHERE datname = 'pomerium_db'" | grep -q 1; then
+                  pg_exec "CREATE DATABASE pomerium_db OWNER pomerium"
                 fi
               }
 
@@ -314,7 +327,10 @@ spec:
               MONGO_BACKUP_PAYLOAD="$(printf '{"data":{"mongo_uri":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin","minio_endpoint":"http://urfu-minio.urfu-platform.svc.cluster.local:9000","minio_access_key":"%s","minio_secret_key":"%s"}}' \
                 "$MONGO_APP_PASSWORD" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY")"  
 
+              POMERIUM_DB_PAYLOAD="$(printf '{"data":{"connection_string":"postgresql://pomerium:%s@urfu-postgres-rw.urfu-platform.svc.cluster.local:5432/pomerium_db?sslmode=disable"}}' "$POMERIUM_DB_PASSWORD")"
+
               vault_put urfu-link/prod/keycloak "$KEYCLOAK_PAYLOAD"
+              vault_put urfu-link/prod/pomerium-db "$POMERIUM_DB_PAYLOAD"
               vault_put urfu-link/prod/user-service "$USER_PAYLOAD"
               vault_put urfu-link/prod/media-service "$MEDIA_PAYLOAD"
               vault_put urfu-link/prod/chat-service "$CHAT_PAYLOAD"

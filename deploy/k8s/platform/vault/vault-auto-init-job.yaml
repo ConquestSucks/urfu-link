@@ -129,6 +129,9 @@ spec:
               path "kv/data/urfu-link/prod/keycloak" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/pomerium-db" {
+                capabilities = ["create", "update", "read"]
+              }
               path "kv/data/urfu-link/prod/user-service" {
                 capabilities = ["create", "update", "read"]
               }
