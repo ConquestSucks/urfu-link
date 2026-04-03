@@ -47,8 +47,8 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "protocol": "openid-connect",
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:8081/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:8081"],
       "protocolMappers": [
         {
           "name": "urfu-link-api audience",
@@ -220,7 +220,7 @@
       "credentials": [
         { "type": "password", "value": "devpass", "temporary": false }
       ],
-      "realmRoles": ["user"]
+      "realmRoles": ["user", "offline_access"]
     },
     {
       "username": "service-account-user-service-admin",

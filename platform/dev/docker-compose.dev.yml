@@ -162,7 +162,7 @@ services:
       KC_HEALTH_ENABLED: "true"
     volumes:
       - ./keycloak/realm-urfu-link.json:/opt/keycloak/data/import/realm-urfu-link.json:ro
-      - ../keycloak-theme:/opt/keycloak/themes/urfu-link/login:ro
+      - ../keycloak-theme:/opt/keycloak/themes/urfu-link:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -211,6 +211,166 @@ services:
       - "3478:3478/udp"
       - "5349:5349"
       - "5349:5349/udp"
+
+  # ── .NET Services ──────────────────────────────────────────────────────────
+
+  user-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/User/UserService.Api/Dockerfile
+    container_name: urfu-user-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Keycloak__ClientSecret: user-service-admin-dev-secret
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Storage__PublicEndpoint: http://localhost:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  chat-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
+    container_name: urfu-chat-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  media-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+    container_name: urfu-media-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  presence-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+    container_name: urfu-presence-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  notification-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+    container_name: urfu-notification-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  call-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/Call/CallService.Api/Dockerfile
+    container_name: urfu-call-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: src/Gateway/ApiGateway/Dockerfile
+    container_name: urfu-api-gateway
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Cors__AllowedOrigins__0: http://localhost:3000
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+    ports:
+      - "5080:8080"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      chat-service:
+        condition: service_started
+      media-service:
+        condition: service_started
+      presence-service:
+        condition: service_started
+      notification-service:
+        condition: service_started
+      call-service:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres-data:

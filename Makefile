@@ -1,15 +1,23 @@
 COMPOSE = docker compose -f platform/dev/docker-compose.dev.yml
 
-.PHONY: up up-core down down-v restart ps logs \
+.PHONY: up up-infra up-core build down down-v restart ps logs \
         migrate-user \
         test test-unit test-integration \
         run-user
 
 # ── Infrastructure ──────────────────────────────────────────────────────────
 
-## Start full dev stack
+## Start full dev stack (infra + all .NET services); run `make build` first on first use
 up:
 	$(COMPOSE) up -d
+
+## Build all .NET service images
+build:
+	$(COMPOSE) build --parallel
+
+## Start only infrastructure (no .NET services)
+up-infra:
+	$(COMPOSE) up -d postgres mongo redis kafka kafka-init minio minio-init keycloak otel-collector livekit coturn kafka-ui
 
 ## Start only core services (postgres, redis, kafka, minio) — no Keycloak/LiveKit/etc.
 up-core:
