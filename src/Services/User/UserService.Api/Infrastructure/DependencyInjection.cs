@@ -1,7 +1,5 @@
 using Amazon.S3;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using UserService.Api.Application;
 using UserService.Api.Domain;
