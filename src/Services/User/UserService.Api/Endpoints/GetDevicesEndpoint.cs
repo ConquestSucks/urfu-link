@@ -19,8 +19,8 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
         var userId = HttpContext.User.GetUserId();
         var currentKeycloakSessionId = HttpContext.Request.Headers["X-Keycloak-Session"].FirstOrDefault();
         var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+        var realIp = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
 
-        // Persist device name for current session on each request
         if (!string.IsNullOrEmpty(currentKeycloakSessionId) && !string.IsNullOrEmpty(userAgent))
             await deviceRegistry.SaveAsync(currentKeycloakSessionId, userAgent, ct).ConfigureAwait(false);
 
@@ -30,13 +30,18 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
             sessions.Select(s => deviceRegistry.GetDeviceNameAsync(s.SessionId, ct))
         ).ConfigureAwait(false);
 
-        var response = sessions.Select((s, i) => new DeviceSessionResponse(
-            SessionId: s.SessionId,
-            IpAddress: s.IpAddress,
-            LastAccess: s.LastAccess,
-            Browser: deviceNames[i],
-            Os: s.Os,
-            IsCurrent: string.Equals(s.SessionId, currentKeycloakSessionId, StringComparison.Ordinal))).ToList();
+        var response = sessions.Select((s, i) =>
+        {
+            var isCurrent = string.Equals(s.SessionId, currentKeycloakSessionId, StringComparison.Ordinal);
+            var ip = isCurrent && !string.IsNullOrEmpty(realIp) ? realIp : s.IpAddress;
+            return new DeviceSessionResponse(
+                SessionId: s.SessionId,
+                IpAddress: ip,
+                LastAccess: s.LastAccess,
+                Browser: deviceNames[i],
+                Os: s.Os,
+                IsCurrent: isCurrent);
+        }).ToList();
 
         await HttpContext.Response.SendAsync(response, cancellation: ct).ConfigureAwait(false);
     }
