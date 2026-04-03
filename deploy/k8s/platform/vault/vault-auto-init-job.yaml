@@ -198,6 +198,9 @@ spec:
               path "kv/data/urfu-link/prod/keycloak" {
                 capabilities = ["read"]
               }
+              path "kv/data/urfu-link/prod/user-service" {
+                capabilities = ["read", "update"]
+              }
               path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }

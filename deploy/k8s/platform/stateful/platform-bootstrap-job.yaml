@@ -301,6 +301,12 @@ spec:
                   "${VAULT_ADDR}/v1/kv/data/$1" >/dev/null
               }
 
+              vault_read() {
+                curl --silent \
+                  --header "X-Vault-Token: ${VAULT_TOKEN}" \
+                  "${VAULT_ADDR}/v1/kv/data/$1" || true
+              }
+
               ensure_generated_secret
               ensure_mongo_password_secret
               ensure_postgres_superuser_secret
@@ -315,7 +321,13 @@ spec:
               MINIO_SECRET_KEY="$(json_get_string "$MINIO_VAULT_RESPONSE" secret_key)"
 
               KEYCLOAK_PAYLOAD="$(printf '{"data":{"admin_username":"admin","admin_password":"%s","db_host":"urfu-postgres-rw.urfu-platform.svc.cluster.local","db_name":"keycloak","db_username":"keycloak","db_password":"%s"}}' "$KEYCLOAK_ADMIN_PASSWORD" "$KEYCLOAK_DB_PASSWORD")"
-              USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s"}}' "$USER_DB_PASSWORD")"
+              EXISTING_USER_SVC="$(vault_read urfu-link/prod/user-service)"
+              EXISTING_KC_SECRET="$(json_get_string "$EXISTING_USER_SVC" keycloak_client_secret)"
+              if [ -n "$EXISTING_KC_SECRET" ]; then
+                USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s","keycloak_client_secret":"%s"}}' "$USER_DB_PASSWORD" "$EXISTING_KC_SECRET")"
+              else
+                USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s"}}' "$USER_DB_PASSWORD")"
+              fi
               MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
               CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
               PRESENCE_PAYLOAD='{"data":{"primary_connection":"urfu-redis.urfu-platform.svc.cluster.local:6379"}}'
