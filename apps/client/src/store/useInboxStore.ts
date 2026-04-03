@@ -6,13 +6,6 @@ import { ViewType } from "@/entities/view";
 import { inboxApi } from "@/shared/api";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-
-interface InboxNavState {
-    currentTab: TabType;
-    currentView: ViewType;
-    setCurrentTab: (tab: TabType) => void;
-    setCurrentView: (view: ViewType) => void;
-}
 interface InboxState {
     chats: InboxChatProps[];
     subjects: InboxSubjectProps[];
@@ -128,16 +121,3 @@ export const useInboxActions = () =>
             getSubjectMessageById: state.getSubjectMessageById,
         })),
     );
-
-const useInboxNavStore = create<InboxNavState>((set) => ({
-    currentTab: "chats",
-    currentView: "messages",
-    setCurrentTab: (tab) => set({ currentTab: tab }),
-    setCurrentView: (view) => set({ currentView: view }),
-}));
-
-export const useTabState = () =>
-    useInboxNavStore(useShallow((state) => [state.currentTab, state.setCurrentTab] as const));
-
-export const useViewState = () =>
-    useInboxNavStore(useShallow((state) => [state.currentView, state.setCurrentView] as const));

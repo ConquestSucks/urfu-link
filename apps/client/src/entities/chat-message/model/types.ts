@@ -5,4 +5,5 @@ export interface ChatMessageProps {
     time: string;
     avatarUrl: string;
     showAvatar?: boolean;
+    seen?: boolean;
 }

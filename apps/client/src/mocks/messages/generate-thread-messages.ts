@@ -18,6 +18,7 @@ export function generateThreadMessages(threadKey: string, total: number = MSGS_P
             id: `${threadKey}#${seq}`,
             text: `Сообщение №${seq} в потоке «${threadKey}». Текст для проверки скролла и пагинации.`,
             isOwn,
+            seen: (seed + i) % 2 === 0,
             time: `${String(9 + (i % 12)).padStart(2, "0")}:${String((seed + i * 7) % 60).padStart(2, "0")}`,
             avatarUrl: `https://i.pravatar.cc/150?u=${avatarId}`,
         };

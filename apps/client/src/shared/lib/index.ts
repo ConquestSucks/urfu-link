@@ -1,0 +1,1 @@
+export { useInboxRouting } from "./useInboxRouting";

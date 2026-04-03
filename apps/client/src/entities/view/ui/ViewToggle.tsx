@@ -1,12 +1,13 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { BellIcon, ChatCircleTextIcon } from "@/shared/ui/phosphor";
+import { Link } from "expo-router";
 import React from "react";
 import { Pressable, View } from "react-native";
 import { ViewType } from "../model/types";
 
 interface ViewToggleProps {
     currentView: ViewType;
-    onCurrentViewChange: (view: ViewType) => void;
+    createHref: (view: ViewType) => any;
 }
 
 const TOGGLE_ITEMS = [
@@ -14,7 +15,7 @@ const TOGGLE_ITEMS = [
     { id: "notifications" as const, icon: BellIcon, label: "Уведомления", hasBadge: true },
 ];
 
-export const ViewToggle = ({ currentView, onCurrentViewChange }: ViewToggleProps) => {
+export const ViewToggle = ({ currentView, createHref }: ViewToggleProps) => {
     const { isMobile } = useWindowSize();
 
     const containerClasses = isMobile
@@ -28,13 +29,9 @@ export const ViewToggle = ({ currentView, onCurrentViewChange }: ViewToggleProps
 
                 const buttonClasses = isMobile
                     ? "p-2.5"
-                    : `p-2 rounded-xl transition-colors duration-300 ${
-                          isActive ? "bg-brand-600 shadow-brand-soft" : "hover:bg-white/5"
-                      }`;
-
+                    : `p-2 rounded-xl transition-colors duration-300 ${isActive ? "bg-brand-600 shadow-brand-soft" : "hover:bg-white/5"}`;
                 const iconSize = isMobile ? 24 : 18;
                 const iconWeight = isMobile && isActive ? "fill" : "regular";
-
                 const iconColor = isActive
                     ? "text-white"
                     : isMobile
@@ -42,23 +39,22 @@ export const ViewToggle = ({ currentView, onCurrentViewChange }: ViewToggleProps
                       : "text-text-placeholder";
 
                 return (
-                    <Pressable
-                        key={id}
-                        onPress={() => onCurrentViewChange(id)}
-                        hitSlop={isMobile ? 8 : 0}
-                        accessibilityRole="button"
-                        accessibilityLabel={label}
-                        accessibilityState={{ selected: isActive }}
-                        className={buttonClasses}
-                    >
-                        <View className="relative">
-                            <Icon size={iconSize} weight={iconWeight} className={iconColor} />
-
-                            {hasBadge && (
-                                <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" />
-                            )}
-                        </View>
-                    </Pressable>
+                    <Link key={id} href={createHref(id)} replace asChild>
+                        <Pressable
+                            hitSlop={isMobile ? 8 : 0}
+                            accessibilityRole="tab"
+                            accessibilityLabel={label}
+                            accessibilityState={{ selected: isActive }}
+                            className={buttonClasses}
+                        >
+                            <View className="relative">
+                                <Icon size={iconSize} weight={iconWeight} className={iconColor} />
+                                {hasBadge && (
+                                    <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" />
+                                )}
+                            </View>
+                        </Pressable>
+                    </Link>
                 );
             })}
         </View>

@@ -5,12 +5,12 @@ import { Text, View } from "react-native";
 
 type MobileHeaderProps = {
     currentView?: ViewType;
-    onCurrentViewChange: (view: ViewType) => void;
+    createHref: (view: ViewType) => any;
 };
 
 export const MobileHeader = ({
     currentView = "messages",
-    onCurrentViewChange,
+    createHref,
 }: MobileHeaderProps) => {
     const messagesActive = currentView === "messages";
     const notificationsActive = currentView === "notifications";
@@ -22,7 +22,7 @@ export const MobileHeader = ({
                 <Text className="text-white text-lg font-extrabold tracking-tight">URFU LINK</Text>
             </View>
 
-            <ViewToggle currentView={currentView} onCurrentViewChange={onCurrentViewChange} />
+            <ViewToggle currentView={currentView} createHref={createHref} />
         </View>
     );
 };
