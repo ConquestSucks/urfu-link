@@ -23,7 +23,7 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
         var xForwardedFor = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
 
         logger.LogInformation("[GetDevices] X-Keycloak-Session={KcSession} UA={UA} X-Forwarded-For={XFF}",
-            currentKeycloakSessionId ?? "(null)", userAgent, xForwardedFor ?? "(null)");
+            currentKeycloakSessionId, userAgent, xForwardedFor);
 
         // Persist device name for current session on each request
         if (!string.IsNullOrEmpty(currentKeycloakSessionId) && !string.IsNullOrEmpty(userAgent))
