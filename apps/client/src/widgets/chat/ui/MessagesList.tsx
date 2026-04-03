@@ -38,7 +38,7 @@ export const MessagesList = ({ chatId, type }: MessagesListProps) => {
 
     return (
         <FlatList
-            className="px-6 py-6"
+            className="flex-1 px-6 py-6"
             inverted={true}
             data={messages}
             keyExtractor={(item) => item.id}
