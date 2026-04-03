@@ -227,6 +227,7 @@ spec:
           - minio-bootstrap
           - minio-bootstrap-buckets
           - minio-oidc-policy
+          - kafka-topics-bootstrap
   policyTypes:
     - Egress
   egress:

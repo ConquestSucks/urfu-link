@@ -12,3 +12,4 @@ resources:
   - minio-bootstrap-job.yaml
   - minio-buckets-job.yaml
   - platform-bootstrap-job.yaml
+  - kafka-topics-job.yaml

@@ -18,6 +18,10 @@ serviceAccount:
 
 podAnnotations:
   linkerd.io/inject: enabled
+  config.linkerd.io/proxy-cpu-request: "10m"
+  config.linkerd.io/proxy-cpu-limit: "200m"
+  config.linkerd.io/proxy-memory-request: "32Mi"
+  config.linkerd.io/proxy-memory-limit: "400Mi"
 
 podSecurityContext:
   runAsNonRoot: true

@@ -1,7 +1,9 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using UserService.Api.Application.Contracts;
@@ -25,6 +27,11 @@ builder.Services.SwaggerDocument(o =>
     };
 });
 builder.Services.AddServiceDefaults(builder.Configuration, "user-service");
+builder.Services.AddDataProtection()
+    .PersistKeysToStackExchangeRedis(
+        sp => sp.GetRequiredService<IConnectionMultiplexer>(),
+        "urfu:dp:user-service")
+    .SetApplicationName("urfu-link-user-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();

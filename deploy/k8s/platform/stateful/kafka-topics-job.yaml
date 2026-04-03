@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-topics-bootstrap
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+    argocd.argoproj.io/sync-wave: "3"
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: kafka-topics
+          image: apache/kafka:4.0.2
+          command:
+            - /bin/sh
+            - -c
+            - >-
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --list > /dev/null 2>&1; do
+                echo "Waiting for Kafka broker...";
+                sleep 5;
+              done &&
+              echo "Kafka is ready. Creating topics..." &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.user.events.v1 --partitions 3 --replication-factor 1 &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.chat.events.v1 --partitions 3 --replication-factor 1 &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.media.events.v1 --partitions 3 --replication-factor 1 &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.notification.events.v1 --partitions 3 --replication-factor 1 &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.call.events.v1 --partitions 3 --replication-factor 1 &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.presence.events.v1 --partitions 3 --replication-factor 1 &&
+              echo "All topics created successfully."
