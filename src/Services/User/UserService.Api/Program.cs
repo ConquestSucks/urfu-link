@@ -2,7 +2,6 @@ using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
@@ -16,13 +15,6 @@ using UserService.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var redisConfiguration =
-    builder.Configuration["Infrastructure:Redis:Configuration"]
-    ?? builder.Configuration["ConnectionStrings:Redis"]
-    ?? "localhost:6379";
-var redisMultiplexer = await ConnectionMultiplexer.ConnectAsync(redisConfiguration);
-builder.Services.TryAddSingleton<IConnectionMultiplexer>(redisMultiplexer);
-
 builder.Services.AddGrpc();
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(o =>
@@ -35,15 +27,23 @@ builder.Services.SwaggerDocument(o =>
     };
 });
 builder.Services.AddServiceDefaults(builder.Configuration, "user-service");
+
+// DataProtection keys are persisted to Redis to survive pod restarts and support horizontal scaling.
+// The factory captures `app` by reference (set after Build()) so IConnectionMultiplexer is resolved
+// from the final DI container — test factories that substitute the multiplexer work correctly.
+WebApplication? app = null;
 builder.Services.AddDataProtection()
-    .PersistKeysToStackExchangeRedis(redisMultiplexer, "urfu:dp:user-service")
-    .SetApplicationName("urfu-link-user-service");
+    .SetApplicationName("urfu-link-user-service")
+    .PersistKeysToStackExchangeRedis(
+        factory: () => app!.Services.GetRequiredService<IConnectionMultiplexer>(),
+        key: "urfu:dp:user-service");
+
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
 builder.Services.AddUserModule(builder.Configuration);
 
-var app = builder.Build();
+app = builder.Build();
 
 await using (var scope = app.Services.CreateAsyncScope())
 {
