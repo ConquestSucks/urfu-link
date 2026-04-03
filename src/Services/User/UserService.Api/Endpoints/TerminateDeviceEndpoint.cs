@@ -3,7 +3,7 @@ using UserService.Api.Domain.Interfaces;
 
 namespace UserService.Api.Endpoints;
 
-public sealed class TerminateDeviceEndpoint(ISessionManager sessionManager)
+public sealed class TerminateDeviceEndpoint(ISessionManager sessionManager, IDeviceRegistry deviceRegistry)
     : EndpointWithoutRequest
 {
     public override void Configure()
@@ -16,6 +16,7 @@ public sealed class TerminateDeviceEndpoint(ISessionManager sessionManager)
     {
         var sessionId = Route<string>("SessionId")!;
         await sessionManager.TerminateAsync(sessionId, ct).ConfigureAwait(false);
+        await deviceRegistry.RemoveAsync(sessionId, ct).ConfigureAwait(false);
         await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
     }
 }
