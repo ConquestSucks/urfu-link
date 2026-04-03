@@ -1,12 +1,11 @@
 using FastEndpoints;
-using Microsoft.Extensions.Logging;
 using UserService.Api.Application.Contracts.Responses;
 using UserService.Api.Domain.Interfaces;
 using UserService.Api.Infrastructure.Auth;
 
 namespace UserService.Api.Endpoints;
 
-public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRegistry deviceRegistry, ILogger<GetDevicesEndpoint> logger)
+public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRegistry deviceRegistry)
     : EndpointWithoutRequest<List<DeviceSessionResponse>>
 {
     public override void Configure()
@@ -20,10 +19,6 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
         var userId = HttpContext.User.GetUserId();
         var currentKeycloakSessionId = HttpContext.Request.Headers["X-Keycloak-Session"].FirstOrDefault();
         var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
-        var xForwardedFor = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-
-        logger.LogInformation("[GetDevices] X-Keycloak-Session={KcSession} UA={UA} X-Forwarded-For={XFF}",
-            currentKeycloakSessionId, userAgent, xForwardedFor);
 
         // Persist device name for current session on each request
         if (!string.IsNullOrEmpty(currentKeycloakSessionId) && !string.IsNullOrEmpty(userAgent))
