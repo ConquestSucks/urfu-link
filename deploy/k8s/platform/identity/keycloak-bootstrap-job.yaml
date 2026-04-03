@@ -343,7 +343,7 @@ spec:
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
 
               # --- Pomerium (centralized auth proxy) ---
-              ensure_client "pomerium" '["https://auth.ghjc.ru/oauth2/callback","https://auth.ghjc.ru/.pomerium/callback"]' '["https://*.ghjc.ru"]' "false" "Pomerium Auth Proxy" "https://auth.ghjc.ru"
+              ensure_client "pomerium" '["https://auth.ghjc.ru/oauth2/callback","https://auth.ghjc.ru/.pomerium/callback","https://auth.ghjc.ru/.pomerium/signed_out"]' '["https://*.ghjc.ru"]' "false" "Pomerium Auth Proxy" "https://auth.ghjc.ru"
               POMERIUM_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
               ensure_audience_mapper "$CLIENT_UUID" "urfu-link-api"
