@@ -26,6 +26,7 @@ service:
 env:
   APP_ENV: prod
   EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru
+  EXPO_PUBLIC_KEYCLOAK_URL: https://id.ghjc.ru
 
 rollout:
   enabled: true
