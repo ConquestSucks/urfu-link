@@ -338,6 +338,22 @@ spec:
               # --- User Service Admin (machine-to-machine, Keycloak Admin API) ---
               ensure_client "user-service-admin" '[]' '[]' "false" "User Service Admin" "" "true"
               USER_SERVICE_ADMIN_SECRET="$CLIENT_SECRET"
+              USER_SERVICE_ADMIN_UUID="$CLIENT_UUID"
+
+              # Grant view-users role from realm-management to user-service-admin service account
+              # Required for GET /admin/realms/{realm}/users/{id}/sessions (GetDevicesEndpoint)
+              RM_CLIENT_ID="$(curl --silent -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients?clientId=realm-management" | jq -r '.[0].id')"
+              SA_USER_ID="$(curl --silent -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${USER_SERVICE_ADMIN_UUID}/service-account-user" | jq -r '.id')"
+              VIEW_USERS_ROLE="$(curl --silent -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${RM_CLIENT_ID}/roles/view-users")"
+              curl --silent -X POST \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/users/${SA_USER_ID}/role-mappings/clients/${RM_CLIENT_ID}" \
+                -d "[${VIEW_USERS_ROLE}]"
+              echo "Granted view-users to user-service-admin service account"
 
               # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
