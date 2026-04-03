@@ -16,6 +16,14 @@ data:
                 - authenticated_user: true
         pass_identity_headers: true
 
+      # Static assets: allow unauthenticated access so app-config.js is loaded
+      # before the auth flow starts. Without this Pomerium intercepts app-config.js
+      # and the browser falls back to the default appEnv: "dev".
+      - from: https://urfu-link.ghjc.ru
+        to: http://frontend-web.urfu-prod.svc.cluster.local:8080
+        path: /app-config.js
+        allow_public_unauthenticated_access: true
+
       # Frontend — any authenticated user
       - from: https://urfu-link.ghjc.ru
         to: http://frontend-web.urfu-prod.svc.cluster.local:8080
