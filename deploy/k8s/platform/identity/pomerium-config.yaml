@@ -16,7 +16,7 @@ data:
                 - authenticated_user: true
         pass_identity_headers: true
         jwt_claims_headers:
-          X-Keycloak-Session: sid
+          X-Keycloak-Session: session_state
 
       # Static assets: allow unauthenticated access so app-config.js is loaded
       # before the auth flow starts. Without this Pomerium intercepts app-config.js
