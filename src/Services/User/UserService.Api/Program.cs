@@ -2,6 +2,7 @@ using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
@@ -14,6 +15,13 @@ using UserService.Api.Messaging;
 using UserService.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var redisConfiguration =
+    builder.Configuration["Infrastructure:Redis:Configuration"]
+    ?? builder.Configuration["ConnectionStrings:Redis"]
+    ?? "localhost:6379";
+var redisMultiplexer = ConnectionMultiplexer.Connect(redisConfiguration);
+builder.Services.TryAddSingleton<IConnectionMultiplexer>(redisMultiplexer);
 
 builder.Services.AddGrpc();
 builder.Services.AddFastEndpoints();
@@ -28,9 +36,7 @@ builder.Services.SwaggerDocument(o =>
 });
 builder.Services.AddServiceDefaults(builder.Configuration, "user-service");
 builder.Services.AddDataProtection()
-    .PersistKeysToStackExchangeRedis(
-        sp => sp.GetRequiredService<IConnectionMultiplexer>(),
-        "urfu:dp:user-service")
+    .PersistKeysToStackExchangeRedis(redisMultiplexer, "urfu:dp:user-service")
     .SetApplicationName("urfu-link-user-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
