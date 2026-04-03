@@ -89,9 +89,7 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
             using var doc = JsonDocument.Parse(json);
             return doc.RootElement.TryGetProperty("sid", out var sid) ? sid.GetString() : null;
         }
-        catch
-        {
-            return null;
-        }
+        catch (FormatException) { return null; }
+        catch (JsonException) { return null; }
     }
 }
