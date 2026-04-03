@@ -20,7 +20,7 @@ var redisConfiguration =
     builder.Configuration["Infrastructure:Redis:Configuration"]
     ?? builder.Configuration["ConnectionStrings:Redis"]
     ?? "localhost:6379";
-var redisMultiplexer = ConnectionMultiplexer.Connect(redisConfiguration);
+var redisMultiplexer = await ConnectionMultiplexer.ConnectAsync(redisConfiguration);
 builder.Services.TryAddSingleton<IConnectionMultiplexer>(redisMultiplexer);
 
 builder.Services.AddGrpc();
