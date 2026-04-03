@@ -41,7 +41,7 @@ public sealed class KeycloakSessionClient(
             SessionId: s.Id,
             IpAddress: s.IpAddress,
             LastAccess: DateTimeOffset.FromUnixTimeMilliseconds(s.LastAccess),
-            Browser: s.Clients is { Count: > 0 } ? string.Join(", ", s.Clients.Values) : null,
+            Browser: null,
             Os: null)).ToList()
             ?? [];
     }
