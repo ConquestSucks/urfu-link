@@ -10,6 +10,7 @@ public sealed class DeviceEndpointTests(UserServiceFactory factory) : IClassFixt
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", "Bearer test-token");
+        client.DefaultRequestHeaders.Add("X-Keycloak-Session", TestAuthHandler.DefaultSessionId);
         return client;
     }
 
