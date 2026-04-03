@@ -17,32 +17,33 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
     public override async Task HandleAsync(CancellationToken ct)
     {
         var userId = HttpContext.User.GetUserId();
-        var currentKeycloakSessionId = HttpContext.Request.Headers["X-Keycloak-Session"].FirstOrDefault();
         var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
         var realIp = HttpContext.Request.Headers["X-Real-Ip"].FirstOrDefault()
-                    ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
-
-        if (!string.IsNullOrEmpty(currentKeycloakSessionId) && !string.IsNullOrEmpty(userAgent))
-            await deviceRegistry.SaveAsync(currentKeycloakSessionId, userAgent, ct).ConfigureAwait(false);
+                     ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
 
         var sessions = await sessionManager.GetSessionsAsync(userId, ct).ConfigureAwait(false);
+
+        // The current session is the one whose IP matches the real client IP
+        var currentSession = !string.IsNullOrEmpty(realIp)
+            ? sessions.FirstOrDefault(s => string.Equals(s.IpAddress, realIp, StringComparison.Ordinal))
+            : null;
+
+        // Save device name for the current session on each request
+        if (currentSession is not null && !string.IsNullOrEmpty(userAgent))
+            await deviceRegistry.SaveAsync(currentSession.SessionId, userAgent, ct).ConfigureAwait(false);
 
         var deviceNames = await Task.WhenAll(
             sessions.Select(s => deviceRegistry.GetDeviceNameAsync(s.SessionId, ct))
         ).ConfigureAwait(false);
 
-        var response = sessions.Select((s, i) =>
-        {
-            var isCurrent = string.Equals(s.SessionId, currentKeycloakSessionId, StringComparison.Ordinal);
-            var ip = isCurrent && !string.IsNullOrEmpty(realIp) ? realIp : s.IpAddress;
-            return new DeviceSessionResponse(
-                SessionId: s.SessionId,
-                IpAddress: ip,
-                LastAccess: s.LastAccess,
-                Browser: deviceNames[i],
-                Os: s.Os,
-                IsCurrent: isCurrent);
-        }).ToList();
+        var response = sessions.Select((s, i) => new DeviceSessionResponse(
+            SessionId: s.SessionId,
+            IpAddress: s.IpAddress,
+            LastAccess: s.LastAccess,
+            Browser: deviceNames[i],
+            Os: s.Os,
+            IsCurrent: currentSession is not null && string.Equals(s.SessionId, currentSession.SessionId, StringComparison.Ordinal)
+        )).ToList();
 
         await HttpContext.Response.SendAsync(response, cancellation: ct).ConfigureAwait(false);
     }
