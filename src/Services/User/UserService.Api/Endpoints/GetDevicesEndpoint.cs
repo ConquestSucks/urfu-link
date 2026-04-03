@@ -19,7 +19,8 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
         var userId = HttpContext.User.GetUserId();
         var currentKeycloakSessionId = HttpContext.Request.Headers["X-Keycloak-Session"].FirstOrDefault();
         var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
-        var realIp = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
+        var realIp = HttpContext.Request.Headers["X-Real-Ip"].FirstOrDefault()
+                    ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
 
         if (!string.IsNullOrEmpty(currentKeycloakSessionId) && !string.IsNullOrEmpty(userAgent))
             await deviceRegistry.SaveAsync(currentKeycloakSessionId, userAgent, ct).ConfigureAwait(false);
