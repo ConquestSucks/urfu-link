@@ -151,6 +151,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
 spec:
   ingressClassName: nginx
   tls:
