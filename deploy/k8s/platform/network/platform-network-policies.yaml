@@ -160,7 +160,7 @@ spec:
         - protocol: TCP
           port: 9000
 ---
-# MinIO: allow ingress from ingress-nginx (console UI)
+# MinIO: allow ingress from ingress-nginx (console port 9001 and API port 9000)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -169,7 +169,7 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: minio
+      app: urfu-minio
   policyTypes:
     - Ingress
   ingress:
@@ -179,7 +179,7 @@ spec:
               kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
-          port: 9090
+          port: 9001
         - protocol: TCP
           port: 9000
 ---
@@ -210,11 +210,11 @@ spec:
         - protocol: UDP
           port: 3478
 ---
-# Bootstrap jobs: allow egress to Vault and Keycloak
+# Bootstrap jobs: allow egress to Vault, Kubernetes API, and external HTTPS (apk packages)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: bootstrap-egress-vault
+  name: bootstrap-egress
   namespace: urfu-platform
 spec:
   podSelector:
@@ -230,6 +230,7 @@ spec:
   policyTypes:
     - Egress
   egress:
+    # Vault internal API
     - to:
         - namespaceSelector:
             matchLabels:
@@ -237,6 +238,18 @@ spec:
       ports:
         - protocol: TCP
           port: 8200
+    # Kubernetes API server (platform-bootstrap uses it to manage Secrets)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: default
+      ports:
+        - protocol: TCP
+          port: 443
+    # External HTTPS: Alpine CDN (apk add), Keycloak/Vault TLS, etc.
+    - ports:
+        - protocol: TCP
+          port: 443
 ---
 # Keycloak: allow egress to external (HTTPS for OIDC federation, email, etc.)
 apiVersion: networking.k8s.io/v1
