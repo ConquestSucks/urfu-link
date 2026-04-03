@@ -24,6 +24,13 @@ public sealed class TerminateAllDevicesEndpoint(ISessionManager sessionManager, 
             ? sessions.FirstOrDefault(s => string.Equals(s.IpAddress, realIp, StringComparison.Ordinal))?.SessionId
             : null;
 
+        // If we can't identify the current session, do nothing to avoid self-logout
+        if (currentSessionId is null)
+        {
+            await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
+            return;
+        }
+
         var toTerminate = sessions
             .Where(s => !string.Equals(s.SessionId, currentSessionId, StringComparison.Ordinal))
             .ToList();
