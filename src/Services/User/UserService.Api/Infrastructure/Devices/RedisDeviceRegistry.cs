@@ -76,12 +76,14 @@ public sealed class RedisDeviceRegistry(IConnectionMultiplexer redis) : IDeviceR
         var browser = info.UA.Family;
         var device = info.Device.Family;
 
-        // Mobile device with known model
-        if (!string.Equals(device, "Other", StringComparison.Ordinal) &&
-            !string.Equals(device, "Generic Smartphone", StringComparison.Ordinal))
-        {
+        // Mobile device with known model (exclude generic desktop identifiers)
+        var isDesktopDevice = string.Equals(device, "Other", StringComparison.Ordinal)
+            || string.Equals(device, "Generic Smartphone", StringComparison.Ordinal)
+            || string.Equals(device, "Mac", StringComparison.Ordinal)
+            || string.Equals(device, "PC", StringComparison.Ordinal);
+
+        if (!isDesktopDevice)
             return $"{device}, {os}";
-        }
 
         // Desktop/browser fallback
         if (!string.Equals(browser, "Other", StringComparison.Ordinal))
