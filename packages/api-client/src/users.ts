@@ -61,6 +61,12 @@ export type UpdateNotificationsDto = {
   mentions: boolean;
 };
 
+export type UpdateSoundVideoDto = {
+  playbackDeviceId?: string | null;
+  recordingDeviceId?: string | null;
+  webcamDeviceId?: string | null;
+};
+
 type AuthHeaders = () => Record<string, string>;
 type HandleUnauthorized = (response: Response) => void;
 
@@ -76,7 +82,7 @@ export function createUsersApi(
     const response = await fetch(`${baseUrl}${path}`, {
       ...init,
       headers: {
-        "Content-Type": "application/json",
+        ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         ...authHeaders(),
         ...init?.headers,
       },
@@ -132,6 +138,13 @@ export function createUsersApi(
     updateNotifications(dto: UpdateNotificationsDto): Promise<void> {
       return request<void>("/api/users/me/notifications", {
         method: "PUT",
+        body: JSON.stringify(dto),
+      });
+    },
+
+    updateSoundVideo(dto: UpdateSoundVideoDto): Promise<void> {
+      return request<void>("/api/users/me/sound-video", {
+        method: "PATCH",
         body: JSON.stringify(dto),
       });
     },

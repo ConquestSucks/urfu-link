@@ -16,6 +16,7 @@ export type {
   UpdateAccountDto,
   UpdatePrivacyDto,
   UpdateNotificationsDto,
+  UpdateSoundVideoDto,
 } from "./users";
 
 import { createUsersApi } from "./users";
@@ -23,9 +24,10 @@ import { createUsersApi } from "./users";
 type ApiClientConfig = {
   baseUrl: string;
   getAccessToken?: () => string | undefined;
+  onUnauthorized?: () => void;
 };
 
-export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
+export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: ApiClientConfig) {
   const normalizedBaseUrl = baseUrl.replace(/\/$/, "");
 
   function authHeaders(): Record<string, string> {
@@ -35,7 +37,12 @@ export function createApiClient({ baseUrl, getAccessToken }: ApiClientConfig) {
 
   let redirecting = false;
   function handleUnauthorized(response: Response): void {
-    if (response.status === 401 && typeof window !== "undefined" && !redirecting) {
+    if (response.status !== 401) return;
+    if (onUnauthorized) {
+      onUnauthorized();
+      return;
+    }
+    if (typeof window !== "undefined" && !redirecting) {
       redirecting = true;
       const rd = encodeURIComponent(window.location.href);
       window.location.href = `/.pomerium/sign_in?pomerium_redirect_uri=${rd}`;

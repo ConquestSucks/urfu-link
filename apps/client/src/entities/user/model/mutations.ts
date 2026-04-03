@@ -4,6 +4,7 @@ import type {
   UpdateAccountDto,
   UpdateNotificationsDto,
   UpdatePrivacyDto,
+  UpdateSoundVideoDto,
 } from "@urfu-link/api-client";
 import { userKeys } from "./queries";
 
@@ -49,6 +50,14 @@ export function useUpdateNotifications() {
   return useMutation({
     mutationFn: (dto: UpdateNotificationsDto) =>
       apiClient.users.updateNotifications(dto),
+    onSuccess: invalidateMe,
+  });
+}
+
+export function useUpdateSoundVideo() {
+  const invalidateMe = useInvalidateMe();
+  return useMutation({
+    mutationFn: (dto: UpdateSoundVideoDto) => apiClient.users.updateSoundVideo(dto),
     onSuccess: invalidateMe,
   });
 }

@@ -1,7 +1,7 @@
-import { Avatar } from "@/shared/ui";
+import { Avatar, ModalOverlay } from "@/shared/ui";
 import { BellSlashIcon, EnvelopeIcon, PhoneIcon, VideoCameraIcon, XIcon, } from "@/shared/ui/phosphor";
 import React from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 interface UserProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -13,9 +13,9 @@ interface UserProfileModalProps {
     };
 }
 export const UserProfileModal = ({ isOpen, onClose, user, }: UserProfileModalProps) => {
-    return (<Modal visible={isOpen} transparent={true} animationType="fade" onRequestClose={onClose}>
-      <Pressable className="flex-1 bg-black/60 justify-center items-center px-4" onPress={onClose}>
-        <Pressable onPress={(e) => e.stopPropagation()} className="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-full max-w-[420px]">
+    return (
+      <ModalOverlay visible={isOpen} onClose={onClose} backdropClassName="px-4"
+        contentClassName="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-full max-w-[420px]">
           <View className="flex-row justify-between items-center px-8 pt-7 pb-4 border-b border-white/5">
             <Text className="text-lg text-white font-bold">Профиль</Text>
             <Pressable onPress={onClose} className="p-2 -mr-2 rounded-xl active:bg-white/10 transition-colors">
@@ -26,7 +26,7 @@ export const UserProfileModal = ({ isOpen, onClose, user, }: UserProfileModalPro
           <View className="px-8 pb-8 pt-6 gap-8 items-center">
             <View className="items-center gap-4">
               <View className="relative">
-                <Avatar size={100} src={user.avatarUrl}/>
+                <Avatar size={100} src={user.avatarUrl} name={user.name}/>
                 <View className="absolute bottom-1 right-1 w-5 h-5 bg-success-500 border-[3px] border-app-card rounded-full"/>
               </View>
               <View className="items-center gap-1">
@@ -50,9 +50,8 @@ export const UserProfileModal = ({ isOpen, onClose, user, }: UserProfileModalPro
               <InfoRow icon={EnvelopeIcon} label="Почта" value={user.email || "user@urfu.ru"}/>
             </View>
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>);
+      </ModalOverlay>
+    );
 };
 const ActionBtn = ({ icon: Icon, label }: {
     icon: any;

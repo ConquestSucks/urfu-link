@@ -9,6 +9,7 @@
     "android": "pnpm exec expo start --android",
     "ios": "pnpm exec expo start --ios",
     "web": "pnpm exec expo start --web",
+    "web:local": "cross-env EXPO_PUBLIC_API_URL=http://localhost:5080 EXPO_PUBLIC_KEYCLOAK_URL=http://localhost:8080 pnpm exec expo start --web --port 3000",
     "web:build": "pnpm exec expo export --platform web",
     "typecheck": "pnpm exec tsc --noEmit",
     "doctor": "pnpm exec expo doctor"
@@ -20,9 +21,12 @@
     "@urfu-link/api-client": "workspace:*",
     "@urfu-link/ui": "workspace:*",
     "expo": "~55.0.9",
+    "expo-auth-session": "^55.0.12",
     "expo-constants": "~55.0.9",
+    "expo-crypto": "^55.0.12",
     "expo-font": "~55.0.4",
     "expo-image": "~55.0.6",
+    "expo-image-picker": "^55.0.16",
     "expo-linking": "~55.0.9",
     "expo-router": "~55.0.8",
     "expo-splash-screen": "~55.0.13",
@@ -45,12 +49,13 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@expo/ngrok": "^4.1.0",
     "@babel/core": "^7.28.5",
+    "@expo/ngrok": "^4.1.0",
     "@types/node": "^24.10.0",
     "@types/react": "~19.2.2",
     "@types/react-dom": "^19.1.11",
     "autoprefixer": "^10.4.21",
+    "cross-env": "^10.1.0",
     "tailwindcss": "^3.4.19",
     "typescript": "~5.9.2"
   },

@@ -30,13 +30,13 @@ export const ProfileMobile = () => {
             label: "Приватность",
             onPress: () => router.push("/profile/privacy"),
         },
-        { icon: MonitorIcon, label: "Устройства", onPress: () => {} },
+        { icon: MonitorIcon, label: "Устройства", onPress: () => router.push("/profile/devices" as Href) },
         {
             icon: BellIcon,
             label: "Уведомления",
             onPress: () => router.push("/profile/notifications" as Href),
         },
-        { icon: SpeakerHighIcon, label: "Звук и видео", onPress: () => {} },
+        { icon: SpeakerHighIcon, label: "Звук и видео", onPress: () => router.push("/profile/sound-video" as Href) },
     ];
 
     return (
@@ -46,7 +46,7 @@ export const ProfileMobile = () => {
         >
             <View className="items-center pt-8 pb-6">
                 <View className="relative">
-                    <Avatar src={avatarUrl} size={100} className="rounded-full" />
+                    <Avatar src={avatarUrl} size={100} name={userName} className="rounded-full" />
                     <StatusIndicator
                         status="online"
                         size={24}

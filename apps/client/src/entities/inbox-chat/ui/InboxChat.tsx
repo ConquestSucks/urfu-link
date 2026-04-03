@@ -23,7 +23,7 @@ export const InboxChat = ({
             <View
                 className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-brand-600/10 transition-all duration-300 ${isActive ? "bg-brand-600/10" : "hover:bg-white/5"}`}
             >
-                <Avatar size={48} src={avatarUrl} />
+                <Avatar size={48} src={avatarUrl} name={name} />
 
                 <View className="flex-1 gap-2 min-w-0">
                     <View className="flex-row justify-between items-start gap-2">

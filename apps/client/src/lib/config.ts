@@ -1,11 +1,12 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import type { AppEnv } from "./env";
-import { DEFAULT_API_URLS, runtimeConfigSchema } from "./env";
+import { DEFAULT_API_URLS, DEFAULT_KEYCLOAK_URL, runtimeConfigSchema } from "./env";
 export type { AppEnv } from "./env";
 export type RuntimeConfig = {
     appEnv: AppEnv;
     apiUrl: string;
+    keycloakUrl: string;
 };
 declare global {
     interface Window {
@@ -15,6 +16,7 @@ declare global {
 const defaultConfig: RuntimeConfig = {
     appEnv: "dev",
     apiUrl: DEFAULT_API_URLS.dev,
+    keycloakUrl: DEFAULT_KEYCLOAK_URL,
 };
 function getRawConfig(): Partial<RuntimeConfig> {
     const extra = (Constants.expoConfig?.extra ?? {}) as Partial<RuntimeConfig>;
@@ -22,6 +24,7 @@ function getRawConfig(): Partial<RuntimeConfig> {
     return {
         appEnv: webConfig.appEnv ?? extra.appEnv ?? defaultConfig.appEnv,
         apiUrl: webConfig.apiUrl ?? extra.apiUrl ?? defaultConfig.apiUrl,
+        keycloakUrl: webConfig.keycloakUrl ?? extra.keycloakUrl ?? defaultConfig.keycloakUrl,
     };
 }
 const raw = getRawConfig();

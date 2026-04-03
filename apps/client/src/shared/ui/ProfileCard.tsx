@@ -10,7 +10,7 @@ export interface ProfileProps {
 }
 export const ProfileCard = ({ textAnimatedStyle, userName, userDescription, avatarUrl, avatarSize, }: ProfileProps) => {
     return (<View className="flex-row gap-3 items-center">
-      <Avatar src={avatarUrl} size={avatarSize}/>
+      <Avatar src={avatarUrl} size={avatarSize} name={userName}/>
       <AnimatedView style={textAnimatedStyle ?? {}}>
         <View className="gap-1.5">
           <Text numberOfLines={1} className="text-white text-sm leading-none">

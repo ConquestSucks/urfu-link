@@ -1,12 +1,5 @@
-import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
-import React from "react";
-import { View } from "react-native";
-import {
-  interpolateColor,
-  useAnimatedStyle,
-  useDerivedValue,
-  withSpring,
-} from "react-native-reanimated";
+import React, { useEffect, useState } from "react";
+import { Pressable, View } from "react-native";
 
 interface SwitchProps {
   value: boolean;
@@ -15,41 +8,46 @@ interface SwitchProps {
 }
 
 export const Switch = ({ value, onValueChange, disabled }: SwitchProps) => {
-  const progress = useDerivedValue(() => {
-    return withSpring(value ? 1 : 0, {
-      mass: 0.3,
-      damping: 12,
-      stiffness: 300,
-    });
-  });
+  const [localValue, setLocalValue] = useState(value);
 
-  const animatedTrackStyle = useAnimatedStyle(
-    () => ({
-      backgroundColor: interpolateColor(
-        progress.value,
-        [0, 1],
-        ["rgba(255, 255, 255, 0.1)", "#2B7FFF"],
-      ),
-      opacity: disabled ? 0.5 : 1,
-    }),
-    [disabled],
-  );
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
 
-  const animatedHandleStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: progress.value * 24 }],
-  }));
+  const handlePress = () => {
+    if (disabled) return;
+    const next = !value; // always based on server state to avoid race conditions
+    setLocalValue(next); // optimistic visual update
+    onValueChange(next);
+  };
 
   return (
-    <AnimatedPressable
-      onPress={() => !disabled && onValueChange(!value)}
+    <Pressable
+      onPress={handlePress}
       disabled={disabled}
-      style={animatedTrackStyle}
+      style={{
+        width: 48,
+        height: 24,
+        borderRadius: 12,
+        padding: 2,
+        justifyContent: "center",
+        backgroundColor: localValue ? "#2B7FFF" : "rgba(255, 255, 255, 0.1)",
+        opacity: disabled ? 0.5 : 1,
+        // @ts-ignore
+        transition: "background-color 200ms ease",
+      }}
     >
-      <View className="w-12 h-6 rounded-full p-0.5 justify-center">
-        <AnimatedView style={animatedHandleStyle}>
-          <View className="w-5 h-5 bg-white rounded-full shadow-sm elevation-2" />
-        </AnimatedView>
-      </View>
-    </AnimatedPressable>
+      <View
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: "white",
+          transform: [{ translateX: localValue ? 24 : 0 }],
+          // @ts-ignore
+          transition: "transform 200ms ease",
+        }}
+      />
+    </Pressable>
   );
 };
