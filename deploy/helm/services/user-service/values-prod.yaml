@@ -22,6 +22,12 @@ env:
   Auth__NameClaim: email
   Auth__RoleClaim: groups
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
+  Keycloak__AdminUrl: http://keycloak.urfu-platform.svc.cluster.local:8080
+  Keycloak__Realm: urfu-link
+  Keycloak__ClientId: user-service-admin
+  Storage__Endpoint: http://urfu-minio.urfu-platform.svc.cluster.local:9000
+  Storage__AvatarBucket: user-avatars
+  Storage__PublicEndpoint: https://storage.ghjc.ru
 
 secrets:
   enabled: true
