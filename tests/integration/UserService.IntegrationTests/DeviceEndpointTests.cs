@@ -7,11 +7,16 @@ namespace UserService.IntegrationTests;
 
 public sealed class DeviceEndpointTests(UserServiceFactory factory) : IClassFixture<UserServiceFactory>
 {
+    // Minimal unsigned JWT with sid claim: {"alg":"none"}.{"sid":"test-pomerium-sid"}.
+    private const string TestPomeriumJwt =
+        "eyJhbGciOiJub25lIn0.eyJzaWQiOiJ0ZXN0LXBvbWVyaXVtLXNpZCJ9.";
+
     private HttpClient CreateAuthenticatedClient()
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", "Bearer test-token");
         client.DefaultRequestHeaders.Add("X-Real-Ip", "127.0.0.1");
+        client.DefaultRequestHeaders.Add("X-Pomerium-Jwt-Assertion", TestPomeriumJwt);
         return client;
     }
 

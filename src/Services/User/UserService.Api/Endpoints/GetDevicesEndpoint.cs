@@ -1,3 +1,5 @@
+using System.Text;
+using System.Text.Json;
 using FastEndpoints;
 using UserService.Api.Application.Contracts.Responses;
 using UserService.Api.Domain.Interfaces;
@@ -18,19 +20,40 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
     {
         var userId = HttpContext.User.GetUserId();
         var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
-        var realIp = HttpContext.Request.Headers["X-Real-Ip"].FirstOrDefault()
-                     ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
+
+        // Pomerium forwards its JWT — extract sid (stable Pomerium session ID)
+        var pomSid = GetPomeriumSid(HttpContext.Request.Headers["X-Pomerium-Jwt-Assertion"].FirstOrDefault());
 
         var sessions = await sessionManager.GetSessionsAsync(userId, ct).ConfigureAwait(false);
 
-        // The current session is the one whose IP matches the real client IP
-        var currentSession = !string.IsNullOrEmpty(realIp)
-            ? sessions.FirstOrDefault(s => string.Equals(s.IpAddress, realIp, StringComparison.Ordinal))
-            : null;
+        // Resolve the stable mapping: pomerium sid → keycloak session id
+        string? currentSessionId = null;
+        if (pomSid is not null)
+        {
+            currentSessionId = await deviceRegistry.GetKeycloakSessionIdAsync(pomSid, ct).ConfigureAwait(false);
 
-        // Save device name for the current session on each request
-        if (currentSession is not null && !string.IsNullOrEmpty(userAgent))
-            await deviceRegistry.SaveAsync(currentSession.SessionId, userAgent, ct).ConfigureAwait(false);
+            if (currentSessionId is null)
+            {
+                // First time seeing this Pomerium session — find the best matching Keycloak session
+                var realIp = HttpContext.Request.Headers["X-Real-Ip"].FirstOrDefault()
+                             ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
+
+                var best = !string.IsNullOrEmpty(realIp)
+                    ? sessions.FirstOrDefault(s => string.Equals(s.IpAddress, realIp, StringComparison.Ordinal))
+                    : null;
+                // Fall back to most recently accessed session
+                best ??= sessions.OrderByDescending(s => s.LastAccess).FirstOrDefault();
+
+                if (best is not null)
+                {
+                    currentSessionId = best.SessionId;
+                    await deviceRegistry.SavePomeriumMappingAsync(pomSid, currentSessionId, ct).ConfigureAwait(false);
+                }
+            }
+        }
+
+        if (currentSessionId is not null && !string.IsNullOrEmpty(userAgent))
+            await deviceRegistry.SaveAsync(currentSessionId, userAgent, ct).ConfigureAwait(false);
 
         var deviceNames = await Task.WhenAll(
             sessions.Select(s => deviceRegistry.GetDeviceNameAsync(s.SessionId, ct))
@@ -42,9 +65,33 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager, IDeviceRe
             LastAccess: s.LastAccess,
             Browser: deviceNames[i],
             Os: s.Os,
-            IsCurrent: currentSession is not null && string.Equals(s.SessionId, currentSession.SessionId, StringComparison.Ordinal)
+            IsCurrent: string.Equals(s.SessionId, currentSessionId, StringComparison.Ordinal)
         )).ToList();
 
         await HttpContext.Response.SendAsync(response, cancellation: ct).ConfigureAwait(false);
+    }
+
+    private static string? GetPomeriumSid(string? jwtAssertion)
+    {
+        if (string.IsNullOrEmpty(jwtAssertion))
+            return null;
+
+        var parts = jwtAssertion.Split('.');
+        if (parts.Length < 2)
+            return null;
+
+        try
+        {
+            var payload = parts[1];
+            // Add base64url padding
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+            var json = Encoding.UTF8.GetString(Convert.FromBase64String(payload.Replace('-', '+').Replace('_', '/')));
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.TryGetProperty("sid", out var sid) ? sid.GetString() : null;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

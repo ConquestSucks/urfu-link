@@ -5,6 +5,7 @@ namespace UserService.IntegrationTests.Helpers;
 public sealed class FakeDeviceRegistry : IDeviceRegistry
 {
     private readonly Dictionary<string, string> _devices = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _mappings = new(StringComparer.Ordinal);
 
     public Task SaveAsync(string keycloakSessionId, string userAgent, CancellationToken cancellationToken = default)
     {
@@ -30,5 +31,17 @@ public sealed class FakeDeviceRegistry : IDeviceRegistry
         foreach (var id in keycloakSessionIds)
             _devices.Remove(id);
         return Task.CompletedTask;
+    }
+
+    public Task SavePomeriumMappingAsync(string pomeriumSid, string keycloakSessionId, CancellationToken cancellationToken = default)
+    {
+        _mappings[pomeriumSid] = keycloakSessionId;
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> GetKeycloakSessionIdAsync(string pomeriumSid, CancellationToken cancellationToken = default)
+    {
+        _mappings.TryGetValue(pomeriumSid, out var id);
+        return Task.FromResult(id);
     }
 }
