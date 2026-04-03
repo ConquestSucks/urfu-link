@@ -25,16 +25,16 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
 
         builder.OwnsOne(u => u.Privacy, privacy =>
         {
-            privacy.Property(p => p.ShowOnlineStatus).HasColumnName("show_online_status").HasDefaultValue(true);
-            privacy.Property(p => p.ShowLastVisitTime).HasColumnName("show_last_visit_time").HasDefaultValue(true);
+            privacy.Property(p => p.ShowOnlineStatus).HasColumnName("show_online_status");
+            privacy.Property(p => p.ShowLastVisitTime).HasColumnName("show_last_visit_time");
         });
 
         builder.OwnsOne(u => u.Notifications, notifications =>
         {
-            notifications.Property(n => n.NewMessages).HasColumnName("notify_new_messages").HasDefaultValue(true);
-            notifications.Property(n => n.NotificationSound).HasColumnName("notify_sound").HasDefaultValue(true);
-            notifications.Property(n => n.DisciplineChatMessages).HasColumnName("notify_discipline_chats").HasDefaultValue(true);
-            notifications.Property(n => n.Mentions).HasColumnName("notify_mentions").HasDefaultValue(true);
+            notifications.Property(n => n.NewMessages).HasColumnName("notify_new_messages");
+            notifications.Property(n => n.NotificationSound).HasColumnName("notify_sound");
+            notifications.Property(n => n.DisciplineChatMessages).HasColumnName("notify_discipline_chats");
+            notifications.Property(n => n.Mentions).HasColumnName("notify_mentions");
         });
 
         builder.OwnsOne(u => u.SoundVideo, soundVideo =>
