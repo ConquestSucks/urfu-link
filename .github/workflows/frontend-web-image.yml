@@ -32,6 +32,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm client:web:build
+        env:
+          APP_ENV: prod
+          EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru
+          EXPO_PUBLIC_KEYCLOAK_URL: https://id.ghjc.ru
       - uses: docker/setup-buildx-action@v4
       - name: Login to GHCR
         uses: docker/login-action@v4
