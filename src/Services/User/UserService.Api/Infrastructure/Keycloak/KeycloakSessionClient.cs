@@ -40,7 +40,7 @@ public sealed class KeycloakSessionClient(
         return sessions?.Select(s => new DeviceSession(
             SessionId: s.Id,
             IpAddress: s.IpAddress,
-            LastAccess: DateTimeOffset.FromUnixTimeSeconds(s.LastAccess),
+            LastAccess: DateTimeOffset.FromUnixTimeMilliseconds(s.LastAccess),
             Browser: s.Clients is { Count: > 0 } ? string.Join(", ", s.Clients.Values) : null,
             Os: null)).ToList()
             ?? [];
