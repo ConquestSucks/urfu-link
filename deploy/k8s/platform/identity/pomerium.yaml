@@ -37,6 +37,8 @@ spec:
               value: "openid,email,profile,roles"
             - name: COOKIE_DOMAIN
               value: ".ghjc.ru"
+            - name: COOKIE_SECURE
+              value: "true"
             - name: COOKIE_NAME
               value: "_pomerium"
             - name: COOKIE_EXPIRE
