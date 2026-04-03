@@ -17,7 +17,7 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager)
     public override async Task HandleAsync(CancellationToken ct)
     {
         var userId = HttpContext.User.GetUserId();
-        var currentSessionId = HttpContext.User.GetSessionId();
+        var currentSessionId = HttpContext.User.TryGetSessionId();
 
         var sessions = await sessionManager.GetSessionsAsync(userId, ct).ConfigureAwait(false);
 
@@ -27,7 +27,7 @@ public sealed class GetDevicesEndpoint(ISessionManager sessionManager)
             LastAccess: s.LastAccess,
             Browser: s.Browser,
             Os: s.Os,
-            IsCurrent: string.Equals(s.SessionId, currentSessionId, StringComparison.Ordinal))).ToList();
+            IsCurrent: currentSessionId is not null && string.Equals(s.SessionId, currentSessionId, StringComparison.Ordinal))).ToList();
 
         await HttpContext.Response.SendAsync(response, cancellation: ct).ConfigureAwait(false);
     }

@@ -41,7 +41,7 @@ public sealed class KeycloakSessionClient(
             SessionId: s.Id,
             IpAddress: s.IpAddress,
             LastAccess: DateTimeOffset.FromUnixTimeSeconds(s.LastAccess),
-            Browser: ParseBrowser(s.Clients),
+            Browser: s.Clients is { Count: > 0 } ? string.Join(", ", s.Clients.Values) : null,
             Os: null)).ToList()
             ?? [];
     }
@@ -113,11 +113,6 @@ public sealed class KeycloakSessionClient(
         }
     }
 
-    private static string? ParseBrowser(List<string>? clients)
-    {
-        return clients is { Count: > 0 } ? string.Join(", ", clients) : null;
-    }
-
     private sealed class KeycloakSession
     {
         [JsonPropertyName("id")]
@@ -130,7 +125,7 @@ public sealed class KeycloakSessionClient(
         public long LastAccess { get; set; }
 
         [JsonPropertyName("clients")]
-        public List<string>? Clients { get; set; }
+        public Dictionary<string, string>? Clients { get; set; }
     }
 
     private sealed class TokenResponse
