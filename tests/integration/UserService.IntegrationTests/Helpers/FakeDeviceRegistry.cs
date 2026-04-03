@@ -26,6 +26,7 @@ public sealed class FakeDeviceRegistry : IDeviceRegistry
 
     public Task RemoveAllAsync(IEnumerable<string> keycloakSessionIds, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(keycloakSessionIds);
         foreach (var id in keycloakSessionIds)
             _devices.Remove(id);
         return Task.CompletedTask;
