@@ -238,14 +238,13 @@ spec:
       ports:
         - protocol: TCP
           port: 8200
-    # Kubernetes API server (platform-bootstrap uses it to manage Secrets)
-    - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: default
-      ports:
+    # Kubernetes API server: port 443 (ClusterIP) + 6443 (actual port after kube-proxy DNAT)
+    # k3s/kube-router evaluates NetworkPolicy after DNAT, so both ports are needed
+    - ports:
         - protocol: TCP
           port: 443
+        - protocol: TCP
+          port: 6443
     # External HTTPS: Alpine CDN (apk add), Keycloak/Vault TLS, etc.
     - ports:
         - protocol: TCP
