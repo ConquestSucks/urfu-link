@@ -8,7 +8,8 @@ namespace UserService.Api.Endpoints;
 public sealed class TerminateDeviceEndpoint(
     ISessionManager sessionManager,
     IDeviceRegistry deviceRegistry,
-    ISessionRevocationStore revocationStore)
+    ISessionRevocationStore revocationStore,
+    ILogger<TerminateDeviceEndpoint> logger)
     : EndpointWithoutRequest
 {
     public override void Configure()
@@ -19,12 +20,28 @@ public sealed class TerminateDeviceEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var sessionId = Route<string>("SessionId")!;
-        await sessionManager.TerminateAsync(sessionId, ct).ConfigureAwait(false);
-        await deviceRegistry.RemoveAsync(sessionId, ct).ConfigureAwait(false);
+        var keycloakSessionId = Route<string>("SessionId")!;
+
+        // Resolve Pomerium sid BEFORE RemoveAsync (which deletes the mapping)
+        var pomeriumSid = await deviceRegistry.GetPomeriumSidByKeycloakSessionAsync(keycloakSessionId, ct)
+            .ConfigureAwait(false);
+
+        await sessionManager.TerminateAsync(keycloakSessionId, ct).ConfigureAwait(false);
+        await deviceRegistry.RemoveAsync(keycloakSessionId, ct).ConfigureAwait(false);
 
         var userId = HttpContext.User.GetUserId().ToString();
-        await revocationStore.RevokeSingleAsync(userId, sessionId, ct).ConfigureAwait(false);
+
+        if (pomeriumSid is not null)
+        {
+            await revocationStore.RevokeSingleAsync(userId, pomeriumSid, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            logger.LogWarning(
+                "No Pomerium mapping for Keycloak session {KeycloakSessionId}; "
+                + "middleware revocation skipped — session terminated via Keycloak only",
+                keycloakSessionId);
+        }
 
         await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
     }

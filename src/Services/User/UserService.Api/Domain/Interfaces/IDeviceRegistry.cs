@@ -9,4 +9,5 @@ public interface IDeviceRegistry
 
     Task SavePomeriumMappingAsync(string pomeriumSid, string keycloakSessionId, CancellationToken cancellationToken = default);
     Task<string?> GetKeycloakSessionIdAsync(string pomeriumSid, CancellationToken cancellationToken = default);
+    Task<string?> GetPomeriumSidByKeycloakSessionAsync(string keycloakSessionId, CancellationToken cancellationToken = default);
 }
