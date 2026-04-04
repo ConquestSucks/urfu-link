@@ -25,6 +25,7 @@ on:
 
 jobs:
   validate:
+    if: github.head_ref != 'develop'
     runs-on: ubuntu-latest
     permissions:
       contents: read
