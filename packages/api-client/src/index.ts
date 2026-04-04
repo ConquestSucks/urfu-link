@@ -37,7 +37,8 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
 
   let redirecting = false;
   function handleUnauthorized(response: Response): void {
-    if (response.status !== 401) return;
+    const isAuthRedirect = response.type === "opaqueredirect";
+    if (response.status !== 401 && !isAuthRedirect) return;
     if (onUnauthorized) {
       onUnauthorized();
       return;
@@ -45,7 +46,7 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
     if (typeof window !== "undefined" && !redirecting) {
       redirecting = true;
       const rd = encodeURIComponent(window.location.href);
-      const isRevoked = response.headers.get("X-Session-Revoked") === "true";
+      const isRevoked = !isAuthRedirect && response.headers.get("X-Session-Revoked") === "true";
       window.location.href = isRevoked
         ? `/.pomerium/sign_out?pomerium_redirect_uri=${rd}`
         : `/.pomerium/sign_in?pomerium_redirect_uri=${rd}`;
