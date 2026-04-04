@@ -364,6 +364,20 @@ spec:
               ensure_groups_mapper "$CLIENT_UUID"
               ensure_audience_mapper "$CLIENT_UUID" "urfu-link-api"
 
+              # Set post-logout redirect URIs for pomerium client (idempotent)
+              POMERIUM_FULL="$(curl --silent --fail \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CLIENT_UUID}")"
+              POMERIUM_UPDATED="$(echo "$POMERIUM_FULL" | \
+                jq '.attributes["post.logout.redirect.uris"] = "https://urfu-link.ghjc.ru/*"')"
+              curl --fail --silent --show-error \
+                -X PUT \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CLIENT_UUID}" \
+                -d "$POMERIUM_UPDATED" >/dev/null
+              echo "Post-logout redirect URIs set for pomerium."
+
               # Store Pomerium secrets in Vault
               EXISTING_POMERIUM="$(vault_read urfu-link/prod/pomerium || true)"
               POMERIUM_COOKIE="$(echo "$EXISTING_POMERIUM" | jq -r '.data.data.cookie_secret // empty' 2>/dev/null || true)"
