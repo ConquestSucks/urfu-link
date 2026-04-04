@@ -24,8 +24,7 @@ public sealed class TerminateDeviceEndpoint(
         await deviceRegistry.RemoveAsync(sessionId, ct).ConfigureAwait(false);
 
         var userId = HttpContext.User.GetUserId().ToString();
-        var currentSessionId = HttpContext.User.GetSessionId();
-        await revocationStore.RevokeAsync(userId, currentSessionId, ct).ConfigureAwait(false);
+        await revocationStore.RevokeSingleAsync(userId, sessionId, ct).ConfigureAwait(false);
 
         await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
     }

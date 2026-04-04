@@ -58,6 +58,8 @@ public interface ISessionRevocationStore
 {
     Task RevokeAsync(string userId, string callerSessionId, CancellationToken cancellationToken = default);
 
+    Task RevokeSingleAsync(string userId, string sessionId, CancellationToken cancellationToken = default);
+
     Task<bool> IsRevokedAsync(string userId, string sessionId, CancellationToken cancellationToken = default);
 }
 
@@ -84,6 +86,23 @@ public sealed class RedisSessionRevocationStore(
         await Task.WhenAll(t1, t2, t3).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task RevokeSingleAsync(string userId, string sessionId, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
+
+        var db = multiplexer.GetDatabase();
+        var opts = options.Value;
+        var deniedKey = $"{opts.KeyPrefix}:denied:{userId}";
+
+        var batch = db.CreateBatch();
+        var t1 = batch.SetAddAsync(deniedKey, sessionId);
+        var t2 = batch.KeyExpireAsync(deniedKey, opts.Ttl);
+        batch.Execute();
+
+        await Task.WhenAll(t1, t2).WaitAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task<bool> IsRevokedAsync(string userId, string sessionId, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
@@ -91,8 +110,13 @@ public sealed class RedisSessionRevocationStore(
 
         var db = multiplexer.GetDatabase();
         var opts = options.Value;
-        var revokedKey = $"{opts.KeyPrefix}:revoked:{userId}";
 
+        var deniedKey = $"{opts.KeyPrefix}:denied:{userId}";
+        var isDenied = await db.SetContainsAsync(deniedKey, sessionId).WaitAsync(cancellationToken).ConfigureAwait(false);
+        if (isDenied)
+            return true;
+
+        var revokedKey = $"{opts.KeyPrefix}:revoked:{userId}";
         var isRevoked = await db.KeyExistsAsync(revokedKey).WaitAsync(cancellationToken).ConfigureAwait(false);
         if (!isRevoked)
             return false;

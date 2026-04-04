@@ -16,6 +16,7 @@ permissions:
 jobs:
   codeql:
     name: CodeQL
+    if: github.head_ref != 'develop'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -44,6 +45,7 @@ jobs:
 
   sbom:
     name: SBOM
+    if: github.head_ref != 'develop'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
