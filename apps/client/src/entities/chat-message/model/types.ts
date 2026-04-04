@@ -1,3 +1,7 @@
+export interface Attachment {
+    name: string;
+    url: string;
+}
 export interface ChatMessageProps {
     id: string;
     text: string;
@@ -6,4 +10,6 @@ export interface ChatMessageProps {
     avatarUrl: string;
     showAvatar?: boolean;
     seen?: boolean;
+    attachments?: Attachment[];
 }
+

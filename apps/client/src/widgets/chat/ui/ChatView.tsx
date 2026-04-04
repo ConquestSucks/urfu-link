@@ -2,7 +2,7 @@ import React from "react";
 import { View } from "react-native";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ChatHeader } from "./chat-header/ChatHeader";
-import { ChatInput } from "./Input";
+import { ChatInput } from "./chat-input/Input";
 import { MessagesList } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 
@@ -23,7 +23,7 @@ export const ChatView = () => {
             )}
             
             <MessagesList chatId={chatId} type={type} />
-            <ChatInput />
+            <ChatInput onSend={() => {}} />
         </View>
     );
 };

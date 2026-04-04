@@ -55,6 +55,7 @@ export const MessagesList = ({ chatId, type }: MessagesListProps) => {
                     time={item.time}
                     avatarUrl={item.avatarUrl}
                     showAvatar={shouldShowAvatars}
+                    attachments={item.attachments}
                 />
             )}
             onEndReached={() => loadMore(chatId, type)}

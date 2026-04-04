@@ -21,6 +21,16 @@ export function generateThreadMessages(threadKey: string, total: number = MSGS_P
             seen: (seed + i) % 2 === 0,
             time: `${String(9 + (i % 12)).padStart(2, "0")}:${String((seed + i * 7) % 60).padStart(2, "0")}`,
             avatarUrl: `https://i.pravatar.cc/150?u=${avatarId}`,
+            attachments: [
+                {
+                    name: `Файл №${seq}.pdf`,
+                    url: `https://example.com/file${seq}.pdf`,
+                },
+                {
+                    name: `Файл №${seq}.docx`,
+                    url: `https://example.com/file${seq}.docx`,
+                },
+            ],
         };
     });
 }
