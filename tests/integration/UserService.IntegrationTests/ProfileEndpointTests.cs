@@ -5,7 +5,8 @@ using UserService.IntegrationTests.Helpers;
 
 namespace UserService.IntegrationTests;
 
-public sealed class ProfileEndpointTests(UserServiceFactory factory) : IClassFixture<UserServiceFactory>
+[Collection("UserService")]
+public sealed class ProfileEndpointTests(UserServiceFactory factory)
 {
     private HttpClient CreateAuthenticatedClient()
     {

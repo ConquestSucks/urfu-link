@@ -4,7 +4,8 @@ using UserService.Api.Domain;
 
 namespace UserService.IntegrationTests;
 
-public sealed class ServiceMetadataTests(UserServiceFactory factory) : IClassFixture<UserServiceFactory>
+[Collection("UserService")]
+public sealed class ServiceMetadataTests(UserServiceFactory factory)
 {
     private readonly HttpClient _client = factory.CreateClient();
 

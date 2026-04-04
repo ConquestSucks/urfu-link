@@ -5,7 +5,8 @@ using UserService.IntegrationTests.Helpers;
 
 namespace UserService.IntegrationTests;
 
-public sealed class DeviceEndpointTests(UserServiceFactory factory) : IClassFixture<UserServiceFactory>
+[Collection("UserService")]
+public sealed class DeviceEndpointTests(UserServiceFactory factory)
 {
     // Minimal unsigned JWT with sid claim: {"alg":"none"}.{"sid":"test-pomerium-sid"}.
     private const string TestPomeriumJwt =
