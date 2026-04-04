@@ -3,7 +3,7 @@ import { useAuthStore } from "@/shared/store/auth-store";
 import { useEffect, useState } from "react";
 import type { PropsWithChildren } from "react";
 import { ActivityIndicator, View } from "react-native";
-import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "./keycloak-constants";
+import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "../keycloak-constants";
 
 const SCOPES = "openid profile email offline_access";
 const REDIRECT_URI = window.location.origin + "/";
