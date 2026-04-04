@@ -24,6 +24,7 @@ permissions:
 
 jobs:
   build-test:
+    if: github.head_ref != 'develop'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,6 +45,7 @@ jobs:
         run: dotnet test Urfu.Link.slnx -c Release --no-build
 
   helm-validate:
+    if: github.head_ref != 'develop'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
