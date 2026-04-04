@@ -77,5 +77,5 @@ runs:
           --title "promote(${SERVICE}): ${TARGET_ENV} -> ${IMAGE_TAG}" \
           --body "Automated image promotion.")
         echo "PR: $PR_URL"
-        gh pr merge "$PR_URL" --auto --squash --repo "${GITHUB_REPOSITORY}" \
-          || echo "::warning::Auto-merge scheduling failed — manual merge required."
+        gh pr merge "$PR_URL" --squash --repo "${GITHUB_REPOSITORY}" \
+          || echo "::warning::Auto-merge failed — manual merge required."
