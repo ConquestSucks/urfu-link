@@ -104,4 +104,72 @@ public sealed class RedisSessionRevocationStoreTests : IAsyncLifetime
         Assert.True(await _store.IsRevokedAsync("user-a", "session-2"));
         Assert.False(await _store.IsRevokedAsync("user-b", "session-2"));
     }
+
+    [Fact]
+    public async Task RevokeSingleShouldRevokeTargetSession()
+    {
+        await _store.RevokeSingleAsync("user-1", "session-bad");
+
+        Assert.True(await _store.IsRevokedAsync("user-1", "session-bad"));
+    }
+
+    [Fact]
+    public async Task RevokeSingleShouldNotAffectOtherSessions()
+    {
+        await _store.RevokeSingleAsync("user-1", "session-bad");
+
+        Assert.False(await _store.IsRevokedAsync("user-1", "session-good"));
+        Assert.False(await _store.IsRevokedAsync("user-1", "session-other"));
+    }
+
+    [Fact]
+    public async Task RevokeSingleShouldNotAffectOtherUsers()
+    {
+        await _store.RevokeSingleAsync("user-a", "session-bad");
+
+        Assert.False(await _store.IsRevokedAsync("user-b", "session-bad"));
+    }
+
+    [Fact]
+    public async Task RevokeSingleShouldExpireAfterTtl()
+    {
+        var shortStore = CreateStore(TimeSpan.FromSeconds(1));
+
+        await shortStore.RevokeSingleAsync("user-ttl2", "session-bad");
+        Assert.True(await shortStore.IsRevokedAsync("user-ttl2", "session-bad"));
+
+        await Task.Delay(TimeSpan.FromSeconds(2));
+
+        Assert.False(await shortStore.IsRevokedAsync("user-ttl2", "session-bad"));
+    }
+
+    [Fact]
+    public async Task RevokeSingleShouldSetDeniedKeyInRedis()
+    {
+        await _store.RevokeSingleAsync("user-1", "session-bad");
+
+        var db = _multiplexer!.GetDatabase();
+        Assert.True(await db.SetContainsAsync("urfu:session:denied:user-1", "session-bad"));
+    }
+
+    [Fact]
+    public async Task RevokeSingleShouldNotSetGlobalRevokedFlag()
+    {
+        await _store.RevokeSingleAsync("user-1", "session-bad");
+
+        var db = _multiplexer!.GetDatabase();
+        Assert.False(await db.KeyExistsAsync("urfu:session:revoked:user-1"));
+    }
+
+    [Fact]
+    public async Task RevokeSingleAndBulkRevokeShouldCompose()
+    {
+        // session-bad denied individually, session-caller allowed via bulk revoke
+        await _store.RevokeSingleAsync("user-1", "session-bad");
+        await _store.RevokeAsync("user-1", "session-caller");
+
+        Assert.True(await _store.IsRevokedAsync("user-1", "session-bad"));
+        Assert.True(await _store.IsRevokedAsync("user-1", "session-other"));
+        Assert.False(await _store.IsRevokedAsync("user-1", "session-caller"));
+    }
 }

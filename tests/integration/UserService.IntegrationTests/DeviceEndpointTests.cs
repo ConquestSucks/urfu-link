@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using NSubstitute.ReceivedExtensions;
+using Urfu.Link.BuildingBlocks.SessionRevocation;
 using UserService.Api.Application.Contracts.Responses;
 using UserService.Api.Domain.Interfaces;
 using UserService.IntegrationTests.Helpers;
@@ -54,6 +57,20 @@ public sealed class DeviceEndpointTests(UserServiceFactory factory)
             new Uri("/api/v1/me/devices", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TerminateDeviceShouldRevokeSingleSessionNotAll()
+    {
+        var revocationStore = factory.Services.GetRequiredService<ISessionRevocationStore>();
+
+        var client = CreateAuthenticatedClient();
+        await client.DeleteAsync(new Uri("/api/v1/me/devices/test-session-002", UriKind.Relative));
+
+        await revocationStore.Received(1)
+            .RevokeSingleAsync(TestAuthHandler.DefaultUserId, "test-session-002", Arg.Any<CancellationToken>());
+        await revocationStore.DidNotReceive()
+            .RevokeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
