@@ -2,6 +2,7 @@ import { appConfig } from "@/lib/config";
 import { useAuthStore } from "@/store/auth-store";
 import { useEffect, useRef } from "react";
 import type { PropsWithChildren } from "react";
+import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "@/features/auth/keycloak-constants";
 
 async function refreshAccessToken(
     keycloakUrl: string,
@@ -9,13 +10,13 @@ async function refreshAccessToken(
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
     try {
         const res = await fetch(
-            `${keycloakUrl}/realms/urfu-link/protocol/openid-connect/token`,
+            `${keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
             {
                 method: "POST",
                 headers: { "Content-Type": "application/x-www-form-urlencoded" },
                 body: new URLSearchParams({
                     grant_type: "refresh_token",
-                    client_id: "urfu-link-web",
+                    client_id: KEYCLOAK_CLIENT_ID,
                     refresh_token: refreshToken,
                 }).toString(),
             }

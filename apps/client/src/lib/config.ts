@@ -22,9 +22,9 @@ function getRawConfig(): Partial<RuntimeConfig> {
     const extra = (Constants.expoConfig?.extra ?? {}) as Partial<RuntimeConfig>;
     const webConfig = Platform.OS === "web" && typeof window !== "undefined" ? window.__APP_CONFIG__ ?? {} : {};
     return {
-        appEnv: webConfig.appEnv ?? extra.appEnv ?? defaultConfig.appEnv,
-        apiUrl: webConfig.apiUrl ?? extra.apiUrl ?? defaultConfig.apiUrl,
-        keycloakUrl: webConfig.keycloakUrl ?? extra.keycloakUrl ?? defaultConfig.keycloakUrl,
+        appEnv: webConfig.appEnv || extra.appEnv || defaultConfig.appEnv,
+        apiUrl: webConfig.apiUrl || extra.apiUrl || defaultConfig.apiUrl,
+        keycloakUrl: webConfig.keycloakUrl || extra.keycloakUrl || defaultConfig.keycloakUrl,
     };
 }
 const raw = getRawConfig();

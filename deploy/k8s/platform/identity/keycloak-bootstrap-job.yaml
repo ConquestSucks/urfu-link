@@ -356,7 +356,7 @@ spec:
               echo "Granted view-users to user-service-admin service account"
 
               # --- Frontend Web (public client for mobile) ---
-              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
+              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*","http://app.dev.127.0.0.1.nip.io/*"]' '["https://urfu-link.ghjc.ru","http://app.dev.127.0.0.1.nip.io"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
 
               # --- Pomerium (centralized auth proxy) ---
               ensure_client "pomerium" '["https://auth.ghjc.ru/oauth2/callback","https://auth.ghjc.ru/.pomerium/callback","https://auth.ghjc.ru/.pomerium/signed_out"]' '["https://*.ghjc.ru"]' "false" "Pomerium Auth Proxy" "https://auth.ghjc.ru"
