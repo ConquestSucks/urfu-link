@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
 using UserService.Api.Application.Contracts.Responses;
+using UserService.Api.Domain.Interfaces;
 using UserService.IntegrationTests.Helpers;
 
 namespace UserService.IntegrationTests;
@@ -52,5 +54,28 @@ public sealed class DeviceEndpointTests(UserServiceFactory factory)
             new Uri("/api/v1/me/devices", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TerminateAllDevicesWithPomeriumMappingAndNoIpShouldTerminateSessions()
+    {
+        var sessionManager = (FakeSessionManager)factory.Services.GetRequiredService<ISessionManager>();
+        var deviceRegistry = factory.Services.GetRequiredService<IDeviceRegistry>();
+
+        sessionManager.Reset();
+        await deviceRegistry.SavePomeriumMappingAsync("test-pomerium-sid", "test-session-001");
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Authorization", "Bearer test-token");
+        client.DefaultRequestHeaders.Add("X-Pomerium-Jwt-Assertion", TestPomeriumJwt);
+        // No X-Real-Ip — simulates production scenario where IP matching fails
+
+        var response = await client.DeleteAsync(new Uri("/api/v1/me/devices", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var sessions = await sessionManager.GetSessionsAsync(Guid.Empty);
+        Assert.Single(sessions);
+        Assert.Equal("test-session-001", sessions[0].SessionId);
     }
 }
