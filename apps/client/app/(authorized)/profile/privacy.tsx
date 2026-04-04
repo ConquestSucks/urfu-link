@@ -1,5 +1,5 @@
-import { PrivacySettingsMobile } from "@/widgets/settings-privacy-mobile";
+import { ManagePrivacy } from "@/features/manage-privacy";
 
 export default function PrivacyRoute() {
-    return <PrivacySettingsMobile />;
+    return <ManagePrivacy />;
 }

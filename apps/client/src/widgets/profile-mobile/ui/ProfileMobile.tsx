@@ -1,19 +1,11 @@
 import { useCurrentUser } from "@/entities/user";
-import { MOBILE_TAB_BAR_HEIGHT } from "@/widgets/bottom-tabs-mobile/config/layout";
-import { Avatar, StatusIndicator } from "@/shared/ui";
-import {
-    AtIcon,
-    BellIcon,
-    CaretRightIcon,
-    EnvelopeSimpleIcon,
-    MonitorIcon,
-    ShieldCheckIcon,
-    SignOutIcon,
-    SpeakerHighIcon,
-} from "@/shared/ui/phosphor";
+import { Avatar, Button, StatusIndicator } from "@/shared/ui";
+import { AtIcon, CaretRightIcon, EnvelopeSimpleIcon } from "@/shared/ui/phosphor";
 import React from "react";
-import { Pressable, Text, View, ScrollView } from "react-native";
-import { router, type Href } from "expo-router";
+import { Text, View, ScrollView } from "react-native";
+import { Logout } from "@/features/logout";
+import { SETTINGS_ITEMS } from "@/shared/config";
+import { Href, router } from "expo-router";
 
 export const ProfileMobile = () => {
     const { data: profile } = useCurrentUser();
@@ -24,26 +16,8 @@ export const ProfileMobile = () => {
     const avatarUrl = profile?.account.avatarUrl ?? undefined;
     const userHandle = profile ? `@${profile.identity.username}` : "";
 
-    const menuItems = [
-        {
-            icon: ShieldCheckIcon,
-            label: "Приватность",
-            onPress: () => router.push("/profile/privacy"),
-        },
-        { icon: MonitorIcon, label: "Устройства", onPress: () => router.push("/profile/devices" as Href) },
-        {
-            icon: BellIcon,
-            label: "Уведомления",
-            onPress: () => router.push("/profile/notifications" as Href),
-        },
-        { icon: SpeakerHighIcon, label: "Звук и видео", onPress: () => router.push("/profile/sound-video" as Href) },
-    ];
-
     return (
-        <ScrollView
-            className="flex-1 bg-app-bg"
-            contentContainerStyle={{ paddingBottom: 24 + MOBILE_TAB_BAR_HEIGHT }}
-        >
+        <View className="flex-1 bg-app-bg">
             <View className="items-center pt-8 pb-6">
                 <View className="relative">
                     <Avatar src={avatarUrl} size={100} name={userName} className="rounded-full" />
@@ -57,7 +31,7 @@ export const ProfileMobile = () => {
                 <Text className="text-text-placeholder text-sm mt-1">{userDescription}</Text>
             </View>
 
-            <View className="px-6 gap-3">
+            <View className="gap-3">
                 <View className="bg-zinc-900 rounded-3xl p-5 gap-4">
                     <View className="flex-row items-center gap-4">
                         <View className="w-10 h-10 bg-white/5 rounded-xl items-center justify-center">
@@ -80,31 +54,35 @@ export const ProfileMobile = () => {
                     </View>
                 </View>
 
-                <View className="bg-zinc-900 rounded-3xl overflow-hidden">
-                    {menuItems.map((item, index) => (
-                        <Pressable
-                            key={index}
-                            onPress={item.onPress}
-                            className={`flex-row items-center justify-between p-5 ${
-                                index !== menuItems.length - 1 ? "border-b border-white/5" : ""
-                            }`}
-                        >
-                            <View className="flex-row items-center gap-4">
-                                <item.icon size={22} className="text-text-placeholder" />
-                                <Text className="text-white text-base font-medium">
-                                    {item.label}
-                                </Text>
-                            </View>
-                            <CaretRightIcon size={18} className="text-text-disabled" />
-                        </Pressable>
-                    ))}
+                <View className="bg-zinc-900 rounded-3xl rounded-b-xl">
+                    {SETTINGS_ITEMS.map(
+                        (item, index) =>
+                            item.key !== "account" && (
+                                <Button
+                                    key={index}
+                                    onPress={() => router.push(`/profile/${item.key}` as Href)}
+                                    variant="secondary"
+                                    className={`rounded-none flex-row items-center justify-between p-5 ${
+                                        index !== SETTINGS_ITEMS.length - 1
+                                            ? "border-b border-white/5"
+                                            : ""
+                                    } ${index === 1 ? "rounded-t-3xl" : ""} ${
+                                        index === SETTINGS_ITEMS.length - 1 ? "rounded-b-xl" : ""
+                                    }`}
+                                >
+                                    <View className="flex-row items-center gap-4">
+                                        <item.icon size={22} className="text-text-placeholder" />
+                                        <Text className="text-white text-base font-medium">
+                                            {item.label}
+                                        </Text>
+                                    </View>
+                                    <CaretRightIcon size={18} className="text-text-disabled" />
+                                </Button>
+                            ),
+                    )}
                 </View>
-
-                <Pressable className="bg-zinc-900 rounded-3xl p-5 flex-row items-center gap-4 mt-2">
-                    <SignOutIcon size={22} className="text-danger-600" />
-                    <Text className="text-danger-600 text-base font-medium">Выйти</Text>
-                </Pressable>
+                <Logout />
             </View>
-        </ScrollView>
+        </View>
     );
 };

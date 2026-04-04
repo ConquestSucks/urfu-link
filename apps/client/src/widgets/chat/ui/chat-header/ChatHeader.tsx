@@ -1,7 +1,7 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar, StatusIndicator } from "@/shared/ui";
-import { useInboxStore } from "@/store/useInboxStore";
+import { useInboxStore } from "@/shared/store/useInboxStore";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";

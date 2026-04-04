@@ -1,12 +1,12 @@
-import { appConfig } from "@/lib/config";
-import { useAuthStore } from "@/store/auth-store";
-import { useEffect, useRef } from "react";
+import { appConfig } from "@/shared/lib/config";
+import { useAuthStore } from "@/shared/store/auth-store";
+import { useCallback, useEffect, useRef } from "react";
 import type { PropsWithChildren } from "react";
 import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "@/features/auth/keycloak-constants";
 
 async function refreshAccessToken(
     keycloakUrl: string,
-    refreshToken: string
+    refreshToken: string,
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
     try {
         const res = await fetch(
@@ -33,60 +33,67 @@ async function refreshAccessToken(
     }
 }
 
-export function AuthProvider({ children }: PropsWithChildren) {
-    const { accessToken, refreshToken, expiresAt, setTokens, clearTokens, isTokenValid } =
-        useAuthStore();
+export default function AuthProvider({ children }: PropsWithChildren) {
+    const { accessToken, setTokens, clearTokens } = useAuthStore();
     const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isDev = appConfig.appEnv === "dev";
 
-    // In production Pomerium handles auth — no token management needed
-    if (appConfig.appEnv !== "dev") {
-        return <>{children}</>;
-    }
-
-    const scheduleRefresh = (expiresAtMs: number) => {
-        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-        const delay = Math.max(expiresAtMs - Date.now() - 60_000, 0);
-        refreshTimerRef.current = setTimeout(async () => {
-            const currentRefreshToken = useAuthStore.getState().refreshToken;
-            if (!currentRefreshToken) return;
-            const result = await refreshAccessToken(appConfig.keycloakUrl, currentRefreshToken);
-            if (result) {
-                setTokens(result.accessToken, result.refreshToken, result.expiresAt);
-                scheduleRefresh(result.expiresAt);
-            } else {
-                clearTokens();
-            }
-        }, delay);
-    };
-
-    useEffect(() => {
-        const tryRefresh = async () => {
-            if (isTokenValid()) {
-                if (expiresAt) scheduleRefresh(expiresAt);
-                return;
-            }
-            if (refreshToken) {
-                const result = await refreshAccessToken(appConfig.keycloakUrl, refreshToken);
+    const scheduleRefresh = useCallback(
+        (expiresAtMs: number) => {
+            if (!isDev) return;
+            if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+            const delay = Math.max(expiresAtMs - Date.now() - 60_000, 0);
+            refreshTimerRef.current = setTimeout(async () => {
+                const currentRefreshToken = useAuthStore.getState().refreshToken;
+                if (!currentRefreshToken) return;
+                const result = await refreshAccessToken(appConfig.keycloakUrl, currentRefreshToken);
                 if (result) {
                     setTokens(result.accessToken, result.refreshToken, result.expiresAt);
                     scheduleRefresh(result.expiresAt);
                 } else {
                     clearTokens();
                 }
+            }, delay);
+        },
+        [isDev, setTokens, clearTokens],
+    );
+
+    // Dev-only: initial refresh attempt on mount; prod uses Pomerium — no token management.
+    useEffect(() => {
+        if (!isDev) return;
+
+        const tryRefresh = async () => {
+            const { isTokenValid: valid, refreshToken: rt, expiresAt: exp, setTokens: set, clearTokens: clear } =
+                useAuthStore.getState();
+            if (valid()) {
+                if (exp) scheduleRefresh(exp);
+                return;
+            }
+            if (rt) {
+                const result = await refreshAccessToken(appConfig.keycloakUrl, rt);
+                if (result) {
+                    set(result.accessToken, result.refreshToken, result.expiresAt);
+                    scheduleRefresh(result.expiresAt);
+                } else {
+                    clear();
+                }
             }
         };
-        tryRefresh();
+        void tryRefresh();
+
         return () => {
             if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
         };
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isDev, scheduleRefresh]);
 
-    // Schedule refresh when a new token is set from AuthGate
+    // Dev-only: schedule refresh when AuthGate sets a new token.
     useEffect(() => {
-        if (accessToken && expiresAt && isTokenValid()) {
-            scheduleRefresh(expiresAt);
+        if (!isDev) return;
+        const { expiresAt: exp, isTokenValid: valid } = useAuthStore.getState();
+        if (accessToken && exp && valid()) {
+            scheduleRefresh(exp);
         }
-    }, [accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isDev, accessToken, scheduleRefresh]);
 
     return <>{children}</>;
 }

@@ -55,7 +55,6 @@ export const useMediaDevices = (kind: DeviceKind, initialDeviceId?: string | nul
                 }, 800);
             }
         } catch (error: any) {
-            console.warn(`[WebRTC Error] ${kind}:`, error.name, error.message);
             switch (error.name) {
                 case "NotFoundError":
                 case "DevicesNotFoundError":

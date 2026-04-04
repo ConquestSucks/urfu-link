@@ -1,5 +1,5 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
-import { MOBILE_TAB_BAR_HEIGHT } from "@/widgets/bottom-tabs-mobile/config/layout";
+import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
 import React from "react";
 import { ScrollView } from "react-native";
 import { InboxListProps } from "../model/components";
