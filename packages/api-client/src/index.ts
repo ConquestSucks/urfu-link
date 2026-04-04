@@ -45,7 +45,10 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
     if (typeof window !== "undefined" && !redirecting) {
       redirecting = true;
       const rd = encodeURIComponent(window.location.href);
-      window.location.href = `/.pomerium/sign_in?pomerium_redirect_uri=${rd}`;
+      const isRevoked = response.headers.get("X-Session-Revoked") === "true";
+      window.location.href = isRevoked
+        ? `/.pomerium/sign_out?pomerium_redirect_uri=${rd}`
+        : `/.pomerium/sign_in?pomerium_redirect_uri=${rd}`;
     }
   }
 
