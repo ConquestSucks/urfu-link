@@ -33,8 +33,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.environment == 'prod' && 'master' || 'develop' }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Verify image exists
         env:
@@ -47,38 +51,11 @@ jobs:
             (echo "::error::Image ${IMAGE} not found in registry" && exit 1)
           echo "Image verified."
 
-      - name: Update Helm values
-        env:
-          SERVICE: ${{ inputs.service }}
-          TARGET_ENV: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import os
-          import re
-
-          path = Path(f"deploy/helm/services/{os.environ['SERVICE']}/values-{os.environ['TARGET_ENV']}.yaml")
-          content = path.read_text(encoding="utf-8")
-          updated = re.sub(
-              r"(^\s*tag:\s*).*$",
-              lambda match: f"{match.group(1)}{os.environ['IMAGE_TAG']}",
-              content,
-              count=1,
-              flags=re.MULTILINE,
-          )
-          if updated == content:
-              raise SystemExit(f"Unable to update image tag in {path}")
-          path.write_text(updated, encoding="utf-8")
-          PY
-      - name: Commit promotion
-        env:
-          SERVICE: ${{ inputs.service }}
-          TARGET_ENV: ${{ inputs.environment }}
-          IMAGE_TAG: ${{ inputs.image_tag }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy/helm/services/${SERVICE}/values-${TARGET_ENV}.yaml
-          git commit -m "promote(${SERVICE}): ${TARGET_ENV} -> ${IMAGE_TAG}" || exit 0
-          git push
+      - name: Promote ${{ inputs.service }} to ${{ inputs.environment }}
+        uses: ./.github/actions/promote
+        with:
+          service: ${{ inputs.service }}
+          environment: ${{ inputs.environment }}
+          image_tag: ${{ inputs.image_tag }}
+          base_branch: ${{ inputs.environment == 'prod' && 'master' || 'develop' }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

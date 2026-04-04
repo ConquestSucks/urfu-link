@@ -1,0 +1,81 @@
+name: Promote image tag
+description: >
+  Update a Helm values file with a new image tag, open a branch,
+  and create an auto-merge PR against the target branch.
+
+inputs:
+  service:
+    description: Service name (e.g. api-gateway)
+    required: true
+  environment:
+    description: Target environment (dev or prod)
+    required: true
+  image_tag:
+    description: Image tag to pin in Helm values
+    required: true
+  base_branch:
+    description: Branch to open the PR against
+    required: false
+    default: master
+  github_token:
+    description: Token with contents:write and pull-requests:write
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Update Helm values
+      shell: bash
+      env:
+        SERVICE: ${{ inputs.service }}
+        TARGET_ENV: ${{ inputs.environment }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+        import os, re
+        svc = os.environ["SERVICE"]
+        env = os.environ["TARGET_ENV"]
+        tag = os.environ["IMAGE_TAG"]
+        path = Path(f"deploy/helm/services/{svc}/values-{env}.yaml")
+        content = path.read_text(encoding="utf-8")
+        updated = re.sub(
+            r"(^\s*tag:\s*).*$",
+            lambda m: f"{m.group(1)}{tag}",
+            content, count=1, flags=re.MULTILINE,
+        )
+        if updated == content:
+            raise SystemExit(f"No 'tag:' field found in {path}")
+        path.write_text(updated, encoding="utf-8")
+        print(f"Updated {path} -> {tag}")
+        PY
+
+    - name: Commit, push, and open PR
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        SERVICE: ${{ inputs.service }}
+        TARGET_ENV: ${{ inputs.environment }}
+        IMAGE_TAG: ${{ inputs.image_tag }}
+        BASE_BRANCH: ${{ inputs.base_branch }}
+      run: |
+        BRANCH="promote/${SERVICE}-${TARGET_ENV}-${IMAGE_TAG}"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git checkout -b "$BRANCH"
+        git add "deploy/helm/services/${SERVICE}/values-${TARGET_ENV}.yaml"
+        if git diff --cached --quiet; then
+          echo "Nothing to promote — tag already set to ${IMAGE_TAG}"
+          exit 0
+        fi
+        git commit -m "promote(${SERVICE}): ${TARGET_ENV} -> ${IMAGE_TAG}"
+        git push origin "$BRANCH"
+        PR_URL=$(gh pr create \
+          --repo "${GITHUB_REPOSITORY}" \
+          --base "${BASE_BRANCH}" \
+          --head "$BRANCH" \
+          --title "promote(${SERVICE}): ${TARGET_ENV} -> ${IMAGE_TAG}" \
+          --body "Automated image promotion.")
+        echo "PR: $PR_URL"
+        gh pr merge "$PR_URL" --auto --squash --repo "${GITHUB_REPOSITORY}" \
+          || echo "::warning::Auto-merge scheduling failed — manual merge required."
