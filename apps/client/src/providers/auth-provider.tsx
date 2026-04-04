@@ -2,21 +2,25 @@ import { appConfig } from "@/shared/lib/config";
 import { useAuthStore } from "@/shared/store/auth-store";
 import { useCallback, useEffect, useRef } from "react";
 import type { PropsWithChildren } from "react";
+import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "@/features/auth/keycloak-constants";
 
 async function refreshAccessToken(
     keycloakUrl: string,
     refreshToken: string,
 ): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
     try {
-        const res = await fetch(`${keycloakUrl}/realms/urfu-link/protocol/openid-connect/token`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                grant_type: "refresh_token",
-                client_id: "urfu-link-web",
-                refresh_token: refreshToken,
-            }).toString(),
-        });
+        const res = await fetch(
+            `${keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    grant_type: "refresh_token",
+                    client_id: KEYCLOAK_CLIENT_ID,
+                    refresh_token: refreshToken,
+                }).toString(),
+            }
+        );
         if (!res.ok) return null;
         const data = await res.json();
         return {

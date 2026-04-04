@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
+using Urfu.Link.BuildingBlocks.SessionRevocation;
 using UserService.Api.Domain.Interfaces;
 using UserService.Api.Infrastructure.Persistence;
 using UserService.IntegrationTests.Helpers;
@@ -59,6 +60,12 @@ public sealed class UserServiceFactory : WebApplicationFactory<Program>
 
             services.RemoveAll<ISessionManager>();
             services.AddSingleton<ISessionManager, FakeSessionManager>();
+
+            services.RemoveAll<IDeviceRegistry>();
+            services.AddSingleton<IDeviceRegistry, FakeDeviceRegistry>();
+
+            services.RemoveAll<ISessionRevocationStore>();
+            services.AddSingleton(Substitute.For<ISessionRevocationStore>());
 
             // Replace authentication with test scheme
             services.AddAuthentication(TestAuthHandler.SchemeName)

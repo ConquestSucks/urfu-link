@@ -3,10 +3,10 @@ import { useAuthStore } from "@/shared/store/auth-store";
 import { useEffect, useState } from "react";
 import type { PropsWithChildren } from "react";
 import { ActivityIndicator, View } from "react-native";
+import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "./keycloak-constants";
 
-const CLIENT_ID = "urfu-link-web";
 const SCOPES = "openid profile email offline_access";
-const REDIRECT_URI = "http://localhost:3000/";
+const REDIRECT_URI = window.location.origin + "/";
 
 function base64urlEncode(bytes: Uint8Array): string {
     return btoa(String.fromCharCode(...bytes))
@@ -37,7 +37,7 @@ async function startPKCEFlow(): Promise<void> {
 
     const params = new URLSearchParams({
         response_type: "code",
-        client_id: CLIENT_ID,
+        client_id: KEYCLOAK_CLIENT_ID,
         redirect_uri: REDIRECT_URI,
         scope: SCOPES,
         state,
@@ -45,7 +45,7 @@ async function startPKCEFlow(): Promise<void> {
         code_challenge_method: "S256",
     });
 
-    window.location.href = `${appConfig.keycloakUrl}/realms/urfu-link/protocol/openid-connect/auth?${params}`;
+    window.location.href = `${appConfig.keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth?${params}`;
 }
 
 async function handleCallback(
@@ -61,13 +61,13 @@ async function handleCallback(
     sessionStorage.removeItem("pkce_state");
 
     const res = await fetch(
-        `${appConfig.keycloakUrl}/realms/urfu-link/protocol/openid-connect/token`,
+        `${appConfig.keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
         {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: new URLSearchParams({
                 grant_type: "authorization_code",
-                client_id: CLIENT_ID,
+                client_id: KEYCLOAK_CLIENT_ID,
                 code,
                 redirect_uri: REDIRECT_URI,
                 code_verifier: storedVerifier,

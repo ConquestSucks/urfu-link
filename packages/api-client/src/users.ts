@@ -87,6 +87,7 @@ export function createUsersApi(
         ...init?.headers,
       },
       credentials: "same-origin",
+      redirect: "manual",
     });
 
     handleUnauthorized(response);

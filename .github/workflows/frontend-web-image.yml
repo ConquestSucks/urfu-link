@@ -20,9 +20,12 @@ jobs:
     permissions:
       contents: write
       packages: write
+      pull-requests: write
       id-token: write
     steps:
       - uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - uses: pnpm/action-setup@v5
         with:
           version: 10.18.0
@@ -78,27 +81,9 @@ jobs:
         run: cosign sign "${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}"
 
       - name: Promote frontend-web to prod
-        run: |
-          IMAGE_TAG="sha-${GITHUB_SHA::7}"
-          FILE="deploy/helm/services/frontend-web/values-prod.yaml"
-          python3 -c "
-          import re, sys
-          from pathlib import Path
-          path = Path(sys.argv[1])
-          tag = sys.argv[2]
-          content = path.read_text()
-          updated = re.sub(r'(^\s*tag:\s*).*$', rf'\g<1>{tag}', content, count=1, flags=re.MULTILINE)
-          if updated == content:
-              raise SystemExit(f'Failed to update tag in {path}')
-          path.write_text(updated)
-          print(f'Updated {path} -> {tag}')
-          " "$FILE" "$IMAGE_TAG"
-
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add deploy/helm/services/frontend-web/values-prod.yaml
-          git commit -m "promote(frontend-web): prod -> sha-${GITHUB_SHA::7}" || exit 0
-          git pull --rebase
-          git push
+        uses: ./.github/actions/promote
+        with:
+          service: frontend-web
+          environment: prod
+          image_tag: ${{ env.IMAGE_TAG }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,15 +1,28 @@
 using System.Net;
 using System.Net.Http.Json;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
+using NSubstitute.ReceivedExtensions;
+using Urfu.Link.BuildingBlocks.SessionRevocation;
 using UserService.Api.Application.Contracts.Responses;
+using UserService.Api.Domain.Interfaces;
+using UserService.IntegrationTests.Helpers;
 
 namespace UserService.IntegrationTests;
 
-public sealed class DeviceEndpointTests(UserServiceFactory factory) : IClassFixture<UserServiceFactory>
+[Collection("UserService")]
+public sealed class DeviceEndpointTests(UserServiceFactory factory)
 {
+    // Minimal unsigned JWT with sid claim: {"alg":"none"}.{"sid":"test-pomerium-sid"}.
+    private const string TestPomeriumJwt =
+        "eyJhbGciOiJub25lIn0.eyJzaWQiOiJ0ZXN0LXBvbWVyaXVtLXNpZCJ9.";
+
     private HttpClient CreateAuthenticatedClient()
     {
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", "Bearer test-token");
+        client.DefaultRequestHeaders.Add("X-Real-Ip", "127.0.0.1");
+        client.DefaultRequestHeaders.Add("X-Pomerium-Jwt-Assertion", TestPomeriumJwt);
         return client;
     }
 
@@ -44,5 +57,42 @@ public sealed class DeviceEndpointTests(UserServiceFactory factory) : IClassFixt
             new Uri("/api/v1/me/devices", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TerminateDeviceShouldRevokeSingleSessionNotAll()
+    {
+        var revocationStore = factory.Services.GetRequiredService<ISessionRevocationStore>();
+
+        var client = CreateAuthenticatedClient();
+        await client.DeleteAsync(new Uri("/api/v1/me/devices/test-session-002", UriKind.Relative));
+
+        await revocationStore.Received(1)
+            .RevokeSingleAsync(TestAuthHandler.DefaultUserId, "test-session-002", Arg.Any<CancellationToken>());
+        await revocationStore.DidNotReceive()
+            .RevokeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TerminateAllDevicesWithPomeriumMappingAndNoIpShouldTerminateSessions()
+    {
+        var sessionManager = (FakeSessionManager)factory.Services.GetRequiredService<ISessionManager>();
+        var deviceRegistry = factory.Services.GetRequiredService<IDeviceRegistry>();
+
+        sessionManager.Reset();
+        await deviceRegistry.SavePomeriumMappingAsync("test-pomerium-sid", "test-session-001");
+
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Authorization", "Bearer test-token");
+        client.DefaultRequestHeaders.Add("X-Pomerium-Jwt-Assertion", TestPomeriumJwt);
+        // No X-Real-Ip — simulates production scenario where IP matching fails
+
+        var response = await client.DeleteAsync(new Uri("/api/v1/me/devices", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+
+        var sessions = await sessionManager.GetSessionsAsync(Guid.Empty);
+        Assert.Single(sessions);
+        Assert.Equal("test-session-001", sessions[0].SessionId);
     }
 }

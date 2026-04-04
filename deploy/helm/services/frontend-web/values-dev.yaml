@@ -23,6 +23,7 @@ service:
 env:
   APP_ENV: dev
   EXPO_PUBLIC_API_URL: https://api.dev.127.0.0.1.nip.io
+  EXPO_PUBLIC_KEYCLOAK_URL: https://id.ghjc.ru
 
 rollout:
   enabled: false
