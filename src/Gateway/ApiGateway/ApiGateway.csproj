@@ -9,6 +9,7 @@
     <ProjectReference Include="..\..\BuildingBlocks\Auth\Auth.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\Observability\Observability.csproj" />
     <ProjectReference Include="..\..\BuildingBlocks\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\SessionRevocation\SessionRevocation.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

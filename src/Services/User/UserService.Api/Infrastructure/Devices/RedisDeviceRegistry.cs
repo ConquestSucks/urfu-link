@@ -65,7 +65,7 @@ public sealed class RedisDeviceRegistry(IConnectionMultiplexer redis) : IDeviceR
         return value.HasValue ? value.ToString() : null;
     }
 
-    private static string ParseDeviceName(string userAgent)
+    internal static string ParseDeviceName(string userAgent)
     {
         if (string.IsNullOrWhiteSpace(userAgent))
             return "Неизвестное устройство";
@@ -76,11 +76,13 @@ public sealed class RedisDeviceRegistry(IConnectionMultiplexer redis) : IDeviceR
         var browser = info.UA.Family;
         var device = info.Device.Family;
 
-        // Mobile device with known model (exclude generic desktop identifiers)
+        // Mobile device with known model (exclude generic desktop identifiers and
+        // single-letter placeholders used by Chrome UA Reduction on Android, e.g. "K")
         var isDesktopDevice = string.Equals(device, "Other", StringComparison.Ordinal)
             || string.Equals(device, "Generic Smartphone", StringComparison.Ordinal)
             || string.Equals(device, "Mac", StringComparison.Ordinal)
-            || string.Equals(device, "PC", StringComparison.Ordinal);
+            || string.Equals(device, "PC", StringComparison.Ordinal)
+            || device.Length == 1;
 
         if (!isDesktopDevice)
             return $"{device}, {os}";

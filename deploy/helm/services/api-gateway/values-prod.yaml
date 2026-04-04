@@ -20,6 +20,7 @@ env:
   Auth__ValidIssuer: urfu-link.ghjc.ru
   Auth__NameClaim: email
   Auth__RoleClaim: groups
+  Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
   Cors__AllowedOrigins__0: https://urfu-link.ghjc.ru
 
 secrets:

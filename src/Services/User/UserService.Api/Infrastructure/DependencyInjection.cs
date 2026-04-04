@@ -7,6 +7,7 @@ using UserService.Api.Domain.Interfaces;
 using UserService.Api.Infrastructure.Devices;
 using UserService.Api.Infrastructure.Keycloak;
 using UserService.Api.Infrastructure.Persistence;
+using Urfu.Link.BuildingBlocks.SessionRevocation;
 using UserService.Api.Infrastructure.Storage;
 
 namespace UserService.Api.Infrastructure;
@@ -53,6 +54,7 @@ public static class ModuleRegistration
         services.AddHttpClient<ISessionManager, KeycloakSessionClient>();
 
         services.AddSingleton<IDeviceRegistry, RedisDeviceRegistry>();
+        services.AddSessionRevocation(configuration);
 
         return services;
     }

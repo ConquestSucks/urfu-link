@@ -1,12 +1,15 @@
 using System.Threading.RateLimiting;
 using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Observability;
+using Urfu.Link.BuildingBlocks.SessionRevocation;
+using Urfu.Link.Gateway.ApiGateway;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddPlatformJwtAuthentication(builder.Configuration)
-    .AddPlatformObservability(builder.Configuration, "api-gateway");
+    .AddPlatformObservability(builder.Configuration, "api-gateway")
+    .AddSessionRevocation(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
@@ -70,6 +73,7 @@ app.Use((context, next) =>
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SessionRevocationMiddleware>();
 
 app.MapGet("/", () => Results.Ok(new
 {
