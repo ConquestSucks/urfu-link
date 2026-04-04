@@ -60,6 +60,9 @@ public sealed class UserServiceFactory : WebApplicationFactory<Program>
             services.RemoveAll<ISessionManager>();
             services.AddSingleton<ISessionManager, FakeSessionManager>();
 
+            services.RemoveAll<IDeviceRegistry>();
+            services.AddSingleton<IDeviceRegistry, FakeDeviceRegistry>();
+
             // Replace authentication with test scheme
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(

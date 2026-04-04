@@ -4,7 +4,7 @@ using UserService.Api.Infrastructure.Auth;
 
 namespace UserService.Api.Endpoints;
 
-public sealed class TerminateAllDevicesEndpoint(ISessionManager sessionManager)
+public sealed class TerminateAllDevicesEndpoint(ISessionManager sessionManager, IDeviceRegistry deviceRegistry)
     : EndpointWithoutRequest
 {
     public override void Configure()
@@ -16,9 +16,30 @@ public sealed class TerminateAllDevicesEndpoint(ISessionManager sessionManager)
     public override async Task HandleAsync(CancellationToken ct)
     {
         var userId = HttpContext.User.GetUserId();
-        var currentSessionId = HttpContext.User.GetSessionId();
+        var realIp = HttpContext.Request.Headers["X-Real-Ip"].FirstOrDefault()
+                     ?? HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
 
-        await sessionManager.TerminateAllExceptAsync(userId, currentSessionId, ct).ConfigureAwait(false);
+        var sessions = await sessionManager.GetSessionsAsync(userId, ct).ConfigureAwait(false);
+        var currentSessionId = !string.IsNullOrEmpty(realIp)
+            ? sessions.FirstOrDefault(s => string.Equals(s.IpAddress, realIp, StringComparison.Ordinal))?.SessionId
+            : null;
+
+        // If we can't identify the current session, do nothing to avoid self-logout
+        if (currentSessionId is null)
+        {
+            await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
+            return;
+        }
+
+        var toTerminate = sessions
+            .Where(s => !string.Equals(s.SessionId, currentSessionId, StringComparison.Ordinal))
+            .ToList();
+
+        await Task.WhenAll(
+            toTerminate.Select(s => sessionManager.TerminateAsync(s.SessionId, ct))
+        ).ConfigureAwait(false);
+
+        await deviceRegistry.RemoveAllAsync(toTerminate.Select(s => s.SessionId), ct).ConfigureAwait(false);
 
         await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
     }
