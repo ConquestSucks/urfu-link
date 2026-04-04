@@ -5,15 +5,11 @@ using UserService.Api.Infrastructure.Auth;
 
 namespace UserService.Api.Endpoints;
 
-public sealed class TerminateDeviceRequest
-{
-    public string SessionId { get; set; } = string.Empty;
-}
-
 public sealed class TerminateDeviceEndpoint(
     ISessionManager sessionManager,
+    IDeviceRegistry deviceRegistry,
     ISessionRevocationStore revocationStore)
-    : Endpoint<TerminateDeviceRequest>
+    : EndpointWithoutRequest
 {
     public override void Configure()
     {
@@ -21,11 +17,11 @@ public sealed class TerminateDeviceEndpoint(
         Summary(s => s.Summary = "Terminate a specific device session");
     }
 
-    public override async Task HandleAsync(TerminateDeviceRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
-
-        await sessionManager.TerminateAsync(req.SessionId, ct).ConfigureAwait(false);
+        var sessionId = Route<string>("SessionId")!;
+        await sessionManager.TerminateAsync(sessionId, ct).ConfigureAwait(false);
+        await deviceRegistry.RemoveAsync(sessionId, ct).ConfigureAwait(false);
 
         var userId = HttpContext.User.GetUserId().ToString();
         var currentSessionId = HttpContext.User.GetSessionId();

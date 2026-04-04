@@ -61,6 +61,9 @@ public sealed class UserServiceFactory : WebApplicationFactory<Program>
             services.RemoveAll<ISessionManager>();
             services.AddSingleton<ISessionManager, FakeSessionManager>();
 
+            services.RemoveAll<IDeviceRegistry>();
+            services.AddSingleton<IDeviceRegistry, FakeDeviceRegistry>();
+
             services.RemoveAll<ISessionRevocationStore>();
             services.AddSingleton(Substitute.For<ISessionRevocationStore>());
 

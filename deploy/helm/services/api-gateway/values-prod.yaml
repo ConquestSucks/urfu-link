@@ -3,7 +3,7 @@ fullnameOverride: api-gateway
 image:
   repository: ghcr.io/conquestsucks/urfu-link/api-gateway
   pullPolicy: IfNotPresent
-  tag: sha-8e4ad4e
+  tag: sha-37039e4
 
 imagePullSecrets:
   - name: ghcr-pull-secret
