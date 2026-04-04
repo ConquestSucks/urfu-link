@@ -17,7 +17,7 @@ export const useSidebarAnimation = () => {
     };
     const sidebarStyle = useAnimatedStyle((): ViewStyle => ({
         width: sidebarWidth.value,
-        userSelect: "none" as any,
+        userSelect: "none",
     }));
     const textAnimatedStyle = useAnimatedStyle((): ViewStyle => {
         const opacity = interpolate(sidebarWidth.value, [MIN_WIDTH, 160, MAX_WIDTH], [0, 0, 1], Extrapolation.CLAMP);

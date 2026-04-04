@@ -10,6 +10,7 @@ public sealed class RedisDeviceRegistry(IConnectionMultiplexer redis) : IDeviceR
     private static readonly TimeSpan Ttl = TimeSpan.FromDays(30);
     private const string KeyPrefix = "urfu:device:";
     private const string MappingPrefix = "urfu:session-map:";
+    private const string ReverseMappingPrefix = "urfu:session-revmap:";
 
     public async Task SaveAsync(string keycloakSessionId, string userAgent, CancellationToken cancellationToken = default)
     {
@@ -32,7 +33,19 @@ public sealed class RedisDeviceRegistry(IConnectionMultiplexer redis) : IDeviceR
     public async Task RemoveAsync(string keycloakSessionId, CancellationToken cancellationToken = default)
     {
         var db = redis.GetDatabase();
-        await db.KeyDeleteAsync(KeyPrefix + keycloakSessionId)
+        var pomeriumSid = await db.StringGetAsync(ReverseMappingPrefix + keycloakSessionId)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var keys = new List<RedisKey>
+        {
+            KeyPrefix + keycloakSessionId,
+            ReverseMappingPrefix + keycloakSessionId,
+        };
+        if (pomeriumSid.HasValue)
+            keys.Add(MappingPrefix + pomeriumSid.ToString());
+
+        await db.KeyDeleteAsync(keys.ToArray())
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -41,25 +54,54 @@ public sealed class RedisDeviceRegistry(IConnectionMultiplexer redis) : IDeviceR
     {
         ArgumentNullException.ThrowIfNull(keycloakSessionIds);
         var db = redis.GetDatabase();
-        var keys = keycloakSessionIds.Select(id => (RedisKey)(KeyPrefix + id)).ToArray();
-        if (keys.Length > 0)
-            await db.KeyDeleteAsync(keys)
-                .WaitAsync(cancellationToken)
-                .ConfigureAwait(false);
+        var ids = keycloakSessionIds.ToList();
+        if (ids.Count == 0)
+            return;
+
+        var pomeriumSids = await Task.WhenAll(
+            ids.Select(id => db.StringGetAsync(ReverseMappingPrefix + id))
+        ).WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        var keys = new List<RedisKey>();
+        foreach (var id in ids)
+        {
+            keys.Add(KeyPrefix + id);
+            keys.Add(ReverseMappingPrefix + id);
+        }
+        foreach (var sid in pomeriumSids)
+        {
+            if (sid.HasValue)
+                keys.Add(MappingPrefix + sid.ToString());
+        }
+
+        await db.KeyDeleteAsync(keys.ToArray())
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task SavePomeriumMappingAsync(string pomeriumSid, string keycloakSessionId, CancellationToken cancellationToken = default)
     {
         var db = redis.GetDatabase();
-        await db.StringSetAsync(MappingPrefix + pomeriumSid, keycloakSessionId, Ttl)
-            .WaitAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var batch = db.CreateBatch();
+        var t1 = batch.StringSetAsync(MappingPrefix + pomeriumSid, keycloakSessionId, Ttl);
+        var t2 = batch.StringSetAsync(ReverseMappingPrefix + keycloakSessionId, pomeriumSid, Ttl);
+        batch.Execute();
+        await Task.WhenAll(t1, t2).WaitAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<string?> GetKeycloakSessionIdAsync(string pomeriumSid, CancellationToken cancellationToken = default)
     {
         var db = redis.GetDatabase();
         var value = await db.StringGetAsync(MappingPrefix + pomeriumSid)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return value.HasValue ? value.ToString() : null;
+    }
+
+    public async Task<string?> GetPomeriumSidByKeycloakSessionAsync(string keycloakSessionId, CancellationToken cancellationToken = default)
+    {
+        var db = redis.GetDatabase();
+        var value = await db.StringGetAsync(ReverseMappingPrefix + keycloakSessionId)
             .WaitAsync(cancellationToken)
             .ConfigureAwait(false);
         return value.HasValue ? value.ToString() : null;

@@ -60,15 +60,35 @@ public sealed class DeviceEndpointTests(UserServiceFactory factory)
     }
 
     [Fact]
-    public async Task TerminateDeviceShouldRevokeSingleSessionNotAll()
+    public async Task TerminateDeviceShouldRevokeByPomeriumSidWhenMappingExists()
     {
         var revocationStore = factory.Services.GetRequiredService<ISessionRevocationStore>();
+        revocationStore.ClearReceivedCalls();
+        var deviceRegistry = factory.Services.GetRequiredService<IDeviceRegistry>();
+        await deviceRegistry.SavePomeriumMappingAsync("pom-sid-for-002", "test-session-002");
 
         var client = CreateAuthenticatedClient();
         await client.DeleteAsync(new Uri("/api/v1/me/devices/test-session-002", UriKind.Relative));
 
         await revocationStore.Received(1)
-            .RevokeSingleAsync(TestAuthHandler.DefaultUserId, "test-session-002", Arg.Any<CancellationToken>());
+            .RevokeSingleAsync(TestAuthHandler.DefaultUserId, "pom-sid-for-002", Arg.Any<CancellationToken>());
+        await revocationStore.DidNotReceive()
+            .RevokeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TerminateDeviceShouldSkipRevocationWhenNoMappingExists()
+    {
+        var revocationStore = factory.Services.GetRequiredService<ISessionRevocationStore>();
+        revocationStore.ClearReceivedCalls();
+
+        var client = CreateAuthenticatedClient();
+        var response = await client.DeleteAsync(
+            new Uri("/api/v1/me/devices/test-session-002", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        await revocationStore.DidNotReceive()
+            .RevokeSingleAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
         await revocationStore.DidNotReceive()
             .RevokeAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }

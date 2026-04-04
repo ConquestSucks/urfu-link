@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiClient } from "@/lib/api";
+import { apiClient } from "@/shared/lib/api";
 import type {
   UpdateAccountDto,
   UpdateNotificationsDto,
