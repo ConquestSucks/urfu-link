@@ -36,4 +36,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="UserService.UnitTests" />
+  </ItemGroup>
+
 </Project>
