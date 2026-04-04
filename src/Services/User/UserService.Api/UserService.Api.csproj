@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\SessionRevocation\SessionRevocation.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

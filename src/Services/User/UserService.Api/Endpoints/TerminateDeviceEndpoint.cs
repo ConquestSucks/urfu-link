@@ -1,9 +1,14 @@
 using FastEndpoints;
+using Urfu.Link.BuildingBlocks.SessionRevocation;
 using UserService.Api.Domain.Interfaces;
+using UserService.Api.Infrastructure.Auth;
 
 namespace UserService.Api.Endpoints;
 
-public sealed class TerminateDeviceEndpoint(ISessionManager sessionManager, IDeviceRegistry deviceRegistry)
+public sealed class TerminateDeviceEndpoint(
+    ISessionManager sessionManager,
+    IDeviceRegistry deviceRegistry,
+    ISessionRevocationStore revocationStore)
     : EndpointWithoutRequest
 {
     public override void Configure()
@@ -17,6 +22,11 @@ public sealed class TerminateDeviceEndpoint(ISessionManager sessionManager, IDev
         var sessionId = Route<string>("SessionId")!;
         await sessionManager.TerminateAsync(sessionId, ct).ConfigureAwait(false);
         await deviceRegistry.RemoveAsync(sessionId, ct).ConfigureAwait(false);
+
+        var userId = HttpContext.User.GetUserId().ToString();
+        var currentSessionId = HttpContext.User.GetSessionId();
+        await revocationStore.RevokeAsync(userId, currentSessionId, ct).ConfigureAwait(false);
+
         await HttpContext.Response.SendNoContentAsync(ct).ConfigureAwait(false);
     }
 }
