@@ -2,6 +2,7 @@ name: Frontend Validate
 
 on:
   pull_request:
+    branches: [master]
     paths:
       - "apps/client/**"
       - "packages/api-client/**"
