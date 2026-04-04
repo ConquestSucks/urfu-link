@@ -1,3 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-urfu-redis
+  namespace: urfu-platform
+spec:
+  storageClassName: fast-ssd
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,14 +35,17 @@ spec:
           ports:
             - containerPort: 6379
               name: redis
-          args: ["--save", "", "--appendonly", "no"]
+          args: ["--save", "", "--appendonly", "yes", "--appendfsync", "everysec"]
           resources:
             requests:
               cpu: 50m
               memory: 64Mi
             limits:
               cpu: 250m
-              memory: 128Mi
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /data
           readinessProbe:
             exec:
               command: ["redis-cli", "ping"]
@@ -40,6 +56,10 @@ spec:
               command: ["redis-cli", "ping"]
             initialDelaySeconds: 10
             periodSeconds: 20
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: data-urfu-redis
 ---
 apiVersion: v1
 kind: Service

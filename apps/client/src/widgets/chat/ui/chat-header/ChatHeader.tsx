@@ -27,7 +27,7 @@ export const ChatHeader = ({ chatId }: { chatId: string }) => {
           )}
           <View className="flex-row gap-3 items-center">
             <View className="relative z-1 p-0.5">
-              <Avatar size={38} src={chatMeta.avatarUrl} />
+              <Avatar size={38} src={chatMeta.avatarUrl} name={chatMeta.name} />
               <StatusIndicator
                 status="online"
                 size={12}

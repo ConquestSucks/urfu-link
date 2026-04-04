@@ -3,7 +3,7 @@ fullnameOverride: presence-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/presence-service
   pullPolicy: IfNotPresent
-  tag: sha-10a474b
+  tag: sha-cac96a8
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -15,9 +15,12 @@ env:
   ASPNETCORE_URLS: http://+:8080
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
   Kafka__BootstrapServers: urfu-kafka.urfu-platform.svc.cluster.local:9092
-  Auth__Authority: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link
-  Auth__MetadataAddress: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/.well-known/openid-configuration
-  Auth__ValidIssuer: https://id.ghjc.ru/realms/urfu-link
+  Auth__TokenHeader: X-Pomerium-Jwt-Assertion
+  Auth__JwksUrl: http://pomerium.urfu-platform.svc.cluster.local/.well-known/pomerium/jwks.json
+  Auth__Audience: urfu-link.ghjc.ru
+  Auth__ValidIssuer: urfu-link.ghjc.ru
+  Auth__NameClaim: email
+  Auth__RoleClaim: groups
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
 
 secrets:

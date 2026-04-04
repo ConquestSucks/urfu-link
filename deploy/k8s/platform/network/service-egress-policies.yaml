@@ -37,6 +37,8 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+        - protocol: TCP
+          port: 80
     - to:
         - namespaceSelector:
             matchLabels:
@@ -77,6 +79,8 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: urfu-platform
       ports:
+        - protocol: TCP
+          port: 80
         - protocol: TCP
           port: 5432
         - protocol: TCP

@@ -2,6 +2,7 @@
 **/obj
 **/.vs
 **/.vscode
+**/node_modules
 .git
 .gitignore
 README.md

@@ -1,4 +1,5 @@
 export { Avatar } from "./Avatar";
+export { ModalOverlay } from "./ModalOverlay";
 export { Button } from "./Button";
 export { Input } from "./Input";
 export { LabeledCard } from "./LabeledCard";

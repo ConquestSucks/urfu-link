@@ -25,26 +25,31 @@ export const Profile = ({
 
   return (
     <View className="p-4 border-t border-white/5 gap-3">
-      <View className="flex-row justify-between items-center bg-app-card rounded-2xl p-[7.5px]">
-        <ProfileCard
-          textAnimatedStyle={textAnimatedStyle}
-          userName={userName}
-          userDescription={userDescription}
-          avatarUrl={avatarUrl}
-          avatarSize={40}
-        />
+      <Pressable
+        className="flex-row justify-between items-center bg-app-card rounded-2xl p-[7.5px] transition-colors active:bg-white/10 hover:bg-white/5"
+        onPress={onSettingsPress}
+      >
+        {({ pressed, hovered }) => (
+          <>
+            <ProfileCard
+              textAnimatedStyle={textAnimatedStyle}
+              userName={userName}
+              userDescription={userDescription}
+              avatarUrl={avatarUrl}
+              avatarSize={40}
+            />
 
-        <AnimatedView style={textAnimatedStyle}>
-          <Pressable className="p-[6px] rounded-xl" onPress={onSettingsPress}>
-            {({ pressed, hovered }) => (
-              <GearIcon
-                size={16}
-                className={pressed ? "text-brand-600" : hovered ? "text-brand-400" : "text-text-disabled"}
-              />
-            )}
-          </Pressable>
-        </AnimatedView>
-      </View>
+            <AnimatedView style={textAnimatedStyle}>
+              <View className="p-[6px] rounded-xl">
+                <GearIcon
+                  size={16}
+                  className={pressed ? "text-brand-600" : hovered ? "text-brand-400" : "text-text-disabled"}
+                />
+              </View>
+            </AnimatedView>
+          </>
+        )}
+      </Pressable>
 
       <Pressable
         className={`text-text-placeholder px-[18.5] py-[11px] flex-row items-center gap-2 rounded-xl`}

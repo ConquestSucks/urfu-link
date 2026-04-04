@@ -22,6 +22,13 @@ public static class ClaimsPrincipalExtensions
             ?? throw new InvalidOperationException("JWT does not contain 'sid' claim.");
     }
 
+    public static string? TryGetSessionId(this ClaimsPrincipal principal)
+    {
+        ArgumentNullException.ThrowIfNull(principal);
+
+        return principal.FindFirstValue("sid");
+    }
+
     public static string GetDisplayName(this ClaimsPrincipal principal)
     {
         ArgumentNullException.ThrowIfNull(principal);
@@ -42,6 +49,8 @@ public static class ClaimsPrincipalExtensions
     {
         ArgumentNullException.ThrowIfNull(principal);
 
-        return principal.FindFirstValue("preferred_username") ?? string.Empty;
+        return principal.FindFirstValue("preferred_username")
+            ?? principal.FindFirstValue("email")
+            ?? string.Empty;
     }
 }

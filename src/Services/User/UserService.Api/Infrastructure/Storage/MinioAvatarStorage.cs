@@ -37,7 +37,8 @@ public sealed class MinioAvatarStorage(
 
         await s3Client.PutObjectAsync(putRequest, cancellationToken).ConfigureAwait(false);
 
-        return $"{_options.Endpoint.TrimEnd('/')}/{_options.AvatarBucket}/{key}";
+        var publicBase = (_options.PublicEndpoint ?? _options.Endpoint).TrimEnd('/');
+        return $"{publicBase}/{_options.AvatarBucket}/{key}";
     }
 
     public async Task DeleteAsync(string objectUrl, CancellationToken cancellationToken)

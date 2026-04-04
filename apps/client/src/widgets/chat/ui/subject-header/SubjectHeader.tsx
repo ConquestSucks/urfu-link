@@ -32,7 +32,7 @@ export const SubjectHeader = ({ subjectId }: {
               <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
             </Pressable>)}
          <View className="flex-row gap-3 items-center">
-          <Avatar size={38} src={subjectMeta.avatarUrl}/>
+          <Avatar size={38} src={subjectMeta.avatarUrl} name={subjectMeta.name}/>
 
           <View className="justify-center flex-1 gap-1.5">
             <Text numberOfLines={1} className="text-white leading-none text-base font-semibold">

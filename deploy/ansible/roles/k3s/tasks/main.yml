@@ -5,6 +5,24 @@
     dest: /tmp/k3s_install.sh
     mode: '0755'
 
+- name: Create audit policy directory
+  file:
+    path: /etc/rancher/k3s
+    state: directory
+    mode: '0755'
+
+- name: Copy audit policy
+  copy:
+    src: audit-policy.yaml
+    dest: /etc/rancher/k3s/audit-policy.yaml
+    mode: '0644'
+
+- name: Create audit log directory
+  file:
+    path: /var/log/kubernetes
+    state: directory
+    mode: '0750'
+
 - name: Install k3s
   command: >
     /tmp/k3s_install.sh -s -
@@ -14,6 +32,11 @@
     --kubelet-arg="system-reserved=cpu=500m,memory=1Gi"
     --kubelet-arg="kube-reserved=cpu=500m,memory=1Gi"
     --kubelet-arg="eviction-hard=memory.available<500Mi,nodefs.available<10%"
+    --kube-apiserver-arg="audit-policy-file=/etc/rancher/k3s/audit-policy.yaml"
+    --kube-apiserver-arg="audit-log-path=/var/log/kubernetes/audit.log"
+    --kube-apiserver-arg="audit-log-maxage=30"
+    --kube-apiserver-arg="audit-log-maxsize=100"
+    --kube-apiserver-arg="audit-log-maxbackup=3"
   environment:
     INSTALL_K3S_VERSION: "{{ k3s_version | default('v1.30.0+k3s1') }}"
     HTTP_PROXY: "{{ proxy_env.http_proxy | default('') }}"

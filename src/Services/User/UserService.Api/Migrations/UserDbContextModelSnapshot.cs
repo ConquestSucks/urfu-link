@@ -78,27 +78,19 @@ namespace UserService.Api.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<bool>("DisciplineChatMessages")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
-                                .HasDefaultValue(true)
                                 .HasColumnName("notify_discipline_chats");
 
                             b1.Property<bool>("Mentions")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
-                                .HasDefaultValue(true)
                                 .HasColumnName("notify_mentions");
 
                             b1.Property<bool>("NewMessages")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
-                                .HasDefaultValue(true)
                                 .HasColumnName("notify_new_messages");
 
                             b1.Property<bool>("NotificationSound")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
-                                .HasDefaultValue(true)
                                 .HasColumnName("notify_sound");
 
                             b1.HasKey("UserProfileId");
@@ -115,15 +107,11 @@ namespace UserService.Api.Migrations
                                 .HasColumnType("uuid");
 
                             b1.Property<bool>("ShowLastVisitTime")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
-                                .HasDefaultValue(true)
                                 .HasColumnName("show_last_visit_time");
 
                             b1.Property<bool>("ShowOnlineStatus")
-                                .ValueGeneratedOnAdd()
                                 .HasColumnType("boolean")
-                                .HasDefaultValue(true)
                                 .HasColumnName("show_online_status");
 
                             b1.HasKey("UserProfileId");

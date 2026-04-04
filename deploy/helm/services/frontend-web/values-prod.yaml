@@ -3,7 +3,7 @@ fullnameOverride: frontend-web
 image:
   repository: ghcr.io/conquestsucks/urfu-link/frontend-web
   pullPolicy: IfNotPresent
-  tag: sha-657d72e
+  tag: sha-39eb73c
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -26,6 +26,7 @@ service:
 env:
   APP_ENV: prod
   EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru
+  EXPO_PUBLIC_KEYCLOAK_URL: https://id.ghjc.ru
 
 rollout:
   enabled: true

@@ -1,0 +1,38 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # Log secret and RBAC changes at RequestResponse level
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["secrets"]
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+    verbs: ["create", "update", "patch", "delete"]
+  # Log service account token requests
+  - level: Metadata
+    resources:
+      - group: ""
+        resources: ["serviceaccounts/token"]
+  # Skip noisy read-only requests from system components
+  - level: None
+    users:
+      - "system:apiserver"
+      - "system:kube-scheduler"
+      - "system:kube-controller-manager"
+    verbs: ["get", "list", "watch"]
+  # Skip health checks and discovery
+  - level: None
+    nonResourceURLs:
+      - "/healthz*"
+      - "/readyz*"
+      - "/livez*"
+      - "/api"
+      - "/api/*"
+      - "/apis"
+      - "/apis/*"
+    verbs: ["get"]
+  # Log everything else at Metadata level
+  - level: Metadata
+    omitStages:
+      - RequestReceived

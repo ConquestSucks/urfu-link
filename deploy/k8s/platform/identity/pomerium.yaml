@@ -37,14 +37,19 @@ spec:
               value: "openid,email,profile,roles"
             - name: COOKIE_DOMAIN
               value: ".ghjc.ru"
+            - name: COOKIE_SECURE
+              value: "true"
             - name: COOKIE_NAME
               value: "_pomerium"
             - name: COOKIE_EXPIRE
               value: "1h"
             - name: DATABROKER_STORAGE_TYPE
-              value: "redis"
+              value: "postgres"
             - name: DATABROKER_STORAGE_CONNECTION_STRING
-              value: "redis://urfu-redis.urfu-platform.svc.cluster.local:6379"
+              valueFrom:
+                secretKeyRef:
+                  name: pomerium
+                  key: databroker-connection-string
             - name: LOG_LEVEL
               value: "info"
             - name: IDP_CLIENT_ID
@@ -81,21 +86,24 @@ spec:
             httpGet:
               path: /ping
               port: http
-            initialDelaySeconds: 15
+            initialDelaySeconds: 45
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /ping
               port: http
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 5
+            timeoutSeconds: 3
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
+              cpu: 100m
               memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:

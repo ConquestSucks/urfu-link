@@ -24,7 +24,9 @@ spec:
               until mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do sleep 5; done &&
               mc mb -p minio/media-private || true &&
               mc mb -p minio/media-public || true &&
-              mc anonymous set download minio/media-public
+              mc anonymous set download minio/media-public &&
+              mc mb -p minio/user-avatars || true &&
+              mc anonymous set download minio/user-avatars
           volumeMounts:
             - name: bootstrap-secret
               mountPath: /bootstrap

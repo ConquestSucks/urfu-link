@@ -13,7 +13,7 @@ metadata:
   namespace: urfu-platform
   annotations:
     argocd.argoproj.io/sync-options: Force=true,Replace=true
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   activeDeadlineSeconds: 600
   template:
@@ -145,7 +145,7 @@ spec:
                 fi
               }
 
-              # ensure_client <clientId> <redirectUrisJson> <webOriginsJson> [isPublic] [displayName] [baseUrl]
+              # ensure_client <clientId> <redirectUrisJson> <webOriginsJson> [isPublic] [displayName] [baseUrl] [serviceAccountsEnabled]
               # Sets CLIENT_SECRET and CLIENT_UUID as output
               ensure_client() {
                 local CL_ID="$1"
@@ -154,6 +154,7 @@ spec:
                 local IS_PUBLIC="${4:-false}"
                 local DISPLAY_NAME="${5:-}"
                 local BASE_URL="${6:-}"
+                local SERVICE_ACCOUNTS="${7:-false}"
 
                 echo "Ensuring client '${CL_ID}'..."
 
@@ -172,6 +173,7 @@ spec:
                       --argjson redirectUris "$REDIRECT_URIS_JSON" \
                       --argjson webOrigins "$WEB_ORIGINS_JSON" \
                       --argjson publicClient "$IS_PUBLIC" \
+                      --argjson serviceAccounts "$SERVICE_ACCOUNTS" \
                       '{
                         clientId: $clientId,
                         name: $name,
@@ -179,7 +181,7 @@ spec:
                         publicClient: $publicClient,
                         standardFlowEnabled: true,
                         directAccessGrantsEnabled: false,
-                        serviceAccountsEnabled: false,
+                        serviceAccountsEnabled: $serviceAccounts,
                         protocol: "openid-connect",
                         redirectUris: $redirectUris,
                         webOrigins: $webOrigins
@@ -198,8 +200,11 @@ spec:
                   echo "Client created with UUID: ${CLIENT_UUID}"
                 else
                   echo "Client '${CL_ID}' already exists (UUID: ${CLIENT_UUID}), updating display info..."
-                  UPDATE_JSON="$(jq -n --arg name "${DISPLAY_NAME:-$CL_ID}" --arg baseUrl "$BASE_URL" \
-                    '{ name: $name } | if $baseUrl != "" then . + {baseUrl: $baseUrl} else . end')"
+                  UPDATE_JSON="$(jq -n \
+                    --arg name "${DISPLAY_NAME:-$CL_ID}" \
+                    --arg baseUrl "$BASE_URL" \
+                    --argjson serviceAccounts "$SERVICE_ACCOUNTS" \
+                    '{ name: $name, serviceAccountsEnabled: $serviceAccounts } | if $baseUrl != "" then . + {baseUrl: $baseUrl} else . end')"
                   curl --fail --silent --show-error \
                     -X PUT \
                     -H "Authorization: Bearer ${KC_TOKEN}" \
@@ -330,11 +335,31 @@ spec:
               MINIO_OIDC_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
 
+              # --- User Service Admin (machine-to-machine, Keycloak Admin API) ---
+              ensure_client "user-service-admin" '[]' '[]' "false" "User Service Admin" "" "true"
+              USER_SERVICE_ADMIN_SECRET="$CLIENT_SECRET"
+              USER_SERVICE_ADMIN_UUID="$CLIENT_UUID"
+
+              # Grant view-users role from realm-management to user-service-admin service account
+              # Required for GET /admin/realms/{realm}/users/{id}/sessions (GetDevicesEndpoint)
+              RM_CLIENT_ID="$(curl --silent -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients?clientId=realm-management" | jq -r '.[0].id')"
+              SA_USER_ID="$(curl --silent -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${USER_SERVICE_ADMIN_UUID}/service-account-user" | jq -r '.id')"
+              VIEW_USERS_ROLE="$(curl --silent -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${RM_CLIENT_ID}/roles/view-users")"
+              curl --silent -X POST \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/users/${SA_USER_ID}/role-mappings/clients/${RM_CLIENT_ID}" \
+                -d "[${VIEW_USERS_ROLE}]"
+              echo "Granted view-users to user-service-admin service account"
+
               # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*"]' '["https://urfu-link.ghjc.ru"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
 
               # --- Pomerium (centralized auth proxy) ---
-              ensure_client "pomerium" '["https://auth.ghjc.ru/oauth2/callback","https://auth.ghjc.ru/.pomerium/callback"]' '["https://*.ghjc.ru"]' "false" "Pomerium Auth Proxy" "https://auth.ghjc.ru"
+              ensure_client "pomerium" '["https://auth.ghjc.ru/oauth2/callback","https://auth.ghjc.ru/.pomerium/callback","https://auth.ghjc.ru/.pomerium/signed_out"]' '["https://*.ghjc.ru"]' "false" "Pomerium Auth Proxy" "https://auth.ghjc.ru"
               POMERIUM_SECRET="$CLIENT_SECRET"
               ensure_groups_mapper "$CLIENT_UUID"
               ensure_audience_mapper "$CLIENT_UUID" "urfu-link-api"
@@ -393,6 +418,15 @@ spec:
               vault_put urfu-link/prod/minio-oidc \
                 "$(printf '{"data":{"client_id":"minio-console","client_secret":"%s"}}' \
                   "$MINIO_OIDC_SECRET")"
+
+              # Merge user-service-admin client secret into user-service Vault path,
+              # preserving the primary_connection written by platform-bootstrap-job.
+              echo "Merging user-service-admin secret into user-service Vault path..."
+              EXISTING_USER_SVC="$(vault_read urfu-link/prod/user-service || true)"
+              USER_SVC_CONN="$(echo "$EXISTING_USER_SVC" | jq -r '.data.data.primary_connection // empty' 2>/dev/null || true)"
+              vault_put urfu-link/prod/user-service \
+                "$(printf '{"data":{"primary_connection":"%s","keycloak_client_secret":"%s"}}' \
+                  "$USER_SVC_CONN" "$USER_SERVICE_ADMIN_SECRET")"
 
               # --- Update Vault OIDC config with real client secret ---
               echo "Updating Vault OIDC auth config..."

@@ -108,10 +108,10 @@ spec:
                 fi
 
                 vault policy write external-secrets - <<EOF_POL
-              path "kv/data/*" {
+              path "kv/data/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
-              path "kv/metadata/*" {
+              path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
               EOF_POL
@@ -127,6 +127,9 @@ spec:
 
                 vault policy write platform-bootstrap - <<EOF_POL
               path "kv/data/urfu-link/prod/keycloak" {
+                capabilities = ["create", "update", "read"]
+              }
+              path "kv/data/urfu-link/prod/pomerium-db" {
                 capabilities = ["create", "update", "read"]
               }
               path "kv/data/urfu-link/prod/user-service" {
@@ -194,6 +197,9 @@ spec:
               }
               path "kv/data/urfu-link/prod/keycloak" {
                 capabilities = ["read"]
+              }
+              path "kv/data/urfu-link/prod/user-service" {
+                capabilities = ["read", "update"]
               }
               path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]

@@ -51,7 +51,11 @@ spec:
             - "--hostname=https://id.ghjc.ru"
             - "--proxy-headers=xforwarded"
             - "--cache=local"
+            - "--health-enabled=true"
+            - "--metrics-enabled=true"
           env:
+            - name: JAVA_OPTS_KC_HEAP
+              value: "-Xms256m -Xmx768m"
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL_HOST
@@ -87,22 +91,24 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+            - containerPort: 9000
+              name: management
           startupProbe:
             httpGet:
-              path: /realms/master
-              port: http
+              path: /health/started
+              port: management
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 30
           readinessProbe:
             httpGet:
-              path: /realms/master
-              port: http
+              path: /health/ready
+              port: management
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /realms/master
-              port: http
+              path: /health/live
+              port: management
             periodSeconds: 20
           volumeMounts:
             - name: theme
@@ -145,6 +151,8 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "0"
     cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
 spec:
   ingressClassName: nginx
   tls:

@@ -1,15 +1,36 @@
+import { useCurrentUser, useUpdateNotifications } from "@/entities/user";
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { MOBILE_TAB_BAR_HEIGHT } from "@/widgets/bottom-tabs-mobile/config/layout";
 import { SwitchCard } from "@/shared/ui";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
-import React, { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+
+type NotificationField = "newMessages" | "notificationSound" | "disciplineChatMessages" | "mentions";
+
 export const NotificationsSettingsMobile = () => {
-    const [personalNewMsg, setPersonalNewMsg] = useState(true);
-    const [personalSound, setPersonalSound] = useState(true);
-    const [subjectNotify, setSubjectNotify] = useState(true);
-    const [mentionsOnly, setMentionsOnly] = useState(false);
-    const [dnd, setDnd] = useState(false);
+    const { data: profile, isLoading } = useCurrentUser();
+    const updateNotifications = useUpdateNotifications();
+
+    if (isLoading) {
+        return (
+            <View className="flex-1 bg-app-bg items-center justify-center">
+                <ActivityIndicator />
+            </View>
+        );
+    }
+
+    const notifications = profile?.notifications;
+
+    const handleToggle = (field: NotificationField) => (newValue: boolean) => {
+        if (!notifications) return;
+        updateNotifications.mutate({
+            newMessages: field === "newMessages" ? newValue : notifications.newMessages,
+            notificationSound: field === "notificationSound" ? newValue : notifications.notificationSound,
+            disciplineChatMessages: field === "disciplineChatMessages" ? newValue : notifications.disciplineChatMessages,
+            mentions: field === "mentions" ? newValue : notifications.mentions,
+        });
+    };
+
     return (
         <View className="flex-1 bg-app-bg">
             <View className="flex-row items-center px-6 py-8 border-b border-white/5">
@@ -34,14 +55,16 @@ export const NotificationsSettingsMobile = () => {
                 <SwitchCard
                     label="Уведомления о новых сообщениях"
                     description="Получать уведомления при получении личных сообщений"
-                    value={personalNewMsg}
-                    onValueChange={setPersonalNewMsg}
+                    value={notifications?.newMessages ?? true}
+                    onValueChange={handleToggle("newMessages")}
+                    disabled={updateNotifications.isPending}
                 />
                 <SwitchCard
                     label="Звук уведомлений"
                     description="Воспроизводить звук при новом сообщении"
-                    value={personalSound}
-                    onValueChange={setPersonalSound}
+                    value={notifications?.notificationSound ?? true}
+                    onValueChange={handleToggle("notificationSound")}
+                    disabled={updateNotifications.isPending}
                 />
 
                 <Text className="text-text-placeholder text-xs font-bold uppercase tracking-wide mt-2">
@@ -50,24 +73,16 @@ export const NotificationsSettingsMobile = () => {
                 <SwitchCard
                     label="Уведомления от дисциплин"
                     description="Получать уведомления о сообщениях в чатах дисциплин"
-                    value={subjectNotify}
-                    onValueChange={setSubjectNotify}
+                    value={notifications?.disciplineChatMessages ?? true}
+                    onValueChange={handleToggle("disciplineChatMessages")}
+                    disabled={updateNotifications.isPending}
                 />
                 <SwitchCard
                     label="Упоминания"
                     description="Уведомлять только когда меня упоминают"
-                    value={mentionsOnly}
-                    onValueChange={setMentionsOnly}
-                />
-
-                <Text className="text-text-placeholder text-xs font-bold uppercase tracking-wide mt-2">
-                    Режим «Не беспокоить»
-                </Text>
-                <SwitchCard
-                    label="Включить режим"
-                    description="Отключить все уведомления"
-                    value={dnd}
-                    onValueChange={setDnd}
+                    value={notifications?.mentions ?? false}
+                    onValueChange={handleToggle("mentions")}
+                    disabled={updateNotifications.isPending}
                 />
 
                 <View className="bg-zinc-900 rounded-2xl p-5 border border-white/5 mt-2">
