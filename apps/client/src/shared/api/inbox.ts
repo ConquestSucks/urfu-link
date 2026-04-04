@@ -1,5 +1,5 @@
 import { InboxChatProps } from "@/entities/inbox-chat";
-import { chatsMockData, notificationsMockData, subjectsMockData, } from "@/mocks";
+import { chatsMockData, notificationsMockData, subjectsMockData, } from "@/shared/mocks";
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export const inboxApi = {
     getChats: async () => {

@@ -1,5 +1,5 @@
-import { DevicesSettingsMobile } from "@/widgets/settings-devices-mobile";
+import { ManageDevices } from "@/features/manage-devices";
 
 export default function DevicesRoute() {
-    return <DevicesSettingsMobile />;
+    return <ManageDevices />;
 }

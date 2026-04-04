@@ -1,7 +1,8 @@
-import { AppProviders } from "@/providers/app-providers";
+import { AppProviders } from "@/providers";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "../global.css";
+
 export default function RootLayout() {
     return (<AppProviders>
       <StatusBar style="light"/>

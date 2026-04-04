@@ -1,5 +1,5 @@
 import { ChatMessage } from "@/entities/chat-message";
-import { useChatStore } from "@/store/useChatStore";
+import { useChatStore } from "@/shared/store/useChatStore";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { FileIcon } from "@/shared/ui/phosphor";
 import React, { useEffect } from "react";

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { apiClient } from "../../lib/api";
+import { apiClient } from "../../shared/lib/api";
 export function useBackendHealth() {
     return useQuery({
         queryKey: ["backend", "health"],

@@ -3,7 +3,7 @@ import { router, usePathname } from "expo-router";
 import React, { useEffect } from "react";
 import { View } from "react-native";
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import { MOBILE_TAB_BAR_HEIGHT } from "../config/layout";
+import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
 import { MOBILE_TABS } from "../config/tabs";
 import { MobileBottomTabItem } from "./MobileBottomTabItem";
 

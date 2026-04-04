@@ -8,7 +8,7 @@ import { InboxSubjectGroup, type InboxSubjectProps } from "@/entities/inbox-subj
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { MasterDetailLayout } from "@/shared/ui";
-import { useInboxData, useInboxActions } from "@/store/useInboxStore";
+import { useInboxData, useInboxActions } from "@/shared/store/useInboxStore";
 import { Inbox } from "./Inbox";
 import { InboxMobile } from "./InboxMobile";
 
@@ -16,7 +16,7 @@ export const InboxLayout = () => {
     const segments = useSegments() as string[];
     const { isMobile } = useWindowSize();
 
-    const { currentTab, currentView, params, pathname } = useInboxRouting();
+    const { currentTab, currentView, params } = useInboxRouting();
 
     const {
         chats,
@@ -33,12 +33,9 @@ export const InboxLayout = () => {
 
     useEffect(() => {
         if (!params.view) {
-            router.replace({
-                pathname: pathname as any,
-                params: { ...params, view: "messages" },
-            });
+            router.setParams({ view: "messages" });
         }
-    }, [params.view, pathname]);
+    }, [params.view]);
 
     useEffect(() => {
         if (currentView === "notifications") {
