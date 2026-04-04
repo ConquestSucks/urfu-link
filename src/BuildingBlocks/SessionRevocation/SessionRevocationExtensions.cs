@@ -32,7 +32,9 @@ public static class SessionRevocationExtensions
         services.TryAddSingleton<IConnectionMultiplexer>(static serviceProvider =>
         {
             var options = serviceProvider.GetRequiredService<IOptions<SessionRevocationOptions>>().Value;
-            return ConnectionMultiplexer.Connect(options.RedisConfiguration);
+            var configOptions = ConfigurationOptions.Parse(options.RedisConfiguration);
+            configOptions.AbortOnConnectFail = false;
+            return ConnectionMultiplexer.Connect(configOptions);
         });
 
         services.AddSingleton<ISessionRevocationStore, RedisSessionRevocationStore>();
