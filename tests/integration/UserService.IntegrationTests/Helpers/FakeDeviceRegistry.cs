@@ -6,6 +6,7 @@ public sealed class FakeDeviceRegistry : IDeviceRegistry
 {
     private readonly Dictionary<string, string> _devices = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _mappings = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _reverseMappings = new(StringComparer.Ordinal);
 
     public Task SaveAsync(string keycloakSessionId, string userAgent, CancellationToken cancellationToken = default)
     {
@@ -22,6 +23,8 @@ public sealed class FakeDeviceRegistry : IDeviceRegistry
     public Task RemoveAsync(string keycloakSessionId, CancellationToken cancellationToken = default)
     {
         _devices.Remove(keycloakSessionId);
+        if (_reverseMappings.Remove(keycloakSessionId, out var pomeriumSid))
+            _mappings.Remove(pomeriumSid);
         return Task.CompletedTask;
     }
 
@@ -29,13 +32,18 @@ public sealed class FakeDeviceRegistry : IDeviceRegistry
     {
         ArgumentNullException.ThrowIfNull(keycloakSessionIds);
         foreach (var id in keycloakSessionIds)
+        {
             _devices.Remove(id);
+            if (_reverseMappings.Remove(id, out var pomeriumSid))
+                _mappings.Remove(pomeriumSid);
+        }
         return Task.CompletedTask;
     }
 
     public Task SavePomeriumMappingAsync(string pomeriumSid, string keycloakSessionId, CancellationToken cancellationToken = default)
     {
         _mappings[pomeriumSid] = keycloakSessionId;
+        _reverseMappings[keycloakSessionId] = pomeriumSid;
         return Task.CompletedTask;
     }
 
@@ -43,5 +51,11 @@ public sealed class FakeDeviceRegistry : IDeviceRegistry
     {
         _mappings.TryGetValue(pomeriumSid, out var id);
         return Task.FromResult(id);
+    }
+
+    public Task<string?> GetPomeriumSidByKeycloakSessionAsync(string keycloakSessionId, CancellationToken cancellationToken = default)
+    {
+        _reverseMappings.TryGetValue(keycloakSessionId, out var sid);
+        return Task.FromResult(sid);
     }
 }
