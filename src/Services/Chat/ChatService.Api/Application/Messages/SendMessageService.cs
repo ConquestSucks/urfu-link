@@ -62,6 +62,9 @@ public sealed class SendMessageService(
         var attachments = await ResolveAttachmentsAsync(request.AttachmentAssetIds, request.SenderId, cancellationToken)
             .ConfigureAwait(false);
 
+        var replyTo = await ResolveReplyToAsync(conversation.Id, request.ReplyToMessageId, cancellationToken)
+            .ConfigureAwait(false);
+
         var now = clock.GetUtcNow();
         var message = Message.Send(
             id: Guid.NewGuid(),
@@ -70,7 +73,8 @@ public sealed class SendMessageService(
             body: request.Body,
             attachments: attachments,
             clientMessageId: request.ClientMessageId,
-            createdAtUtc: now);
+            createdAtUtc: now,
+            replyTo: replyTo);
 
         try
         {
@@ -128,6 +132,25 @@ public sealed class SendMessageService(
         {
             throw new ArgumentException("ClientMessageId is required.", nameof(request));
         }
+    }
+
+    private async Task<ReplyTo?> ResolveReplyToAsync(
+        string conversationId,
+        Guid? replyToMessageId,
+        CancellationToken cancellationToken)
+    {
+        if (replyToMessageId is not { } id)
+        {
+            return null;
+        }
+
+        var target = await messages.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (target is null || !string.Equals(target.ConversationId, conversationId, StringComparison.Ordinal))
+        {
+            throw new ChatReplyTargetNotFoundException(id, conversationId);
+        }
+
+        return ReplyTo.Create(target.Id, target.SenderId, target.Body);
     }
 
     private async Task<IReadOnlyList<Attachment>> ResolveAttachmentsAsync(
