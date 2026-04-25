@@ -24,10 +24,12 @@
     <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="Grpc.Net.Client" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Services\Media\MediaService.Api\MediaService.Api.csproj" />
+    <ProjectReference Include="..\..\..\src\Services\Media\MediaService.Api.Contracts\MediaService.Api.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
