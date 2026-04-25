@@ -1,24 +1,72 @@
-using Urfu.Link.BuildingBlocks.Contracts.Integration;
-using Urfu.Link.Services.Media.Application;
-using Urfu.Link.Services.Media.Domain;
+using Amazon.S3;
+using MediaService.Api.Application.Access;
+using MediaService.Api.Application.Limits;
+using MediaService.Api.Domain.Interfaces;
+using MediaService.Api.Infrastructure.Persistence;
+using MediaService.Api.Infrastructure.Persistence.Repositories;
+using MediaService.Api.Infrastructure.Storage;
+using MediaService.Api.Workers;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Urfu.Link.BuildingBlocks.Outbox;
 
-namespace Urfu.Link.Services.Media.Infrastructure;
+namespace MediaService.Api.Infrastructure;
 
 public static class ModuleRegistration
 {
-    public static IServiceCollection AddMediaModule(this IServiceCollection services)
+    public const string ServiceName = "media-service";
+
+    public static IServiceCollection AddMediaModule(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
 
-        services.AddSingleton(new ServiceProfile(
-            "media-service",
-            "postgresql",
-            KafkaTopicNames.MediaEvents,
-            "media.sample.v1"));
-        services.AddScoped<SampleEventDispatcher>();
+        // Persistence
+        services.AddDbContextPool<MediaDbContext>(options =>
+            options.UseNpgsql(configuration.GetConnectionString("Primary")));
+
+        services.AddScoped<IMediaAssetRepository>(sp => new MediaAssetRepository(
+            sp.GetRequiredService<MediaDbContext>(),
+            sp.GetRequiredService<IOutboxWriter>(),
+            ServiceName));
+        services.AddScoped<IUploadSessionRepository, UploadSessionRepository>();
+        services.AddScoped<IMediaAccessGrantRepository, MediaAccessGrantRepository>();
+
+        // Object storage
+        services.AddOptions<StorageOptions>()
+            .BindConfiguration(StorageOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddSingleton<IAmazonS3>(sp =>
+        {
+            var storageOptions = sp.GetRequiredService<IOptions<StorageOptions>>().Value;
+            var endpointUri = new Uri(storageOptions.Endpoint);
+            var config = new AmazonS3Config
+            {
+                ServiceURL = storageOptions.Endpoint,
+                ForcePathStyle = true,
+                // AmazonS3Config defaults to UseHttp=false (HTTPS), regardless of the
+                // ServiceURL scheme. Honour the configured scheme so dev MinIO over
+                // plain HTTP gets HTTP presigned URLs the browser can actually reach.
+                UseHttp = endpointUri.Scheme == Uri.UriSchemeHttp,
+            };
+            return new AmazonS3Client(storageOptions.AccessKey, storageOptions.SecretKey, config);
+        });
+        services.AddSingleton<IMediaObjectStorage, MinioObjectStorage>();
+        services.AddSingleton<IPresignedUrlGenerator, PresignedUrlGenerator>();
+
+        // Limits / policy
+        services.Configure<MediaLimitsOptions>(configuration.GetSection(MediaLimitsOptions.SectionName));
+        services.AddScoped<AccessPolicy>();
+
+        // Background workers
+        services.Configure<RetentionWorkerOptions>(configuration.GetSection(RetentionWorkerOptions.SectionName));
+        services.AddHostedService<UploadSessionCleanupWorker>();
+        services.AddHostedService<RetentionWorker>();
 
         return services;
     }
 }
-
-

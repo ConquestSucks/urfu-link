@@ -89,7 +89,7 @@ jobs:
       - name: Detect changed paths
         if: inputs.force_all != true
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@v4
         with:
           base: ${{ github.event.before }}
           filters: |

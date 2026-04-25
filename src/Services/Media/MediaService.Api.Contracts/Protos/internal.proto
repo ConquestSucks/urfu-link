@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+option csharp_namespace = "MediaService.Api.Grpc";
+package media.internal.v1;
+
+service InternalApi {
+  // Health probe.
+  rpc Ping (PingRequest) returns (PingReply);
+
+  // Owner check used by attaching services to verify the uploader before
+  // referencing an asset (e.g. ChatService validating a message attachment).
+  rpc CheckOwnership (CheckOwnershipRequest) returns (CheckOwnershipReply);
+
+  // Bulk metadata fetch — used to render a list of attachments without
+  // round-tripping per asset.
+  rpc BatchGetMetadata (BatchGetMetadataRequest) returns (BatchGetMetadataReply);
+
+  // Variant C: external services (ChatService / DisciplineService) push the
+  // current set of users that should have access. MediaService stores one row
+  // per user so the download hot path stays a local EXISTS check.
+  rpc GrantAssetAccess (GrantAssetAccessRequest) returns (GrantAssetAccessReply);
+
+  // Inverse of GrantAssetAccess; used when participants leave the source.
+  rpc RevokeAssetAccess (RevokeAssetAccessRequest) returns (RevokeAssetAccessReply);
+
+  // Cascade revocation when an entire conversation/discipline is archived.
+  rpc RevokeAllForSource (RevokeAllForSourceRequest) returns (RevokeAllForSourceReply);
+}
+
+message PingRequest {
+  string message = 1;
+}
+
+message PingReply {
+  string message = 1;
+  string service = 2;
+  string utc = 3;
+}
+
+message CheckOwnershipRequest {
+  string asset_id = 1; // Guid
+  string user_id = 2;  // Guid
+}
+
+message CheckOwnershipReply {
+  bool is_owner = 1;
+  bool exists = 2;
+}
+
+message BatchGetMetadataRequest {
+  repeated string asset_ids = 1;
+}
+
+enum AssetState {
+  ASSET_STATE_INITIATED = 0;
+  ASSET_STATE_UPLOADED = 1;
+  ASSET_STATE_DELETED = 2;
+  ASSET_STATE_HARD_DELETED = 3;
+  ASSET_STATE_FAILED = 4;
+}
+
+message AssetMetadata {
+  string asset_id = 1;
+  string owner_id = 2;
+  int32 visibility = 3;
+  int32 kind = 4;
+  int64 size_bytes = 5;
+  string mime_type = 6;
+  string original_file_name = 7;
+  AssetState state = 8;
+  string created_at_utc = 9;
+}
+
+message BatchGetMetadataReply {
+  repeated AssetMetadata items = 1;
+}
+
+enum GrantSource {
+  GRANT_SOURCE_DIRECT = 0;
+  GRANT_SOURCE_CONVERSATION = 1;
+  GRANT_SOURCE_DISCIPLINE = 2;
+}
+
+message GrantAssetAccessRequest {
+  string asset_id = 1;
+  repeated string user_ids = 2;
+  GrantSource source = 3;
+  string source_id = 4;        // empty for Direct
+  string granted_by_user_id = 5;
+}
+
+message GrantAssetAccessReply {
+  int32 grants_added = 1;
+}
+
+message RevokeAssetAccessRequest {
+  string asset_id = 1;
+  repeated string user_ids = 2;
+  GrantSource source = 3;
+  string source_id = 4;
+}
+
+message RevokeAssetAccessReply {
+  int32 grants_removed = 1;
+}
+
+message RevokeAllForSourceRequest {
+  GrantSource source = 1;
+  string source_id = 2;
+}
+
+message RevokeAllForSourceReply {
+  int32 grants_removed = 1;
+}
