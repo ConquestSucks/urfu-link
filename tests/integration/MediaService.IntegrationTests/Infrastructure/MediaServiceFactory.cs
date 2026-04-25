@@ -38,7 +38,7 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
         .Build();
 
     private readonly MinioContainer _minio = new MinioBuilder()
-        .WithImage("minio/minio:latest")
+        .WithImage("minio/minio:RELEASE.2025-09-07T16-13-09Z")
         .WithUsername(MinioRootUser)
         .WithPassword(MinioRootPassword)
         .Build();
