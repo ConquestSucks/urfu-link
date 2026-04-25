@@ -9,6 +9,7 @@ using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
+using Testcontainers.Redis;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
@@ -28,18 +29,25 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
         .WithImage("postgres:16-alpine")
         .Build();
 
+    private readonly RedisContainer _redis = new RedisBuilder()
+        .WithImage("redis:7.4.2-alpine")
+        .Build();
+
     public FakeOutboxWriter OutboxWriter { get; } = new();
     public IIdempotencyStore IdempotencyStore { get; } = Substitute.For<IIdempotencyStore>();
 
+    public string RedisConnectionString => $"{_redis.GetConnectionString()},allowAdmin=true";
+
     public async Task InitializeAsync()
     {
-        await _postgres.StartAsync();
+        await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
         await ApplyMigrationsAsync();
     }
 
     public new async Task DisposeAsync()
     {
         await base.DisposeAsync();
+        await _redis.DisposeAsync();
         await _postgres.DisposeAsync();
     }
 
@@ -55,6 +63,15 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
         var ctx = scope.ServiceProvider.GetRequiredService<PresenceDbContext>();
         await ctx.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE presence.last_seen RESTART IDENTITY CASCADE");
+
+        var multiplexer = scope.ServiceProvider.GetRequiredService<IConnectionMultiplexer>();
+        var endpoints = multiplexer.GetEndPoints();
+        if (endpoints.Length > 0)
+        {
+            var server = multiplexer.GetServer(endpoints[0]);
+            await server.FlushDatabaseAsync();
+        }
+
         ResetCapturedState();
     }
 
@@ -69,9 +86,10 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
                 ["Auth:Authority"] = "http://localhost:9999/realms/test",
                 ["Observability:Otlp:Endpoint"] = "http://localhost:9999",
                 ["ConnectionStrings:Primary"] = _postgres.GetConnectionString(),
-                ["ConnectionStrings:Redis"] = "localhost:9999,abortConnect=false",
+                ["Infrastructure:Redis:Configuration"] = RedisConnectionString,
                 ["Kafka:BootstrapServers"] = "localhost:9999",
-                ["Outbox:ConnectionString"] = "test-placeholder",
+                ["Outbox:RedisConfiguration"] = RedisConnectionString,
+                ["Idempotency:RedisConfiguration"] = RedisConnectionString,
             });
         });
 
@@ -85,9 +103,8 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
             services.RemoveAll<IIdempotencyStore>();
             services.AddSingleton(IdempotencyStore);
 
-            services.RemoveAll<IConnectionMultiplexer>();
-            services.AddSingleton(Substitute.For<IConnectionMultiplexer>());
-
+            // Real Redis container backs IConnectionMultiplexer (registered by AddOutbox).
+            // We replace the outbox writer with a fake to capture published events.
             services.RemoveAll<IOutboxStore>();
             services.RemoveAll<IOutboxWriter>();
             services.AddSingleton<IOutboxWriter>(OutboxWriter);

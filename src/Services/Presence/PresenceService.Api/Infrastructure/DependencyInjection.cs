@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Application;
@@ -6,6 +7,7 @@ using Urfu.Link.Services.Presence.Domain;
 using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence.Repositories;
+using Urfu.Link.Services.Presence.Infrastructure.Redis;
 
 namespace Urfu.Link.Services.Presence.Infrastructure;
 
@@ -27,6 +29,11 @@ public static class ModuleRegistration
             "presence.sample.v1"));
         services.AddScoped<SampleEventDispatcher>();
 
+        services.AddOptions<PresenceOptions>()
+            .Bind(configuration.GetSection(PresenceOptions.SectionName));
+
+        services.TryAddSingleton(TimeProvider.System);
+
         services.AddDbContextPool<PresenceDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("Primary")));
 
@@ -34,6 +41,8 @@ public static class ModuleRegistration
             sp.GetRequiredService<PresenceDbContext>(),
             sp.GetRequiredService<IOutboxWriter>(),
             ServiceName));
+
+        services.AddSingleton<IPresenceSessionStore, RedisPresenceSessionStore>();
 
         return services;
     }
