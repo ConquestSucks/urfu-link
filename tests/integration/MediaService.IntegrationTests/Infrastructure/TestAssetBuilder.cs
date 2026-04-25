@@ -70,4 +70,24 @@ public static class TestAssetBuilder
         await PutAsync(init.PresignedPutUrl, content, mimeType);
         return init.AssetId;
     }
+
+    /// <summary>
+    /// Init + PUT + Complete cycle for tests that need an asset already in the
+    /// Uploaded state (e.g. download / metadata / delete / list).
+    /// </summary>
+    public static async Task<Guid> CreateUploadedAssetAsync(
+        MediaServiceFactory factory,
+        Guid ownerId,
+        Visibility visibility = Visibility.Private,
+        int sizeBytes = 64)
+    {
+        var content = new byte[sizeBytes];
+        var assetId = await InitAndUploadAsync(factory, ownerId, content, visibility);
+        var ownerClient = AuthorizedClient(factory, ownerId);
+        var completeRes = await ownerClient.PostAsJsonAsync(
+            "/api/v1/media/upload/complete",
+            new CompleteUploadRequest(assetId, "x"));
+        completeRes.EnsureSuccessStatusCode();
+        return assetId;
+    }
 }

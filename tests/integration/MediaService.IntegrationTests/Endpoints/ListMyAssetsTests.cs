@@ -129,15 +129,6 @@ public class ListMyAssetsTests : IClassFixture<MediaServiceFactory>
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    private async Task<Guid> CreateUploadedAssetAsync(Guid ownerId)
-    {
-        var content = new byte[64];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        var completeRes = await ownerClient.PostAsJsonAsync(
-            "/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
-        completeRes.EnsureSuccessStatusCode();
-        return assetId;
-    }
+    private Task<Guid> CreateUploadedAssetAsync(Guid ownerId)
+        => TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 }

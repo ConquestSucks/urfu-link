@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Claims;
 using FluentAssertions;
 using MediaService.Api.Application.Contracts.Requests;
 using MediaService.Api.Application.Contracts.Responses;
@@ -19,21 +18,10 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
         _factory = factory;
     }
 
-    private static ClaimsPrincipal MakeUser(Guid userId)
-        => new(new ClaimsIdentity([new Claim("sub", userId.ToString())], TestAuthHandler.SchemeName));
-
-    private static HttpClient AuthorizedClient(MediaServiceFactory factory, Guid userId)
-    {
-        TestAuthHandler.CurrentPrincipal = MakeUser(userId);
-        var client = factory.CreateClient();
-        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
-        return client;
-    }
-
     [Fact]
     public async Task ValidImage_ReturnsPresignedUrlAndAssetId()
     {
-        var client = AuthorizedClient(_factory, Guid.NewGuid());
+        var client = TestAssetBuilder.AuthorizedClient(_factory, Guid.NewGuid());
         var req = new InitiateUploadRequest("photo.png", 1024, "image/png", Visibility.Private);
 
         var response = await client.PostAsJsonAsync("/api/v1/media/upload/init", req);
@@ -53,7 +41,7 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
     [Fact]
     public async Task PublicVisibility_RoutesToPublicBucket()
     {
-        var client = AuthorizedClient(_factory, Guid.NewGuid());
+        var client = TestAssetBuilder.AuthorizedClient(_factory, Guid.NewGuid());
         var req = new InitiateUploadRequest("avatar.png", 1024, "image/png", Visibility.Public);
 
         var response = await client.PostAsJsonAsync("/api/v1/media/upload/init", req);
@@ -66,7 +54,7 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
     [Fact]
     public async Task Image_OverSizeLimit_Returns400()
     {
-        var client = AuthorizedClient(_factory, Guid.NewGuid());
+        var client = TestAssetBuilder.AuthorizedClient(_factory, Guid.NewGuid());
         var req = new InitiateUploadRequest("huge.png", 50L * 1024 * 1024, "image/png", Visibility.Private);
 
         var response = await client.PostAsJsonAsync("/api/v1/media/upload/init", req);
@@ -84,7 +72,7 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
     [InlineData("payload.bin", "application/octet-stream")]
     public async Task ForbiddenMime_Returns400(string fileName, string mimeType)
     {
-        var client = AuthorizedClient(_factory, Guid.NewGuid());
+        var client = TestAssetBuilder.AuthorizedClient(_factory, Guid.NewGuid());
         var req = new InitiateUploadRequest(fileName, 1024, mimeType, Visibility.Private);
 
         var response = await client.PostAsJsonAsync("/api/v1/media/upload/init", req);
@@ -95,7 +83,7 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
     [Fact]
     public async Task MissingIdempotencyKey_Returns400()
     {
-        TestAuthHandler.CurrentPrincipal = MakeUser(Guid.NewGuid());
+        TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(Guid.NewGuid());
         var client = _factory.CreateClient();
         var req = new InitiateUploadRequest("a.png", 1024, "image/png", Visibility.Private);
 

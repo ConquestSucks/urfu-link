@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.Api.Domain.Events;
 using MediaService.IntegrationTests.Infrastructure;
@@ -20,7 +19,7 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
     public async Task Owner_SoftDeletesAsset_AndPublishesEvent()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await CreateUploadedAssetAsync(ownerId);
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
         _factory.OutboxWriter.Clear();
 
         var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
@@ -43,7 +42,7 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
     public async Task NonOwner_Returns403()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await CreateUploadedAssetAsync(ownerId);
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var attacker = Guid.NewGuid();
         var client = TestAssetBuilder.AuthorizedClient(_factory, attacker);
@@ -71,17 +70,5 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
         var response = await client.DeleteAsync($"/api/v1/media/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
-
-    private async Task<Guid> CreateUploadedAssetAsync(Guid ownerId)
-    {
-        var content = new byte[64];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        var completeRes = await ownerClient.PostAsJsonAsync(
-            "/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
-        completeRes.EnsureSuccessStatusCode();
-        return assetId;
     }
 }
