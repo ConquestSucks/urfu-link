@@ -43,6 +43,8 @@ public static class ModuleRegistration
             ServiceName));
 
         services.AddSingleton<IPresenceSessionStore, RedisPresenceSessionStore>();
+        services.AddSingleton<ITypingStore, RedisTypingStore>();
+        services.AddSingleton<IPrivacyProjectionStore, RedisPrivacyProjectionStore>();
 
         return services;
     }
