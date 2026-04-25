@@ -24,7 +24,8 @@ public sealed class ChatHub(
     MarkDeliveredService markDelivered,
     MarkReadService markRead,
     EditMessageService editMessage,
-    DeleteMessageService deleteMessage) : Hub<IChatClient>
+    DeleteMessageService deleteMessage,
+    ForwardMessagesService forwardMessages) : Hub<IChatClient>
 {
     public async Task<ConversationDto> OpenDirectConversation(Guid peerUserId)
     {
@@ -80,6 +81,14 @@ public sealed class ChatHub(
         var deleteMode = ParseMode(mode);
         return deleteMessage.DeleteAsync(
             new DeleteMessageRequest(messageId, caller, deleteMode),
+            Context.ConnectionAborted);
+    }
+
+    public Task<IReadOnlyList<MessageDto>> ForwardMessages(string targetConversationId, IReadOnlyList<Guid> messageIds)
+    {
+        var caller = Context.User!.GetUserId();
+        return forwardMessages.ForwardAsync(
+            new ForwardMessagesRequest(targetConversationId, caller, messageIds ?? Array.Empty<Guid>()),
             Context.ConnectionAborted);
     }
 
