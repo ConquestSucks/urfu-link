@@ -50,7 +50,7 @@ public sealed class RetentionWorker(
         }
     }
 
-    private async Task SweepAsync(CancellationToken cancellationToken)
+    internal async Task SweepAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var assetRepo = scope.ServiceProvider.GetRequiredService<IMediaAssetRepository>();
