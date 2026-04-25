@@ -57,6 +57,19 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
             .MessageReadUpdate(conversationId, upToMessageId, readerUserId);
     }
 
+    public Task NotifyMessageReadByAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid messageId,
+        Guid readerUserId,
+        DateTimeOffset readAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .MessageReadByUpdate(conversationId, messageId, readerUserId, readAtUtc);
+    }
+
     public Task NotifyMessageEditedAsync(
         IReadOnlyList<Guid> recipientUserIds,
         MessageDto message,

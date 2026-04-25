@@ -104,6 +104,7 @@ public static class ModuleRegistration
         services.AddScoped<GetUserConversationsQuery>();
         services.AddScoped<GetConversationQuery>();
         services.AddScoped<GetConversationMessagesQuery>();
+        services.AddScoped<GetReadReceiptsQuery>();
 
         services.AddSingleton<IChatBroadcaster, ChatBroadcaster>();
 

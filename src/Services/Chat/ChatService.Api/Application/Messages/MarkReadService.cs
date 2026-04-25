@@ -1,5 +1,6 @@
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Domain.ValueObjects;
 using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
@@ -37,9 +38,18 @@ public sealed class MarkReadService(
             new ChatMessageReadEvent(conversation.Id, anchor.Value, request.ReaderUserId, now),
             cancellationToken).ConfigureAwait(false);
 
+        // Group-aware read receipts: also append to the anchor's ReadBy[] and emit the
+        // group-flavoured broadcast. For Direct conversations this is essentially a noop on the
+        // wire (the existing scalar ReadAtUtc still drives client UI), but the data is in place
+        // for #214 when discipline group chats start populating ReadBy across many readers.
+        await messages.AddReadByAsync(
+            anchor.Value, new ReadReceipt(request.ReaderUserId, now), cancellationToken).ConfigureAwait(false);
+
         var observers = conversation.Participants.Where(p => p != request.ReaderUserId).ToList();
         await broadcaster.NotifyMessageReadAsync(
             observers, conversation.Id, anchor.Value, request.ReaderUserId, cancellationToken).ConfigureAwait(false);
+        await broadcaster.NotifyMessageReadByAsync(
+            observers, conversation.Id, anchor.Value, request.ReaderUserId, now, cancellationToken).ConfigureAwait(false);
 
         return anchor;
     }

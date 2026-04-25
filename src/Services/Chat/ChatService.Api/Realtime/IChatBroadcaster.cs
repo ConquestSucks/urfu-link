@@ -33,6 +33,14 @@ public interface IChatBroadcaster
         Guid readerUserId,
         CancellationToken cancellationToken);
 
+    Task NotifyMessageReadByAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid messageId,
+        Guid readerUserId,
+        DateTimeOffset readAtUtc,
+        CancellationToken cancellationToken);
+
     Task NotifyMessageEditedAsync(
         IReadOnlyList<Guid> recipientUserIds,
         MessageDto message,
