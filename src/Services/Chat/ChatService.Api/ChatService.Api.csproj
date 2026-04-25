@@ -19,10 +19,17 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChatService.UnitTests" />
+    <InternalsVisibleTo Include="ChatService.IntegrationTests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Urfu.Link.Services.Chat</RootNamespace>
+    <NoWarn>$(NoWarn);CA1819;CA2227</NoWarn>
   </PropertyGroup>
 
 </Project>

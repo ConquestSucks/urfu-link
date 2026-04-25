@@ -33,6 +33,7 @@
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/unit/">
+    <Project Path="tests/unit/ChatService.UnitTests/ChatService.UnitTests.csproj" />
     <Project Path="tests/unit/MediaService.UnitTests/MediaService.UnitTests.csproj" />
     <Project Path="tests/unit/PresenceService.UnitTests/PresenceService.UnitTests.csproj" />
     <Project Path="tests/unit/UserService.UnitTests/UserService.UnitTests.csproj" />
