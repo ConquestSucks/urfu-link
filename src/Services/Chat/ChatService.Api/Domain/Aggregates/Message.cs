@@ -6,6 +6,11 @@ namespace Urfu.Link.Services.Chat.Domain.Aggregates;
 public sealed class Message
 {
     private readonly List<Attachment> _attachments;
+    private readonly List<EditHistoryEntry> _editHistory;
+    private readonly List<Guid> _hiddenFor;
+    private readonly List<Reaction> _reactions;
+    private readonly List<Guid> _mentions;
+    private readonly List<ReadReceipt> _readBy;
 
     private Message(
         Guid id,
@@ -17,7 +22,18 @@ public sealed class Message
         MessageState state,
         DateTimeOffset createdAtUtc,
         DateTimeOffset? deliveredAtUtc,
-        DateTimeOffset? readAtUtc)
+        DateTimeOffset? readAtUtc,
+        DateTimeOffset? editedAtUtc,
+        IEnumerable<EditHistoryEntry>? editHistory,
+        DateTimeOffset? deletedAtUtc,
+        Guid? deletedBy,
+        DeleteMode? deleteMode,
+        IEnumerable<Guid>? hiddenFor,
+        IEnumerable<Reaction>? reactions,
+        IEnumerable<Guid>? mentions,
+        ReplyTo? replyTo,
+        ForwardedFrom? forwardedFrom,
+        IEnumerable<ReadReceipt>? readBy)
     {
         Id = id;
         ConversationId = conversationId;
@@ -29,6 +45,17 @@ public sealed class Message
         CreatedAtUtc = createdAtUtc;
         DeliveredAtUtc = deliveredAtUtc;
         ReadAtUtc = readAtUtc;
+        EditedAtUtc = editedAtUtc;
+        _editHistory = editHistory?.ToList() ?? [];
+        DeletedAtUtc = deletedAtUtc;
+        DeletedBy = deletedBy;
+        DeleteMode = deleteMode;
+        _hiddenFor = hiddenFor?.ToList() ?? [];
+        _reactions = reactions?.ToList() ?? [];
+        _mentions = mentions?.ToList() ?? [];
+        ReplyTo = replyTo;
+        ForwardedFrom = forwardedFrom;
+        _readBy = readBy?.ToList() ?? [];
     }
 
     public Guid Id { get; }
@@ -37,7 +64,7 @@ public sealed class Message
 
     public Guid SenderId { get; }
 
-    public string Body { get; }
+    public string Body { get; private set; }
 
     public IReadOnlyList<Attachment> Attachments => _attachments;
 
@@ -51,6 +78,28 @@ public sealed class Message
 
     public DateTimeOffset? ReadAtUtc { get; private set; }
 
+    public DateTimeOffset? EditedAtUtc { get; private set; }
+
+    public IReadOnlyList<EditHistoryEntry> EditHistory => _editHistory;
+
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+
+    public Guid? DeletedBy { get; private set; }
+
+    public DeleteMode? DeleteMode { get; private set; }
+
+    public IReadOnlyList<Guid> HiddenFor => _hiddenFor;
+
+    public IReadOnlyList<Reaction> Reactions => _reactions;
+
+    public IReadOnlyList<Guid> Mentions => _mentions;
+
+    public ReplyTo? ReplyTo { get; private set; }
+
+    public ForwardedFrom? ForwardedFrom { get; private set; }
+
+    public IReadOnlyList<ReadReceipt> ReadBy => _readBy;
+
     public bool HasAttachments => _attachments.Count > 0;
 
     public static Message Send(
@@ -60,7 +109,10 @@ public sealed class Message
         string body,
         IEnumerable<Attachment> attachments,
         string clientMessageId,
-        DateTimeOffset createdAtUtc)
+        DateTimeOffset createdAtUtc,
+        IEnumerable<Guid>? mentions = null,
+        ReplyTo? replyTo = null,
+        ForwardedFrom? forwardedFrom = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
         ArgumentNullException.ThrowIfNull(attachments);
@@ -76,7 +128,18 @@ public sealed class Message
             MessageState.Sent,
             createdAtUtc,
             deliveredAtUtc: null,
-            readAtUtc: null);
+            readAtUtc: null,
+            editedAtUtc: null,
+            editHistory: null,
+            deletedAtUtc: null,
+            deletedBy: null,
+            deleteMode: null,
+            hiddenFor: null,
+            reactions: null,
+            mentions: mentions,
+            replyTo: replyTo,
+            forwardedFrom: forwardedFrom,
+            readBy: null);
     }
 
     public static Message Hydrate(
@@ -89,8 +152,40 @@ public sealed class Message
         MessageState state,
         DateTimeOffset createdAtUtc,
         DateTimeOffset? deliveredAtUtc,
-        DateTimeOffset? readAtUtc)
-        => new(id, conversationId, senderId, body, attachments, clientMessageId, state, createdAtUtc, deliveredAtUtc, readAtUtc);
+        DateTimeOffset? readAtUtc,
+        DateTimeOffset? editedAtUtc = null,
+        IEnumerable<EditHistoryEntry>? editHistory = null,
+        DateTimeOffset? deletedAtUtc = null,
+        Guid? deletedBy = null,
+        DeleteMode? deleteMode = null,
+        IEnumerable<Guid>? hiddenFor = null,
+        IEnumerable<Reaction>? reactions = null,
+        IEnumerable<Guid>? mentions = null,
+        ReplyTo? replyTo = null,
+        ForwardedFrom? forwardedFrom = null,
+        IEnumerable<ReadReceipt>? readBy = null)
+        => new(
+            id,
+            conversationId,
+            senderId,
+            body,
+            attachments,
+            clientMessageId,
+            state,
+            createdAtUtc,
+            deliveredAtUtc,
+            readAtUtc,
+            editedAtUtc,
+            editHistory,
+            deletedAtUtc,
+            deletedBy,
+            deleteMode,
+            hiddenFor,
+            reactions,
+            mentions,
+            replyTo,
+            forwardedFrom,
+            readBy);
 
     public bool MarkDelivered(DateTimeOffset atUtc)
     {
@@ -114,6 +209,149 @@ public sealed class Message
         DeliveredAtUtc ??= atUtc;
         ReadAtUtc = atUtc;
         State = MessageState.Read;
+        return true;
+    }
+
+    public bool IsAuthor(Guid userId) => SenderId == userId;
+
+    public bool IsEditableBy(Guid userId, DateTimeOffset nowUtc, TimeSpan ttl)
+        => IsAuthor(userId)
+           && State != MessageState.Deleted
+           && nowUtc - CreatedAtUtc <= ttl;
+
+    public bool IsDeletableForEveryoneBy(Guid userId, DateTimeOffset nowUtc, TimeSpan ttl)
+        => IsAuthor(userId)
+           && State != MessageState.Deleted
+           && nowUtc - CreatedAtUtc <= ttl;
+
+    public bool Edit(string newBody, IReadOnlyList<Guid> validatedMentions, DateTimeOffset atUtc, TimeSpan ttl)
+    {
+        ArgumentNullException.ThrowIfNull(validatedMentions);
+
+        if (State == MessageState.Deleted)
+        {
+            return false;
+        }
+
+        if (atUtc - CreatedAtUtc > ttl)
+        {
+            return false;
+        }
+
+        var safeBody = newBody ?? string.Empty;
+        if (string.Equals(Body, safeBody, StringComparison.Ordinal)
+            && _mentions.SequenceEqual(validatedMentions))
+        {
+            return false;
+        }
+
+        _editHistory.Add(new EditHistoryEntry(Body, EditedAtUtc ?? CreatedAtUtc));
+        Body = safeBody;
+        _mentions.Clear();
+        _mentions.AddRange(validatedMentions);
+        EditedAtUtc = atUtc;
+        return true;
+    }
+
+    public bool MarkDeletedForEveryone(Guid byUserId, DateTimeOffset atUtc, TimeSpan ttl)
+    {
+        if (State == MessageState.Deleted)
+        {
+            return false;
+        }
+
+        if (atUtc - CreatedAtUtc > ttl)
+        {
+            return false;
+        }
+
+        State = MessageState.Deleted;
+        DeletedAtUtc = atUtc;
+        DeletedBy = byUserId;
+        DeleteMode = Enums.DeleteMode.ForEveryone;
+        Body = string.Empty;
+        _attachments.Clear();
+        _reactions.Clear();
+        _mentions.Clear();
+        ReplyTo = null;
+        ForwardedFrom = null;
+        return true;
+    }
+
+    public bool MarkDeletedForMe(Guid userId)
+    {
+        if (_hiddenFor.Contains(userId))
+        {
+            return false;
+        }
+
+        _hiddenFor.Add(userId);
+        return true;
+    }
+
+    public bool IsHiddenFor(Guid userId) => _hiddenFor.Contains(userId);
+
+    public bool AddReaction(Guid userId, string emoji, DateTimeOffset atUtc)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(emoji);
+
+        if (State == MessageState.Deleted)
+        {
+            return false;
+        }
+
+        var existingIndex = _reactions.FindIndex(r => r.UserId == userId);
+        if (existingIndex >= 0)
+        {
+            var existing = _reactions[existingIndex];
+            if (string.Equals(existing.Emoji, emoji, StringComparison.Ordinal))
+            {
+                return false;
+            }
+            _reactions.RemoveAt(existingIndex);
+        }
+
+        _reactions.Add(new Reaction(userId, emoji, atUtc));
+        return true;
+    }
+
+    public bool RemoveReaction(Guid userId, string emoji)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(emoji);
+
+        var index = _reactions.FindIndex(r => r.UserId == userId
+            && string.Equals(r.Emoji, emoji, StringComparison.Ordinal));
+        if (index < 0)
+        {
+            return false;
+        }
+
+        _reactions.RemoveAt(index);
+        return true;
+    }
+
+    public bool MarkReadBy(Guid userId, DateTimeOffset atUtc)
+    {
+        if (State == MessageState.Deleted)
+        {
+            return false;
+        }
+
+        if (_readBy.Any(r => r.UserId == userId))
+        {
+            return false;
+        }
+
+        _readBy.Add(new ReadReceipt(userId, atUtc));
+
+        // Preserve existing direct-chat semantics: keep the scalar ReadAt as the first read time.
+        if (State != MessageState.Read)
+        {
+            DeliveredAtUtc ??= atUtc;
+            ReadAtUtc = atUtc;
+            State = MessageState.Read;
+        }
+
         return true;
     }
 }
