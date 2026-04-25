@@ -41,4 +41,30 @@ public class InitiateUploadValidatorTests
 
         result.IsValid.Should().BeTrue();
     }
+
+    [Fact]
+    public void RejectsOverLongFileName()
+    {
+        var sut = CreateValidator();
+        var longName = new string('a', 201) + ".png";
+        var request = new InitiateUploadRequest(longName, 1024, "image/png", Visibility.Private);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(InitiateUploadRequest.FileName));
+    }
+
+    [Fact]
+    public void RejectsOverLongMimeType()
+    {
+        var sut = CreateValidator();
+        var longMime = "image/" + new string('x', 200);
+        var request = new InitiateUploadRequest("photo.png", 1024, longMime, Visibility.Private);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(InitiateUploadRequest.MimeType));
+    }
 }
