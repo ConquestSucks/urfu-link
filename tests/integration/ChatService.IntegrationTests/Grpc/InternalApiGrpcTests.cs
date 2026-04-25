@@ -22,6 +22,8 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         await _factory.ResetDataAsync();
+        // Internal gRPC requires authentication; impersonate any user for the call.
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
         _httpClient = _factory.CreateClient();
         _channel = GrpcChannel.ForAddress(_httpClient.BaseAddress!,
             new GrpcChannelOptions { HttpClient = _httpClient });
@@ -108,6 +110,18 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
 
         reply.Participates.Should().BeFalse();
         reply.ConversationExists.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Ping_WithoutAuth_ReturnsUnauthenticated()
+    {
+        TestAuthHandler.CurrentPrincipal = null;
+        var client = new InternalApi.InternalApiClient(_channel);
+
+        var act = () => client.PingAsync(new PingRequest()).ResponseAsync;
+
+        var ex = await act.Should().ThrowAsync<global::Grpc.Core.RpcException>();
+        ex.Which.StatusCode.Should().Be(global::Grpc.Core.StatusCode.Unauthenticated);
     }
 
     [Fact]

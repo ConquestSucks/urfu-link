@@ -45,7 +45,7 @@ var app = builder.Build();
 
 app.MapServiceDefaults();
 app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
-app.MapGrpcService<InternalApiService>();
+app.MapGrpcService<InternalApiService>().RequireAuthorization();
 app.MapHub<ChatHub>("/hubs/chat");
 
 app.MapGet("/", (ServiceProfile descriptor) => Results.Ok(new
