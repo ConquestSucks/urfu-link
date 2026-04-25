@@ -304,8 +304,14 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
+      Kafka__ConsumerTopic: urfu.user.events.v1
+      Kafka__ConsumerGroup: presence-privacy-projection-v1
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
