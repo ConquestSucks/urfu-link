@@ -1,7 +1,7 @@
 using Grpc.Core;
-using Urfu.Link.Services.Media.Grpc;
+using MediaService.Api.Grpc;
 
-namespace Urfu.Link.Services.Media.Services;
+namespace MediaService.Api.Services;
 
 public sealed class InternalApiService : InternalApi.InternalApiBase
 {

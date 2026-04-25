@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option csharp_namespace = "Urfu.Link.Services.Media.Grpc";
+option csharp_namespace = "MediaService.Api.Grpc";
 package media.internal.v1;
 
 service InternalApi {
