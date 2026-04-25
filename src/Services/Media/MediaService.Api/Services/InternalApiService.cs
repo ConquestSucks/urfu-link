@@ -87,7 +87,7 @@ public sealed class InternalApiService(
 
         var source = (DomainEnums.GrantSource)request.Source;
         var sourceId = string.IsNullOrWhiteSpace(request.SourceId) ? null : request.SourceId;
-        var userIds = request.UserIds.Select(Guid.Parse).Distinct().ToList();
+        var userIds = ParseUserIdsOrThrow(request.UserIds);
 
         var grants = userIds
             .Select(uid => MediaAccessGrant.Create(assetId, uid, source, sourceId, grantedBy))
@@ -112,13 +112,27 @@ public sealed class InternalApiService(
 
         var source = (DomainEnums.GrantSource)request.Source;
         var sourceId = string.IsNullOrWhiteSpace(request.SourceId) ? null : request.SourceId;
-        var userIds = request.UserIds.Select(Guid.Parse).Distinct().ToList();
+        var userIds = ParseUserIdsOrThrow(request.UserIds);
 
         var removed = await grantRepository
             .RemoveRangeAsync(assetId, userIds, source, sourceId, context.CancellationToken)
             .ConfigureAwait(false);
 
         return new RevokeAssetAccessReply { GrantsRemoved = removed };
+    }
+
+    private static List<Guid> ParseUserIdsOrThrow(IEnumerable<string> userIds)
+    {
+        var result = new List<Guid>();
+        foreach (var raw in userIds)
+        {
+            if (!Guid.TryParse(raw, out var parsed))
+            {
+                throw new RpcException(new Status(StatusCode.InvalidArgument, "Bad guid in user_ids."));
+            }
+            result.Add(parsed);
+        }
+        return result.Distinct().ToList();
     }
 
     public override async Task<RevokeAllForSourceReply> RevokeAllForSource(
