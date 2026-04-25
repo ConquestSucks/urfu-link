@@ -42,7 +42,10 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
         var body = await response.Content.ReadFromJsonAsync<UploadInitResponse>();
         body.Should().NotBeNull();
         body!.AssetId.Should().NotBeEmpty();
-        body.PresignedPutUrl.Should().StartWith("http://test/upload/media-private/");
+        var presignedUrl = new Uri(body.PresignedPutUrl);
+        presignedUrl.Authority.Should().Be(new Uri(_factory.MinioEndpoint).Authority,
+            "presigned URL must point at the MinIO container host:port");
+        body.PresignedPutUrl.Should().Contain("/media-private/").And.Contain("X-Amz-Signature");
         body.Bucket.Should().Be("media-private");
         body.ExpiresAtUtc.Should().BeAfter(DateTimeOffset.UtcNow);
     }

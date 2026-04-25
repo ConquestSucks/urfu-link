@@ -1,34 +1,63 @@
 using Amazon.S3;
+using Amazon.S3.Model;
 using MediaService.Api.Domain.Interfaces;
-using MediaService.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using StackExchange.Redis;
+using Testcontainers.Minio;
+using Testcontainers.PostgreSql;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 
 namespace MediaService.IntegrationTests.Infrastructure;
 
 /// <summary>
-/// Boots MediaService.Api with InMemory EF + mocked S3/Redis/auth. Suitable for
-/// asserting endpoint contracts and the access-policy code-path without
-/// requiring Docker. Full TestContainers (PG + MinIO) are tracked as a
-/// follow-up — the seam is intentionally narrow so swapping in real
-/// infrastructure is mostly registration changes here.
+/// Boots MediaService.Api against real PostgreSQL and MinIO containers.
+/// External hosted services (Kafka outbox, retention/cleanup workers) are
+/// stripped, and Redis / IIdempotencyStore stay mocked because they are
+/// not exercised by the endpoint contracts under test. Migrations are
+/// applied automatically by Program.cs on host start.
 /// </summary>
-public sealed class MediaServiceFactory : WebApplicationFactory<Program>
+public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    private const string MinioRootUser = "minioadmin";
+    private const string MinioRootPassword = "minioadmin";
+    private const string PrivateBucket = "media-private";
+    private const string PublicBucket = "media-public";
+
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
+        .WithImage("postgres:16-alpine")
+        .Build();
+
+    private readonly MinioContainer _minio = new MinioBuilder()
+        .WithImage("minio/minio:latest")
+        .WithUsername(MinioRootUser)
+        .WithPassword(MinioRootPassword)
+        .Build();
+
     public FakeOutboxWriter OutboxWriter { get; } = new();
     public IIdempotencyStore IdempotencyStore { get; } = Substitute.For<IIdempotencyStore>();
-    public IMediaObjectStorage ObjectStorage { get; } = Substitute.For<IMediaObjectStorage>();
-    public FakePresignedUrlGenerator UrlGenerator { get; } = new();
+
+    public string MinioEndpoint => $"http://{_minio.Hostname}:{_minio.GetMappedPublicPort(9000)}";
+
+    public async Task InitializeAsync()
+    {
+        await Task.WhenAll(_postgres.StartAsync(), _minio.StartAsync());
+        await CreateBucketsAsync();
+    }
+
+    public new async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _minio.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -40,13 +69,13 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>
             {
                 ["Auth:Authority"] = "http://localhost:9999/realms/test",
                 ["Observability:Otlp:Endpoint"] = "http://localhost:9999",
-                ["ConnectionStrings:Primary"] = "test-placeholder",
+                ["ConnectionStrings:Primary"] = _postgres.GetConnectionString(),
                 ["ConnectionStrings:Redis"] = "localhost:9999,abortConnect=false",
-                ["Storage:Endpoint"] = "http://localhost:9999",
-                ["Storage:AccessKey"] = "test",
-                ["Storage:SecretKey"] = "test",
-                ["Storage:PrivateBucket"] = "media-private",
-                ["Storage:PublicBucket"] = "media-public",
+                ["Storage:Endpoint"] = MinioEndpoint,
+                ["Storage:AccessKey"] = MinioRootUser,
+                ["Storage:SecretKey"] = MinioRootPassword,
+                ["Storage:PrivateBucket"] = PrivateBucket,
+                ["Storage:PublicBucket"] = PublicBucket,
                 ["Kafka:BootstrapServers"] = "localhost:9999",
                 ["Outbox:ConnectionString"] = "test-placeholder",
             });
@@ -55,11 +84,13 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.ConfigureServices(services =>
         {
+            // Strip Kafka consumer / outbox dispatcher / workers — none of
+            // them are exercised by REST contract tests and they only add
+            // background noise that races with assertions.
             services.RemoveAll<IHostedService>();
 
-            ReplaceDbWithInMemory(services);
-
-            // Idempotency / Redis
+            // Idempotency / Redis: keep mocked. Real Redis is not in the
+            // service-under-test path for these endpoints.
             IdempotencyStore.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(ValueTask.FromResult(true));
             services.RemoveAll<IIdempotencyStore>();
@@ -68,41 +99,29 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>
             services.RemoveAll<IConnectionMultiplexer>();
             services.AddSingleton(Substitute.For<IConnectionMultiplexer>());
 
-            // Outbox / Kafka
+            // Outbox: keep the in-memory fake so we can assert published events
+            // without spinning up Kafka.
             services.RemoveAll<IOutboxStore>();
             services.RemoveAll<IOutboxWriter>();
             services.AddSingleton<IOutboxWriter>(OutboxWriter);
-
-            // Storage
-            services.RemoveAll<IAmazonS3>();
-            services.AddSingleton(Substitute.For<IAmazonS3>());
-
-            services.RemoveAll<IMediaObjectStorage>();
-            services.AddSingleton(ObjectStorage);
-
-            services.RemoveAll<IPresignedUrlGenerator>();
-            services.AddSingleton<IPresignedUrlGenerator>(UrlGenerator);
 
             ReplaceAuthWithTestScheme(services);
         });
     }
 
-    private static void ReplaceDbWithInMemory(IServiceCollection services)
+    private async Task CreateBucketsAsync()
     {
-        var toRemove = services
-            .Where(d => d.ServiceType.FullName?.Contains("MediaDbContext", StringComparison.Ordinal) == true
-                || d.ServiceType.FullName?.Contains("DbContextOptions", StringComparison.Ordinal) == true
-                || d.ServiceType.FullName?.Contains("IDbContextPool", StringComparison.Ordinal) == true
-                || d.ServiceType.FullName?.Contains("IScopedDbContextLease", StringComparison.Ordinal) == true)
-            .ToList();
-        foreach (var descriptor in toRemove)
+        var config = new AmazonS3Config
         {
-            services.Remove(descriptor);
-        }
+            ServiceURL = MinioEndpoint,
+            ForcePathStyle = true,
+        };
+        using var s3 = new AmazonS3Client(MinioRootUser, MinioRootPassword, config);
 
-        var dbName = "TestDb_" + Guid.NewGuid().ToString("N");
-        services.AddDbContext<MediaDbContext>(options =>
-            options.UseInMemoryDatabase(dbName));
+        foreach (var bucket in new[] { PrivateBucket, PublicBucket })
+        {
+            await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
+        }
     }
 
     private static void ReplaceAuthWithTestScheme(IServiceCollection services)
