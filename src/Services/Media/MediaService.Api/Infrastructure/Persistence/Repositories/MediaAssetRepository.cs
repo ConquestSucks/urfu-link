@@ -34,30 +34,68 @@ public sealed class MediaAssetRepository(
     public async Task<PagedAssets> ListByOwnerAsync(
         Guid ownerId, Guid? cursor, int limit, CancellationToken cancellationToken)
     {
-        var query = dbContext.Assets.AsNoTracking()
+        var ownerScope = dbContext.Assets.AsNoTracking()
             .Where(a => a.OwnerId == ownerId && a.State == AssetState.Uploaded);
 
-        if (cursor is { } cursorId)
+        if (cursor is not { } cursorId)
         {
-            var anchor = await dbContext.Assets.AsNoTracking()
-                .Where(a => a.Id == cursorId)
-                .Select(a => (DateTimeOffset?)a.CreatedAtUtc)
-                .FirstOrDefaultAsync(cancellationToken)
+            var firstPage = await ownerScope
+                .OrderByDescending(a => a.CreatedAtUtc)
+                .ThenByDescending(a => a.Id)
+                .Take(limit + 1)
+                .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
-            if (anchor.HasValue)
-            {
-                query = query.Where(a => a.CreatedAtUtc < anchor.Value);
-            }
+            return BuildPage(firstPage, limit);
         }
 
-        var page = await query
+        var anchor = await dbContext.Assets.AsNoTracking()
+            .Where(a => a.Id == cursorId)
+            .Select(a => new { a.CreatedAtUtc, a.Id })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (anchor is null)
+        {
+            // Unknown cursor: fall back to the first page to avoid surprising the caller.
+            var firstPage = await ownerScope
+                .OrderByDescending(a => a.CreatedAtUtc)
+                .ThenByDescending(a => a.Id)
+                .Take(limit + 1)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            return BuildPage(firstPage, limit);
+        }
+
+        // EF Core cannot translate Guid comparison operators to SQL, so the keyset
+        // tie-breaker is applied in two steps: first the typically-tiny set of rows
+        // sharing the anchor's CreatedAtUtc (filtered in memory by id ordinal), then
+        // the bulk of strictly-older rows fetched via SQL with composite ordering.
+        var siblings = await ownerScope
+            .Where(a => a.CreatedAtUtc == anchor.CreatedAtUtc && a.Id != anchor.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var anchorComparer = Comparer<Guid>.Default;
+        var sameTimeAfterAnchor = siblings
+            .Where(a => anchorComparer.Compare(a.Id, anchor.Id) < 0)
+            .OrderByDescending(a => a.Id, anchorComparer)
+            .ToList();
+
+        var strictlyOlder = await ownerScope
+            .Where(a => a.CreatedAtUtc < anchor.CreatedAtUtc)
             .OrderByDescending(a => a.CreatedAtUtc)
+            .ThenByDescending(a => a.Id)
             .Take(limit + 1)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var hasMore = page.Count > limit;
-        var items = hasMore ? page.GetRange(0, limit) : page;
+        var combined = sameTimeAfterAnchor.Concat(strictlyOlder).Take(limit + 1).ToList();
+        return BuildPage(combined, limit);
+    }
+
+    private static PagedAssets BuildPage(List<MediaAsset> rows, int limit)
+    {
+        var hasMore = rows.Count > limit;
+        var items = hasMore ? rows.GetRange(0, limit) : rows;
         var nextCursor = hasMore ? items[^1].Id : (Guid?)null;
         return new PagedAssets(items, nextCursor);
     }
