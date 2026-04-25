@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using PresenceService.IntegrationTests.Infrastructure;
@@ -44,6 +45,40 @@ public class PrivacyProjectionTests : IAsyncLifetime
         var store = scope.ServiceProvider.GetRequiredService<IPrivacyProjectionStore>();
         (await store.GetAsync(userId, CancellationToken.None))
             .Should().Be(PrivacySettings.Default);
+    }
+
+    [Fact]
+    public async Task PrivacyChangedFromKafka_ImmediatelyReflectsInRestResponse()
+    {
+        var requesterId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.MakeUser(requesterId);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var sessions = scope.ServiceProvider.GetRequiredService<Urfu.Link.Services.Presence.Domain.Interfaces.IPresenceSessionStore>();
+            await sessions.AddSessionAsync(new Urfu.Link.Services.Presence.Domain.ValueObjects.PresenceSession(
+                targetId, "d1",
+                Urfu.Link.Services.Presence.Domain.Enums.Platform.Web,
+                Urfu.Link.Services.Presence.Domain.Enums.PresenceStatus.Online,
+                CustomActivity: null,
+                ConnectedAt: DateTimeOffset.UtcNow,
+                LastHeartbeatAt: DateTimeOffset.UtcNow), CancellationToken.None);
+        }
+
+        // Before: privacy is default (everything visible) → REST returns Online.
+        var before = await _factory.CreateClient().GetFromJsonAsync<Urfu.Link.Services.Presence.Application.Contracts.Responses.PresenceInfoResponse>(
+            $"/api/v1/presence/users/{targetId}");
+        before!.Status.Should().Be(Urfu.Link.Services.Presence.Domain.Enums.PresenceStatus.Online);
+
+        // Kafka projects privacy=hide-online.
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, false, true);
+
+        // REST now reflects offline (status hidden).
+        var after = await _factory.CreateClient().GetFromJsonAsync<Urfu.Link.Services.Presence.Application.Contracts.Responses.PresenceInfoResponse>(
+            $"/api/v1/presence/users/{targetId}");
+        after!.Status.Should().Be(Urfu.Link.Services.Presence.Domain.Enums.PresenceStatus.Offline);
+        after.Platforms.Should().BeEmpty();
     }
 
     [Fact]
