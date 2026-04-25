@@ -141,6 +141,9 @@ services:
         mc alias set minio http://minio:9000 minio minio123
         mc mb minio/user-avatars --ignore-existing
         mc anonymous set public minio/user-avatars
+        mc mb minio/media-private --ignore-existing
+        mc mb minio/media-public --ignore-existing
+        mc anonymous set download minio/media-public
         echo "MinIO buckets ready."
     restart: "no"
 
@@ -269,6 +272,13 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
+      Storage__Endpoint: http://minio:9000
+      Storage__PublicEndpoint: http://localhost:9000
+      Storage__AccessKey: minio
+      Storage__SecretKey: minio123
+      Storage__PrivateBucket: media-private
+      Storage__PublicBucket: media-public
     depends_on:
       postgres:
         condition: service_healthy
@@ -278,6 +288,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
       kafka-init:

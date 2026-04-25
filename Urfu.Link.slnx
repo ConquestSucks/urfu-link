@@ -39,6 +39,7 @@
     <Project Path="tests/contract/ContractTests/ContractTests.csproj" />
   </Folder>
   <Folder Name="/tests/integration/">
+    <Project Path="tests/integration/MediaService.IntegrationTests/MediaService.IntegrationTests.csproj" />
     <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/smoke/">
