@@ -10,7 +10,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
 {
     public const string SchemeName = "TestScheme";
 
-    public static AsyncLocal<ClaimsPrincipal?> Current { get; } = new();
+    public static ClaimsPrincipal? CurrentPrincipal { get; set; }
 
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -22,12 +22,12 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (Current.Value is null)
+        if (CurrentPrincipal is null)
         {
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var ticket = new AuthenticationTicket(Current.Value, SchemeName);
+        var ticket = new AuthenticationTicket(CurrentPrincipal, SchemeName);
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }

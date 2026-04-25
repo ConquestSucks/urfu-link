@@ -61,7 +61,7 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
     {
         OutboxWriter.Clear();
         MediaServiceClient.Reset();
-        TestAuthHandler.Current.Value = null;
+        TestAuthHandler.CurrentPrincipal = null;
     }
 
     public async Task ResetDataAsync()
