@@ -10,10 +10,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.Services.Chat.Application;
+using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Infrastructure.Authorization;
 using Urfu.Link.Services.Chat.Infrastructure.Grpc;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
 using Urfu.Link.Services.Chat.Realtime;
@@ -46,6 +48,10 @@ public static class ModuleRegistration
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddHostedService<MongoIndexInitializer>();
+
+        services.AddOptions<ChatOptions>()
+            .Bind(configuration.GetSection(ChatOptions.SectionName));
+        services.AddSingleton<IDisciplineRoleResolver, DefaultDisciplineRoleResolver>();
 
         services.AddOptions<MediaServiceClientOptions>()
             .Bind(configuration.GetSection(MediaServiceClientOptions.SectionName));
