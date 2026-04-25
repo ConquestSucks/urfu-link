@@ -11,6 +11,7 @@ using Testcontainers.MongoDb;
 using Testcontainers.Redis;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
+using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
 
 namespace ChatService.IntegrationTests.Infrastructure;
@@ -32,6 +33,8 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
         .Build();
 
     public FakeOutboxWriter OutboxWriter { get; } = new();
+
+    public FakeMediaServiceClient MediaServiceClient { get; } = new();
 
     public IIdempotencyStore IdempotencyStore { get; } = Substitute.For<IIdempotencyStore>();
 
@@ -57,6 +60,7 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
     public void ResetCapturedState()
     {
         OutboxWriter.Clear();
+        MediaServiceClient.Reset();
         TestAuthHandler.Current.Value = null;
     }
 
@@ -113,6 +117,9 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<IOutboxStore>();
             services.RemoveAll<IOutboxWriter>();
             services.AddSingleton<IOutboxWriter>(OutboxWriter);
+
+            services.RemoveAll<IMediaServiceClient>();
+            services.AddSingleton<IMediaServiceClient>(MediaServiceClient);
 
             ReplaceAuthWithTestScheme(services);
         });
