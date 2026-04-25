@@ -7,6 +7,7 @@ using MediaService.Api.Infrastructure.Persistence.Repositories;
 using MediaService.Api.Infrastructure.Storage;
 using MediaService.Api.Workers;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Outbox;
 
 namespace MediaService.Api.Infrastructure;
@@ -34,11 +35,14 @@ public static class ModuleRegistration
         services.AddScoped<IMediaAccessGrantRepository, MediaAccessGrantRepository>();
 
         // Object storage
-        services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
+        services.AddOptions<StorageOptions>()
+            .BindConfiguration(StorageOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         services.AddSingleton<IAmazonS3>(sp =>
         {
-            var storageOptions = configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>()
-                ?? new StorageOptions();
+            var storageOptions = sp.GetRequiredService<IOptions<StorageOptions>>().Value;
             var config = new AmazonS3Config
             {
                 ServiceURL = storageOptions.Endpoint,
