@@ -2,7 +2,7 @@ using Confluent.Kafka;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 
-namespace Urfu.Link.Services.Media.Messaging;
+namespace MediaService.Api.Messaging;
 
 public sealed class KafkaConsumerWorker(ILogger<KafkaConsumerWorker> logger, IConfiguration configuration) : BackgroundService
 {

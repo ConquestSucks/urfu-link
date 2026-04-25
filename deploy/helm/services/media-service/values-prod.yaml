@@ -44,3 +44,7 @@ resources:
   limits:
     cpu: 250m
     memory: 256Mi
+
+migrations:
+  enabled: true
+  command: ["dotnet", "MediaService.Api.dll", "--migrate"]
