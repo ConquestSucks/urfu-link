@@ -51,4 +51,10 @@ public interface IChatBroadcaster
         Guid messageId,
         IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary,
         CancellationToken cancellationToken);
+
+    Task NotifyPinsUpdatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        IReadOnlyList<MessageDto> pinnedMessages,
+        CancellationToken cancellationToken);
 }

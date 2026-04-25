@@ -90,6 +90,17 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
         return hub.Clients.Users(ToUserIds(recipientUserIds)).ReactionUpdated(messageId, summary);
     }
 
+    public Task NotifyPinsUpdatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        IReadOnlyList<MessageDto> pinnedMessages,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        ArgumentNullException.ThrowIfNull(pinnedMessages);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).PinsUpdated(conversationId, pinnedMessages);
+    }
+
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)
         => userIds.Select(u => u.ToString("D", CultureInfo.InvariantCulture)).ToList();
 }

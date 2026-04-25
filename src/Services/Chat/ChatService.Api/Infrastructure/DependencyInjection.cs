@@ -99,6 +99,8 @@ public static class ModuleRegistration
         services.AddScoped<ForwardMessagesService>();
         services.AddScoped<AddReactionService>();
         services.AddScoped<RemoveReactionService>();
+        services.AddScoped<PinMessageService>();
+        services.AddScoped<UnpinMessageService>();
         services.AddScoped<GetUserConversationsQuery>();
         services.AddScoped<GetConversationQuery>();
         services.AddScoped<GetConversationMessagesQuery>();

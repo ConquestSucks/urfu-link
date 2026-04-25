@@ -20,4 +20,6 @@ public interface IChatClient
     Task MessageDeletedUpdate(string conversationId, Guid messageId, string mode, Guid deletedBy);
 
     Task ReactionUpdated(Guid messageId, IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary);
+
+    Task PinsUpdated(string conversationId, IReadOnlyList<MessageDto> pinnedMessages);
 }

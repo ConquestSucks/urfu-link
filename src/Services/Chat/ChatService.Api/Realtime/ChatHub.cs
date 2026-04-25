@@ -5,6 +5,7 @@ using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
+// PinMessageService and UnpinMessageService live in Application.Conversations.
 
 namespace Urfu.Link.Services.Chat.Realtime;
 
@@ -27,7 +28,9 @@ public sealed class ChatHub(
     DeleteMessageService deleteMessage,
     ForwardMessagesService forwardMessages,
     AddReactionService addReaction,
-    RemoveReactionService removeReaction) : Hub<IChatClient>
+    RemoveReactionService removeReaction,
+    PinMessageService pinMessage,
+    UnpinMessageService unpinMessage) : Hub<IChatClient>
 {
     public async Task<ConversationDto> OpenDirectConversation(Guid peerUserId)
     {
@@ -107,6 +110,22 @@ public sealed class ChatHub(
         var caller = Context.User!.GetUserId();
         return removeReaction.RemoveAsync(
             new RemoveReactionRequest(messageId, caller, emoji ?? string.Empty),
+            Context.ConnectionAborted);
+    }
+
+    public Task<IReadOnlyList<MessageDto>> PinMessage(string conversationId, Guid messageId)
+    {
+        var caller = Context.User!.GetUserId();
+        return pinMessage.PinAsync(
+            new PinMessageRequest(conversationId, caller, messageId),
+            Context.ConnectionAborted);
+    }
+
+    public Task<IReadOnlyList<MessageDto>> UnpinMessage(string conversationId, Guid messageId)
+    {
+        var caller = Context.User!.GetUserId();
+        return unpinMessage.UnpinAsync(
+            new UnpinMessageRequest(conversationId, caller, messageId),
             Context.ConnectionAborted);
     }
 
