@@ -55,6 +55,9 @@ builder.Services
 var app = builder.Build();
 
 app.UseExceptionHandler();
+// Required for SignalR WebSocket upgrades to be proxied by YARP (used by
+// /api/presence/hubs/presence). Must be enabled before MapReverseProxy.
+app.UseWebSockets();
 app.UseRateLimiter();
 app.UseCors();
 

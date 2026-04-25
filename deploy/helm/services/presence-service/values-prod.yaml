@@ -15,6 +15,8 @@ env:
   ASPNETCORE_URLS: http://+:8080
   Observability__Otlp__Endpoint: http://otel-collector.observability.svc.cluster.local:4317
   Kafka__BootstrapServers: urfu-kafka.urfu-platform.svc.cluster.local:9092
+  Kafka__ConsumerTopic: urfu.user.events.v1
+  Kafka__ConsumerGroup: presence-privacy-projection-v1
   Auth__TokenHeader: X-Pomerium-Jwt-Assertion
   Auth__JwksUrl: http://pomerium.urfu-platform.svc.cluster.local/.well-known/pomerium/jwks.json
   Auth__Audience: urfu-link.ghjc.ru
@@ -31,6 +33,8 @@ rollout:
   enabled: true
   autoPromotionEnabled: true
 
+# SignalR PresenceHub runs without a Redis backplane in this MVP — keep a single
+# replica and disable HPA until a backplane is introduced (separate issue).
 autoscaling:
   enabled: false
 
@@ -44,3 +48,7 @@ resources:
   limits:
     cpu: 250m
     memory: 256Mi
+
+migrations:
+  enabled: true
+  command: ["dotnet", "PresenceService.Api.dll", "--migrate"]

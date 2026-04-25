@@ -1,5 +1,6 @@
 using FastEndpoints;
 using MediaService.Api.Application.Contracts.Responses;
+using MediaService.Api.Application.Limits;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
 
@@ -8,9 +9,7 @@ namespace MediaService.Api.Endpoints;
 public sealed class ListMyAssetsRequest
 {
     public Guid? Cursor { get; set; }
-    public int Limit { get; set; } = DefaultLimit;
-    public const int DefaultLimit = 20;
-    public const int MaxLimit = 100;
+    public int Limit { get; set; } = MediaConstraints.DefaultListLimit;
 }
 
 public sealed class ListMyAssetsEndpoint(IMediaAssetRepository assetRepository)
@@ -27,7 +26,7 @@ public sealed class ListMyAssetsEndpoint(IMediaAssetRepository assetRepository)
     {
         ArgumentNullException.ThrowIfNull(req);
 
-        var limit = Math.Clamp(req.Limit, 1, ListMyAssetsRequest.MaxLimit);
+        var limit = Math.Clamp(req.Limit, 1, MediaConstraints.MaxListLimit);
         var ownerId = HttpContext.User.GetUserId();
 
         var page = await assetRepository.ListByOwnerAsync(ownerId, req.Cursor, limit, ct).ConfigureAwait(false);

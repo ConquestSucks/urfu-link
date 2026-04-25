@@ -34,6 +34,7 @@
   <Folder Name="/tests/" />
   <Folder Name="/tests/unit/">
     <Project Path="tests/unit/MediaService.UnitTests/MediaService.UnitTests.csproj" />
+    <Project Path="tests/unit/PresenceService.UnitTests/PresenceService.UnitTests.csproj" />
     <Project Path="tests/unit/UserService.UnitTests/UserService.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/contract/">
@@ -41,6 +42,7 @@
   </Folder>
   <Folder Name="/tests/integration/">
     <Project Path="tests/integration/MediaService.IntegrationTests/MediaService.IntegrationTests.csproj" />
+    <Project Path="tests/integration/PresenceService.IntegrationTests/PresenceService.IntegrationTests.csproj" />
     <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/smoke/">
