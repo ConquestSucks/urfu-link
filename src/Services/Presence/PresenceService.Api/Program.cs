@@ -1,9 +1,9 @@
+using FastEndpoints;
+using FastEndpoints.Swagger;
 using Microsoft.EntityFrameworkCore;
-using Urfu.Link.BuildingBlocks.Idempotency;
+using Scalar.AspNetCore;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
-using Urfu.Link.Services.Presence.Application;
-using Urfu.Link.Services.Presence.Domain;
 using Urfu.Link.Services.Presence.Infrastructure;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
 using Urfu.Link.Services.Presence.Messaging;
@@ -37,6 +37,16 @@ if (args.Any(a => string.Equals(a, "--migrate", StringComparison.OrdinalIgnoreCa
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
+builder.Services.AddFastEndpoints();
+builder.Services.SwaggerDocument(o =>
+{
+    o.DocumentSettings = s =>
+    {
+        s.Title = "PresenceService API";
+        s.Version = "v1";
+    };
+});
+
 builder.Services.AddServiceDefaults(builder.Configuration, "presence-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
@@ -46,25 +56,10 @@ builder.Services.AddPresenceModule(builder.Configuration);
 var app = builder.Build();
 
 app.MapServiceDefaults();
-app.MapGrpcService<InternalApiService>();
-
-app.MapGet("/", (ServiceProfile descriptor) => Results.Ok(new
-{
-    service = descriptor.ServiceName,
-    datastore = descriptor.Datastore,
-    utc = DateTimeOffset.UtcNow,
-}));
-
-app.MapPost("/api/v1/integration/publish", async (
-    PublishSampleEventRequest request,
-    SampleEventDispatcher dispatcher,
-    CancellationToken cancellationToken) =>
-{
-    var messageId = await dispatcher.PublishAsync(request, cancellationToken).ConfigureAwait(false);
-    return Results.Accepted($"/api/v1/integration/messages/{messageId}", new { MessageId = messageId });
-})
-.RequireAuthorization()
-.AddEndpointFilter<IdempotencyEndpointFilter>();
+app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
+app.UseSwaggerGen();
+app.MapScalarApiReference(o => o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
+app.MapGrpcService<InternalApiService>().RequireAuthorization();
 
 await app.RunAsync();
 

@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Application;
+using Urfu.Link.Services.Presence.Application.Aggregation;
 using Urfu.Link.Services.Presence.Domain;
 using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
@@ -48,6 +49,8 @@ public static class ModuleRegistration
         services.AddSingleton<IPrivacyProjectionStore, RedisPrivacyProjectionStore>();
 
         services.AddScoped<IKafkaMessageHandler, PrivacyChangedHandler>();
+
+        services.AddSingleton<PresenceAggregator>();
 
         return services;
     }
