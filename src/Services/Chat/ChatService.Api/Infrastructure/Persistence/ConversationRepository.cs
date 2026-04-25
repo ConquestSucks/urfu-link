@@ -17,17 +17,19 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         return doc?.ToDomain();
     }
 
-    public async Task UpsertAsync(Conversation conversation, CancellationToken cancellationToken)
+    public async Task<bool> TryCreateAsync(Conversation conversation, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         var doc = ConversationDocument.FromDomain(conversation);
-        await context.Conversations
-            .ReplaceOneAsync(
-                c => c.Id == doc.Id,
-                doc,
-                new ReplaceOptions { IsUpsert = true },
-                cancellationToken)
-            .ConfigureAwait(false);
+        try
+        {
+            await context.Conversations.InsertOneAsync(doc, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+        {
+            return false;
+        }
     }
 
     public async Task UpdateLastMessageAsync(

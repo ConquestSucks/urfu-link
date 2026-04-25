@@ -32,15 +32,16 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
     }
 
     [Fact]
-    public async Task UpsertAsync_RoundTripsConversation()
+    public async Task TryCreateAsync_FirstWriter_RoundTripsConversation()
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
         var conversation = Conversation.OpenDirect(userA, userB, now);
 
-        await _repo.UpsertAsync(conversation, default);
+        var created = await _repo.TryCreateAsync(conversation, default);
 
+        created.Should().BeTrue();
         var loaded = await _repo.GetByIdAsync(conversation.Id, default);
         loaded.Should().NotBeNull();
         loaded!.Id.Should().Be(conversation.Id);
@@ -50,10 +51,27 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
     }
 
     [Fact]
+    public async Task TryCreateAsync_SecondWriter_ReturnsFalse_AndKeepsOriginal()
+    {
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        var first = Conversation.OpenDirect(userA, userB, DateTimeOffset.UtcNow);
+        await _repo.TryCreateAsync(first, default);
+
+        // Same conversation Id (deterministic), different timestamp.
+        var racyDuplicate = Conversation.OpenDirect(userA, userB, DateTimeOffset.UtcNow.AddSeconds(1));
+        var second = await _repo.TryCreateAsync(racyDuplicate, default);
+
+        second.Should().BeFalse();
+        var loaded = await _repo.GetByIdAsync(first.Id, default);
+        loaded!.CreatedAtUtc.Should().BeCloseTo(first.CreatedAtUtc, TimeSpan.FromSeconds(1));
+    }
+
+    [Fact]
     public async Task UpdateLastMessageAsync_PersistsPreview()
     {
         var conversation = Conversation.OpenDirect(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
-        await _repo.UpsertAsync(conversation, default);
+        await _repo.TryCreateAsync(conversation, default);
 
         var sentAt = DateTimeOffset.UtcNow.AddMinutes(1);
         var preview = new MessagePreview(conversation.Participants[0], "ping", sentAt, HasAttachments: false);
@@ -73,9 +91,9 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
         var c2 = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-1));
         var noise = Conversation.OpenDirect(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
 
-        await _repo.UpsertAsync(c1, default);
-        await _repo.UpsertAsync(c2, default);
-        await _repo.UpsertAsync(noise, default);
+        await _repo.TryCreateAsync(c1, default);
+        await _repo.TryCreateAsync(c2, default);
+        await _repo.TryCreateAsync(noise, default);
 
         var results = await _repo.ListByParticipantAsync(user, cursor: null, limit: 50, default);
 
@@ -89,8 +107,8 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
         var user = Guid.NewGuid();
         var older = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-2));
         var newer = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-1));
-        await _repo.UpsertAsync(older, default);
-        await _repo.UpsertAsync(newer, default);
+        await _repo.TryCreateAsync(older, default);
+        await _repo.TryCreateAsync(newer, default);
 
         var page = await _repo.ListByParticipantAsync(
             user,

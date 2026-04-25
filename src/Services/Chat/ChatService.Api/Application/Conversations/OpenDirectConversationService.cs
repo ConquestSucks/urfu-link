@@ -23,13 +23,23 @@ public sealed class OpenDirectConversationService(
         var now = clock.GetUtcNow();
         var draft = Conversation.OpenDirect(callerUserId, peerUserId, now);
 
+        // Fast path: conversation already exists — skip the write entirely.
         var existing = await repository.GetByIdAsync(draft.Id, cancellationToken).ConfigureAwait(false);
         if (existing is not null)
         {
             return existing;
         }
 
-        await repository.UpsertAsync(draft, cancellationToken).ConfigureAwait(false);
+        // Race-safe create: only the winning caller publishes the creation event and broadcasts
+        // ConversationUpdated. A concurrent loser re-fetches the document instead of duplicating
+        // the side effects.
+        var created = await repository.TryCreateAsync(draft, cancellationToken).ConfigureAwait(false);
+        if (!created)
+        {
+            var winner = await repository.GetByIdAsync(draft.Id, cancellationToken).ConfigureAwait(false);
+            return winner ?? draft;
+        }
+
         await dispatcher.PublishAsync(
             new ChatConversationCreatedEvent(
                 draft.Id,

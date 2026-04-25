@@ -28,17 +28,17 @@ public class OpenDirectConversationServiceTests
     }
 
     [Fact]
-    public async Task OpenAsync_FirstTime_PersistsAndPublishesEvent()
+    public async Task OpenAsync_FirstTime_CreatesAndPublishesEvent()
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
-        _repo.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((Conversation?)null);
+        _repo.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversation?)null);
+        _repo.TryCreateAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var service = Build();
         var result = await service.OpenAsync(userA, userB, default);
 
-        await _repo.Received(1).UpsertAsync(Arg.Is<Conversation>(c => c.Id == result.Id), Arg.Any<CancellationToken>());
+        await _repo.Received(1).TryCreateAsync(Arg.Is<Conversation>(c => c.Id == result.Id), Arg.Any<CancellationToken>());
         _outbox.Captured.Should().ContainSingle()
             .Which.Should().BeOfType<ChatConversationCreatedEvent>()
             .Which.ConversationId.Should().Be(result.Id);
@@ -56,8 +56,31 @@ public class OpenDirectConversationServiceTests
         var result = await service.OpenAsync(userA, userB, default);
 
         result.Should().BeSameAs(existing);
-        await _repo.DidNotReceive().UpsertAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>());
+        await _repo.DidNotReceive().TryCreateAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>());
         _outbox.Captured.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task OpenAsync_RaceLost_ReturnsWinner_WithoutPublishingOrBroadcasting()
+    {
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        var winner = Conversation.OpenDirect(userA, userB, DateTimeOffset.UtcNow);
+
+        // Simulate a concurrent race: GetById returns null on first probe but TryCreateAsync
+        // loses to a competing inserter, then the re-fetch returns the winning document.
+        _repo.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((Conversation?)null, winner);
+        _repo.TryCreateAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await Build().OpenAsync(userA, userB, default);
+
+        result.Id.Should().Be(winner.Id);
+        _outbox.Captured.Should().BeEmpty();
+        await _broadcaster.DidNotReceive().NotifyConversationUpdatedAsync(
+            Arg.Any<IReadOnlyList<Guid>>(),
+            Arg.Any<Urfu.Link.Services.Chat.Application.Contracts.ConversationDto>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -65,8 +88,8 @@ public class OpenDirectConversationServiceTests
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
-        _repo.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-            .Returns((Conversation?)null);
+        _repo.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversation?)null);
+        _repo.TryCreateAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(true);
 
         var service = Build();
         var first = await service.OpenAsync(userA, userB, default);
