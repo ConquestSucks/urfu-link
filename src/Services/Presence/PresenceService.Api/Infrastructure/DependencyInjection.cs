@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
-using Urfu.Link.Services.Presence.Application;
 using Urfu.Link.Services.Presence.Application.Aggregation;
 using Urfu.Link.Services.Presence.Application.Dispatchers;
 using Urfu.Link.Services.Presence.Domain;
@@ -31,8 +30,7 @@ public static class ModuleRegistration
             ServiceName,
             "redis+postgres",
             KafkaTopicNames.PresenceEvents,
-            "presence.sample.v1"));
-        services.AddScoped<SampleEventDispatcher>();
+            "presence.user.online.v1"));
 
         services.AddOptions<PresenceOptions>()
             .Bind(configuration.GetSection(PresenceOptions.SectionName));

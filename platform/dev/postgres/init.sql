@@ -13,3 +13,10 @@ CREATE USER media WITH PASSWORD 'media';
 GRANT ALL PRIVILEGES ON DATABASE media_db TO media;
 \c media_db
 GRANT ALL ON SCHEMA public TO media;
+
+\c postgres
+CREATE DATABASE presence_db;
+CREATE USER presence WITH PASSWORD 'presence';
+GRANT ALL PRIVILEGES ON DATABASE presence_db TO presence;
+\c presence_db
+GRANT ALL ON SCHEMA public TO presence;
