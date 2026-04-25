@@ -43,10 +43,15 @@ public static class ModuleRegistration
         services.AddSingleton<IAmazonS3>(sp =>
         {
             var storageOptions = sp.GetRequiredService<IOptions<StorageOptions>>().Value;
+            var endpointUri = new Uri(storageOptions.Endpoint);
             var config = new AmazonS3Config
             {
                 ServiceURL = storageOptions.Endpoint,
                 ForcePathStyle = true,
+                // AmazonS3Config defaults to UseHttp=false (HTTPS), regardless of the
+                // ServiceURL scheme. Honour the configured scheme so dev MinIO over
+                // plain HTTP gets HTTP presigned URLs the browser can actually reach.
+                UseHttp = endpointUri.Scheme == Uri.UriSchemeHttp,
             };
             return new AmazonS3Client(storageOptions.AccessKey, storageOptions.SecretKey, config);
         });
