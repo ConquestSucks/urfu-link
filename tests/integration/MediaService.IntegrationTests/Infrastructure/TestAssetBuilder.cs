@@ -1,9 +1,11 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
+using global::Grpc.Net.Client;
 using MediaService.Api.Application.Contracts.Requests;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Enums;
+using MediaService.Api.Grpc;
 
 namespace MediaService.IntegrationTests.Infrastructure;
 
@@ -13,6 +15,9 @@ namespace MediaService.IntegrationTests.Infrastructure;
 /// </summary>
 public static class TestAssetBuilder
 {
+    /// <summary>Default in-memory payload used by helpers that just need "some bytes".</summary>
+    public const int DefaultContentSize = 64;
+
     public static ClaimsPrincipal MakeUser(Guid userId)
         => new(new ClaimsIdentity([new Claim("sub", userId.ToString())], TestAuthHandler.SchemeName));
 
@@ -22,6 +27,21 @@ public static class TestAssetBuilder
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString());
         return client;
+    }
+
+    /// <summary>
+    /// Builds an <see cref="InternalApi.InternalApiClient"/> backed by the test
+    /// server, with <see cref="TestAuthHandler.CurrentPrincipal"/> set to the
+    /// supplied user. The caller owns disposal of the returned channel + client.
+    /// </summary>
+    public static (GrpcChannel Channel, HttpClient Http, InternalApi.InternalApiClient Client) CreateGrpcClient(
+        MediaServiceFactory factory, Guid userId)
+    {
+        TestAuthHandler.CurrentPrincipal = MakeUser(userId);
+        var http = factory.CreateClient();
+        var channel = GrpcChannel.ForAddress(http.BaseAddress!,
+            new GrpcChannelOptions { HttpClient = http });
+        return (channel, http, new InternalApi.InternalApiClient(channel));
     }
 
     public static async Task<UploadInitResponse> InitAsync(
@@ -79,7 +99,7 @@ public static class TestAssetBuilder
         MediaServiceFactory factory,
         Guid ownerId,
         Visibility visibility = Visibility.Private,
-        int sizeBytes = 64)
+        int sizeBytes = DefaultContentSize)
     {
         var content = new byte[sizeBytes];
         var assetId = await InitAndUploadAsync(factory, ownerId, content, visibility);

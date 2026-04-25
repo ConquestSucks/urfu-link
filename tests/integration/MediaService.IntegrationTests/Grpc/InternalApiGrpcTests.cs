@@ -1,5 +1,4 @@
 using FluentAssertions;
-using global::Grpc.Core;
 using global::Grpc.Net.Client;
 using MediaService.Api.Grpc;
 using MediaService.IntegrationTests.Infrastructure;
@@ -49,7 +48,7 @@ public sealed class InternalApiGrpcTests : IClassFixture<MediaServiceFactory>, I
     public async Task CheckOwnership_OwnersAsset_ReturnsTrueAndExists()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var client = AuthorizedClient(ownerId);
         var reply = await client.CheckOwnershipAsync(new CheckOwnershipRequest
@@ -66,7 +65,7 @@ public sealed class InternalApiGrpcTests : IClassFixture<MediaServiceFactory>, I
     public async Task CheckOwnership_OtherUsersAsset_ReturnsExistsButNotOwner()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var client = AuthorizedClient(Guid.NewGuid());
         var reply = await client.CheckOwnershipAsync(new CheckOwnershipRequest
@@ -98,8 +97,8 @@ public sealed class InternalApiGrpcTests : IClassFixture<MediaServiceFactory>, I
     public async Task BatchGetMetadata_DropsInvalidIdsAndReturnsKnownAssets()
     {
         var ownerId = Guid.NewGuid();
-        var assetId1 = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
-        var assetId2 = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
+        var assetId1 = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
+        var assetId2 = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var client = AuthorizedClient(ownerId);
         var request = new BatchGetMetadataRequest();
@@ -117,7 +116,7 @@ public sealed class InternalApiGrpcTests : IClassFixture<MediaServiceFactory>, I
     public async Task GrantAssetAccess_AddsOneRowPerUser()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var client = AuthorizedClient(ownerId);
         var request = new GrantAssetAccessRequest
@@ -138,7 +137,7 @@ public sealed class InternalApiGrpcTests : IClassFixture<MediaServiceFactory>, I
     public async Task RevokeAllForSource_RemovesEverythingForThatSource()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
         const string conversationId = "conv-1";
 
         var client = AuthorizedClient(ownerId);

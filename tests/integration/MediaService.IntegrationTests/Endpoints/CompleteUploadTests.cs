@@ -10,6 +10,7 @@ namespace MediaService.IntegrationTests.Endpoints;
 [Collection(IntegrationCollection.Name)]
 public class CompleteUploadTests : IClassFixture<MediaServiceFactory>
 {
+    private const int SamplePayloadSize = 2048;
     private readonly MediaServiceFactory _factory;
 
     public CompleteUploadTests(MediaServiceFactory factory)
@@ -22,7 +23,7 @@ public class CompleteUploadTests : IClassFixture<MediaServiceFactory>
     {
         _factory.ResetCapturedState();
         var ownerId = Guid.NewGuid();
-        var content = Enumerable.Range(0, 2048).Select(i => (byte)(i & 0xFF)).ToArray();
+        var content = Enumerable.Range(0, SamplePayloadSize).Select(i => (byte)(i & 0xFF)).ToArray();
 
         var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
 

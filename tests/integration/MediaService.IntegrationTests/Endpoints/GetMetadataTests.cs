@@ -21,12 +21,7 @@ public class GetMetadataTests : IClassFixture<MediaServiceFactory>
     public async Task Owner_GetsMetadata()
     {
         var ownerId = Guid.NewGuid();
-        var content = new byte[128];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
-
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
         var response = await client.GetAsync($"/api/v1/media/{assetId}/metadata");
@@ -43,12 +38,7 @@ public class GetMetadataTests : IClassFixture<MediaServiceFactory>
     public async Task NonOwner_PrivateAsset_Returns403()
     {
         var ownerId = Guid.NewGuid();
-        var content = new byte[128];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
-
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var attacker = Guid.NewGuid();
         var client = TestAssetBuilder.AuthorizedClient(_factory, attacker);

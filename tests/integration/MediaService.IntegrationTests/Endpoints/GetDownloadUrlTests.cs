@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
-using global::Grpc.Net.Client;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Enums;
 using MediaService.Api.Grpc;
@@ -23,13 +22,7 @@ public class GetDownloadUrlTests : IClassFixture<MediaServiceFactory>
     public async Task Owner_GetsPresignedUrl()
     {
         var ownerId = Guid.NewGuid();
-        var content = new byte[256];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
-
-        // Move the asset to Uploaded so AccessPolicy.IsAccessible passes.
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
         var response = await client.GetAsync($"/api/v1/media/{assetId}/download-url");
@@ -44,12 +37,7 @@ public class GetDownloadUrlTests : IClassFixture<MediaServiceFactory>
     public async Task NonOwner_PrivateAsset_Returns403()
     {
         var ownerId = Guid.NewGuid();
-        var content = new byte[256];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
-
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
 
         var attacker = Guid.NewGuid();
         var client = TestAssetBuilder.AuthorizedClient(_factory, attacker);
@@ -63,13 +51,7 @@ public class GetDownloadUrlTests : IClassFixture<MediaServiceFactory>
     public async Task NonOwner_PublicAsset_GetsPresignedUrl()
     {
         var ownerId = Guid.NewGuid();
-        var content = new byte[256];
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content,
-            visibility: Visibility.Public);
-
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId, Visibility.Public);
 
         var stranger = Guid.NewGuid();
         var client = TestAssetBuilder.AuthorizedClient(_factory, stranger);
@@ -93,12 +75,7 @@ public class GetDownloadUrlTests : IClassFixture<MediaServiceFactory>
     public async Task NonOwner_WithDirectGrant_GetsPresignedUrl()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
-
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
-
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
         var beneficiary = Guid.NewGuid();
         await GrantAccessAsync(ownerId, beneficiary, assetId);
 
@@ -113,12 +90,7 @@ public class GetDownloadUrlTests : IClassFixture<MediaServiceFactory>
     public async Task NonOwner_AfterRevoke_Returns403()
     {
         var ownerId = Guid.NewGuid();
-        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, new byte[64]);
-
-        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
-        await ownerClient.PostAsJsonAsync("/api/v1/media/upload/complete",
-            new { assetId, checksum = "x" });
-
+        var assetId = await TestAssetBuilder.CreateUploadedAssetAsync(_factory, ownerId);
         var beneficiary = Guid.NewGuid();
         await GrantAccessAsync(ownerId, beneficiary, assetId);
         await RevokeAccessAsync(beneficiary, assetId);
@@ -132,36 +104,44 @@ public class GetDownloadUrlTests : IClassFixture<MediaServiceFactory>
 
     private async Task GrantAccessAsync(Guid ownerId, Guid beneficiary, Guid assetId)
     {
-        TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(ownerId);
-        using var http = _factory.CreateClient();
-        using var channel = GrpcChannel.ForAddress(http.BaseAddress!,
-            new GrpcChannelOptions { HttpClient = http });
-        var grpc = new InternalApi.InternalApiClient(channel);
-        var grant = new GrantAssetAccessRequest
+        var (channel, http, grpc) = TestAssetBuilder.CreateGrpcClient(_factory, ownerId);
+        try
         {
-            AssetId = assetId.ToString(),
-            GrantedByUserId = ownerId.ToString(),
-            Source = global::MediaService.Api.Grpc.GrantSource.Direct,
-        };
-        grant.UserIds.Add(beneficiary.ToString());
-        await grpc.GrantAssetAccessAsync(grant);
+            var grant = new GrantAssetAccessRequest
+            {
+                AssetId = assetId.ToString(),
+                GrantedByUserId = ownerId.ToString(),
+                Source = global::MediaService.Api.Grpc.GrantSource.Direct,
+            };
+            grant.UserIds.Add(beneficiary.ToString());
+            await grpc.GrantAssetAccessAsync(grant);
+        }
+        finally
+        {
+            channel.Dispose();
+            http.Dispose();
+        }
     }
 
     private async Task RevokeAccessAsync(Guid beneficiary, Guid assetId)
     {
-        // Caller must be authenticated; reuse the beneficiary principal — gRPC
+        // Caller must be authenticated; the beneficiary works because gRPC
         // here only requires the JWT scheme, not asset ownership.
-        TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(beneficiary);
-        using var http = _factory.CreateClient();
-        using var channel = GrpcChannel.ForAddress(http.BaseAddress!,
-            new GrpcChannelOptions { HttpClient = http });
-        var grpc = new InternalApi.InternalApiClient(channel);
-        var revoke = new RevokeAssetAccessRequest
+        var (channel, http, grpc) = TestAssetBuilder.CreateGrpcClient(_factory, beneficiary);
+        try
         {
-            AssetId = assetId.ToString(),
-            Source = global::MediaService.Api.Grpc.GrantSource.Direct,
-        };
-        revoke.UserIds.Add(beneficiary.ToString());
-        await grpc.RevokeAssetAccessAsync(revoke);
+            var revoke = new RevokeAssetAccessRequest
+            {
+                AssetId = assetId.ToString(),
+                Source = global::MediaService.Api.Grpc.GrantSource.Direct,
+            };
+            revoke.UserIds.Add(beneficiary.ToString());
+            await grpc.RevokeAssetAccessAsync(revoke);
+        }
+        finally
+        {
+            channel.Dispose();
+            http.Dispose();
+        }
     }
 }
