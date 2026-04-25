@@ -23,9 +23,15 @@ public sealed class SendMessageService(
     IChatBroadcaster broadcaster,
     TimeProvider clock)
 {
+    public const int MaxBodyLength = 4000;
+
+    public const int MaxAttachmentsPerMessage = 10;
+
     public async Task<MessageDto> SendAsync(SendMessageRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+
+        ValidatePayloadShape(request);
 
         var conversation = await conversations.GetByIdAsync(request.ConversationId, cancellationToken).ConfigureAwait(false)
             ?? throw ConversationNotFoundException.For(request.ConversationId);
@@ -42,14 +48,19 @@ public sealed class SendMessageService(
             var prior = await messages.FindByClientMessageIdAsync(request.SenderId, request.ClientMessageId, cancellationToken).ConfigureAwait(false);
             if (prior is not null)
             {
+                // The conversation lastMessage update may have failed in the prior attempt — replay
+                // it now so the conversation projection eventually catches up. Idempotent at the
+                // Mongo write level (Set $set with the same payload).
+                await ReprojectLastMessageAsync(conversation, prior, cancellationToken).ConfigureAwait(false);
                 return MessageDto.FromDomain(prior);
             }
-            // Idempotency win without an actual stored message means the writer crashed mid-way
-            // last time. Fall through and let the unique index reject the duplicate so the caller
-            // sees a deterministic error.
+            // Idempotency win without an actual stored message means the writer crashed before
+            // InsertAsync. Fall through and let the unique index reject the duplicate so the
+            // caller sees a deterministic error if a competing writer made progress.
         }
 
-        await ValidateAttachmentsOwnershipAsync(request.Attachments, request.SenderId, cancellationToken).ConfigureAwait(false);
+        var attachments = await ResolveAttachmentsAsync(request.AttachmentAssetIds, request.SenderId, cancellationToken)
+            .ConfigureAwait(false);
 
         var now = clock.GetUtcNow();
         var message = Message.Send(
@@ -57,7 +68,7 @@ public sealed class SendMessageService(
             conversationId: conversation.Id,
             senderId: request.SenderId,
             body: request.Body,
-            attachments: request.Attachments,
+            attachments: attachments,
             clientMessageId: request.ClientMessageId,
             createdAtUtc: now);
 
@@ -70,6 +81,7 @@ public sealed class SendMessageService(
             var prior = await messages.FindByClientMessageIdAsync(request.SenderId, request.ClientMessageId, cancellationToken).ConfigureAwait(false);
             if (prior is not null)
             {
+                await ReprojectLastMessageAsync(conversation, prior, cancellationToken).ConfigureAwait(false);
                 return MessageDto.FromDomain(prior);
             }
             throw;
@@ -78,7 +90,7 @@ public sealed class SendMessageService(
         var preview = new MessagePreview(request.SenderId, request.Body, now, message.HasAttachments);
         await conversations.UpdateLastMessageAsync(conversation.Id, preview, now, cancellationToken).ConfigureAwait(false);
 
-        await GrantAttachmentAccessAsync(request, conversation, cancellationToken).ConfigureAwait(false);
+        await GrantAttachmentAccessAsync(attachments, conversation, request.SenderId, cancellationToken).ConfigureAwait(false);
 
         var recipients = conversation.Participants.Where(p => p != request.SenderId).ToList();
         await dispatcher.PublishAsync(
@@ -98,46 +110,102 @@ public sealed class SendMessageService(
         return dto;
     }
 
-    private async Task ValidateAttachmentsOwnershipAsync(
-        IReadOnlyList<Attachment> attachments,
-        Guid senderId,
-        CancellationToken cancellationToken)
+    private static void ValidatePayloadShape(SendMessageRequest request)
     {
-        foreach (var attachment in attachments)
+        if (request.Body is { Length: > MaxBodyLength })
         {
-            var owns = await mediaServiceClient.CheckOwnershipAsync(attachment.MediaAssetId, senderId, cancellationToken).ConfigureAwait(false);
-            if (!owns)
-            {
-                throw new ChatAttachmentNotOwnedException(attachment.MediaAssetId, senderId);
-            }
+            throw new ChatPayloadTooLargeException(
+                $"Message body exceeds {MaxBodyLength} characters.");
+        }
+
+        if (request.AttachmentAssetIds is { Count: > MaxAttachmentsPerMessage })
+        {
+            throw new ChatPayloadTooLargeException(
+                $"Message has more than {MaxAttachmentsPerMessage} attachments.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.ClientMessageId))
+        {
+            throw new ArgumentException("ClientMessageId is required.", nameof(request));
         }
     }
 
-    private async Task GrantAttachmentAccessAsync(
-        SendMessageRequest request,
-        Conversation conversation,
+    private async Task<IReadOnlyList<Attachment>> ResolveAttachmentsAsync(
+        IReadOnlyList<Guid> assetIds,
+        Guid senderId,
         CancellationToken cancellationToken)
     {
-        if (request.Attachments.Count == 0)
+        if (assetIds is null || assetIds.Count == 0)
+        {
+            return Array.Empty<Attachment>();
+        }
+
+        var metadata = await mediaServiceClient.BatchGetMetadataAsync(assetIds, cancellationToken).ConfigureAwait(false);
+        var byId = metadata.ToDictionary(m => m.AssetId);
+
+        var resolved = new List<Attachment>(assetIds.Count);
+        foreach (var assetId in assetIds)
+        {
+            if (!byId.TryGetValue(assetId, out var meta) || !meta.IsUploaded)
+            {
+                throw new ChatAttachmentNotOwnedException(assetId, senderId);
+            }
+            if (meta.OwnerId != senderId)
+            {
+                throw new ChatAttachmentNotOwnedException(assetId, senderId);
+            }
+            resolved.Add(new Attachment(
+                MediaAssetId: meta.AssetId,
+                Type: meta.Kind,
+                ThumbnailAssetId: null,
+                FileName: meta.OriginalFileName,
+                Size: meta.SizeBytes,
+                MimeType: meta.MimeType));
+        }
+        return resolved;
+    }
+
+    private async Task GrantAttachmentAccessAsync(
+        IReadOnlyList<Attachment> attachments,
+        Conversation conversation,
+        Guid senderId,
+        CancellationToken cancellationToken)
+    {
+        if (attachments.Count == 0)
         {
             return;
         }
 
-        var grantees = conversation.Participants.Where(p => p != request.SenderId).ToList();
+        var grantees = conversation.Participants.Where(p => p != senderId).ToList();
         if (grantees.Count == 0)
         {
             return;
         }
 
-        foreach (var attachment in request.Attachments)
+        // Fan out grants in parallel — each call is a separate gRPC round-trip and the calls
+        // are independent.
+        var grantTasks = attachments
+            .Select(a => mediaServiceClient.GrantConversationAccessAsync(
+                a.MediaAssetId, grantees, conversation.Id, senderId, cancellationToken))
+            .ToArray();
+        await Task.WhenAll(grantTasks).ConfigureAwait(false);
+    }
+
+    private async Task ReprojectLastMessageAsync(
+        Conversation conversation,
+        Message message,
+        CancellationToken cancellationToken)
+    {
+        // Only re-project if THIS message is the one that should be on top of the conversation.
+        // A stale write would otherwise overwrite a newer preview.
+        if (conversation.LastMessageAtUtc > message.CreatedAtUtc)
         {
-            await mediaServiceClient.GrantConversationAccessAsync(
-                attachment.MediaAssetId,
-                grantees,
-                conversation.Id,
-                request.SenderId,
-                cancellationToken).ConfigureAwait(false);
+            return;
         }
+
+        var preview = new MessagePreview(message.SenderId, message.Body, message.CreatedAtUtc, message.HasAttachments);
+        await conversations.UpdateLastMessageAsync(conversation.Id, preview, message.CreatedAtUtc, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static string BuildPreviewText(string body, bool hasAttachments)
@@ -148,8 +216,18 @@ public sealed class SendMessageService(
         }
 
         const int maxPreview = 120;
-        return body.Length <= maxPreview ? body : body[..maxPreview];
+        if (body.Length <= maxPreview)
+        {
+            return body;
+        }
+
+        // Avoid splitting a UTF-16 surrogate pair when truncating — the high surrogate at
+        // index `maxPreview - 1` would otherwise be left without its low surrogate and produce
+        // an invalid string when re-encoded.
+        var cutoff = char.IsHighSurrogate(body[maxPreview - 1]) ? maxPreview - 1 : maxPreview;
+        return body[..cutoff];
     }
+
 }
 
 public sealed class ChatAttachmentNotOwnedException : InvalidOperationException
@@ -169,7 +247,7 @@ public sealed class ChatAttachmentNotOwnedException : InvalidOperationException
     }
 
     public ChatAttachmentNotOwnedException(Guid assetId, Guid userId)
-        : base($"Asset '{assetId}' is not owned by user '{userId}'.")
+        : base($"Asset '{assetId}' is not owned by user '{userId}' or is not in Uploaded state.")
     {
         AssetId = assetId;
         UserId = userId;
@@ -178,4 +256,21 @@ public sealed class ChatAttachmentNotOwnedException : InvalidOperationException
     public Guid AssetId { get; }
 
     public Guid UserId { get; }
+}
+
+public sealed class ChatPayloadTooLargeException : InvalidOperationException
+{
+    public ChatPayloadTooLargeException()
+    {
+    }
+
+    public ChatPayloadTooLargeException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatPayloadTooLargeException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

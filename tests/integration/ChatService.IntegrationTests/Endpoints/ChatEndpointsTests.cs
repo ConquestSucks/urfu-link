@@ -103,7 +103,7 @@ public class ChatEndpointsTests : IAsyncLifetime
             await using var sendScope = _factory.Services.CreateAsyncScope();
             var send = sendScope.ServiceProvider.GetRequiredService<SendMessageService>();
             await send.SendAsync(
-                new SendMessageRequest(convId, caller, $"m{i}", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(convId, caller, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
                 default);
             await Task.Delay(5);
         }

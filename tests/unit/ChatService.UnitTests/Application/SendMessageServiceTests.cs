@@ -7,6 +7,7 @@ using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
@@ -40,6 +41,8 @@ public class SendMessageServiceTests
         _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
         _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
         return conv;
     }
 
@@ -48,7 +51,7 @@ public class SendMessageServiceTests
     {
         var conv = SeedConversation();
         var stranger = Guid.NewGuid();
-        var request = new SendMessageRequest(conv.Id, stranger, "x", Array.Empty<Attachment>(), "c1");
+        var request = new SendMessageRequest(conv.Id, stranger, "x", Array.Empty<Guid>(), "c1");
 
         var act = () => Build().SendAsync(request, default);
 
@@ -61,7 +64,7 @@ public class SendMessageServiceTests
         _conversations.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversation?)null);
 
         var act = () => Build().SendAsync(
-            new SendMessageRequest("missing", Sender, "x", Array.Empty<Attachment>(), "c1"),
+            new SendMessageRequest("missing", Sender, "x", Array.Empty<Guid>(), "c1"),
             default);
 
         await act.Should().ThrowAsync<ConversationNotFoundException>();
@@ -71,7 +74,7 @@ public class SendMessageServiceTests
     public async Task SendAsync_HappyPath_PersistsAndPublishesSentEvent()
     {
         var conv = SeedConversation();
-        var request = new SendMessageRequest(conv.Id, Sender, "hello", Array.Empty<Attachment>(), "c1");
+        var request = new SendMessageRequest(conv.Id, Sender, "hello", Array.Empty<Guid>(), "c1");
 
         var dto = await Build().SendAsync(request, default);
 
@@ -98,7 +101,7 @@ public class SendMessageServiceTests
         _messages.FindByClientMessageIdAsync(Sender, "c-dup", Arg.Any<CancellationToken>()).Returns(prior);
 
         var dto = await Build().SendAsync(
-            new SendMessageRequest(conv.Id, Sender, "new", Array.Empty<Attachment>(), "c-dup"),
+            new SendMessageRequest(conv.Id, Sender, "new", Array.Empty<Guid>(), "c-dup"),
             default);
 
         dto.Id.Should().Be(prior.Id);
@@ -107,14 +110,20 @@ public class SendMessageServiceTests
     }
 
     [Fact]
-    public async Task SendAsync_AttachmentNotOwned_ThrowsAttachmentException_BeforeInsert()
+    public async Task SendAsync_AssetNotOwned_ThrowsAttachmentException_BeforeInsert()
     {
         var conv = SeedConversation();
-        var asset = Guid.NewGuid();
-        _media.CheckOwnershipAsync(asset, Sender, Arg.Any<CancellationToken>()).Returns(false);
+        var assetId = Guid.NewGuid();
+        var someoneElse = Guid.NewGuid();
+        _media.BatchGetMetadataAsync(
+                Arg.Is<IReadOnlyList<Guid>>(l => l.Contains(assetId)),
+                Arg.Any<CancellationToken>())
+            .Returns(new List<MediaAssetMetadata>
+            {
+                new(assetId, someoneElse, AttachmentType.Image, 100, "image/png", "p.png", IsUploaded: true),
+            });
 
-        var attach = new Attachment(asset, Urfu.Link.Services.Chat.Domain.Enums.AttachmentType.Image, null, "p.png", 1, "image/png");
-        var request = new SendMessageRequest(conv.Id, Sender, "x", new[] { attach }, "c1");
+        var request = new SendMessageRequest(conv.Id, Sender, "x", new[] { assetId }, "c1");
 
         var act = () => Build().SendAsync(request, default);
 
@@ -123,23 +132,104 @@ public class SendMessageServiceTests
     }
 
     [Fact]
-    public async Task SendAsync_WithAttachment_GrantsAccessToOtherParticipants()
+    public async Task SendAsync_AssetMissingFromMediaService_ThrowsAttachmentException()
     {
         var conv = SeedConversation();
-        var asset = Guid.NewGuid();
-        _media.CheckOwnershipAsync(asset, Sender, Arg.Any<CancellationToken>()).Returns(true);
+        var assetId = Guid.NewGuid();
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
 
-        var attach = new Attachment(asset, Urfu.Link.Services.Chat.Domain.Enums.AttachmentType.Image, null, "p.png", 1, "image/png");
-        var request = new SendMessageRequest(conv.Id, Sender, "look", new[] { attach }, "c1");
+        var request = new SendMessageRequest(conv.Id, Sender, "x", new[] { assetId }, "c1");
 
-        await Build().SendAsync(request, default);
+        await Build().Invoking(s => s.SendAsync(request, default))
+            .Should().ThrowAsync<ChatAttachmentNotOwnedException>();
+    }
+
+    [Fact]
+    public async Task SendAsync_AssetNotUploadedYet_Throws()
+    {
+        var conv = SeedConversation();
+        var assetId = Guid.NewGuid();
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<MediaAssetMetadata>
+            {
+                new(assetId, Sender, AttachmentType.Image, 100, "image/png", "p.png", IsUploaded: false),
+            });
+
+        var request = new SendMessageRequest(conv.Id, Sender, "x", new[] { assetId }, "c1");
+
+        await Build().Invoking(s => s.SendAsync(request, default))
+            .Should().ThrowAsync<ChatAttachmentNotOwnedException>();
+    }
+
+    [Fact]
+    public async Task SendAsync_WithAttachment_PersistsServerSideMetadata_AndGrantsAccess()
+    {
+        var conv = SeedConversation();
+        var assetId = Guid.NewGuid();
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<MediaAssetMetadata>
+            {
+                new(assetId, Sender, AttachmentType.Image, 1024, "image/png", "photo.png", IsUploaded: true),
+            });
+
+        var request = new SendMessageRequest(conv.Id, Sender, "look", new[] { assetId }, "c1");
+
+        var dto = await Build().SendAsync(request, default);
+
+        dto.Attachments.Should().ContainSingle()
+            .Which.Should().Match<Urfu.Link.Services.Chat.Application.Contracts.AttachmentDto>(a =>
+                a.MediaAssetId == assetId
+                && a.Type == AttachmentType.Image
+                && a.Size == 1024
+                && a.MimeType == "image/png"
+                && a.FileName == "photo.png");
 
         await _media.Received(1).GrantConversationAccessAsync(
-            asset,
+            assetId,
             Arg.Is<IReadOnlyList<Guid>>(u => u.Count == 1 && u[0] == Peer),
             conv.Id,
             Sender,
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SendAsync_BodyTooLong_ThrowsPayloadTooLarge()
+    {
+        var conv = SeedConversation();
+        var hugeBody = new string('a', SendMessageService.MaxBodyLength + 1);
+        var request = new SendMessageRequest(conv.Id, Sender, hugeBody, Array.Empty<Guid>(), "c1");
+
+        await Build().Invoking(s => s.SendAsync(request, default))
+            .Should().ThrowAsync<ChatPayloadTooLargeException>();
+    }
+
+    [Fact]
+    public async Task SendAsync_TooManyAttachments_ThrowsPayloadTooLarge()
+    {
+        var conv = SeedConversation();
+        var ids = Enumerable.Range(0, SendMessageService.MaxAttachmentsPerMessage + 1).Select(_ => Guid.NewGuid()).ToList();
+        var request = new SendMessageRequest(conv.Id, Sender, "x", ids, "c1");
+
+        await Build().Invoking(s => s.SendAsync(request, default))
+            .Should().ThrowAsync<ChatPayloadTooLargeException>();
+    }
+
+    [Fact]
+    public async Task SendAsync_WithMultipleAttachments_GrantsAccessInParallel()
+    {
+        var conv = SeedConversation();
+        var ids = new[] { Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid() };
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(ids.Select(id => new MediaAssetMetadata(id, Sender, AttachmentType.Image, 100, "image/png", "p.png", true)).ToList());
+
+        await Build().SendAsync(new SendMessageRequest(conv.Id, Sender, "x", ids, "c1"), default);
+
+        foreach (var id in ids)
+        {
+            await _media.Received(1).GrantConversationAccessAsync(
+                id, Arg.Any<IReadOnlyList<Guid>>(), conv.Id, Sender, Arg.Any<CancellationToken>());
+        }
     }
 
     private sealed class RecordingOutboxWriter : IOutboxWriter

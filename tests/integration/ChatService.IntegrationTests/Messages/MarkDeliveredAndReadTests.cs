@@ -36,7 +36,7 @@ public class MarkDeliveredAndReadTests : IAsyncLifetime
             await using var sendScope = _factory.Services.CreateAsyncScope();
             var send = sendScope.ServiceProvider.GetRequiredService<SendMessageService>();
             var dto = await send.SendAsync(
-                new SendMessageRequest(conv.Id, sender, $"m{i}", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(conv.Id, sender, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
                 default);
             messageIds.Add(dto.Id);
         }
@@ -84,7 +84,7 @@ public class MarkDeliveredAndReadTests : IAsyncLifetime
             await using var sendScope = _factory.Services.CreateAsyncScope();
             var send = sendScope.ServiceProvider.GetRequiredService<SendMessageService>();
             var dto = await send.SendAsync(
-                new SendMessageRequest(conv.Id, sender, $"m{i}", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(conv.Id, sender, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
                 default);
             ids.Add(dto.Id);
         }
@@ -119,7 +119,7 @@ public class MarkDeliveredAndReadTests : IAsyncLifetime
         await using var sendScope = _factory.Services.CreateAsyncScope();
         var send = sendScope.ServiceProvider.GetRequiredService<SendMessageService>();
         var msg = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "m", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "m", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
             default);
 
         await using var scope = _factory.Services.CreateAsyncScope();

@@ -7,7 +7,6 @@ using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
-using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
 namespace ChatService.IntegrationTests.Messages;
 
@@ -33,7 +32,7 @@ public class SendMessageServiceTests : IAsyncLifetime
         await using var scope = _factory.Services.CreateAsyncScope();
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var dto = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "hello", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "hello", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
             default);
 
         dto.Body.Should().Be("hello");
@@ -66,13 +65,13 @@ public class SendMessageServiceTests : IAsyncLifetime
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
 
         var first = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "hi", Array.Empty<Attachment>(), clientMsgId),
+            new SendMessageRequest(conv.Id, sender, "hi", Array.Empty<Guid>(), clientMsgId),
             default);
 
         // The fake idempotency store returns true on every call (treats every key as fresh).
         // So duplicate detection must rely on the unique sparse index in MongoDB.
         var second = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "hi-again", Array.Empty<Attachment>(), clientMsgId),
+            new SendMessageRequest(conv.Id, sender, "hi-again", Array.Empty<Guid>(), clientMsgId),
             default);
 
         second.Id.Should().Be(first.Id);
@@ -83,18 +82,18 @@ public class SendMessageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SendAsync_AttachmentNotOwned_Throws_AndDoesNotPersist()
+    public async Task SendAsync_AssetOwnedBySomeoneElse_Throws_AndDoesNotPersist()
     {
         var (sender, _, conv) = await OpenConversationAsync();
         var assetId = Guid.NewGuid();
-        _factory.MediaServiceClient.SetOwnership(assetId, sender, isOwner: false);
-        var attachment = new Attachment(assetId, AttachmentType.Image, null, "p.png", 100, "image/png");
+        var someoneElse = Guid.NewGuid();
+        _factory.MediaServiceClient.RegisterAsset(assetId, ownerId: someoneElse, kind: AttachmentType.Image);
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
 
         var act = () => send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "x", new[] { attachment }, $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "x", new[] { assetId }, $"c-{Guid.NewGuid():N}"),
             default);
 
         await act.Should().ThrowAsync<ChatAttachmentNotOwnedException>();
@@ -104,19 +103,31 @@ public class SendMessageServiceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task SendAsync_WithAttachment_GrantsAccessToOtherParticipants()
+    public async Task SendAsync_WithAttachment_PersistsServerSideMetadata_AndGrantsAccess()
     {
         var (sender, peer, conv) = await OpenConversationAsync();
         var assetId = Guid.NewGuid();
-        _factory.MediaServiceClient.SetOwnership(assetId, sender, isOwner: true);
-        var attachment = new Attachment(assetId, AttachmentType.Image, null, "p.png", 100, "image/png");
+        _factory.MediaServiceClient.RegisterAsset(
+            assetId,
+            ownerId: sender,
+            kind: AttachmentType.Image,
+            sizeBytes: 4096,
+            mimeType: "image/png",
+            fileName: "server-controlled.png");
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
 
-        await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "look", new[] { attachment }, $"c-{Guid.NewGuid():N}"),
+        var dto = await send.SendAsync(
+            new SendMessageRequest(conv.Id, sender, "look", new[] { assetId }, $"c-{Guid.NewGuid():N}"),
             default);
+
+        var attachment = dto.Attachments.Should().ContainSingle().Subject;
+        attachment.MediaAssetId.Should().Be(assetId);
+        attachment.Type.Should().Be(AttachmentType.Image);
+        attachment.Size.Should().Be(4096);
+        attachment.MimeType.Should().Be("image/png");
+        attachment.FileName.Should().Be("server-controlled.png");
 
         _factory.MediaServiceClient.Grants
             .Should().ContainSingle(g => g.AssetId == assetId

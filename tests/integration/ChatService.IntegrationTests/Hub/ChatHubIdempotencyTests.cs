@@ -38,14 +38,14 @@ public class ChatHubIdempotencyTests : IAsyncLifetime
         {
             ConversationId = conv.Id,
             Body = "hi",
-            Attachments = Array.Empty<AttachmentDto>(),
+            AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = clientMessageId,
         });
         var second = await aliceConn.InvokeAsync<MessageDto>("SendMessage", new
         {
             ConversationId = conv.Id,
             Body = "hi-again",
-            Attachments = Array.Empty<AttachmentDto>(),
+            AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = clientMessageId,
         });
 

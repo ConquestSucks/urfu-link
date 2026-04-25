@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.SignalR;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
-using Urfu.Link.Services.Chat.Domain.ValueObjects;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Realtime;
@@ -11,7 +10,7 @@ namespace Urfu.Link.Services.Chat.Realtime;
 public sealed record SendMessageHubInput(
     string ConversationId,
     string Body,
-    IReadOnlyList<AttachmentDto> Attachments,
+    IReadOnlyList<Guid> AttachmentAssetIds,
     string ClientMessageId);
 
 [Authorize]
@@ -32,9 +31,9 @@ public sealed class ChatHub(
     {
         ArgumentNullException.ThrowIfNull(input);
         var caller = Context.User!.GetUserId();
-        var attachments = input.Attachments?.Select(a => a.ToDomain()).ToList() ?? new List<Attachment>();
+        var assetIds = input.AttachmentAssetIds ?? Array.Empty<Guid>();
         return sendMessage.SendAsync(
-            new SendMessageRequest(input.ConversationId, caller, input.Body ?? string.Empty, attachments, input.ClientMessageId),
+            new SendMessageRequest(input.ConversationId, caller, input.Body ?? string.Empty, assetIds, input.ClientMessageId),
             Context.ConnectionAborted);
     }
 

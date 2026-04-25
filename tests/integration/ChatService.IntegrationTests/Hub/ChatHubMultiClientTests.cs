@@ -37,7 +37,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
         {
             ConversationId = conv.Id,
             Body = "hi bob",
-            Attachments = Array.Empty<AttachmentDto>(),
+            AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
         });
 
@@ -64,7 +64,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
         {
             ConversationId = conv.Id,
             Body = "hi",
-            Attachments = Array.Empty<AttachmentDto>(),
+            AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
         });
 
@@ -95,7 +95,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
         {
             ConversationId = conv.Id,
             Body = "hi",
-            Attachments = Array.Empty<AttachmentDto>(),
+            AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
         });
 

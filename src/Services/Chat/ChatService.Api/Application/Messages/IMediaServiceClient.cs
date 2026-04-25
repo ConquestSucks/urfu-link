@@ -1,4 +1,20 @@
+using Urfu.Link.Services.Chat.Domain.Enums;
+
 namespace Urfu.Link.Services.Chat.Application.Messages;
+
+/// <summary>
+/// Server-side projection of a single asset returned by MediaService. Used by ChatService to
+/// build an <see cref="Domain.ValueObjects.Attachment"/> from a client-supplied asset id without
+/// trusting any client metadata.
+/// </summary>
+public sealed record MediaAssetMetadata(
+    Guid AssetId,
+    Guid OwnerId,
+    AttachmentType Kind,
+    long SizeBytes,
+    string MimeType,
+    string OriginalFileName,
+    bool IsUploaded);
 
 /// <summary>
 /// Abstraction over MediaService gRPC. Decouples the chat application layer from generated
@@ -6,7 +22,13 @@ namespace Urfu.Link.Services.Chat.Application.Messages;
 /// </summary>
 public interface IMediaServiceClient
 {
-    Task<bool> CheckOwnershipAsync(Guid assetId, Guid userId, CancellationToken cancellationToken);
+    /// <summary>
+    /// Fetches authoritative metadata for the given asset ids. The returned list contains an
+    /// entry for every asset that exists in MediaService — missing assets are silently dropped.
+    /// </summary>
+    Task<IReadOnlyList<MediaAssetMetadata>> BatchGetMetadataAsync(
+        IReadOnlyList<Guid> assetIds,
+        CancellationToken cancellationToken);
 
     Task GrantConversationAccessAsync(
         Guid assetId,
