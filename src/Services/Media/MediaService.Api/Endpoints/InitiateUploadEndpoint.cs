@@ -31,12 +31,8 @@ public sealed class InitiateUploadEndpoint(
     {
         ArgumentNullException.ThrowIfNull(req);
 
-        if (!MimeTypeCatalog.TryResolve(req.MimeType, out var kind))
-        {
-            AddError(r => r.MimeType, "Mime type is not in the white-list.");
-            await HttpContext.Response.SendErrorsAsync(ValidationFailures, cancellation: ct).ConfigureAwait(false);
-            return;
-        }
+        // InitiateUploadValidator has already accepted the MIME type — TryResolve cannot fail.
+        MimeTypeCatalog.TryResolve(req.MimeType, out var kind);
 
         var ownerId = HttpContext.User.GetUserId();
         var bucket = req.Visibility == Visibility.Public
