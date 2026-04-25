@@ -41,7 +41,7 @@ builder.Services.AddServiceDefaults(builder.Configuration, "presence-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
-builder.Services.AddPresenceModule();
+builder.Services.AddPresenceModule(builder.Configuration);
 
 var app = builder.Build();
 
