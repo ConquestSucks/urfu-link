@@ -14,7 +14,7 @@ builder.Services.AddServiceDefaults(builder.Configuration, "chat-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
-builder.Services.AddChatModule();
+builder.Services.AddChatModule(builder.Configuration);
 
 var app = builder.Build();
 
