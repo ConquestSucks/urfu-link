@@ -85,6 +85,11 @@ public sealed class InternalApiService(
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Bad guid in request."));
         }
 
+        if (request.UserIds.Count == 0)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "user_ids cannot be empty."));
+        }
+
         var source = (DomainEnums.GrantSource)request.Source;
         var sourceId = string.IsNullOrWhiteSpace(request.SourceId) ? null : request.SourceId;
         var userIds = ParseUserIdsOrThrow(request.UserIds);
@@ -108,6 +113,11 @@ public sealed class InternalApiService(
         if (!Guid.TryParse(request.AssetId, out var assetId))
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Bad guid in request."));
+        }
+
+        if (request.UserIds.Count == 0)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "user_ids cannot be empty."));
         }
 
         var source = (DomainEnums.GrantSource)request.Source;

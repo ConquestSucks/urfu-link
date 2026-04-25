@@ -50,6 +50,45 @@ public class InternalApiServiceTests
         ex.Which.Status.StatusCode.Should().Be(StatusCode.InvalidArgument);
     }
 
+    [Fact]
+    public async Task GrantAssetAccess_EmptyUserIds_ThrowsInvalidArgument()
+    {
+        var assetRepo = Substitute.For<IMediaAssetRepository>();
+        var grantRepo = Substitute.For<IMediaAccessGrantRepository>();
+        var sut = new InternalApiService(assetRepo, grantRepo);
+
+        var request = new GrantAssetAccessRequest
+        {
+            AssetId = Guid.NewGuid().ToString(),
+            GrantedByUserId = Guid.NewGuid().ToString(),
+            Source = GrantSource.Direct,
+        };
+
+        var act = async () => await sut.GrantAssetAccess(request, new StubServerCallContext());
+
+        var ex = await act.Should().ThrowAsync<RpcException>();
+        ex.Which.Status.StatusCode.Should().Be(StatusCode.InvalidArgument);
+    }
+
+    [Fact]
+    public async Task RevokeAssetAccess_EmptyUserIds_ThrowsInvalidArgument()
+    {
+        var assetRepo = Substitute.For<IMediaAssetRepository>();
+        var grantRepo = Substitute.For<IMediaAccessGrantRepository>();
+        var sut = new InternalApiService(assetRepo, grantRepo);
+
+        var request = new RevokeAssetAccessRequest
+        {
+            AssetId = Guid.NewGuid().ToString(),
+            Source = GrantSource.Direct,
+        };
+
+        var act = async () => await sut.RevokeAssetAccess(request, new StubServerCallContext());
+
+        var ex = await act.Should().ThrowAsync<RpcException>();
+        ex.Which.Status.StatusCode.Should().Be(StatusCode.InvalidArgument);
+    }
+
     private sealed class StubServerCallContext : ServerCallContext
     {
         protected override string MethodCore => "Stub";
