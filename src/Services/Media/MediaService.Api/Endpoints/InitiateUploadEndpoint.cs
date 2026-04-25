@@ -2,6 +2,7 @@ using FastEndpoints;
 using MediaService.Api.Application.Contracts.Requests;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Application.Limits;
+using MediaService.Api.Application.Storage;
 using MediaService.Api.Domain;
 using MediaService.Api.Domain.Enums;
 using MediaService.Api.Domain.Interfaces;
@@ -40,7 +41,7 @@ public sealed class InitiateUploadEndpoint(
             : storageOptions.Value.PrivateBucket;
 
         var assetId = Guid.NewGuid();
-        var objectKey = $"{ownerId:N}/{assetId:N}/{SanitizeFileName(req.FileName)}";
+        var objectKey = $"{ownerId:N}/{assetId:N}/{FileNameSanitizer.Sanitize(req.FileName)}";
 
         var asset = MediaAsset.Initiate(
             assetId, ownerId, req.Visibility, kind, bucket, objectKey, req.Size, req.MimeType, req.FileName);
@@ -59,10 +60,4 @@ public sealed class InitiateUploadEndpoint(
             cancellation: ct).ConfigureAwait(false);
     }
 
-    private static string SanitizeFileName(string fileName)
-    {
-        var invalid = Path.GetInvalidFileNameChars();
-        var sanitized = new string([.. fileName.Where(c => !invalid.Contains(c))]);
-        return string.IsNullOrEmpty(sanitized) ? "file" : sanitized;
-    }
 }
