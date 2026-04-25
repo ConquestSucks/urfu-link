@@ -10,6 +10,7 @@ using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
+using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.UnitTests.Application;
 
@@ -22,6 +23,7 @@ public class SendMessageServiceTests
     private readonly IMessageRepository _messages = Substitute.For<IMessageRepository>();
     private readonly IMediaServiceClient _media = Substitute.For<IMediaServiceClient>();
     private readonly IIdempotencyStore _idempotency = Substitute.For<IIdempotencyStore>();
+    private readonly IChatBroadcaster _broadcaster = Substitute.For<IChatBroadcaster>();
     private readonly RecordingOutboxWriter _outbox = new();
 
     private SendMessageService Build()
@@ -29,7 +31,7 @@ public class SendMessageServiceTests
         var dispatcher = new ChatEventDispatcher(
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
-        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, TimeProvider.System);
+        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, TimeProvider.System);
     }
 
     private Conversation SeedConversation()

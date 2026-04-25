@@ -1,5 +1,6 @@
 using Grpc.Net.Client;
 using MediaService.Api.Grpc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -13,6 +14,7 @@ using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Infrastructure.Grpc;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
+using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Infrastructure;
 
@@ -68,6 +70,8 @@ public static class ModuleRegistration
         services.AddScoped<GetUserConversationsQuery>();
         services.AddScoped<GetConversationQuery>();
         services.AddScoped<GetConversationMessagesQuery>();
+
+        services.AddSingleton<IChatBroadcaster, ChatBroadcaster>();
 
         return services;
     }

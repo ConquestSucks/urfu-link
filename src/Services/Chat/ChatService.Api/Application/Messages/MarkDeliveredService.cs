@@ -1,5 +1,6 @@
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
 
@@ -9,6 +10,7 @@ public sealed class MarkDeliveredService(
     IConversationRepository conversations,
     IMessageRepository messages,
     ChatEventDispatcher dispatcher,
+    IChatBroadcaster broadcaster,
     TimeProvider clock)
 {
     public async Task<IReadOnlyList<Guid>> MarkAsync(MarkDeliveredRequest request, CancellationToken cancellationToken)
@@ -37,6 +39,14 @@ public sealed class MarkDeliveredService(
             await dispatcher.PublishAsync(
                 new ChatMessageDeliveredEvent(conversation.Id, id, request.RecipientUserId, now),
                 cancellationToken).ConfigureAwait(false);
+        }
+
+        if (transitioned.Count > 0)
+        {
+            // Notify the OTHER participants (typically the sender) that their messages are now delivered.
+            var observers = conversation.Participants.Where(p => p != request.RecipientUserId).ToList();
+            await broadcaster.NotifyMessageDeliveredAsync(
+                observers, conversation.Id, transitioned, request.RecipientUserId, cancellationToken).ConfigureAwait(false);
         }
 
         return transitioned;

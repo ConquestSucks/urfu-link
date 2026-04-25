@@ -1,5 +1,6 @@
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
 
@@ -9,6 +10,7 @@ public sealed class MarkReadService(
     IConversationRepository conversations,
     IMessageRepository messages,
     ChatEventDispatcher dispatcher,
+    IChatBroadcaster broadcaster,
     TimeProvider clock)
 {
     public async Task<Guid?> MarkAsync(MarkReadRequest request, CancellationToken cancellationToken)
@@ -34,6 +36,10 @@ public sealed class MarkReadService(
         await dispatcher.PublishAsync(
             new ChatMessageReadEvent(conversation.Id, anchor.Value, request.ReaderUserId, now),
             cancellationToken).ConfigureAwait(false);
+
+        var observers = conversation.Participants.Where(p => p != request.ReaderUserId).ToList();
+        await broadcaster.NotifyMessageReadAsync(
+            observers, conversation.Id, anchor.Value, request.ReaderUserId, cancellationToken).ConfigureAwait(false);
 
         return anchor;
     }

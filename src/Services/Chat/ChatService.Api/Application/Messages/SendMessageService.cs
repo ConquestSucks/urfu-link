@@ -4,6 +4,7 @@ using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
+using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
 
@@ -19,6 +20,7 @@ public sealed class SendMessageService(
     IMediaServiceClient mediaServiceClient,
     IIdempotencyStore idempotencyStore,
     ChatEventDispatcher dispatcher,
+    IChatBroadcaster broadcaster,
     TimeProvider clock)
 {
     public async Task<MessageDto> SendAsync(SendMessageRequest request, CancellationToken cancellationToken)
@@ -90,7 +92,10 @@ public sealed class SendMessageService(
                 now),
             cancellationToken).ConfigureAwait(false);
 
-        return MessageDto.FromDomain(message);
+        var dto = MessageDto.FromDomain(message);
+        await broadcaster.NotifyMessageReceivedAsync(recipients, dto, cancellationToken).ConfigureAwait(false);
+
+        return dto;
     }
 
     private async Task ValidateAttachmentsOwnershipAsync(

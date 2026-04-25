@@ -8,12 +8,14 @@ using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.UnitTests.Application;
 
 public class OpenDirectConversationServiceTests
 {
     private readonly IConversationRepository _repo = Substitute.For<IConversationRepository>();
+    private readonly IChatBroadcaster _broadcaster = Substitute.For<IChatBroadcaster>();
     private readonly RecordingOutboxWriter _outbox = new();
     private readonly TimeProvider _clock = TimeProvider.System;
 
@@ -22,7 +24,7 @@ public class OpenDirectConversationServiceTests
         var dispatcher = new ChatEventDispatcher(
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
-        return new OpenDirectConversationService(_repo, dispatcher, _clock);
+        return new OpenDirectConversationService(_repo, dispatcher, _broadcaster, _clock);
     }
 
     [Fact]
