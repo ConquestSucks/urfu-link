@@ -42,7 +42,7 @@ public sealed class UploadSessionCleanupWorker(
         }
     }
 
-    private async Task SweepAsync(CancellationToken cancellationToken)
+    internal async Task SweepAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var sessionRepo = scope.ServiceProvider.GetRequiredService<IUploadSessionRepository>();
