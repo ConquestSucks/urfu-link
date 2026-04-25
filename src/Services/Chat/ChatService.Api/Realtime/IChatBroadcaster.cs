@@ -1,4 +1,5 @@
 using Urfu.Link.Services.Chat.Application.Contracts;
+using Urfu.Link.Services.Chat.Domain.Enums;
 
 namespace Urfu.Link.Services.Chat.Realtime;
 
@@ -30,5 +31,18 @@ public interface IChatBroadcaster
         string conversationId,
         Guid upToMessageId,
         Guid readerUserId,
+        CancellationToken cancellationToken);
+
+    Task NotifyMessageEditedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken);
+
+    Task NotifyMessageDeletedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid messageId,
+        DeleteMode mode,
+        Guid deletedBy,
         CancellationToken cancellationToken);
 }

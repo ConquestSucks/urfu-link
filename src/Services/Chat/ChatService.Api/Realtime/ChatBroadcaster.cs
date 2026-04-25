@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.SignalR;
 using Urfu.Link.Services.Chat.Application.Contracts;
+using Urfu.Link.Services.Chat.Domain.Enums;
 
 namespace Urfu.Link.Services.Chat.Realtime;
 
@@ -54,6 +55,28 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
         ArgumentNullException.ThrowIfNull(recipientUserIds);
         return hub.Clients.Users(ToUserIds(recipientUserIds))
             .MessageReadUpdate(conversationId, upToMessageId, readerUserId);
+    }
+
+    public Task NotifyMessageEditedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).MessageEdited(message);
+    }
+
+    public Task NotifyMessageDeletedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid messageId,
+        DeleteMode mode,
+        Guid deletedBy,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .MessageDeletedUpdate(conversationId, messageId, mode.ToString(), deletedBy);
     }
 
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)

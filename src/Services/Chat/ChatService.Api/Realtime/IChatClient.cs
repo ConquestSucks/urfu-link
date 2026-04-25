@@ -14,4 +14,8 @@ public interface IChatClient
     Task MessageDeliveredUpdate(string conversationId, IReadOnlyList<Guid> messageIds, Guid recipientUserId);
 
     Task MessageReadUpdate(string conversationId, Guid upToMessageId, Guid readerUserId);
+
+    Task MessageEdited(MessageDto message);
+
+    Task MessageDeletedUpdate(string conversationId, Guid messageId, string mode, Guid deletedBy);
 }
