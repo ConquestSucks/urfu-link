@@ -74,11 +74,18 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
-    [Fact]
-    public async Task ExecutableMime_Rejected()
+    [Theory]
+    [InlineData("evil.exe", "application/x-msdownload")]
+    [InlineData("evil.bat", "application/x-bat")]
+    [InlineData("install.sh", "application/x-sh")]
+    [InlineData("script.ps1", "application/x-powershell")]
+    [InlineData("setup.msi", "application/x-msi")]
+    [InlineData("launcher.com", "application/x-msdos-program")]
+    [InlineData("payload.bin", "application/octet-stream")]
+    public async Task ForbiddenMime_Returns400(string fileName, string mimeType)
     {
         var client = AuthorizedClient(_factory, Guid.NewGuid());
-        var req = new InitiateUploadRequest("evil.exe", 1024, "application/x-msdownload", Visibility.Private);
+        var req = new InitiateUploadRequest(fileName, 1024, mimeType, Visibility.Private);
 
         var response = await client.PostAsJsonAsync("/api/v1/media/upload/init", req);
 

@@ -1,5 +1,5 @@
 using System.Net;
-using System.Security.Claims;
+using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.IntegrationTests.Infrastructure;
 
@@ -15,17 +15,65 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
         _factory = factory;
     }
 
-    private static ClaimsPrincipal MakeUser(Guid userId)
-        => new(new ClaimsIdentity([new Claim("sub", userId.ToString())], TestAuthHandler.SchemeName));
+    [Fact]
+    public async Task Owner_SoftDeletesAsset()
+    {
+        var ownerId = Guid.NewGuid();
+        var assetId = await CreateUploadedAssetAsync(ownerId);
+
+        var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
+        var response = await client.DeleteAsync($"/api/v1/media/{assetId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        // Subsequent metadata read should now 404 (asset.IsAccessible == false).
+        var followUp = await client.GetAsync($"/api/v1/media/{assetId}/metadata");
+        followUp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task NonOwner_Returns403()
+    {
+        var ownerId = Guid.NewGuid();
+        var assetId = await CreateUploadedAssetAsync(ownerId);
+
+        var attacker = Guid.NewGuid();
+        var client = TestAssetBuilder.AuthorizedClient(_factory, attacker);
+        var response = await client.DeleteAsync($"/api/v1/media/{assetId}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task UnknownAssetId_Returns404()
+    {
+        var client = TestAssetBuilder.AuthorizedClient(_factory, Guid.NewGuid());
+
+        var response = await client.DeleteAsync($"/api/v1/media/{Guid.NewGuid()}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
 
     [Fact]
     public async Task DeleteAsset_MissingIdempotencyKey_Returns400()
     {
-        TestAuthHandler.CurrentPrincipal = MakeUser(Guid.NewGuid());
+        TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(Guid.NewGuid());
         var client = _factory.CreateClient();
 
         var response = await client.DeleteAsync($"/api/v1/media/{Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    private async Task<Guid> CreateUploadedAssetAsync(Guid ownerId)
+    {
+        var content = new byte[64];
+        var assetId = await TestAssetBuilder.InitAndUploadAsync(_factory, ownerId, content);
+        var ownerClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
+        var completeRes = await ownerClient.PostAsJsonAsync(
+            "/api/v1/media/upload/complete",
+            new { assetId, checksum = "x" });
+        completeRes.EnsureSuccessStatusCode();
+        return assetId;
     }
 }
