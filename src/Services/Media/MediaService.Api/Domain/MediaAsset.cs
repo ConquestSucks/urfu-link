@@ -37,8 +37,11 @@ public sealed class MediaAsset
 
     /// <summary>
     /// Reserve a new asset record before the client uploads bytes to MinIO.
+    /// The id is supplied by the caller so that the storage object key can
+    /// reference it from the start.
     /// </summary>
     public static MediaAsset Initiate(
+        Guid id,
         Guid ownerId,
         Visibility visibility,
         AssetKind kind,
@@ -52,11 +55,11 @@ public sealed class MediaAsset
         ArgumentException.ThrowIfNullOrWhiteSpace(objectKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
         ArgumentException.ThrowIfNullOrWhiteSpace(originalFileName);
-        if (size <= 0) throw new ArgumentOutOfRangeException(nameof(size), "Size must be positive.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
 
         return new MediaAsset
         {
-            Id = Guid.NewGuid(),
+            Id = id,
             OwnerId = ownerId,
             Visibility = visibility,
             Kind = kind,

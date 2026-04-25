@@ -5,6 +5,7 @@ using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Persistence;
 using MediaService.Api.Infrastructure.Persistence.Repositories;
 using MediaService.Api.Infrastructure.Storage;
+using MediaService.Api.Workers;
 using Microsoft.EntityFrameworkCore;
 using Urfu.Link.BuildingBlocks.Outbox;
 
@@ -51,6 +52,11 @@ public static class ModuleRegistration
         // Limits / policy
         services.Configure<MediaLimitsOptions>(configuration.GetSection(MediaLimitsOptions.SectionName));
         services.AddScoped<AccessPolicy>();
+
+        // Background workers
+        services.Configure<RetentionWorkerOptions>(configuration.GetSection(RetentionWorkerOptions.SectionName));
+        services.AddHostedService<UploadSessionCleanupWorker>();
+        services.AddHostedService<RetentionWorker>();
 
         return services;
     }

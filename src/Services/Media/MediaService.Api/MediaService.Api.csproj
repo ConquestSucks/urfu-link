@@ -36,6 +36,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MediaService.Api</RootNamespace>
+    <!-- CA1873 fires on cheap struct args (DateTimeOffset etc.) when passed to logger;
+         the suggested IsEnabled wrapper adds noise without measurable benefit here. -->
+    <NoWarn>$(NoWarn);CA1873</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
