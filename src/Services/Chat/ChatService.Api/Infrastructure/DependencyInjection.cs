@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.Services.Chat.Application;
+using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
@@ -36,6 +38,10 @@ public static class ModuleRegistration
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
         services.AddHostedService<MongoIndexInitializer>();
+
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddScoped<ChatEventDispatcher>();
+        services.AddScoped<OpenDirectConversationService>();
 
         return services;
     }
