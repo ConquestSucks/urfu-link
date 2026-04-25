@@ -1,4 +1,6 @@
+using Grpc.Core;
 using Grpc.Net.Client;
+using Grpc.Net.Client.Configuration;
 using MediaService.Api.Grpc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
@@ -55,7 +57,27 @@ public static class ModuleRegistration
                 throw new InvalidOperationException(
                     "MediaService gRPC address is not configured (GrpcClients:MediaService:Address).");
             }
-            return GrpcChannel.ForAddress(opts.Address);
+
+            // Built-in Grpc.Net retry on transient errors. ChatService relies on MediaService for
+            // attachment validation/grant; a single brief outage shouldn't fail SendMessage.
+            var retryPolicy = new RetryPolicy
+            {
+                MaxAttempts = 3,
+                InitialBackoff = TimeSpan.FromMilliseconds(100),
+                MaxBackoff = TimeSpan.FromSeconds(2),
+                BackoffMultiplier = 2,
+                RetryableStatusCodes = { StatusCode.Unavailable, StatusCode.DeadlineExceeded },
+            };
+            return GrpcChannel.ForAddress(opts.Address, new GrpcChannelOptions
+            {
+                ServiceConfig = new ServiceConfig
+                {
+                    MethodConfigs =
+                    {
+                        new MethodConfig { Names = { MethodName.Default }, RetryPolicy = retryPolicy },
+                    },
+                },
+            });
         });
         services.AddSingleton(sp => new InternalApi.InternalApiClient(sp.GetRequiredService<GrpcChannel>()));
         services.AddSingleton<IMediaServiceClient, MediaServiceClient>();
