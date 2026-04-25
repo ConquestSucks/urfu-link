@@ -1,0 +1,17 @@
+using Urfu.Link.Services.Chat.Application.Contracts;
+
+namespace Urfu.Link.Services.Chat.Realtime;
+
+/// <summary>
+/// Server-to-client method surface broadcast by <see cref="ChatHub"/>.
+/// </summary>
+public interface IChatClient
+{
+    Task ConversationUpdated(ConversationDto conversation);
+
+    Task MessageReceived(MessageDto message);
+
+    Task MessageDeliveredUpdate(string conversationId, IReadOnlyList<Guid> messageIds, Guid recipientUserId);
+
+    Task MessageReadUpdate(string conversationId, Guid upToMessageId, Guid readerUserId);
+}

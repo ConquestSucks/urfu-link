@@ -2,27 +2,39 @@
 
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" />
+    <PackageReference Include="FastEndpoints" />
     <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Grpc.Tools">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="MongoDB.Driver" />
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
+    <Protobuf Include="Protos\internal.proto" GrpcServices="Both" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Idempotency\Idempotency.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Media\MediaService.Api.Contracts\MediaService.Api.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChatService.UnitTests" />
+    <InternalsVisibleTo Include="ChatService.IntegrationTests" />
   </ItemGroup>
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Urfu.Link.Services.Chat</RootNamespace>
+    <NoWarn>$(NoWarn);CA1819;CA2227</NoWarn>
   </PropertyGroup>
 
 </Project>

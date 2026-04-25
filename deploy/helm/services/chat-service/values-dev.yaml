@@ -10,6 +10,7 @@ replicaCount: 1
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: http://+:8080
+  GrpcClients__MediaService__Address: http://media-service:8080
 
 secrets:
   enabled: true
