@@ -1,9 +1,12 @@
+using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application.Contracts;
+using Urfu.Link.Services.Chat.Application.Mentions;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
+using Urfu.Link.Services.Chat.Infrastructure;
 using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
@@ -21,7 +24,8 @@ public sealed class SendMessageService(
     IIdempotencyStore idempotencyStore,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
-    TimeProvider clock)
+    TimeProvider clock,
+    IOptions<ChatOptions> options)
 {
     public const int MaxBodyLength = 4000;
 
@@ -65,6 +69,9 @@ public sealed class SendMessageService(
         var replyTo = await ResolveReplyToAsync(conversation.Id, request.ReplyToMessageId, cancellationToken)
             .ConfigureAwait(false);
 
+        var opts = options.Value;
+        var mentions = MentionsParser.Parse(request.Body, conversation.Participants, opts.MaxMentionsPerMessage);
+
         var now = clock.GetUtcNow();
         var message = Message.Send(
             id: Guid.NewGuid(),
@@ -74,6 +81,7 @@ public sealed class SendMessageService(
             attachments: attachments,
             clientMessageId: request.ClientMessageId,
             createdAtUtc: now,
+            mentions: mentions,
             replyTo: replyTo);
 
         try
@@ -105,8 +113,21 @@ public sealed class SendMessageService(
                 recipients,
                 BuildPreviewText(request.Body, message.HasAttachments),
                 message.HasAttachments,
-                now),
+                now,
+                Mentions: mentions.Count == 0 ? null : mentions),
             cancellationToken).ConfigureAwait(false);
+
+        if (mentions.Count > 0)
+        {
+            await dispatcher.PublishAsync(
+                new ChatMentionCreatedEvent(
+                    conversation.Id,
+                    message.Id,
+                    request.SenderId,
+                    mentions,
+                    now),
+                cancellationToken).ConfigureAwait(false);
+        }
 
         var dto = MessageDto.FromDomain(message);
         await broadcaster.NotifyMessageReceivedAsync(recipients, dto, cancellationToken).ConfigureAwait(false);

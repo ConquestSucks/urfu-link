@@ -32,7 +32,8 @@ public class SendMessageServiceTests
         var dispatcher = new ChatEventDispatcher(
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
-        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, TimeProvider.System);
+        var options = Microsoft.Extensions.Options.Options.Create(new Urfu.Link.Services.Chat.Infrastructure.ChatOptions());
+        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, TimeProvider.System, options);
     }
 
     private Conversation SeedConversation()

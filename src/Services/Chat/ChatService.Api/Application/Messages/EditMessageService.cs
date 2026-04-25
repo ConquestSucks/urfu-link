@@ -50,6 +50,8 @@ public sealed class EditMessageService(
 
         var newBody = request.NewBody ?? string.Empty;
         var mentions = MentionsParser.Parse(newBody, conversation.Participants, opts.MaxMentionsPerMessage);
+        var priorMentions = new HashSet<Guid>(message.Mentions);
+        var newlyAddedMentions = mentions.Where(m => !priorMentions.Contains(m)).ToList();
         var historyEntry = new EditHistoryEntry(message.Body, message.EditedAtUtc ?? message.CreatedAtUtc);
 
         var applied = await messages.ApplyEditAsync(
@@ -74,6 +76,18 @@ public sealed class EditMessageService(
                 refreshed.EditedAtUtc ?? now,
                 now),
             cancellationToken).ConfigureAwait(false);
+
+        if (newlyAddedMentions.Count > 0)
+        {
+            await dispatcher.PublishAsync(
+                new ChatMentionCreatedEvent(
+                    conversation.Id,
+                    refreshed.Id,
+                    request.CallerUserId,
+                    newlyAddedMentions,
+                    now),
+                cancellationToken).ConfigureAwait(false);
+        }
 
         var observers = conversation.Participants.ToList();
         var dto = MessageDto.FromDomain(refreshed);
