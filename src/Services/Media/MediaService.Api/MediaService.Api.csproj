@@ -20,10 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <ProjectReference Include="..\MediaService.Api.Contracts\MediaService.Api.Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Auth\Auth.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Idempotency\Idempotency.csproj" />
