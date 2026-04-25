@@ -9,7 +9,8 @@ public sealed record ConversationDto(
     IReadOnlyList<Guid> Participants,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset LastMessageAtUtc,
-    MessagePreviewDto? LastMessagePreview)
+    MessagePreviewDto? LastMessagePreview,
+    IReadOnlyList<Guid>? PinnedMessageIds = null)
 {
     public static ConversationDto FromDomain(Conversation conversation)
     {
@@ -22,7 +23,10 @@ public sealed record ConversationDto(
             conversation.LastMessageAtUtc,
             conversation.LastMessagePreview is { } p
                 ? new MessagePreviewDto(p.SenderId, p.Body, p.SentAtUtc, p.HasAttachments)
-                : null);
+                : null,
+            PinnedMessageIds: conversation.PinnedMessageIds.Count == 0
+                ? Array.Empty<Guid>()
+                : conversation.PinnedMessageIds.ToList());
     }
 }
 
