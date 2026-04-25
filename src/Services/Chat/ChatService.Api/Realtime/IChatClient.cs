@@ -18,4 +18,6 @@ public interface IChatClient
     Task MessageEdited(MessageDto message);
 
     Task MessageDeletedUpdate(string conversationId, Guid messageId, string mode, Guid deletedBy);
+
+    Task ReactionUpdated(Guid messageId, IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary);
 }

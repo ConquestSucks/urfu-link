@@ -45,4 +45,10 @@ public interface IChatBroadcaster
         DeleteMode mode,
         Guid deletedBy,
         CancellationToken cancellationToken);
+
+    Task NotifyReactionUpdatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        Guid messageId,
+        IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary,
+        CancellationToken cancellationToken);
 }

@@ -79,6 +79,17 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
             .MessageDeletedUpdate(conversationId, messageId, mode.ToString(), deletedBy);
     }
 
+    public Task NotifyReactionUpdatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        Guid messageId,
+        IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        ArgumentNullException.ThrowIfNull(summary);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).ReactionUpdated(messageId, summary);
+    }
+
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)
         => userIds.Select(u => u.ToString("D", CultureInfo.InvariantCulture)).ToList();
 }

@@ -25,7 +25,9 @@ public sealed class ChatHub(
     MarkReadService markRead,
     EditMessageService editMessage,
     DeleteMessageService deleteMessage,
-    ForwardMessagesService forwardMessages) : Hub<IChatClient>
+    ForwardMessagesService forwardMessages,
+    AddReactionService addReaction,
+    RemoveReactionService removeReaction) : Hub<IChatClient>
 {
     public async Task<ConversationDto> OpenDirectConversation(Guid peerUserId)
     {
@@ -89,6 +91,22 @@ public sealed class ChatHub(
         var caller = Context.User!.GetUserId();
         return forwardMessages.ForwardAsync(
             new ForwardMessagesRequest(targetConversationId, caller, messageIds ?? Array.Empty<Guid>()),
+            Context.ConnectionAborted);
+    }
+
+    public Task AddReaction(Guid messageId, string emoji)
+    {
+        var caller = Context.User!.GetUserId();
+        return addReaction.AddAsync(
+            new AddReactionRequest(messageId, caller, emoji ?? string.Empty),
+            Context.ConnectionAborted);
+    }
+
+    public Task RemoveReaction(Guid messageId, string emoji)
+    {
+        var caller = Context.User!.GetUserId();
+        return removeReaction.RemoveAsync(
+            new RemoveReactionRequest(messageId, caller, emoji ?? string.Empty),
             Context.ConnectionAborted);
     }
 
