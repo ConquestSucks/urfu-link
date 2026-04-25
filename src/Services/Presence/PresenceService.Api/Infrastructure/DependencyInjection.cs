@@ -12,6 +12,7 @@ using Urfu.Link.Services.Presence.Infrastructure.Persistence.Repositories;
 using Urfu.Link.Services.Presence.Infrastructure.Redis;
 using Urfu.Link.Services.Presence.Messaging;
 using Urfu.Link.Services.Presence.Realtime;
+using Urfu.Link.Services.Presence.Workers;
 
 namespace Urfu.Link.Services.Presence.Infrastructure;
 
@@ -55,6 +56,8 @@ public static class ModuleRegistration
         services.AddSingleton<PresenceAggregator>();
         services.AddScoped<PresenceEventDispatcher>();
         services.AddSingleton<PresenceBroadcaster>();
+
+        services.AddHostedService<PresenceSweeperWorker>();
 
         return services;
     }
