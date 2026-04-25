@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
+using Urfu.Link.Services.Chat.Application.Cursors;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Conversations;
@@ -26,7 +27,15 @@ public sealed class ListConversationsEndpoint(GetUserConversationsQuery query)
     {
         ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
-        var page = await query.ExecuteAsync(caller, req.Cursor, req.Limit, ct).ConfigureAwait(false);
-        await Send.OkAsync(page, ct).ConfigureAwait(false);
+        try
+        {
+            var page = await query.ExecuteAsync(caller, req.Cursor, req.Limit, ct).ConfigureAwait(false);
+            await Send.OkAsync(page, ct).ConfigureAwait(false);
+        }
+        catch (InvalidChatCursorException)
+        {
+            AddError(r => r.Cursor!, "Invalid cursor.");
+            await Send.ErrorsAsync(StatusCodes.Status400BadRequest, ct).ConfigureAwait(false);
+        }
     }
 }

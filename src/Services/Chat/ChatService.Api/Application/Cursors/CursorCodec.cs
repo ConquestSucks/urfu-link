@@ -4,6 +4,32 @@ using Urfu.Link.Services.Chat.Domain.Interfaces;
 
 namespace Urfu.Link.Services.Chat.Application.Cursors;
 
+/// <summary>
+/// Thrown when an opaque cursor cannot be parsed. Surfaced as HTTP 400 (Bad Request) by the
+/// endpoint layer.
+/// </summary>
+public sealed class InvalidChatCursorException : ArgumentException
+{
+    public InvalidChatCursorException()
+    {
+    }
+
+    public InvalidChatCursorException(string message)
+        : base(message)
+    {
+    }
+
+    public InvalidChatCursorException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public InvalidChatCursorException(string message, string? paramName, Exception? innerException)
+        : base(message, paramName, innerException)
+    {
+    }
+}
+
 internal static class CursorCodec
 {
     private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
@@ -30,7 +56,7 @@ internal static class CursorCodec
         }
         catch (Exception ex) when (ex is FormatException or JsonException)
         {
-            throw new ArgumentException("Invalid cursor.", nameof(cursor), ex);
+            throw new InvalidChatCursorException("Invalid cursor.", nameof(cursor), ex);
         }
     }
 
@@ -56,7 +82,7 @@ internal static class CursorCodec
         }
         catch (Exception ex) when (ex is FormatException or JsonException)
         {
-            throw new ArgumentException("Invalid cursor.", nameof(cursor), ex);
+            throw new InvalidChatCursorException("Invalid cursor.", nameof(cursor), ex);
         }
     }
 

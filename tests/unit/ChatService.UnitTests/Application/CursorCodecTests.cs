@@ -43,9 +43,9 @@ public class CursorCodecTests
     }
 
     [Fact]
-    public void Decode_Garbage_ThrowsArgumentException()
+    public void Decode_Garbage_ThrowsInvalidChatCursorException()
     {
         var act = () => CursorCodec.DecodeConversation("not-base64!!");
-        act.Should().Throw<ArgumentException>();
+        act.Should().Throw<InvalidChatCursorException>();
     }
 }

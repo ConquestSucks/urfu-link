@@ -86,6 +86,17 @@ public class ChatEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_Conversations_BadCursor_Returns400()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/chat/conversations?cursor=not-base64!!");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Get_ConversationMessages_ReturnsCursorPage()
     {
         var caller = Guid.NewGuid();
