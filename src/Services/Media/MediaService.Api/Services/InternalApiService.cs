@@ -66,7 +66,7 @@ public sealed class InternalApiService(
                 SizeBytes = asset.Size,
                 MimeType = asset.MimeType,
                 OriginalFileName = asset.OriginalFileName,
-                State = (AssetState)asset.State,
+                State = MapAssetState(asset.State),
                 CreatedAtUtc = asset.CreatedAtUtc.ToString("O"),
             });
         }
@@ -129,6 +129,24 @@ public sealed class InternalApiService(
             .ConfigureAwait(false);
 
         return new RevokeAssetAccessReply { GrantsRemoved = removed };
+    }
+
+    /// <summary>
+    /// Maps the domain <see cref="DomainEnums.AssetState"/> to the wire enum.
+    /// Both enums share numeric values on purpose; if a new domain state is
+    /// added without a matching proto member the cast becomes unsafe and we
+    /// surface the drift as InvalidOperationException instead of silently
+    /// emitting an Unspecified value.
+    /// </summary>
+    private static AssetState MapAssetState(DomainEnums.AssetState state)
+    {
+        var raw = (int)state;
+        if (!Enum.IsDefined(typeof(AssetState), raw))
+        {
+            throw new InvalidOperationException(
+                $"Domain AssetState {state} (value {raw}) has no matching media.internal.v1.AssetState member.");
+        }
+        return (AssetState)raw;
     }
 
     private static List<Guid> ParseUserIdsOrThrow(IEnumerable<string> userIds)
