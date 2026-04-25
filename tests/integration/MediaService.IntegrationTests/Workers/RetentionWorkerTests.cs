@@ -12,15 +12,17 @@ using Microsoft.Extensions.Options;
 namespace MediaService.IntegrationTests.Workers;
 
 [Collection(IntegrationCollection.Name)]
-public sealed class RetentionWorkerTests : IClassFixture<MediaServiceFactory>
+public sealed class RetentionWorkerTests : IAsyncLifetime
 {
     private readonly MediaServiceFactory _factory;
 
     public RetentionWorkerTests(MediaServiceFactory factory)
     {
         _factory = factory;
-        _factory.ResetCapturedState();
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Sweep_HardDeletesAssetsBeyondRetentionTtl_AndPublishesEvent()

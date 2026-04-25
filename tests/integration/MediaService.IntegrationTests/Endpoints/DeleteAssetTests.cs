@@ -6,7 +6,7 @@ using MediaService.IntegrationTests.Infrastructure;
 namespace MediaService.IntegrationTests.Endpoints;
 
 [Collection(IntegrationCollection.Name)]
-public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
+public class DeleteAssetTests : IAsyncLifetime
 {
     private readonly MediaServiceFactory _factory;
 
@@ -14,6 +14,9 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
     {
         _factory = factory;
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Owner_SoftDeletesAsset_AndPublishesEvent()

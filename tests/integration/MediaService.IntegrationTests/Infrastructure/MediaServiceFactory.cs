@@ -63,15 +63,29 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
     }
 
     /// <summary>
-    /// Clears any captured state that survives across tests inside the same
-    /// IClassFixture: outbox events, the static auth principal, and any
-    /// configured idempotency calls. Call from test setup to guarantee
-    /// independence between methods.
+    /// Clears any captured state that survives across tests: outbox events
+    /// and the static auth principal. Cheap; call between tests inside the
+    /// same class.
     /// </summary>
     public void ResetCapturedState()
     {
         OutboxWriter.Clear();
         TestAuthHandler.CurrentPrincipal = null;
+    }
+
+    /// <summary>
+    /// Wipes the media schema so a fresh test class starts with an empty DB.
+    /// Cascades through asset → session / grant FKs and resets identity
+    /// generators in one round-trip. Bucket contents in MinIO are left in
+    /// place because object keys are GUID-prefixed and never collide.
+    /// </summary>
+    public async Task ResetDataAsync()
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<MediaDbContext>();
+        await ctx.Database.ExecuteSqlRawAsync(
+            "TRUNCATE TABLE media.media_assets, media.upload_sessions, media.media_access_grants RESTART IDENTITY CASCADE");
+        ResetCapturedState();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)

@@ -10,15 +10,17 @@ using Microsoft.Extensions.Logging.Abstractions;
 namespace MediaService.IntegrationTests.Workers;
 
 [Collection(IntegrationCollection.Name)]
-public sealed class UploadSessionCleanupWorkerTests : IClassFixture<MediaServiceFactory>
+public sealed class UploadSessionCleanupWorkerTests : IAsyncLifetime
 {
     private readonly MediaServiceFactory _factory;
 
     public UploadSessionCleanupWorkerTests(MediaServiceFactory factory)
     {
         _factory = factory;
-        _factory.ResetCapturedState();
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task Sweep_ExpiredSessionForInitiatedAsset_DeletesObjectAndMarksFailed()

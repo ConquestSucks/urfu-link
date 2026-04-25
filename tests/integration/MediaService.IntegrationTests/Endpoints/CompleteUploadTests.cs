@@ -8,7 +8,7 @@ using MediaService.IntegrationTests.Infrastructure;
 namespace MediaService.IntegrationTests.Endpoints;
 
 [Collection(IntegrationCollection.Name)]
-public class CompleteUploadTests : IClassFixture<MediaServiceFactory>
+public class CompleteUploadTests : IAsyncLifetime
 {
     private const int SamplePayloadSize = 2048;
     private readonly MediaServiceFactory _factory;
@@ -17,6 +17,9 @@ public class CompleteUploadTests : IClassFixture<MediaServiceFactory>
     {
         _factory = factory;
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task CompleteUpload_AfterPut_ReturnsNoContent_AndPublishesEvent()

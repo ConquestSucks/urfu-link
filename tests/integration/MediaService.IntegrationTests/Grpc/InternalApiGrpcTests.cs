@@ -6,31 +6,36 @@ using MediaService.IntegrationTests.Infrastructure;
 namespace MediaService.IntegrationTests.Grpc;
 
 [Collection(IntegrationCollection.Name)]
-public sealed class InternalApiGrpcTests : IClassFixture<MediaServiceFactory>, IDisposable
+public sealed class InternalApiGrpcTests : IAsyncLifetime
 {
     private readonly MediaServiceFactory _factory;
-    private readonly HttpClient _httpClient;
-    private readonly GrpcChannel _channel;
+    private HttpClient _httpClient = null!;
+    private GrpcChannel _channel = null!;
 
     public InternalApiGrpcTests(MediaServiceFactory factory)
     {
         _factory = factory;
-        _factory.ResetCapturedState();
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _factory.ResetDataAsync();
         _httpClient = _factory.CreateClient();
         _channel = GrpcChannel.ForAddress(_httpClient.BaseAddress!,
             new GrpcChannelOptions { HttpClient = _httpClient });
+    }
+
+    public Task DisposeAsync()
+    {
+        _channel.Dispose();
+        _httpClient.Dispose();
+        return Task.CompletedTask;
     }
 
     private InternalApi.InternalApiClient AuthorizedClient(Guid userId)
     {
         TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(userId);
         return new InternalApi.InternalApiClient(_channel);
-    }
-
-    public void Dispose()
-    {
-        _channel.Dispose();
-        _httpClient.Dispose();
     }
 
     [Fact]

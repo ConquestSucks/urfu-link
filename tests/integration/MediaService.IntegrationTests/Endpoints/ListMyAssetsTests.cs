@@ -10,7 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace MediaService.IntegrationTests.Endpoints;
 
 [Collection(IntegrationCollection.Name)]
-public class ListMyAssetsTests : IClassFixture<MediaServiceFactory>
+public class ListMyAssetsTests : IAsyncLifetime
 {
     private readonly MediaServiceFactory _factory;
 
@@ -18,6 +18,9 @@ public class ListMyAssetsTests : IClassFixture<MediaServiceFactory>
     {
         _factory = factory;
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task ReturnsOnlyOwnerUploadedAssets()

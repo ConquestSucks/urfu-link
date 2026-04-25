@@ -9,7 +9,7 @@ using MediaService.IntegrationTests.Infrastructure;
 namespace MediaService.IntegrationTests.Endpoints;
 
 [Collection(IntegrationCollection.Name)]
-public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
+public class InitiateUploadTests : IAsyncLifetime
 {
     private const long SmallImageSize = 1024;
     private const long ImageSizeLimitExceeded = 50L * 1024 * 1024;
@@ -19,6 +19,9 @@ public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
     {
         _factory = factory;
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task ValidImage_ReturnsPresignedUrlAndAssetId()

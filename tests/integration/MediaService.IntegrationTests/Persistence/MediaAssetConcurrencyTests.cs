@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace MediaService.IntegrationTests.Persistence;
 
 [Collection(IntegrationCollection.Name)]
-public class MediaAssetConcurrencyTests : IClassFixture<MediaServiceFactory>
+public class MediaAssetConcurrencyTests : IAsyncLifetime
 {
     private readonly MediaServiceFactory _factory;
 
@@ -15,6 +15,9 @@ public class MediaAssetConcurrencyTests : IClassFixture<MediaServiceFactory>
     {
         _factory = factory;
     }
+
+    public Task InitializeAsync() => _factory.ResetDataAsync();
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task LosingWriter_ThrowsDbUpdateConcurrencyException()

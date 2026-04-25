@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace MediaService.IntegrationTests.Infrastructure;
 
 [Collection(IntegrationCollection.Name)]
-public class RestAuthorizationTests : IClassFixture<MediaServiceFactory>
+public class RestAuthorizationTests
 {
     private readonly MediaServiceFactory _factory;
 
