@@ -1,6 +1,7 @@
 using FastEndpoints;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
+using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace MediaService.Api.Endpoints;
 
@@ -15,6 +16,7 @@ public sealed class DeleteAssetEndpoint(IMediaAssetRepository assetRepository)
     public override void Configure()
     {
         Delete("/media/{assetId}");
+        Options(x => x.AddEndpointFilter<IdempotencyEndpointFilter>());
         Summary(s => s.Summary = "Soft-delete the asset. The MinIO object stays for the retention period.");
     }
 
