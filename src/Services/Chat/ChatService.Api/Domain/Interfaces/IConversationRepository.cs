@@ -26,4 +26,21 @@ public interface IConversationRepository
         ConversationCursor? cursor,
         int limit,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds <paramref name="messageId"/> to <c>pinnedMessageIds</c> using <c>$addToSet</c> with
+    /// a precondition that the array length is below <paramref name="maxPinned"/>. Returns
+    /// false when the conversation is missing, the message is already pinned, or the cap is
+    /// already reached.
+    /// </summary>
+    Task<bool> AddPinnedMessageAsync(
+        string conversationId,
+        Guid messageId,
+        int maxPinned,
+        CancellationToken cancellationToken);
+
+    Task<bool> RemovePinnedMessageAsync(
+        string conversationId,
+        Guid messageId,
+        CancellationToken cancellationToken);
 }

@@ -2,6 +2,7 @@ using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Domain.ValueObjects;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence.Documents;
 
 namespace Urfu.Link.Services.Chat.Infrastructure.Persistence;
@@ -15,6 +16,30 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
         return doc?.ToDomain();
+    }
+
+    public async Task<IReadOnlyList<Message>> GetByIdsAsync(
+        string conversationId,
+        IReadOnlyList<Guid> messageIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(messageIds);
+        if (messageIds.Count == 0)
+        {
+            return Array.Empty<Message>();
+        }
+
+        var fb = Builders<MessageDocument>.Filter;
+        var filter = fb.And(
+            fb.Eq(m => m.ConversationId, conversationId),
+            fb.In(m => m.Id, messageIds));
+
+        var docs = await context.Messages
+            .Find(filter)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return docs.Select(d => d.ToDomain()).ToList();
     }
 
     public async Task InsertAsync(Message message, CancellationToken cancellationToken)
@@ -190,5 +215,166 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             .ConfigureAwait(false);
 
         return upToMessageId;
+    }
+
+    public async Task<bool> ApplyEditAsync(
+        Guid messageId,
+        string newBody,
+        IReadOnlyList<Guid> mentions,
+        EditHistoryEntry historyEntry,
+        DateTimeOffset editedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(mentions);
+        ArgumentNullException.ThrowIfNull(historyEntry);
+
+        var fb = Builders<MessageDocument>.Filter;
+        var filter = fb.And(
+            fb.Eq(m => m.Id, messageId),
+            fb.Ne(m => m.State, MessageState.Deleted));
+        var update = Builders<MessageDocument>.Update
+            .Set(m => m.Body, newBody ?? string.Empty)
+            .Set(m => m.Mentions, mentions.ToList())
+            .Set(m => m.EditedAtUtc, editedAtUtc.UtcDateTime)
+            .Push(m => m.EditHistory, EditHistoryEntryDocument.FromDomain(historyEntry));
+
+        var result = await context.Messages
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> ApplyDeleteForEveryoneAsync(
+        Guid messageId,
+        Guid byUserId,
+        DateTimeOffset deletedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var fb = Builders<MessageDocument>.Filter;
+        var filter = fb.And(
+            fb.Eq(m => m.Id, messageId),
+            fb.Ne(m => m.State, MessageState.Deleted));
+        var update = Builders<MessageDocument>.Update
+            .Set(m => m.State, MessageState.Deleted)
+            .Set(m => m.DeletedAtUtc, deletedAtUtc.UtcDateTime)
+            .Set(m => m.DeletedBy, byUserId)
+            .Set(m => m.DeleteMode, DeleteMode.ForEveryone)
+            .Set(m => m.Body, string.Empty)
+            .Set(m => m.Attachments, new List<AttachmentDocument>())
+            .Set(m => m.Reactions, new List<ReactionDocument>())
+            .Set(m => m.Mentions, new List<Guid>())
+            .Set(m => m.ReplyTo, (ReplyToDocument?)null)
+            .Set(m => m.ForwardedFrom, (ForwardedFromDocument?)null);
+
+        var result = await context.Messages
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> AddHiddenForAsync(Guid messageId, Guid userId, CancellationToken cancellationToken)
+    {
+        var fb = Builders<MessageDocument>.Filter;
+        var filter = fb.And(
+            fb.Eq(m => m.Id, messageId),
+            fb.Not(fb.AnyEq(m => m.HiddenFor, userId)));
+        var update = Builders<MessageDocument>.Update.AddToSet(m => m.HiddenFor, userId);
+
+        var result = await context.Messages
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> AddReactionAsync(Guid messageId, Reaction reaction, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(reaction);
+
+        var fb = Builders<MessageDocument>.Filter;
+
+        // Idempotent: same (user, emoji) is a noop.
+        var sameExistsCount = await context.Messages
+            .CountDocumentsAsync(
+                fb.And(
+                    fb.Eq(m => m.Id, messageId),
+                    fb.ElemMatch(
+                        m => m.Reactions,
+                        r => r.UserId == reaction.UserId && r.Emoji == reaction.Emoji)),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        if (sameExistsCount > 0)
+        {
+            return false;
+        }
+
+        // Pull any prior reaction by this user (different emoji).
+        var pullUpdate = Builders<MessageDocument>.Update
+            .PullFilter(m => m.Reactions, r => r.UserId == reaction.UserId);
+        await context.Messages
+            .UpdateOneAsync(m => m.Id == messageId, pullUpdate, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        // Push new reaction.
+        var pushUpdate = Builders<MessageDocument>.Update
+            .Push(m => m.Reactions, ReactionDocument.FromDomain(reaction));
+        var result = await context.Messages
+            .UpdateOneAsync(m => m.Id == messageId, pushUpdate, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> RemoveReactionAsync(
+        Guid messageId,
+        Guid userId,
+        string emoji,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(emoji);
+
+        var fb = Builders<MessageDocument>.Filter;
+        var filter = fb.And(
+            fb.Eq(m => m.Id, messageId),
+            fb.ElemMatch(m => m.Reactions, r => r.UserId == userId && r.Emoji == emoji));
+        var update = Builders<MessageDocument>.Update
+            .PullFilter(m => m.Reactions, r => r.UserId == userId && r.Emoji == emoji);
+
+        var result = await context.Messages
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> AddReadByAsync(Guid messageId, ReadReceipt receipt, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+
+        var fb = Builders<MessageDocument>.Filter;
+        var filter = fb.And(
+            fb.Eq(m => m.Id, messageId),
+            fb.Ne(m => m.State, MessageState.Deleted),
+            fb.Not(fb.ElemMatch(m => m.ReadBy, r => r.UserId == receipt.UserId)));
+        var update = Builders<MessageDocument>.Update
+            .Push(m => m.ReadBy, ReadReceiptDocument.FromDomain(receipt));
+
+        var result = await context.Messages
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<IReadOnlyList<ReadReceipt>> GetReadReceiptsAsync(
+        Guid messageId,
+        CancellationToken cancellationToken)
+    {
+        var doc = await context.Messages
+            .Find(m => m.Id == messageId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (doc is null)
+        {
+            return Array.Empty<ReadReceipt>();
+        }
+        return doc.ReadBy.Select(r => r.ToDomain()).ToList();
     }
 }

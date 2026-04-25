@@ -26,13 +26,17 @@ internal sealed class ConversationDocument
     [BsonIgnoreIfNull]
     public MessagePreviewDocument? LastMessagePreview { get; set; }
 
+    [BsonElement("pinnedMessageIds")]
+    public List<Guid> PinnedMessageIds { get; set; } = new();
+
     public Conversation ToDomain() => Conversation.Hydrate(
         Id,
         Type,
         Participants,
         new DateTimeOffset(DateTime.SpecifyKind(CreatedAtUtc, DateTimeKind.Utc)),
         new DateTimeOffset(DateTime.SpecifyKind(LastMessageAtUtc, DateTimeKind.Utc)),
-        LastMessagePreview?.ToDomain());
+        LastMessagePreview?.ToDomain(),
+        PinnedMessageIds);
 
     public static ConversationDocument FromDomain(Conversation conversation) => new()
     {
@@ -42,5 +46,6 @@ internal sealed class ConversationDocument
         CreatedAtUtc = conversation.CreatedAtUtc.UtcDateTime,
         LastMessageAtUtc = conversation.LastMessageAtUtc.UtcDateTime,
         LastMessagePreview = conversation.LastMessagePreview is { } p ? MessagePreviewDocument.FromDomain(p) : null,
+        PinnedMessageIds = conversation.PinnedMessageIds.ToList(),
     };
 }

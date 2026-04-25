@@ -1,11 +1,22 @@
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
+using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Chat.Domain.Interfaces;
 
 public interface IMessageRepository
 {
     Task<Message?> GetByIdAsync(Guid messageId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns messages whose ids are in <paramref name="messageIds"/> and that belong to
+    /// <paramref name="conversationId"/>. Useful for forward and pinned-list materialization
+    /// where ids alone could otherwise leak across conversations.
+    /// </summary>
+    Task<IReadOnlyList<Message>> GetByIdsAsync(
+        string conversationId,
+        IReadOnlyList<Guid> messageIds,
+        CancellationToken cancellationToken);
 
     /// <summary>
     /// Inserts a new message. Throws <see cref="DuplicateClientMessageException"/> when the
@@ -45,6 +56,56 @@ public interface IMessageRepository
         Guid upToMessageId,
         DateTimeOffset readAtUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Atomically applies an edit: sets new body / mentions / editedAt and appends a single
+    /// history entry. Returns false if the message does not exist or is in the Deleted state.
+    /// </summary>
+    Task<bool> ApplyEditAsync(
+        Guid messageId,
+        string newBody,
+        IReadOnlyList<Guid> mentions,
+        EditHistoryEntry historyEntry,
+        DateTimeOffset editedAtUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Atomically applies a tombstone: clears body/attachments/reactions/mentions/replyTo/
+    /// forwardedFrom, sets state to Deleted and records the deleter. Returns false if the
+    /// message is missing or already deleted.
+    /// </summary>
+    Task<bool> ApplyDeleteForEveryoneAsync(
+        Guid messageId,
+        Guid byUserId,
+        DateTimeOffset deletedAtUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds <paramref name="userId"/> to the message's <c>hiddenFor</c> set. Idempotent.
+    /// Returns true when the user was newly added.
+    /// </summary>
+    Task<bool> AddHiddenForAsync(Guid messageId, Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds or replaces a reaction by <c>userId</c>. Pull-then-push semantics: any prior
+    /// reaction by the same user is removed before the new one is appended. Returns true if
+    /// the message exists and the reaction was applied.
+    /// </summary>
+    Task<bool> AddReactionAsync(Guid messageId, Reaction reaction, CancellationToken cancellationToken);
+
+    Task<bool> RemoveReactionAsync(
+        Guid messageId,
+        Guid userId,
+        string emoji,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds a <see cref="ReadReceipt"/>, deduplicated by user id. Returns true when the receipt
+    /// was newly recorded.
+    /// </summary>
+    Task<bool> AddReadByAsync(Guid messageId, ReadReceipt receipt, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<ReadReceipt>> GetReadReceiptsAsync(Guid messageId, CancellationToken cancellationToken);
 }
 
 public sealed class DuplicateClientMessageException : InvalidOperationException
