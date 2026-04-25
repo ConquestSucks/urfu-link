@@ -30,7 +30,6 @@ public static class ModuleRegistration
             "mongodb",
             KafkaTopicNames.ChatEvents,
             "chat.message.sent.v1"));
-        services.AddScoped<SampleEventDispatcher>();
 
         services.AddOptions<ChatMongoOptions>()
             .Bind(configuration.GetSection(ChatMongoOptions.SectionName))
