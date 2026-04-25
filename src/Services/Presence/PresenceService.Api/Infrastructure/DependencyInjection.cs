@@ -8,6 +8,7 @@ using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence.Repositories;
 using Urfu.Link.Services.Presence.Infrastructure.Redis;
+using Urfu.Link.Services.Presence.Messaging;
 
 namespace Urfu.Link.Services.Presence.Infrastructure;
 
@@ -45,6 +46,8 @@ public static class ModuleRegistration
         services.AddSingleton<IPresenceSessionStore, RedisPresenceSessionStore>();
         services.AddSingleton<ITypingStore, RedisTypingStore>();
         services.AddSingleton<IPrivacyProjectionStore, RedisPrivacyProjectionStore>();
+
+        services.AddScoped<IKafkaMessageHandler, PrivacyChangedHandler>();
 
         return services;
     }
