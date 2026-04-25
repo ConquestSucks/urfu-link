@@ -31,6 +31,37 @@ public sealed class MediaAssetRepository(
             .ConfigureAwait(false);
     }
 
+    public async Task<PagedAssets> ListByOwnerAsync(
+        Guid ownerId, Guid? cursor, int limit, CancellationToken cancellationToken)
+    {
+        var query = dbContext.Assets.AsNoTracking()
+            .Where(a => a.OwnerId == ownerId && a.State == AssetState.Uploaded);
+
+        if (cursor is { } cursorId)
+        {
+            var anchor = await dbContext.Assets.AsNoTracking()
+                .Where(a => a.Id == cursorId)
+                .Select(a => (DateTimeOffset?)a.CreatedAtUtc)
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (anchor.HasValue)
+            {
+                query = query.Where(a => a.CreatedAtUtc < anchor.Value);
+            }
+        }
+
+        var page = await query
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var hasMore = page.Count > limit;
+        var items = hasMore ? page.GetRange(0, limit) : page;
+        var nextCursor = hasMore ? items[^1].Id : (Guid?)null;
+        return new PagedAssets(items, nextCursor);
+    }
+
     public async Task<IReadOnlyList<MediaAsset>> GetForRetentionAsync(
         DateTimeOffset cutoff, int limit, CancellationToken cancellationToken)
     {
