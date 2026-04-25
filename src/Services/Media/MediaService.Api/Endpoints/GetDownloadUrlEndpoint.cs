@@ -4,6 +4,7 @@ using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
 using MediaService.Api.Infrastructure.Storage;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace MediaService.Api.Endpoints;
@@ -13,6 +14,7 @@ public sealed class GetDownloadUrlRequest
     public Guid AssetId { get; set; }
 }
 
+[Authorize]
 public sealed class GetDownloadUrlEndpoint(
     IMediaAssetRepository assetRepository,
     IPresignedUrlGenerator urlGenerator,

@@ -2,10 +2,12 @@ using FastEndpoints;
 using MediaService.Api.Application.Contracts.Requests;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace MediaService.Api.Endpoints;
 
+[Authorize]
 public sealed class CompleteUploadEndpoint(
     IMediaAssetRepository assetRepository,
     IUploadSessionRepository sessionRepository,

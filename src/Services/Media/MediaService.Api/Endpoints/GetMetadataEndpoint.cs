@@ -3,6 +3,7 @@ using MediaService.Api.Application.Access;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
+using Microsoft.AspNetCore.Authorization;
 
 namespace MediaService.Api.Endpoints;
 
@@ -11,6 +12,7 @@ public sealed class GetMetadataRequest
     public Guid AssetId { get; set; }
 }
 
+[Authorize]
 public sealed class GetMetadataEndpoint(
     IMediaAssetRepository assetRepository,
     AccessPolicy accessPolicy)

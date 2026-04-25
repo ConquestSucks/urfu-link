@@ -7,11 +7,13 @@ using MediaService.Api.Domain.Enums;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
 using MediaService.Api.Infrastructure.Storage;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace MediaService.Api.Endpoints;
 
+[Authorize]
 public sealed class InitiateUploadEndpoint(
     IMediaAssetRepository assetRepository,
     IUploadSessionRepository sessionRepository,
