@@ -4,12 +4,14 @@ using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Application;
 using Urfu.Link.Services.Presence.Application.Aggregation;
+using Urfu.Link.Services.Presence.Application.Dispatchers;
 using Urfu.Link.Services.Presence.Domain;
 using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence.Repositories;
 using Urfu.Link.Services.Presence.Infrastructure.Redis;
 using Urfu.Link.Services.Presence.Messaging;
+using Urfu.Link.Services.Presence.Realtime;
 
 namespace Urfu.Link.Services.Presence.Infrastructure;
 
@@ -51,6 +53,8 @@ public static class ModuleRegistration
         services.AddScoped<IKafkaMessageHandler, PrivacyChangedHandler>();
 
         services.AddSingleton<PresenceAggregator>();
+        services.AddScoped<PresenceEventDispatcher>();
+        services.AddSingleton<PresenceBroadcaster>();
 
         return services;
     }
