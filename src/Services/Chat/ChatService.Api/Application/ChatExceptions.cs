@@ -48,6 +48,26 @@ public sealed class ConversationNotFoundException : InvalidOperationException
         => new($"Conversation '{conversationId}' was not found.");
 }
 
+public sealed class ChatMessageNotFoundException : InvalidOperationException
+{
+    public ChatMessageNotFoundException()
+    {
+    }
+
+    public ChatMessageNotFoundException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatMessageNotFoundException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public static ChatMessageNotFoundException For(Guid messageId)
+        => new($"Message '{messageId:D}' was not found.");
+}
+
 public sealed class ChatPinLimitExceededException : InvalidOperationException
 {
     public ChatPinLimitExceededException()
