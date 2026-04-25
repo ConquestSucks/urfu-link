@@ -22,6 +22,7 @@ env:
   Auth__NameClaim: email
   Auth__RoleClaim: groups
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
+  GrpcClients__MediaService__Address: http://media-service.urfu-link.svc.cluster.local:8080
 
 secrets:
   enabled: true
