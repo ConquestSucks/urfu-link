@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MediaService.IntegrationTests.Infrastructure;
 
+[Collection(IntegrationCollection.Name)]
 public class GrpcAuthorizationTests : IClassFixture<MediaServiceFactory>
 {
     private readonly MediaServiceFactory _factory;

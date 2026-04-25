@@ -7,13 +7,11 @@ using MediaService.Api.Domain.Enums;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
 using MediaService.Api.Infrastructure.Storage;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace MediaService.Api.Endpoints;
 
-[Authorize]
 public sealed class InitiateUploadEndpoint(
     IMediaAssetRepository assetRepository,
     IUploadSessionRepository sessionRepository,
@@ -23,7 +21,8 @@ public sealed class InitiateUploadEndpoint(
 {
     public override void Configure()
     {
-        Post("/media/upload/init");
+        Post("upload/init");
+        Group<MediaGroup>();
         Options(x => x.AddEndpointFilter<IdempotencyEndpointFilter>());
         Summary(s => s.Summary = "Reserve a media asset record and return a presigned PUT URL.");
     }

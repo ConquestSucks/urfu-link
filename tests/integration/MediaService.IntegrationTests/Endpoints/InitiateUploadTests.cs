@@ -9,6 +9,7 @@ using MediaService.IntegrationTests.Infrastructure;
 
 namespace MediaService.IntegrationTests.Endpoints;
 
+[Collection(IntegrationCollection.Name)]
 public class InitiateUploadTests : IClassFixture<MediaServiceFactory>
 {
     private readonly MediaServiceFactory _factory;

@@ -2,12 +2,10 @@ using FastEndpoints;
 using MediaService.Api.Application.Contracts.Requests;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
-using Microsoft.AspNetCore.Authorization;
 using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace MediaService.Api.Endpoints;
 
-[Authorize]
 public sealed class CompleteUploadEndpoint(
     IMediaAssetRepository assetRepository,
     IUploadSessionRepository sessionRepository,
@@ -16,7 +14,8 @@ public sealed class CompleteUploadEndpoint(
 {
     public override void Configure()
     {
-        Post("/media/upload/complete");
+        Post("upload/complete");
+        Group<MediaGroup>();
         Options(x => x.AddEndpointFilter<IdempotencyEndpointFilter>());
         Summary(s => s.Summary = "Confirm the client uploaded bytes; transition the asset to Uploaded.");
     }

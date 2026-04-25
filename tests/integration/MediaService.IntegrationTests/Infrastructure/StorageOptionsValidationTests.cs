@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 
 namespace MediaService.IntegrationTests.Infrastructure;
 
+[Collection(IntegrationCollection.Name)]
 public class StorageOptionsValidationTests
 {
     [Fact]

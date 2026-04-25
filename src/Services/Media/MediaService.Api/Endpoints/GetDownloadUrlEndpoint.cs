@@ -4,7 +4,6 @@ using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Auth;
 using MediaService.Api.Infrastructure.Storage;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 
 namespace MediaService.Api.Endpoints;
@@ -14,7 +13,6 @@ public sealed class GetDownloadUrlRequest
     public Guid AssetId { get; set; }
 }
 
-[Authorize]
 public sealed class GetDownloadUrlEndpoint(
     IMediaAssetRepository assetRepository,
     IPresignedUrlGenerator urlGenerator,
@@ -24,7 +22,8 @@ public sealed class GetDownloadUrlEndpoint(
 {
     public override void Configure()
     {
-        Get("/media/{assetId}/download-url");
+        Get("{assetId}/download-url");
+        Group<MediaGroup>();
         Summary(s => s.Summary = "Issue a short-lived presigned GET URL if the user has access.");
     }
 
