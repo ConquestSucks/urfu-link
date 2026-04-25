@@ -63,6 +63,8 @@ public static class ModuleRegistration
         services.AddScoped<ChatEventDispatcher>();
         services.AddScoped<OpenDirectConversationService>();
         services.AddScoped<SendMessageService>();
+        services.AddScoped<MarkDeliveredService>();
+        services.AddScoped<MarkReadService>();
 
         return services;
     }
