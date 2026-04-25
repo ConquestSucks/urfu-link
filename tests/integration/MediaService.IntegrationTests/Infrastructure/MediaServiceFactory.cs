@@ -1,9 +1,11 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using MediaService.Api.Domain.Interfaces;
+using MediaService.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -50,6 +52,7 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
     {
         await Task.WhenAll(_postgres.StartAsync(), _minio.StartAsync());
         await CreateBucketsAsync();
+        await ApplyMigrationsAsync();
     }
 
     public new async Task DisposeAsync()
@@ -122,6 +125,19 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
         {
             await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket });
         }
+    }
+
+    private async Task ApplyMigrationsAsync()
+    {
+        // Production now applies migrations via the dedicated --migrate CLI flag
+        // (Helm pre-install/pre-upgrade Job). Tests reproduce that by running the
+        // same EF migration set directly against the container before the host
+        // is built.
+        var options = new DbContextOptionsBuilder<MediaDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .Options;
+        await using var ctx = new MediaDbContext(options);
+        await ctx.Database.MigrateAsync();
     }
 
     private static void ReplaceAuthWithTestScheme(IServiceCollection services)

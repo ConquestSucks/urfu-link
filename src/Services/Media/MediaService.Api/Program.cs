@@ -14,6 +14,18 @@ using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 
+if (args.Length > 0 && args[0] == "--migrate")
+{
+    var migrateBuilder = WebApplication.CreateBuilder(args);
+    migrateBuilder.Services.AddDbContextPool<MediaDbContext>(options =>
+        options.UseNpgsql(migrateBuilder.Configuration.GetConnectionString("Primary")));
+    var migrateApp = migrateBuilder.Build();
+    await using var migrateScope = migrateApp.Services.CreateAsyncScope();
+    var migrateDb = migrateScope.ServiceProvider.GetRequiredService<MediaDbContext>();
+    await migrateDb.Database.MigrateAsync();
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
@@ -43,13 +55,6 @@ builder.Services.AddHostedService<KafkaConsumerWorker>();
 builder.Services.AddMediaModule(builder.Configuration);
 
 var app = builder.Build();
-
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<MediaDbContext>();
-    if (db.Database.IsRelational())
-        await db.Database.MigrateAsync();
-}
 
 app.MapServiceDefaults();
 app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
