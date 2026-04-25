@@ -51,6 +51,14 @@ message BatchGetMetadataRequest {
   repeated string asset_ids = 1;
 }
 
+enum AssetState {
+  ASSET_STATE_INITIATED = 0;
+  ASSET_STATE_UPLOADED = 1;
+  ASSET_STATE_DELETED = 2;
+  ASSET_STATE_HARD_DELETED = 3;
+  ASSET_STATE_FAILED = 4;
+}
+
 message AssetMetadata {
   string asset_id = 1;
   string owner_id = 2;
@@ -59,7 +67,7 @@ message AssetMetadata {
   int64 size_bytes = 5;
   string mime_type = 6;
   string original_file_name = 7;
-  string state = 8;
+  AssetState state = 8;
   string created_at_utc = 9;
 }
 

@@ -66,7 +66,7 @@ public sealed class InternalApiService(
                 SizeBytes = asset.Size,
                 MimeType = asset.MimeType,
                 OriginalFileName = asset.OriginalFileName,
-                State = asset.State.ToString(),
+                State = (AssetState)asset.State,
                 CreatedAtUtc = asset.CreatedAtUtc.ToString("O"),
             });
         }

@@ -10,6 +10,6 @@ public sealed record AssetMetadataResponse(
     long Size,
     string MimeType,
     string OriginalFileName,
-    string State,
+    AssetState State,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? UploadedAtUtc);

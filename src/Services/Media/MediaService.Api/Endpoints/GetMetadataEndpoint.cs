@@ -49,7 +49,7 @@ public sealed class GetMetadataEndpoint(
             asset.Size,
             asset.MimeType,
             asset.OriginalFileName,
-            asset.State.ToString(),
+            asset.State,
             asset.CreatedAtUtc,
             asset.UploadedAtUtc), cancellation: ct).ConfigureAwait(false);
     }
