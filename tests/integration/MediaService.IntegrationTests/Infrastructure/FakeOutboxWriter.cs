@@ -4,13 +4,15 @@ using Urfu.Link.BuildingBlocks.Outbox;
 
 namespace MediaService.IntegrationTests.Infrastructure;
 
+public sealed record PublishedEvent(string Topic, string EventType, IIntegrationEvent Payload);
+
 /// <summary>
-/// In-memory IOutboxWriter; tests can inspect <see cref="Published"/> to verify
-/// integration events were enqueued without spinning up Redis.
+/// In-memory IOutboxWriter; tests inspect <see cref="Published"/> to assert
+/// integration events were enqueued without spinning up Redis or Kafka.
 /// </summary>
 public sealed class FakeOutboxWriter : IOutboxWriter
 {
-    public ConcurrentBag<(string Topic, string EventType)> Published { get; } = [];
+    public ConcurrentBag<PublishedEvent> Published { get; } = [];
 
     public ValueTask EnqueueAsync<TEvent>(
         string topic,
@@ -19,7 +21,9 @@ public sealed class FakeOutboxWriter : IOutboxWriter
         where TEvent : IIntegrationEvent
     {
         ArgumentNullException.ThrowIfNull(envelope);
-        Published.Add((topic, envelope.Payload.EventType));
+        Published.Add(new PublishedEvent(topic, envelope.Payload.EventType, envelope.Payload));
         return ValueTask.CompletedTask;
     }
+
+    public void Clear() => Published.Clear();
 }

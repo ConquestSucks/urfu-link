@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using MediaService.Api.Domain.Events;
 using MediaService.IntegrationTests.Infrastructure;
 
 namespace MediaService.IntegrationTests.Endpoints;
@@ -16,10 +17,11 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
     }
 
     [Fact]
-    public async Task Owner_SoftDeletesAsset()
+    public async Task Owner_SoftDeletesAsset_AndPublishesEvent()
     {
         var ownerId = Guid.NewGuid();
         var assetId = await CreateUploadedAssetAsync(ownerId);
+        _factory.OutboxWriter.Clear();
 
         var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
         var response = await client.DeleteAsync($"/api/v1/media/{assetId}");
@@ -29,6 +31,12 @@ public class DeleteAssetTests : IClassFixture<MediaServiceFactory>
         // Subsequent metadata read should now 404 (asset.IsAccessible == false).
         var followUp = await client.GetAsync($"/api/v1/media/{assetId}/metadata");
         followUp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<MediaAssetDeletedEvent>()
+            .Should().Contain(ev => ev.AssetId == assetId,
+                "soft delete must enqueue MediaAssetDeletedEvent so downstream consumers can purge attachments");
     }
 
     [Fact]

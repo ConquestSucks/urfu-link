@@ -62,6 +62,18 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
         await _postgres.DisposeAsync();
     }
 
+    /// <summary>
+    /// Clears any captured state that survives across tests inside the same
+    /// IClassFixture: outbox events, the static auth principal, and any
+    /// configured idempotency calls. Call from test setup to guarantee
+    /// independence between methods.
+    /// </summary>
+    public void ResetCapturedState()
+    {
+        OutboxWriter.Clear();
+        TestAuthHandler.CurrentPrincipal = null;
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);

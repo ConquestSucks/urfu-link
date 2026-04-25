@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.Api.Application.Contracts.Requests;
+using MediaService.Api.Domain.Events;
 using MediaService.IntegrationTests.Infrastructure;
 
 namespace MediaService.IntegrationTests.Endpoints;
@@ -17,8 +18,9 @@ public class CompleteUploadTests : IClassFixture<MediaServiceFactory>
     }
 
     [Fact]
-    public async Task CompleteUpload_AfterPut_ReturnsNoContent()
+    public async Task CompleteUpload_AfterPut_ReturnsNoContent_AndPublishesEvent()
     {
+        _factory.ResetCapturedState();
         var ownerId = Guid.NewGuid();
         var content = Enumerable.Range(0, 2048).Select(i => (byte)(i & 0xFF)).ToArray();
 
@@ -30,6 +32,12 @@ public class CompleteUploadTests : IClassFixture<MediaServiceFactory>
         var response = await client.PostAsJsonAsync("/api/v1/media/upload/complete", req);
 
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<MediaAssetUploadedEvent>()
+            .Should().Contain(ev => ev.AssetId == assetId,
+                "complete must enqueue MediaAssetUploadedEvent for downstream consumers (ChatService etc.)");
     }
 
     [Fact]
