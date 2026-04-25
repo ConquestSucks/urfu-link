@@ -5,13 +5,14 @@ using Urfu.Link.Services.Chat.Application.Contracts;
 namespace Urfu.Link.Services.Chat.Realtime;
 
 /// <summary>
-/// Sends realtime updates over SignalR. Uses the non-typed <see cref="IHubContext{THub}"/> +
-/// <c>SendAsync(method, args)</c> form because the typed-client open generic
-/// <c>IHubContext&lt;THub, TClient&gt;</c> isn't reliably resolvable under strict DI
-/// validation in the test factory; the method names are kept aligned with
-/// <see cref="IChatClient"/>.
+/// Sends realtime updates over SignalR via the strongly-typed
+/// <see cref="IHubContext{THub, T}"/> overload — method names and signatures are checked at
+/// compile time against <see cref="IChatClient"/>, so a rename in the contract immediately
+/// propagates here. Recipients are addressed by user id (resolved through
+/// <see cref="ChatUserIdProvider"/>) so the same broadcast reaches every active connection a
+/// user has.
 /// </summary>
-internal sealed class ChatBroadcaster(IHubContext<ChatHub> hub) : IChatBroadcaster
+internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : IChatBroadcaster
 {
     public Task NotifyConversationUpdatedAsync(
         IReadOnlyList<Guid> participantUserIds,
@@ -19,8 +20,7 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub> hub) : IChatBroadcast
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(participantUserIds);
-        return hub.Clients.Users(ToUserIds(participantUserIds))
-            .SendAsync(nameof(IChatClient.ConversationUpdated), conversation, cancellationToken);
+        return hub.Clients.Users(ToUserIds(participantUserIds)).ConversationUpdated(conversation);
     }
 
     public Task NotifyMessageReceivedAsync(
@@ -29,8 +29,7 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub> hub) : IChatBroadcast
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(recipientUserIds);
-        return hub.Clients.Users(ToUserIds(recipientUserIds))
-            .SendAsync(nameof(IChatClient.MessageReceived), message, cancellationToken);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).MessageReceived(message);
     }
 
     public Task NotifyMessageDeliveredAsync(
@@ -42,12 +41,7 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub> hub) : IChatBroadcast
     {
         ArgumentNullException.ThrowIfNull(recipientUserIds);
         return hub.Clients.Users(ToUserIds(recipientUserIds))
-            .SendAsync(
-                nameof(IChatClient.MessageDeliveredUpdate),
-                conversationId,
-                messageIds,
-                recipientUserId,
-                cancellationToken);
+            .MessageDeliveredUpdate(conversationId, messageIds, recipientUserId);
     }
 
     public Task NotifyMessageReadAsync(
@@ -59,12 +53,7 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub> hub) : IChatBroadcast
     {
         ArgumentNullException.ThrowIfNull(recipientUserIds);
         return hub.Clients.Users(ToUserIds(recipientUserIds))
-            .SendAsync(
-                nameof(IChatClient.MessageReadUpdate),
-                conversationId,
-                upToMessageId,
-                readerUserId,
-                cancellationToken);
+            .MessageReadUpdate(conversationId, upToMessageId, readerUserId);
     }
 
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)
