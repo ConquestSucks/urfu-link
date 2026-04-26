@@ -2,6 +2,7 @@ using System.Globalization;
 using Grpc.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Disciplines;
@@ -108,8 +109,11 @@ public sealed class ChatHub(
                 conversationIds.Add(id);
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is MongoException or TimeoutException)
         {
+            // Mongo outage shouldn't fail the SignalR handshake — the gRPC pass above already
+            // covered the user's discipline groups, and broadcasts targeted via Clients.Users
+            // still reach the connection without group membership.
             logger.LogWarning(
                 ex,
                 "Failed to load local conversation ids for {UserId}; some SignalR groups may not be joined.",
