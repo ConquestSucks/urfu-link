@@ -28,7 +28,7 @@ public sealed class ChatMessageSentHandler : INotificationHandler<ChatMessageSen
         if (!Guid.TryParse(conversationId, out var conversationGuid))
         {
             // Fallback: hash the string into a stable Guid so GroupKey remains deterministic.
-            conversationGuid = StableGuidFromString(conversationId);
+            conversationGuid = StableGuids.From(conversationId);
         }
 
         var preview = string.IsNullOrWhiteSpace(integrationEvent.Preview)
@@ -79,10 +79,4 @@ public sealed class ChatMessageSentHandler : INotificationHandler<ChatMessageSen
         return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
     }
 
-    private static Guid StableGuidFromString(string input)
-    {
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(input));
-        // Take the first 16 bytes — collision-resistant enough for grouping non-Guid conversation ids.
-        return new Guid(hash.AsSpan(0, 16));
-    }
 }

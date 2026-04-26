@@ -2,7 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Idempotency;
+using Urfu.Link.Services.Notification.Application.Handlers.Admin;
+using Urfu.Link.Services.Notification.Application.Handlers.Call;
 using Urfu.Link.Services.Notification.Application.Handlers.Chat;
+using Urfu.Link.Services.Notification.Application.Handlers.Discipline;
 using Urfu.Link.Services.Notification.Application.Preferences;
 using Urfu.Link.Services.Notification.Application.Routing;
 using Urfu.Link.Services.Notification.Application.Services;
@@ -55,6 +58,16 @@ public static class ModuleRegistration
         services.AddSingleton<INotificationBroadcaster, NotificationBroadcaster>();
 
         services.AddScoped<ChatMessageSentHandler>();
+        services.AddScoped<ChatMentionCreatedHandler>();
+        services.AddScoped<AdminChatInviteHandler>();
+        services.AddScoped<AdminRoleChangedHandler>();
+        services.AddScoped<UserEnrolledHandler>();
+        services.AddScoped<EnrollmentRoleChangedHandler>();
+        services.AddScoped<DisciplineAnnouncementHandler>();
+        services.AddScoped<DisciplineMaterialHandler>();
+        services.AddScoped<DisciplineDeadlineHandler>();
+        services.AddScoped<CallIncomingHandler>();
+        services.AddScoped<CallMissedHandler>();
 
         return services;
     }

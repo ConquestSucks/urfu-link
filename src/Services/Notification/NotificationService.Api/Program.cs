@@ -43,6 +43,9 @@ builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddNotificationModule(builder.Configuration);
 builder.Services.AddHostedService<ChatEventsConsumer>();
+builder.Services.AddHostedService<DisciplineEventsConsumer>();
+builder.Services.AddHostedService<CallEventsConsumer>();
+builder.Services.AddHostedService<UserEventsConsumer>();
 
 var app = builder.Build();
 
