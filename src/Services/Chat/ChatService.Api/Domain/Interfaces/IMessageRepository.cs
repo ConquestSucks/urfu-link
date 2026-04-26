@@ -19,6 +19,15 @@ public interface IMessageRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Bulk-loads messages by id across any conversation. Used by forward, where source
+    /// messages may live in different conversations and the caller verifies membership for
+    /// each source separately. Result order is unspecified — callers should index by id.
+    /// </summary>
+    Task<IReadOnlyList<Message>> GetManyAsync(
+        IReadOnlyList<Guid> messageIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Inserts a new message. Throws <see cref="DuplicateClientMessageException"/> when the
     /// (senderId, clientMessageId) pair already exists in the collection.
     /// </summary>

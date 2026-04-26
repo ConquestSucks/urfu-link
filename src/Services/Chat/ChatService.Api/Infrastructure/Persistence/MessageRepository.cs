@@ -42,6 +42,26 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
         return docs.Select(d => d.ToDomain()).ToList();
     }
 
+    public async Task<IReadOnlyList<Message>> GetManyAsync(
+        IReadOnlyList<Guid> messageIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(messageIds);
+        if (messageIds.Count == 0)
+        {
+            return Array.Empty<Message>();
+        }
+
+        var filter = Builders<MessageDocument>.Filter.In(m => m.Id, messageIds);
+
+        var docs = await context.Messages
+            .Find(filter)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return docs.Select(d => d.ToDomain()).ToList();
+    }
+
     public async Task InsertAsync(Message message, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(message);
