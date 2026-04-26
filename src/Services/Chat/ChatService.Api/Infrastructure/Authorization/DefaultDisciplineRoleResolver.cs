@@ -5,16 +5,36 @@ using Urfu.Link.Services.Chat.Domain.Enums;
 namespace Urfu.Link.Services.Chat.Infrastructure.Authorization;
 
 /// <summary>
-/// Stub used until <c>DisciplineService</c> (#207) and discipline chats (#214) are wired up.
-/// Direct conversations: any participant can pin. Group conversations: blocked until the real
-/// teacher/student role resolver replaces this implementation.
+/// Real role resolution for discipline-driven conversations:
+/// - <c>callerIsAdmin = true</c> always wins: realm admins manage pins anywhere,
+///   even in conversations they have no enrolment in.
+/// - Direct conversations: any participant can pin (parity with the previous behaviour).
+/// - Group conversations: only participants flagged as <see cref="ParticipantRole.Teacher"/>
+///   can pin / manage messages. The role information arrives via the
+///   <c>urfu.discipline.events.v1</c> topic and is mirrored into <see cref="Conversation.ParticipantRoles"/>.
 /// </summary>
 internal sealed class DefaultDisciplineRoleResolver : IDisciplineRoleResolver
 {
-    public Task<bool> CanPinAsync(Guid userId, Conversation conversation, CancellationToken cancellationToken)
+    public Task<bool> CanPinAsync(
+        Guid userId,
+        bool callerIsAdmin,
+        Conversation conversation,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(conversation);
-        var allowed = conversation.Type == ConversationType.Direct && conversation.IsParticipant(userId);
+        _ = cancellationToken;
+
+        if (callerIsAdmin)
+        {
+            return Task.FromResult(true);
+        }
+
+        if (!conversation.IsParticipant(userId))
+        {
+            return Task.FromResult(false);
+        }
+
+        var allowed = conversation.Type == ConversationType.Direct || conversation.IsTeacher(userId);
         return Task.FromResult(allowed);
     }
 }

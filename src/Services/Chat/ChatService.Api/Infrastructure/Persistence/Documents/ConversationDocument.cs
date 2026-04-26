@@ -29,6 +29,24 @@ internal sealed class ConversationDocument
     [BsonElement("pinnedMessageIds")]
     public List<Guid> PinnedMessageIds { get; set; } = new();
 
+    /// <summary>
+    /// Map of user id -> role. Persisted as a Bson array of {userId, role} entries to
+    /// avoid GUID-key compatibility issues across drivers. Always present on documents
+    /// produced after the discipline rollout; may be absent on older direct rows, in
+    /// which case ParticipantRole.Member is implied.
+    /// </summary>
+    [BsonElement("participantRoles")]
+    [BsonIgnoreIfNull]
+    public List<ParticipantRoleEntry>? ParticipantRoles { get; set; }
+
+    [BsonElement("disciplineId")]
+    [BsonIgnoreIfNull]
+    public Guid? DisciplineId { get; set; }
+
+    [BsonElement("archivedAtUtc")]
+    [BsonIgnoreIfNull]
+    public DateTime? ArchivedAtUtc { get; set; }
+
     public Conversation ToDomain() => Conversation.Hydrate(
         Id,
         Type,
@@ -36,16 +54,55 @@ internal sealed class ConversationDocument
         new DateTimeOffset(DateTime.SpecifyKind(CreatedAtUtc, DateTimeKind.Utc)),
         new DateTimeOffset(DateTime.SpecifyKind(LastMessageAtUtc, DateTimeKind.Utc)),
         LastMessagePreview?.ToDomain(),
-        PinnedMessageIds);
+        PinnedMessageIds,
+        ParticipantRoles?.ToDictionary(e => e.UserId, e => e.Role),
+        DisciplineId,
+        ArchivedAtUtc is { } archived
+            ? new DateTimeOffset(DateTime.SpecifyKind(archived, DateTimeKind.Utc))
+            : null);
 
-    public static ConversationDocument FromDomain(Conversation conversation) => new()
+    public static ConversationDocument FromDomain(Conversation conversation)
     {
-        Id = conversation.Id,
-        Type = conversation.Type,
-        Participants = conversation.Participants.ToList(),
-        CreatedAtUtc = conversation.CreatedAtUtc.UtcDateTime,
-        LastMessageAtUtc = conversation.LastMessageAtUtc.UtcDateTime,
-        LastMessagePreview = conversation.LastMessagePreview is { } p ? MessagePreviewDocument.FromDomain(p) : null,
-        PinnedMessageIds = conversation.PinnedMessageIds.ToList(),
-    };
+        ArgumentNullException.ThrowIfNull(conversation);
+
+        return new ConversationDocument
+        {
+            Id = conversation.Id,
+            Type = conversation.Type,
+            Participants = conversation.Participants.ToList(),
+            CreatedAtUtc = conversation.CreatedAtUtc.UtcDateTime,
+            LastMessageAtUtc = conversation.LastMessageAtUtc.UtcDateTime,
+            LastMessagePreview = conversation.LastMessagePreview is { } p
+                ? MessagePreviewDocument.FromDomain(p)
+                : null,
+            PinnedMessageIds = conversation.PinnedMessageIds.ToList(),
+            ParticipantRoles = conversation.ParticipantRoles.Count == 0
+                ? null
+                : conversation.ParticipantRoles
+                    .Select(kv => new ParticipantRoleEntry(kv.Key, kv.Value))
+                    .ToList(),
+            DisciplineId = conversation.DisciplineId,
+            ArchivedAtUtc = conversation.ArchivedAtUtc?.UtcDateTime,
+        };
+    }
+}
+
+internal sealed class ParticipantRoleEntry
+{
+    public ParticipantRoleEntry()
+    {
+    }
+
+    public ParticipantRoleEntry(Guid userId, ParticipantRole role)
+    {
+        UserId = userId;
+        Role = role;
+    }
+
+    [BsonElement("userId")]
+    public Guid UserId { get; set; }
+
+    [BsonElement("role")]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public ParticipantRole Role { get; set; }
 }

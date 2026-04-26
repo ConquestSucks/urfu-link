@@ -27,7 +27,8 @@ public sealed class UnpinMessageEndpoint(UnpinMessageService service)
         ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
         var dtos = await service.UnpinAsync(
-            new UnpinMessageRequest(req.Id, caller, req.MessageId), ct).ConfigureAwait(false);
+            new UnpinMessageRequest(req.Id, caller, User.IsAdmin(), req.MessageId),
+            ct).ConfigureAwait(false);
         await Send.OkAsync(dtos, ct).ConfigureAwait(false);
     }
 }

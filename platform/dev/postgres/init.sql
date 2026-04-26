@@ -20,3 +20,10 @@ CREATE USER presence WITH PASSWORD 'presence';
 GRANT ALL PRIVILEGES ON DATABASE presence_db TO presence;
 \c presence_db
 GRANT ALL ON SCHEMA public TO presence;
+
+\c postgres
+CREATE DATABASE discipline_db;
+CREATE USER discipline WITH PASSWORD 'discipline';
+GRANT ALL PRIVILEGES ON DATABASE discipline_db TO discipline;
+\c discipline_db
+GRANT ALL ON SCHEMA public TO discipline;

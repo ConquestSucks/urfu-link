@@ -18,6 +18,11 @@
 ## Call Service
 - Signaling workflows and LiveKit session orchestration
 
+## Discipline Service
+- Disciplines (учебные курсы), enrollments, owner-teacher invariant.
+- Source of truth for discipline membership and roles (teacher/student).
+- Publishes integration events that drive group-conversation lifecycle in ChatService.
+
 ## Cross-cutting ownership
 - API contracts and integration events: `BuildingBlocks/Contracts`
 - Security and telemetry defaults: `BuildingBlocks/Auth` + `BuildingBlocks/Observability`

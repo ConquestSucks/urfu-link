@@ -27,7 +27,12 @@ public class MongoIndexInitializerTests : IClassFixture<MongoFixture>
             .GetCollection<dynamic>(ChatMongoContext.ConversationsCollectionName)
             .Indexes.ListAsync();
         var convNames = (await convIndexes.ToListAsync()).Select(d => (string)d["name"]).ToList();
-        convNames.Should().Contain(new[] { "ix_conversations_participants", "ix_conversations_lastMessageAtUtc_desc" });
+        convNames.Should().Contain(new[]
+        {
+            "ix_conversations_participants",
+            "ix_conversations_lastMessageAtUtc_desc",
+            "ux_conversations_disciplineId",
+        });
 
         var msgIndexes = await context.Database
             .GetCollection<dynamic>(ChatMongoContext.MessagesCollectionName)
@@ -56,8 +61,8 @@ public class MongoIndexInitializerTests : IClassFixture<MongoFixture>
             .GetCollection<dynamic>(ChatMongoContext.ConversationsCollectionName)
             .Indexes.ListAsync();
         var convCount = (await convIndexes.ToListAsync()).Count;
-        // _id + 2 of ours = 3
-        convCount.Should().Be(3);
+        // _id + 3 of ours = 4
+        convCount.Should().Be(4);
     }
 
     [Fact]

@@ -10,7 +10,11 @@ using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Conversations;
 
-public sealed record PinMessageRequest(string ConversationId, Guid CallerUserId, Guid MessageId);
+public sealed record PinMessageRequest(
+    string ConversationId,
+    Guid CallerUserId,
+    bool CallerIsAdmin,
+    Guid MessageId);
 
 public sealed class PinMessageService(
     IConversationRepository conversations,
@@ -28,12 +32,17 @@ public sealed class PinMessageService(
         var conversation = await conversations.GetByIdAsync(request.ConversationId, cancellationToken).ConfigureAwait(false)
             ?? throw ConversationNotFoundException.For(request.ConversationId);
 
-        if (!conversation.IsParticipant(request.CallerUserId))
+        // Admins can manage pins on any conversation (Q4 in #207 review). The
+        // resolver short-circuits the membership and role checks for them; for
+        // every other caller we still require participation + the per-type rule.
+        if (!request.CallerIsAdmin && !conversation.IsParticipant(request.CallerUserId))
         {
             throw new ChatAccessDeniedException(request.ConversationId, request.CallerUserId);
         }
 
-        var canPin = await roleResolver.CanPinAsync(request.CallerUserId, conversation, cancellationToken).ConfigureAwait(false);
+        var canPin = await roleResolver
+            .CanPinAsync(request.CallerUserId, request.CallerIsAdmin, conversation, cancellationToken)
+            .ConfigureAwait(false);
         if (!canPin)
         {
             throw new ChatAccessDeniedException(request.ConversationId, request.CallerUserId);

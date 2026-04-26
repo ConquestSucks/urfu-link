@@ -128,17 +128,19 @@ public sealed class ChatHub(
 
     public Task<IReadOnlyList<MessageDto>> PinMessage(string conversationId, Guid messageId)
     {
-        var caller = Context.User!.GetUserId();
+        var principal = Context.User!;
+        var caller = principal.GetUserId();
         return pinMessage.PinAsync(
-            new PinMessageRequest(conversationId, caller, messageId),
+            new PinMessageRequest(conversationId, caller, principal.IsAdmin(), messageId),
             Context.ConnectionAborted);
     }
 
     public Task<IReadOnlyList<MessageDto>> UnpinMessage(string conversationId, Guid messageId)
     {
-        var caller = Context.User!.GetUserId();
+        var principal = Context.User!;
+        var caller = principal.GetUserId();
         return unpinMessage.UnpinAsync(
-            new UnpinMessageRequest(conversationId, caller, messageId),
+            new UnpinMessageRequest(conversationId, caller, principal.IsAdmin(), messageId),
             Context.ConnectionAborted);
     }
 

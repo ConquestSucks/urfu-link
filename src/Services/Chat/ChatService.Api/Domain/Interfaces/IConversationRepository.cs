@@ -1,4 +1,5 @@
 using Urfu.Link.Services.Chat.Domain.Aggregates;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Chat.Domain.Interfaces;
@@ -60,5 +61,43 @@ public interface IConversationRepository
     /// </summary>
     Task<IReadOnlyList<Conversation>> GetByIdsAsync(
         IReadOnlyList<string> conversationIds,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the conversation backed by <paramref name="disciplineId"/>, or
+    /// <see langword="null"/> when there is none yet. Used by the discipline-event consumer
+    /// to keep participant sync idempotent.
+    /// </summary>
+    Task<Conversation?> GetByDisciplineIdAsync(Guid disciplineId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Adds <paramref name="userId"/> with <paramref name="role"/> to the conversation. Returns
+    /// <see langword="true"/> when the user was added (so the caller knows when to publish a
+    /// derived event), <see langword="false"/> when already present.
+    /// </summary>
+    Task<bool> AddParticipantAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken);
+
+    Task<bool> RemoveParticipantAsync(
+        string conversationId,
+        Guid userId,
+        CancellationToken cancellationToken);
+
+    Task<bool> ChangeParticipantRoleAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole newRole,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Marks the conversation as archived. Idempotent — second call is a no-op and returns
+    /// <see langword="false"/>.
+    /// </summary>
+    Task<bool> ArchiveAsync(
+        string conversationId,
+        DateTimeOffset archivedAtUtc,
         CancellationToken cancellationToken);
 }

@@ -93,6 +93,7 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.presence.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.notification.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.call.events.v1 --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.discipline.events.v1 --partitions 3 --replication-factor 1
         echo "Kafka topics created."
     restart: "no"
 
@@ -362,6 +363,30 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  discipline-service:
+    build:
+      context: ../..
+      dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
+    container_name: urfu-discipline-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
+      Infrastructure__Redis__Configuration: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   api-gateway:
     build:
       context: ../..
@@ -387,6 +412,8 @@ services:
       notification-service:
         condition: service_started
       call-service:
+        condition: service_started
+      discipline-service:
         condition: service_started
     restart: unless-stopped
 

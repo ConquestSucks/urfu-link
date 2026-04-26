@@ -28,6 +28,19 @@ internal sealed class MongoIndexInitializer(
                 new CreateIndexModel<ConversationDocument>(
                     Builders<ConversationDocument>.IndexKeys.Descending(c => c.LastMessageAtUtc),
                     new CreateIndexOptions { Name = "ix_conversations_lastMessageAtUtc_desc", Background = true }),
+                // Sparse + unique: only conversations sourced from a discipline carry this
+                // field, and there is at most one conversation per discipline. The discipline
+                // event consumer looks up this index on every projected event — without it
+                // the lookup degrades linearly with the conversation count.
+                new CreateIndexModel<ConversationDocument>(
+                    Builders<ConversationDocument>.IndexKeys.Ascending(c => c.DisciplineId),
+                    new CreateIndexOptions
+                    {
+                        Name = "ux_conversations_disciplineId",
+                        Background = true,
+                        Sparse = true,
+                        Unique = true,
+                    }),
             },
             cancellationToken).ConfigureAwait(false);
 
