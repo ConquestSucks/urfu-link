@@ -1,5 +1,7 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Notifications;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
+using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 using Urfu.Link.Services.Notification.Realtime;
 
 namespace Urfu.Link.Services.Notification.Application.Services;
@@ -12,6 +14,7 @@ public sealed class MarkAsReadService(
     INotificationRepository repository,
     IBadgeStore badgeStore,
     INotificationBroadcaster broadcaster,
+    IOutboxEnqueue outboxEnqueue,
     TimeProvider timeProvider)
 {
     public async Task MarkSingleAsync(Guid userId, Guid notificationId, CancellationToken cancellationToken)
@@ -22,11 +25,14 @@ public sealed class MarkAsReadService(
             return;
         }
 
-        var changed = notification.MarkRead(timeProvider.GetUtcNow());
+        var readAt = timeProvider.GetUtcNow();
+        var changed = notification.MarkRead(readAt);
         if (!changed)
         {
             return;
         }
+
+        outboxEnqueue.Enqueue(new NotificationReadEvent(notification.Id, userId, readAt));
 
         await repository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await badgeStore.DecrementAsync(userId, notification.Category, cancellationToken).ConfigureAwait(false);

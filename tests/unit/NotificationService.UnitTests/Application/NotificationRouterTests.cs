@@ -8,6 +8,7 @@ using Urfu.Link.Services.Notification.Application.Routing;
 using Urfu.Link.Services.Notification.Application.Services;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
+using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 using Urfu.Link.Services.Notification.Realtime;
 using NotificationAggregate = Urfu.Link.Services.Notification.Domain.Aggregates.Notification;
 
@@ -20,6 +21,7 @@ public sealed class NotificationRouterTests
     private readonly IPushDeviceRepository _pushDevices = Substitute.For<IPushDeviceRepository>();
     private readonly IBadgeStore _badgeStore = Substitute.For<IBadgeStore>();
     private readonly INotificationBroadcaster _broadcaster = Substitute.For<INotificationBroadcaster>();
+    private readonly IOutboxEnqueue _outboxEnqueue = Substitute.For<IOutboxEnqueue>();
     private readonly NotificationFactory _factory = new(TimeProvider.System);
     private readonly NotificationRouter _router;
 
@@ -46,6 +48,7 @@ public sealed class NotificationRouterTests
             TimeProvider.System,
             _badgeStore,
             inAppChannel,
+            _outboxEnqueue,
             NullLogger<NotificationRouter>.Instance);
     }
 

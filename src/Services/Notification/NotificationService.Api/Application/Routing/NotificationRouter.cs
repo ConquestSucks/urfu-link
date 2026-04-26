@@ -1,10 +1,12 @@
 using Microsoft.Extensions.Logging;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Notifications;
 using Urfu.Link.Services.Notification.Application.Preferences;
 using Urfu.Link.Services.Notification.Application.Services;
 using Urfu.Link.Services.Notification.Domain.Aggregates;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
+using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 
 namespace Urfu.Link.Services.Notification.Application.Routing;
 
@@ -21,6 +23,7 @@ public sealed class NotificationRouter(
     TimeProvider timeProvider,
     IBadgeStore badgeStore,
     InAppChannel inAppChannel,
+    IOutboxEnqueue outboxEnqueue,
     ILogger<NotificationRouter> logger)
 {
     public async Task<RoutingOutcome> RouteAsync<TEvent>(
@@ -88,6 +91,14 @@ public sealed class NotificationRouter(
 
                 continue;
             }
+
+            // Outbox event: published downstream once SaveChanges commits.
+            outboxEnqueue.Enqueue(new NotificationCreatedEvent(
+                notification.Id,
+                draft.RecipientUserId,
+                (int)draft.Category,
+                draft.SourceEventId,
+                draft.SourceEventType));
 
             await repository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await badgeStore.IncrementAsync(draft.RecipientUserId, draft.Category, cancellationToken).ConfigureAwait(false);

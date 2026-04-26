@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Notifications;
 using Urfu.Link.Services.Notification.Domain.Aggregates;
 using Urfu.Link.Services.Notification.Domain.Enums;
+using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 using NotificationAggregate = Urfu.Link.Services.Notification.Domain.Aggregates.Notification;
 
 namespace Urfu.Link.Services.Notification.Channels.EmailChannel;
@@ -8,6 +10,7 @@ namespace Urfu.Link.Services.Notification.Channels.EmailChannel;
 public sealed class EmailChannel(
     ITemplateRenderer renderer,
     IEmailSender sender,
+    IOutboxEnqueue outboxEnqueue,
     TimeProvider timeProvider,
     ILogger<EmailChannel> logger)
 {
@@ -44,12 +47,24 @@ public sealed class EmailChannel(
         {
             case EmailSendOutcome.Success:
                 delivery.MarkSent(now);
+                outboxEnqueue.Enqueue(new NotificationDeliveredEvent(
+                    notification.Id,
+                    notification.RecipientUserId,
+                    (int)notification.Category,
+                    (int)DeliveryChannel.Email,
+                    now));
                 break;
             case EmailSendOutcome.Transient:
                 delivery.RecordFailure(now, result.Error ?? "transient", ComputeBackoff(delivery.Attempts));
                 break;
             case EmailSendOutcome.PermanentFailure:
                 delivery.MarkFinalFailed(now, result.Error ?? "permanent_failure");
+                outboxEnqueue.Enqueue(new NotificationFailedEvent(
+                    notification.Id,
+                    notification.RecipientUserId,
+                    (int)notification.Category,
+                    (int)DeliveryChannel.Email,
+                    result.Error ?? "permanent_failure"));
                 break;
         }
 

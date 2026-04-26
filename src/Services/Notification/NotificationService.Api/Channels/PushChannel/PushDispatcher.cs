@@ -1,9 +1,11 @@
 using Microsoft.Extensions.Logging;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Notifications;
 using Urfu.Link.Services.Notification.Channels.PushChannel.Apns;
 using Urfu.Link.Services.Notification.Channels.PushChannel.Fcm;
 using Urfu.Link.Services.Notification.Domain.Aggregates;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
+using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 using NotificationAggregate = Urfu.Link.Services.Notification.Domain.Aggregates.Notification;
 
 namespace Urfu.Link.Services.Notification.Channels.PushChannel;
@@ -17,6 +19,7 @@ public sealed class PushDispatcher(
     IFcmClient fcmClient,
     IApnsClient apnsClient,
     IPushDeviceRepository pushDevices,
+    IOutboxEnqueue outboxEnqueue,
     TimeProvider timeProvider,
     ILogger<PushDispatcher> logger)
 {
@@ -53,6 +56,12 @@ public sealed class PushDispatcher(
         {
             case PushSendOutcome.Success:
                 delivery.MarkSent(now, result.ProviderMessageId);
+                outboxEnqueue.Enqueue(new NotificationDeliveredEvent(
+                    notification.Id,
+                    notification.RecipientUserId,
+                    (int)notification.Category,
+                    (int)DeliveryChannel.Push,
+                    now));
                 break;
 
             case PushSendOutcome.TokenInvalid:
@@ -63,7 +72,6 @@ public sealed class PushDispatcher(
                     if (device is not null)
                     {
                         device.Deactivate(now, result.Error ?? "token_invalid");
-                        await pushDevices.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                     }
                 }
 
@@ -78,6 +86,12 @@ public sealed class PushDispatcher(
 
             case PushSendOutcome.PermanentFailure:
                 delivery.MarkFinalFailed(now, result.Error ?? "permanent_failure");
+                outboxEnqueue.Enqueue(new NotificationFailedEvent(
+                    notification.Id,
+                    notification.RecipientUserId,
+                    (int)notification.Category,
+                    (int)DeliveryChannel.Push,
+                    result.Error ?? "permanent_failure"));
                 break;
         }
 
