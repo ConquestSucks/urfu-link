@@ -1,7 +1,5 @@
 using FastEndpoints;
 using FluentValidation;
-using Microsoft.Extensions.DependencyInjection;
-using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Cursors;
 using Urfu.Link.Services.Chat.Application.Messages;
@@ -9,15 +7,6 @@ using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Messages;
-
-/// <summary>
-/// DI key under which the chat-search rate limiter is registered. Endpoints resolve it via
-/// <c>[FromKeyedServices]</c> so multiple policies can coexist.
-/// </summary>
-public static class ChatSearchRateLimiterPolicy
-{
-    public const string Name = "chat-search";
-}
 
 public sealed class SearchMessagesRequest
 {
@@ -53,15 +42,14 @@ public sealed class SearchMessagesValidator : Validator<SearchMessagesRequest>
     }
 }
 
-public sealed class SearchMessagesEndpoint(
-    SearchMessagesQuery query,
-    [FromKeyedServices(ChatSearchRateLimiterPolicy.Name)] IRateLimiter rateLimiter)
+public sealed class SearchMessagesEndpoint(SearchMessagesQuery query)
     : Endpoint<SearchMessagesRequest, CursorPage<MessageSearchResultDto>>
 {
     public override void Configure()
     {
         Get("search");
         Group<Endpoints.ChatGroup>();
+        Options(x => x.AddEndpointFilter<ChatSearchRateLimitFilter>());
         Summary(s => s.Summary = "Full-text search across the caller's chat history.");
     }
 
@@ -69,18 +57,6 @@ public sealed class SearchMessagesEndpoint(
     {
         ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
-
-        var decision = await rateLimiter
-            .TryAcquireAsync($"{caller:N}", ct)
-            .ConfigureAwait(false);
-        if (!decision.Allowed)
-        {
-            var retry = decision.RetryAfter ?? TimeSpan.FromSeconds(60);
-            HttpContext.Response.Headers["Retry-After"] =
-                ((int)Math.Ceiling(retry.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            await Send.ResponseAsync(default!, StatusCodes.Status429TooManyRequests, ct).ConfigureAwait(false);
-            return;
-        }
 
         try
         {
