@@ -11,6 +11,7 @@ public sealed class Message
     private readonly List<Reaction> _reactions;
     private readonly List<Guid> _mentions;
     private readonly List<ReadReceipt> _readBy;
+    private readonly List<Guid> _threadParticipants;
 
     private Message(
         Guid id,
@@ -33,7 +34,11 @@ public sealed class Message
         IEnumerable<Guid>? mentions,
         ReplyTo? replyTo,
         ForwardedFrom? forwardedFrom,
-        IEnumerable<ReadReceipt>? readBy)
+        IEnumerable<ReadReceipt>? readBy,
+        Guid? threadRootId,
+        int threadReplyCount,
+        IEnumerable<Guid>? threadParticipants,
+        DateTimeOffset? threadLastReplyAtUtc)
     {
         Id = id;
         ConversationId = conversationId;
@@ -56,6 +61,10 @@ public sealed class Message
         ReplyTo = replyTo;
         ForwardedFrom = forwardedFrom;
         _readBy = readBy?.ToList() ?? [];
+        ThreadRootId = threadRootId;
+        ThreadReplyCount = threadReplyCount;
+        _threadParticipants = threadParticipants?.ToList() ?? [];
+        ThreadLastReplyAtUtc = threadLastReplyAtUtc;
     }
 
     public Guid Id { get; }
@@ -102,6 +111,31 @@ public sealed class Message
 
     public bool HasAttachments => _attachments.Count > 0;
 
+    /// <summary>
+    /// When set, this message is a reply within the thread rooted at <see cref="ThreadRootId"/>.
+    /// On root and main-flow messages this is <c>null</c>.
+    /// </summary>
+    public Guid? ThreadRootId { get; }
+
+    /// <summary>
+    /// Denormalized count of replies in the thread rooted at this message. Always 0 on
+    /// thread replies (denorms live only on the root).
+    /// </summary>
+    public int ThreadReplyCount { get; private set; }
+
+    /// <summary>
+    /// Denormalized unique senders that have replied in this thread. Empty on thread replies.
+    /// </summary>
+    public IReadOnlyList<Guid> ThreadParticipants => _threadParticipants;
+
+    /// <summary>
+    /// Denormalized timestamp of the last reply in this thread. <c>null</c> if no replies yet,
+    /// or on thread replies themselves.
+    /// </summary>
+    public DateTimeOffset? ThreadLastReplyAtUtc { get; private set; }
+
+    public bool IsThreadReply => ThreadRootId.HasValue;
+
     public static Message Send(
         Guid id,
         string conversationId,
@@ -139,7 +173,71 @@ public sealed class Message
             mentions: mentions,
             replyTo: replyTo,
             forwardedFrom: forwardedFrom,
-            readBy: null);
+            readBy: null,
+            threadRootId: null,
+            threadReplyCount: 0,
+            threadParticipants: null,
+            threadLastReplyAtUtc: null);
+    }
+
+    /// <summary>
+    /// Creates a new reply in the thread rooted at <paramref name="threadRootId"/>. The reply
+    /// lives in the same <c>messages</c> collection but carries a non-null <see cref="ThreadRootId"/>;
+    /// the main-flow query filters these out. Denorm fields (count/participants/lastReplyAt)
+    /// remain at zero/empty on the reply itself — they are tracked on the root message only.
+    /// </summary>
+    public static Message SendAsThreadReply(
+        Guid id,
+        string conversationId,
+        Guid senderId,
+        string body,
+        IEnumerable<Attachment> attachments,
+        string clientMessageId,
+        DateTimeOffset createdAtUtc,
+        Guid threadRootId,
+        IEnumerable<Guid>? mentions = null,
+        ReplyTo? replyTo = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
+        ArgumentNullException.ThrowIfNull(attachments);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientMessageId);
+
+        if (threadRootId == Guid.Empty)
+        {
+            throw new ArgumentException("threadRootId must be a non-empty GUID.", nameof(threadRootId));
+        }
+
+        if (threadRootId == id)
+        {
+            throw new InvalidOperationException("A thread reply cannot reference itself as the thread root.");
+        }
+
+        return new Message(
+            id,
+            conversationId,
+            senderId,
+            body ?? string.Empty,
+            attachments,
+            clientMessageId,
+            MessageState.Sent,
+            createdAtUtc,
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            editedAtUtc: null,
+            editHistory: null,
+            deletedAtUtc: null,
+            deletedBy: null,
+            deleteMode: null,
+            hiddenFor: null,
+            reactions: null,
+            mentions: mentions,
+            replyTo: replyTo,
+            forwardedFrom: null,
+            readBy: null,
+            threadRootId: threadRootId,
+            threadReplyCount: 0,
+            threadParticipants: null,
+            threadLastReplyAtUtc: null);
     }
 
     public static Message Hydrate(
@@ -185,7 +283,11 @@ public sealed class Message
             mentions,
             replyTo,
             forwardedFrom,
-            readBy);
+            readBy,
+            threadRootId: null,
+            threadReplyCount: 0,
+            threadParticipants: null,
+            threadLastReplyAtUtc: null);
 
     public bool MarkDelivered(DateTimeOffset atUtc)
     {
