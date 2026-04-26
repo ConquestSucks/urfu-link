@@ -5,8 +5,10 @@ using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Notification.Application.Handlers.Chat;
 using Urfu.Link.Services.Notification.Application.Preferences;
 using Urfu.Link.Services.Notification.Application.Routing;
+using Urfu.Link.Services.Notification.Application.Services;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
+using Urfu.Link.Services.Notification.Realtime;
 using NotificationAggregate = Urfu.Link.Services.Notification.Domain.Aggregates.Notification;
 
 namespace NotificationService.UnitTests.Application;
@@ -16,6 +18,7 @@ public sealed class NotificationRouterTests
     private readonly IUserPreferencesClient _prefs = Substitute.For<IUserPreferencesClient>();
     private readonly INotificationRepository _repository = Substitute.For<INotificationRepository>();
     private readonly IBadgeStore _badgeStore = Substitute.For<IBadgeStore>();
+    private readonly INotificationBroadcaster _broadcaster = Substitute.For<INotificationBroadcaster>();
     private readonly NotificationFactory _factory = new(TimeProvider.System);
     private readonly NotificationRouter _router;
 
@@ -27,6 +30,10 @@ public sealed class NotificationRouterTests
             .Returns(new UserContact("user@urfu.ru", "User", "ru-RU"));
         _repository.TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
             .Returns(true);
+        _badgeStore.GetSnapshotAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(BadgeSnapshot.Empty);
+
+        var inAppChannel = new InAppChannel(_broadcaster, new BadgeService(_badgeStore));
 
         _router = new NotificationRouter(
             _prefs,
@@ -34,6 +41,7 @@ public sealed class NotificationRouterTests
             _factory,
             TimeProvider.System,
             _badgeStore,
+            inAppChannel,
             NullLogger<NotificationRouter>.Instance);
     }
 

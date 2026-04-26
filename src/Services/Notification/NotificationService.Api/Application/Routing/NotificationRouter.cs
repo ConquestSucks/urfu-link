@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.Services.Notification.Application.Preferences;
+using Urfu.Link.Services.Notification.Application.Services;
 using Urfu.Link.Services.Notification.Domain.Aggregates;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
@@ -18,6 +19,7 @@ public sealed class NotificationRouter(
     NotificationFactory factory,
     TimeProvider timeProvider,
     IBadgeStore badgeStore,
+    InAppChannel inAppChannel,
     ILogger<NotificationRouter> logger)
 {
     public async Task<RoutingOutcome> RouteAsync<TEvent>(
@@ -84,6 +86,11 @@ public sealed class NotificationRouter(
             await repository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await badgeStore.IncrementAsync(draft.RecipientUserId, draft.Category, cancellationToken).ConfigureAwait(false);
             created++;
+
+            if (channels.Contains(DeliveryChannel.InApp))
+            {
+                await inAppChannel.DeliverAsync(notification, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return new RoutingOutcome(created, skipped);
