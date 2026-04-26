@@ -109,6 +109,20 @@ public class SearchEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_Search_HasAttachmentsFalse_WithAttachmentType_Returns400()
+    {
+        // Contradictory combo: "no attachments" AND "attachments of type X" can never both
+        // hold. Reject up front rather than silently returning empty results — that would
+        // hide a client bug.
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/chat/search?q=test&hasAttachments=false&attachmentType=Image");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Get_Search_FiltersBySender()
     {
         var caller = Guid.NewGuid();

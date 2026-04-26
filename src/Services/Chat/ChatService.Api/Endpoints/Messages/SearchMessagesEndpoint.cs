@@ -39,6 +39,12 @@ public sealed class SearchMessagesValidator : Validator<SearchMessagesRequest>
         RuleFor(x => x.Limit!.Value)
             .InclusiveBetween(1, 100).WithMessage("Limit must be between 1 and 100.")
             .When(x => x.Limit.HasValue);
+        // hasAttachments=false and attachmentType=X are mutually exclusive — silently
+        // returning empty would hide a client bug.
+        RuleFor(x => x.AttachmentType)
+            .Null()
+            .When(x => x.HasAttachments == false)
+            .WithMessage("attachmentType cannot be combined with hasAttachments=false.");
     }
 }
 
