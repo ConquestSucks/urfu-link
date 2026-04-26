@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -315,7 +316,9 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
 
         var fb = Builders<MessageDocument>.Filter;
 
-        // Idempotent: same (user, emoji) is a noop.
+        // Same (user, emoji) is a noop on the wire — short-circuit before issuing an update.
+        // The atomic pipeline below is idempotent under concurrent same-emoji writes anyway,
+        // but the early exit saves a write when the request is a duplicate.
         var sameExistsCount = await context.Messages
             .CountDocumentsAsync(
                 fb.And(
@@ -330,18 +333,39 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             return false;
         }
 
-        // Pull any prior reaction by this user (different emoji).
-        var pullUpdate = Builders<MessageDocument>.Update
-            .PullFilter(m => m.Reactions, r => r.UserId == reaction.UserId);
-        await context.Messages
-            .UpdateOneAsync(m => m.Id == messageId, pullUpdate, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+        // Atomic pipeline update: in a single Mongo operation, drop any prior reaction by the
+        // same user, then append the new one. This holds the "one emoji per (user, message)"
+        // invariant under concurrent writes from the same user — pull-then-push as separate
+        // updates left a window where two reactions could both be appended.
+        var newReactionBson = new BsonDocument
+        {
+            { "userId", new BsonBinaryData(reaction.UserId, GuidRepresentation.Standard) },
+            { "emoji", reaction.Emoji },
+            { "createdAtUtc", reaction.CreatedAtUtc.UtcDateTime },
+        };
+        var setStage = new BsonDocument("$set", new BsonDocument("reactions", new BsonDocument("$concatArrays", new BsonArray
+        {
+            new BsonDocument("$filter", new BsonDocument
+            {
+                { "input", new BsonDocument("$ifNull", new BsonArray { "$reactions", new BsonArray() }) },
+                { "as", "r" },
+                { "cond", new BsonDocument("$ne", new BsonArray
+                {
+                    "$$r.userId",
+                    new BsonBinaryData(reaction.UserId, GuidRepresentation.Standard),
+                }) },
+            }),
+            new BsonArray { newReactionBson },
+        })));
 
-        // Push new reaction.
-        var pushUpdate = Builders<MessageDocument>.Update
-            .Push(m => m.Reactions, ReactionDocument.FromDomain(reaction));
+        PipelineDefinition<MessageDocument, MessageDocument> pipeline = new[] { setStage };
+        var update = Builders<MessageDocument>.Update.Pipeline(pipeline);
+
         var result = await context.Messages
-            .UpdateOneAsync(m => m.Id == messageId, pushUpdate, cancellationToken: cancellationToken)
+            .UpdateOneAsync(
+                fb.And(fb.Eq(m => m.Id, messageId), fb.Ne(m => m.State, MessageState.Deleted)),
+                update,
+                cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
         return result.ModifiedCount > 0;

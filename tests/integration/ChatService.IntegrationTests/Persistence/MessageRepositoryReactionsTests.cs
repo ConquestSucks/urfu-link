@@ -131,4 +131,23 @@ public class MessageRepositoryReactionsTests : IClassFixture<MongoFixture>, IAsy
         var loaded = await _repo.GetByIdAsync(msg.Id, default);
         loaded!.Reactions.Should().HaveCount(1);
     }
+
+    [Fact]
+    public async Task AddReactionAsync_ConcurrentSameUserDifferentEmojis_LeavesExactlyOneReaction()
+    {
+        var msg = await InsertNewAsync();
+        var user = Guid.NewGuid();
+        var emojis = new[] { "👍", "❤", "🔥", "🎉", "😂", "👀", "🚀", "💯", "✨", "🙌" };
+
+        // Fire all 10 add reactions concurrently. Without atomic pull-then-push the database
+        // can end up with multiple reactions from the same user; with the pipeline update we
+        // are guaranteed a single reaction.
+        var tasks = emojis.Select(e =>
+            _repo.AddReactionAsync(msg.Id, new Reaction(user, e, DateTimeOffset.UtcNow), default)).ToArray();
+        await Task.WhenAll(tasks);
+
+        var loaded = await _repo.GetByIdAsync(msg.Id, default);
+        loaded!.Reactions.Should().ContainSingle(r => r.UserId == user);
+        emojis.Should().Contain(loaded.Reactions[0].Emoji);
+    }
 }
