@@ -46,6 +46,7 @@ public static class ModuleRegistration
 
         services.AddScoped<PartitionManager>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
 
         // Replaced by gRPC-backed UserServiceClient in Wave 13.
         services.AddSingleton<IUserPreferencesClient, StubUserPreferencesClient>();
