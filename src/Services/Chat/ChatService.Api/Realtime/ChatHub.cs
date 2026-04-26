@@ -97,10 +97,11 @@ public sealed class ChatHub(
 
     public Task<MessageDto?> DeleteMessage(Guid messageId, string mode)
     {
-        var caller = Context.User!.GetUserId();
+        var principal = Context.User!;
+        var caller = principal.GetUserId();
         var deleteMode = DeleteModes.Parse(mode);
         return deleteMessage.DeleteAsync(
-            new DeleteMessageRequest(messageId, caller, deleteMode),
+            new DeleteMessageRequest(messageId, caller, deleteMode, principal.IsAdmin()),
             Context.ConnectionAborted);
     }
 

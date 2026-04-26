@@ -5,6 +5,7 @@ using NSubstitute;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Application;
+using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
@@ -28,6 +29,7 @@ public class DeleteMessageServiceTests
     private readonly IChatBroadcaster _broadcaster = Substitute.For<IChatBroadcaster>();
     private readonly RecordingOutboxWriter _outbox = new();
     private readonly FakeTimeProvider _clock = new(DateTimeOffset.Parse("2026-04-25T12:00:00Z", CultureInfo.InvariantCulture));
+    private readonly InlineDisciplineRoleResolver _roles = new();
 
     private DeleteMessageService Build()
     {
@@ -35,7 +37,7 @@ public class DeleteMessageServiceTests
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
         var options = Options.Create(new ChatOptions { DeleteForEveryoneTtlHours = 48 });
-        return new DeleteMessageService(_conversations, _messages, options, dispatcher, _broadcaster, _clock);
+        return new DeleteMessageService(_conversations, _messages, options, dispatcher, _broadcaster, _clock, _roles);
     }
 
     private (Conversation conversation, Message message) Seed(Guid sender, DateTimeOffset createdAt)
@@ -133,6 +135,95 @@ public class DeleteMessageServiceTests
             Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<DeleteMode>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task DeleteAsync_ForEveryone_TeacherInGroup_DeletesStudentMessage_WithoutTtlCheck()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, _clock.GetUtcNow().AddHours(-100));
+        conv.AddParticipant(studentId, ParticipantRole.Student);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+
+        var msg = Message.Send(
+            id: Guid.NewGuid(),
+            conversationId: conv.Id,
+            senderId: studentId,
+            body: "spam",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c-spam",
+            createdAtUtc: _clock.GetUtcNow().AddHours(-50),
+            authorRole: ParticipantRole.Student);
+        _messages.GetByIdAsync(msg.Id, Arg.Any<CancellationToken>()).Returns(msg);
+        _messages.ApplyDeleteForEveryoneAsync(msg.Id, Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var dto = await Build().DeleteAsync(
+            new DeleteMessageRequest(msg.Id, teacherId, DeleteMode.ForEveryone), default);
+
+        dto.Should().NotBeNull();
+        await _messages.Received().ApplyDeleteForEveryoneAsync(
+            msg.Id, teacherId, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ForEveryone_StudentCannotDeleteOthersMessage()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentA = Guid.NewGuid();
+        var studentB = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, _clock.GetUtcNow());
+        conv.AddParticipant(studentA, ParticipantRole.Student);
+        conv.AddParticipant(studentB, ParticipantRole.Student);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+
+        var msg = Message.Send(
+            id: Guid.NewGuid(),
+            conversationId: conv.Id,
+            senderId: studentA,
+            body: "x",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c1",
+            createdAtUtc: _clock.GetUtcNow(),
+            authorRole: ParticipantRole.Student);
+        _messages.GetByIdAsync(msg.Id, Arg.Any<CancellationToken>()).Returns(msg);
+
+        var act = () => Build().DeleteAsync(
+            new DeleteMessageRequest(msg.Id, studentB, DeleteMode.ForEveryone), default);
+
+        await act.Should().ThrowAsync<ChatNotMessageAuthorException>();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ForEveryone_AdminBypassesAllChecks()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var adminId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, _clock.GetUtcNow().AddHours(-200));
+        conv.AddParticipant(studentId, ParticipantRole.Student);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+
+        var msg = Message.Send(
+            id: Guid.NewGuid(),
+            conversationId: conv.Id,
+            senderId: studentId,
+            body: "x",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c1",
+            createdAtUtc: _clock.GetUtcNow().AddHours(-100));
+        _messages.GetByIdAsync(msg.Id, Arg.Any<CancellationToken>()).Returns(msg);
+        _messages.ApplyDeleteForEveryoneAsync(msg.Id, Arg.Any<Guid>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var dto = await Build().DeleteAsync(
+            new DeleteMessageRequest(msg.Id, adminId, DeleteMode.ForEveryone, CallerIsAdmin: true), default);
+
+        dto.Should().NotBeNull();
+    }
+
     private sealed class RecordingOutboxWriter : IOutboxWriter
     {
         public List<IIntegrationEvent> Captured { get; } = new();
@@ -148,5 +239,28 @@ public class DeleteMessageServiceTests
     private sealed class FakeTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
+    }
+
+    /// <summary>
+    /// Mirrors <c>DefaultDisciplineRoleResolver</c>: admins always pass; direct conversations
+    /// have no moderator role; in groups any Teacher participant moderates.
+    /// </summary>
+    private sealed class InlineDisciplineRoleResolver : IDisciplineRoleResolver
+    {
+        public Task<bool> CanPinAsync(Guid userId, bool callerIsAdmin, Conversation conversation, CancellationToken cancellationToken)
+            => Task.FromResult(true);
+
+        public Task<bool> CanModerateAsync(Guid userId, bool callerIsAdmin, Conversation conversation, CancellationToken cancellationToken)
+        {
+            if (callerIsAdmin)
+            {
+                return Task.FromResult(true);
+            }
+            if (conversation.Type == ConversationType.Direct)
+            {
+                return Task.FromResult(false);
+            }
+            return Task.FromResult(conversation.IsTeacher(userId));
+        }
     }
 }

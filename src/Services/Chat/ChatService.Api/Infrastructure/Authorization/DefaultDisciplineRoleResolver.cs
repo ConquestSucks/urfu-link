@@ -37,4 +37,29 @@ internal sealed class DefaultDisciplineRoleResolver : IDisciplineRoleResolver
         var allowed = conversation.Type == ConversationType.Direct || conversation.IsTeacher(userId);
         return Task.FromResult(allowed);
     }
+
+    public Task<bool> CanModerateAsync(
+        Guid userId,
+        bool callerIsAdmin,
+        Conversation conversation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(conversation);
+        _ = cancellationToken;
+
+        if (callerIsAdmin)
+        {
+            return Task.FromResult(true);
+        }
+
+        // Direct chats have no moderator role — only the message author can delete.
+        // The application layer treats this resolver returning false as "fall through to
+        // author-only check" — no message-author exception is raised here.
+        if (conversation.Type == ConversationType.Direct)
+        {
+            return Task.FromResult(false);
+        }
+
+        return Task.FromResult(conversation.IsTeacher(userId));
+    }
 }
