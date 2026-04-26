@@ -185,36 +185,47 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         ParticipantRole role,
         CancellationToken cancellationToken)
     {
-        // Step 1: append to participants only if not already present.
-        var addParticipantFilter = Builders<ConversationDocument>.Filter.And(
+        // Step 1 (idempotent): if a role entry for this user already exists, replace
+        // it in-place atomically using the positional $ operator. The role array and
+        // participants array stay consistent because we never delete then re-insert.
+        var roleString = role.ToString();
+        var existingFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Eq("participantRoles.userId", userId));
+        var setRole = Builders<ConversationDocument>.Update.Set(
+            "participantRoles.$.role",
+            roleString);
+        var setResult = await context.Conversations
+            .UpdateOneAsync(existingFilter, setRole, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (setResult.MatchedCount > 0)
+        {
+            // The user was already a (possibly differently-roled) participant; we
+            // just refreshed the role. Return false so the caller doesn't double-publish.
+            return false;
+        }
+
+        // Step 2 (atomic): brand-new participant — push to both arrays in a single
+        // UpdateOne so a process crash mid-update can't leave one array stale.
+        // The participantRoles.userId guard keeps the call idempotent under retries.
+        var freshFilter = Builders<ConversationDocument>.Filter.And(
             Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
             Builders<ConversationDocument>.Filter.Ne(
                 "participants",
-                new BsonBinaryData(userId, GuidRepresentation.Standard)));
+                new BsonBinaryData(userId, GuidRepresentation.Standard)),
+            Builders<ConversationDocument>.Filter.Ne(
+                "participantRoles.userId",
+                userId));
+        var addUpdate = Builders<ConversationDocument>.Update.Combine(
+            Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
+            Builders<ConversationDocument>.Update.Push(
+                "participantRoles",
+                new ParticipantRoleEntry(userId, role)));
         var addResult = await context.Conversations
-            .UpdateOneAsync(
-                addParticipantFilter,
-                Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
-                cancellationToken: cancellationToken)
+            .UpdateOneAsync(freshFilter, addUpdate, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-
-        var added = addResult.ModifiedCount > 0;
-
-        // Step 2: upsert role entry. Always replaces to keep role consistent if it drifted.
-        var pull = Builders<ConversationDocument>.Update.PullFilter(
-            "participantRoles",
-            Builders<ParticipantRoleEntry>.Filter.Eq(e => e.UserId, userId));
-        await context.Conversations
-            .UpdateOneAsync(c => c.Id == conversationId, pull, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-        var push = Builders<ConversationDocument>.Update.Push(
-            "participantRoles",
-            new ParticipantRoleEntry(userId, role));
-        await context.Conversations
-            .UpdateOneAsync(c => c.Id == conversationId, push, cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-        return added;
+        return addResult.ModifiedCount > 0;
     }
 
     public async Task<bool> RemoveParticipantAsync(
@@ -239,28 +250,39 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         ParticipantRole newRole,
         CancellationToken cancellationToken)
     {
-        var pullFilter = Builders<ConversationDocument>.Filter.And(
+        // Single atomic Set via the positional $ operator: replaces the role of an
+        // existing entry without ever leaving the participantRoles array empty.
+        var roleString = newRole.ToString();
+        var filter = Builders<ConversationDocument>.Filter.And(
             Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
-            Builders<ConversationDocument>.Filter.AnyEq(c => c.Participants, userId));
-        var pull = Builders<ConversationDocument>.Update.PullFilter(
-            "participantRoles",
-            Builders<ParticipantRoleEntry>.Filter.Eq(e => e.UserId, userId));
-        var pulled = await context.Conversations
-            .UpdateOneAsync(pullFilter, pull, cancellationToken: cancellationToken)
+            Builders<ConversationDocument>.Filter.AnyEq(c => c.Participants, userId),
+            Builders<ConversationDocument>.Filter.Eq("participantRoles.userId", userId));
+        var update = Builders<ConversationDocument>.Update.Set(
+            "participantRoles.$.role",
+            roleString);
+        var result = await context.Conversations
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        if (pulled.MatchedCount == 0)
+        if (result.ModifiedCount > 0)
         {
-            return false;
+            return true;
         }
 
-        var push = Builders<ConversationDocument>.Update.Push(
+        // Fallback for participants that pre-date role tracking: no entry yet, but
+        // the user IS a participant — push the role atomically. The participantRoles
+        // guard makes the operation idempotent so retries can't insert duplicates.
+        var legacyFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.AnyEq(c => c.Participants, userId),
+            Builders<ConversationDocument>.Filter.Ne("participantRoles.userId", userId));
+        var legacyPush = Builders<ConversationDocument>.Update.Push(
             "participantRoles",
             new ParticipantRoleEntry(userId, newRole));
-        var pushed = await context.Conversations
-            .UpdateOneAsync(c => c.Id == conversationId, push, cancellationToken: cancellationToken)
+        var legacyResult = await context.Conversations
+            .UpdateOneAsync(legacyFilter, legacyPush, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
-        return pushed.ModifiedCount > 0;
+        return legacyResult.ModifiedCount > 0;
     }
 
     public async Task<bool> ArchiveAsync(
