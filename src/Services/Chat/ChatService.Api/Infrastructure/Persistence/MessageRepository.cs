@@ -102,7 +102,12 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
         }
 
         var fb = Builders<MessageDocument>.Filter;
-        var filter = fb.Eq(m => m.ConversationId, conversationId);
+        // Main-flow only: thread replies have threadRootId set and are surfaced exclusively via
+        // ListThreadAsync. Mongo treats missing == null, so legacy documents without the field
+        // continue to appear here without backfill.
+        var filter = fb.And(
+            fb.Eq(m => m.ConversationId, conversationId),
+            fb.Eq(m => m.ThreadRootId, (Guid?)null));
 
         if (cursor is { } c)
         {
@@ -180,8 +185,13 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
         DateTimeOffset readAtUtc,
         CancellationToken cancellationToken)
     {
+        // Reading the main flow does not affect thread replies: they have their own surfacing
+        // via GetThreadMessages and read transitions there are out of scope for this call. We
+        // therefore reject thread reply anchors and exclude thread replies from the bulk update.
         var anchor = await context.Messages
-            .Find(m => m.Id == upToMessageId && m.ConversationId == conversationId)
+            .Find(m => m.Id == upToMessageId
+                && m.ConversationId == conversationId
+                && m.ThreadRootId == null)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
         if (anchor is null)
@@ -193,6 +203,7 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
         var anchorTs = anchor.CreatedAtUtc;
         var filter = fb.And(
             fb.Eq(m => m.ConversationId, conversationId),
+            fb.Eq(m => m.ThreadRootId, (Guid?)null),
             fb.Ne(m => m.State, MessageState.Read),
             fb.Ne(m => m.State, MessageState.Deleted),
             fb.Or(
