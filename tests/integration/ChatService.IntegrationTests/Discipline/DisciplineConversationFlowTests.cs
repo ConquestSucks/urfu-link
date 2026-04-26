@@ -4,6 +4,7 @@ using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -297,6 +298,133 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
         record.UserId.Should().Be(studentId);
         record.NewRole.Should().Be(ParticipantRole.Teacher);
         record.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
+    }
+
+    [Fact]
+    public async Task DisciplineCreated_PublishesChatDisciplineConversationCreated()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var coverId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB1", "Pub", null, "2026", teacherId, coverId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatDisciplineConversationCreatedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatDisciplineConversationCreatedEvent>(e =>
+                e.DisciplineId == disciplineId
+                && e.OwnerTeacherId == teacherId
+                && e.Title == "Pub"
+                && e.CoverAssetId == coverId);
+    }
+
+    [Fact]
+    public async Task UserEnrolled_PublishesChatParticipantJoined()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB2", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatParticipantJoinedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatParticipantJoinedEvent>(e =>
+                e.UserId == studentId && e.Role == ChatParticipantRole.Student);
+    }
+
+    [Fact]
+    public async Task UserUnenrolled_PublishesChatParticipantLeft()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB3", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleUserUnenrolledAsync(
+            new UserUnenrolledEvent(disciplineId, studentId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatParticipantLeftEvent>()
+            .Should().ContainSingle()
+            .Which.UserId.Should().Be(studentId);
+    }
+
+    [Fact]
+    public async Task EnrollmentRoleChanged_PublishesChatParticipantRoleChanged()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB4", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleEnrollmentRoleChangedAsync(
+            new EnrollmentRoleChangedEvent(disciplineId, studentId, DisciplineRole.Student, DisciplineRole.Teacher),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatParticipantRoleChangedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatParticipantRoleChangedEvent>(e =>
+                e.UserId == studentId
+                && e.OldRole == ChatParticipantRole.Student
+                && e.NewRole == ChatParticipantRole.Teacher);
+    }
+
+    [Fact]
+    public async Task DisciplineDeleted_PublishesChatConversationArchived()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB5", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleDisciplineDeletedAsync(
+            new DisciplineDeletedEvent(disciplineId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatConversationArchivedEvent>()
+            .Should().ContainSingle();
     }
 
     [Fact]

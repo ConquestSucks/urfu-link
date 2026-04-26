@@ -1,3 +1,4 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
@@ -11,11 +12,14 @@ namespace Urfu.Link.Services.Chat.Application.Disciplines;
 /// Reacts to discipline integration events by keeping the corresponding group conversation
 /// in sync. All operations are idempotent: the discipline-events topic is at-least-once,
 /// so each handler must tolerate replays. After every state change the corresponding SignalR
-/// notification is emitted so connected clients see participant updates in real time.
+/// notification is emitted so connected clients see participant updates in real time, and
+/// the matching chat integration event is published on <c>urfu.chat.events.v1</c> for any
+/// downstream consumer (notifications, search, analytics).
 /// </summary>
 public sealed class DisciplineConversationService(
     IConversationRepository conversations,
-    IChatBroadcaster broadcaster)
+    IChatBroadcaster broadcaster,
+    ChatEventDispatcher dispatcher)
 {
     public async Task HandleDisciplineCreatedAsync(
         DisciplineCreatedEvent evt,
@@ -49,6 +53,15 @@ public sealed class DisciplineConversationService(
         await broadcaster
             .NotifyConversationCreatedAsync([evt.OwnerTeacherId], dto, cancellationToken)
             .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatDisciplineConversationCreatedEvent(
+                conversation.Id,
+                evt.DisciplineId,
+                evt.OwnerTeacherId,
+                evt.Title,
+                evt.CoverAssetId),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleDisciplineUpdatedAsync(
@@ -123,6 +136,10 @@ public sealed class DisciplineConversationService(
         await broadcaster
             .NotifyConversationCreatedAsync([evt.UserId], dto, cancellationToken)
             .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatParticipantJoinedEvent(conversation.Id, evt.UserId, MapToContract(role)),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleUserUnenrolledAsync(
@@ -152,6 +169,10 @@ public sealed class DisciplineConversationService(
         await broadcaster
             .NotifyParticipantLeftAsync(conversation.Participants.ToList(), conversation.Id, evt.UserId, cancellationToken)
             .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatParticipantLeftEvent(conversation.Id, evt.UserId),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleEnrollmentRoleChangedAsync(
@@ -180,6 +201,14 @@ public sealed class DisciplineConversationService(
         await broadcaster
             .NotifyParticipantRoleChangedAsync(conversation.Participants.ToList(), conversation.Id, evt.UserId, newRole, cancellationToken)
             .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatParticipantRoleChangedEvent(
+                conversation.Id,
+                evt.UserId,
+                MapToContract(MapRole(evt.OldRole)),
+                MapToContract(newRole)),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleDisciplineDeletedAsync(
@@ -207,6 +236,10 @@ public sealed class DisciplineConversationService(
         await broadcaster
             .NotifyConversationArchivedAsync(conversation.Participants.ToList(), conversation.Id, evt.OccurredAtUtc, cancellationToken)
             .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatConversationArchivedEvent(conversation.Id, evt.OccurredAtUtc),
+            cancellationToken).ConfigureAwait(false);
     }
 
     private static ParticipantRole MapRole(DisciplineRole role) => role switch
@@ -214,5 +247,12 @@ public sealed class DisciplineConversationService(
         DisciplineRole.Teacher => ParticipantRole.Teacher,
         DisciplineRole.Student => ParticipantRole.Student,
         _ => ParticipantRole.Member,
+    };
+
+    private static ChatParticipantRole MapToContract(ParticipantRole role) => role switch
+    {
+        ParticipantRole.Teacher => ChatParticipantRole.Teacher,
+        ParticipantRole.Student => ChatParticipantRole.Student,
+        _ => ChatParticipantRole.Member,
     };
 }
