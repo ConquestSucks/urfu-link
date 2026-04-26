@@ -46,6 +46,7 @@ builder.Services.AddHostedService<ChatEventsConsumer>();
 builder.Services.AddHostedService<DisciplineEventsConsumer>();
 builder.Services.AddHostedService<CallEventsConsumer>();
 builder.Services.AddHostedService<UserEventsConsumer>();
+builder.Services.AddHostedService<SystemEventsConsumer>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.PushDispatcherWorker>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.EmailDispatcherWorker>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Infrastructure.Outbox.NotificationOutboxRelay>();

@@ -85,6 +85,8 @@ public static class ModuleRegistration
         services.AddScoped<CallMissedHandler>();
         services.AddScoped<UserDeletedHandler>();
         services.AddScoped<DirectNotificationHandler>();
+        services.AddScoped<Urfu.Link.Services.Notification.Application.Handlers.System.SystemMaintenanceHandler>();
+        services.AddScoped<Urfu.Link.Services.Notification.Application.Handlers.System.SystemUpdateHandler>();
 
         services.Configure<FcmOptions>(configuration.GetSection(FcmOptions.SectionName));
         services.Configure<ApnsOptions>(configuration.GetSection(ApnsOptions.SectionName));
