@@ -10,7 +10,9 @@
     "realm": [
       { "name": "admin" },
       { "name": "user" },
-      { "name": "service" }
+      { "name": "service" },
+      { "name": "teacher", "description": "Discipline owner / instructor" },
+      { "name": "student", "description": "Discipline participant" }
     ]
   },
   "clients": [
@@ -36,6 +38,19 @@
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
+        },
+        {
+          "name": "realm roles to roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
         }
       ]
     },
@@ -58,6 +73,19 @@
             "included.client.audience": "urfu-link-api",
             "id.token.claim": "false",
             "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles to roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
           }
         }
       ]
@@ -221,6 +249,42 @@
         { "type": "password", "value": "devpass", "temporary": false }
       ],
       "realmRoles": ["user", "offline_access"]
+    },
+    {
+      "username": "dev-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@urfu.link",
+      "firstName": "Dev",
+      "lastName": "Admin",
+      "credentials": [
+        { "type": "password", "value": "devpass", "temporary": false }
+      ],
+      "realmRoles": ["admin", "user", "offline_access"]
+    },
+    {
+      "username": "dev-teacher",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "teacher@urfu.link",
+      "firstName": "Dev",
+      "lastName": "Teacher",
+      "credentials": [
+        { "type": "password", "value": "devpass", "temporary": false }
+      ],
+      "realmRoles": ["teacher", "user", "offline_access"]
+    },
+    {
+      "username": "dev-student",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "student@urfu.link",
+      "firstName": "Dev",
+      "lastName": "Student",
+      "credentials": [
+        { "type": "password", "value": "devpass", "temporary": false }
+      ],
+      "realmRoles": ["student", "user", "offline_access"]
     },
     {
       "username": "service-account-user-service-admin",
