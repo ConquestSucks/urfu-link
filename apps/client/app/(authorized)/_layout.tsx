@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { usePresenceHub } from "@/shared/lib/usePresenceHub";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -14,6 +15,9 @@ export default function AuthLayout() {
         (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Connect to PresenceHub and maintain heartbeat for the whole session
+    usePresenceHub();
 
     const safeAreaEdges: Edge[] = isMobile
         ? ["top", "left", "right", "bottom"]

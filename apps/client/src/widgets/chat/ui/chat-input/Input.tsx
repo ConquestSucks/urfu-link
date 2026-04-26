@@ -6,17 +6,20 @@ import type { DocumentPickerAsset } from "expo-document-picker";
 
 import { useAttachments, FilesModal } from "@/features/attach-file";
 import { AttachmentsPreview } from "./AttachmentsPreview";
+import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAX_INPUT_HEIGHT = SCREEN_HEIGHT * 0.35;
 const MAX_FILES_LIMIT = 10;
 
 interface ChatInputProps {
+    conversationId: string;
     onSend: (text: string, files: DocumentPickerAsset[]) => void;
 }
 
-export const ChatInput = ({ onSend }: ChatInputProps) => {
+export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     const [query, setQuery] = useState("");
+    const { onTextChange: notifyTyping, onSend: notifyStopTyping } = useTypingIndicator(conversationId);
     const [isEmojiVisible, setIsEmojiVisible] = useState(false);
     const [inputHeight, setInputHeight] = useState(24);
 
@@ -59,6 +62,7 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
     const handleSend = () => {
         if (!canSend) return;
 
+        notifyStopTyping();
         onSend(query.trim(), attachments);
 
         setQuery("");
@@ -91,6 +95,7 @@ export const ChatInput = ({ onSend }: ChatInputProps) => {
                         value={query}
                         onChangeText={(text) => {
                             setQuery(text);
+                            notifyTyping(text);
                             if (text === "") setInputHeight(24);
                         }}
                         onFocus={() => isEmojiVisible && animate(false)}

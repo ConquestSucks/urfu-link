@@ -57,7 +57,7 @@ export const ChatView = () => {
             )}
             
             <MessagesList chatId={chatId} type={type} />
-            <ChatInput onSend={handleSend} />
+            <ChatInput conversationId={chatId} onSend={handleSend} />
         </View>
     );
 };

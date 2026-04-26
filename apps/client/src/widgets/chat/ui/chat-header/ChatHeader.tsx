@@ -7,12 +7,37 @@ import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ChatHeaderActions } from "./ChatHeaderActions";
 import { UserProfileModal } from "./UserProfileModal";
+import { useUserPresence, presenceStatusToLabel } from "@/entities/presence";
+import type { UserStatus } from "@/shared/ui/StatusIndicator";
+import { TypingIndicator } from "@/entities/presence";
+import { useConversationTypers } from "@/entities/presence";
+
+const presenceStatusToIndicator = (status?: string): UserStatus => {
+    switch (status) {
+        case "Online": return "online";
+        case "Away": return "away";
+        case "DoNotDisturb": return "doNotDisturb";
+        default: return "offline";
+    }
+};
 
 export const ChatHeader = ({ chatId }: { chatId: string }) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
     const chatMeta = useInboxStore((state) => state.getChatById(chatId));
+
+    // Get presence for the peer — we use chatId as a proxy for the peer user id for now.
+    // In a real scenario the peer's userId should come from conversation metadata.
+    const peerPresence = useUserPresence(chatId);
+    const typers = useConversationTypers(chatId);
+
     if (!chatMeta) return null;
+
+    const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
+    const statusLabel = peerPresence
+        ? presenceStatusToLabel(peerPresence.status)
+        : null;
+
     return (
         <>
             <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2">
@@ -30,7 +55,7 @@ export const ChatHeader = ({ chatId }: { chatId: string }) => {
                         <View className="relative z-1 p-0.5">
                             <Avatar size={38} src={chatMeta.avatarUrl} name={chatMeta.name} />
                             <StatusIndicator
-                                status="online"
+                                status={indicatorStatus}
                                 size={12}
                                 className="absolute bottom-0 right-0"
                             />
@@ -43,12 +68,20 @@ export const ChatHeader = ({ chatId }: { chatId: string }) => {
                             >
                                 {chatMeta.name}
                             </Text>
-                            <Text
-                                numberOfLines={1}
-                                className="text-success-600 leading-none text-xs font-medium"
-                            >
-                                В сети
-                            </Text>
+                            {typers.length > 0 ? (
+                                <TypingIndicator conversationId={chatId} showNames={false} />
+                            ) : (
+                                <Text
+                                    numberOfLines={1}
+                                    className={`leading-none text-xs font-medium ${
+                                        indicatorStatus === "online"
+                                            ? "text-success-600"
+                                            : "text-text-muted"
+                                    }`}
+                                >
+                                    {statusLabel ?? "Не в сети"}
+                                </Text>
+                            )}
                         </View>
                     </View>
                 </View>
