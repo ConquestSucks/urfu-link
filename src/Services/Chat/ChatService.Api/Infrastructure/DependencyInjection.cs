@@ -116,8 +116,8 @@ public static class ModuleRegistration
         services.AddScoped<GetUserActiveThreadsQuery>();
         services.AddScoped<SearchMessagesQuery>();
 
-        // Per-user fixed window for /chat/search. Issue #213 specifies 30 req/min per user;
-        // see ChatSearchRateLimiterPolicy below for the keyed-DI consumer.
+        // Per-user fixed window for /chat/search (issue #213 — 30 req/min per user).
+        // ChatSearchRateLimitFilter resolves this limiter via [FromKeyedServices(name)].
         services.AddRedisRateLimiter(
             ChatSearchRateLimiterPolicy.Name,
             window: TimeSpan.FromMinutes(1),

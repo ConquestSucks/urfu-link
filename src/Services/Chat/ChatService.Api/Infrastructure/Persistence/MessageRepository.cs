@@ -561,16 +561,16 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             matchStage.Add("senderId", new BsonBinaryData(senderId, GuidRepresentation.Standard));
         }
 
-        if (criteria.DateFrom is { } from || criteria.DateTo is { } to)
+        if (criteria.DateFrom.HasValue || criteria.DateTo.HasValue)
         {
             var range = new BsonDocument();
-            if (criteria.DateFrom is { } f)
+            if (criteria.DateFrom is { } from)
             {
-                range.Add("$gte", f.UtcDateTime);
+                range.Add("$gte", from.UtcDateTime);
             }
-            if (criteria.DateTo is { } t)
+            if (criteria.DateTo is { } to)
             {
-                range.Add("$lte", t.UtcDateTime);
+                range.Add("$lte", to.UtcDateTime);
             }
             matchStage.Add("createdAtUtc", range);
         }
