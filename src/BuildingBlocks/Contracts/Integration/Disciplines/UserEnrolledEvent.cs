@@ -1,4 +1,4 @@
-namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Discipline;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 
 public sealed record UserEnrolledEvent(
     Guid DisciplineId,

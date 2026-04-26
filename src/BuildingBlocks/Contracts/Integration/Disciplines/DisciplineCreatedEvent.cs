@@ -1,6 +1,6 @@
-namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Discipline;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 
-public sealed record DisciplineUpdatedEvent(
+public sealed record DisciplineCreatedEvent(
     Guid DisciplineId,
     string Code,
     string Title,
@@ -11,7 +11,7 @@ public sealed record DisciplineUpdatedEvent(
 {
     public Guid EventId { get; } = Guid.NewGuid();
 
-    public string EventType => "discipline.updated.v1";
+    public string EventType => "discipline.created.v1";
 
     public DateTimeOffset OccurredAtUtc { get; } = DateTimeOffset.UtcNow;
 }

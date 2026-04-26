@@ -1,4 +1,4 @@
-namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Discipline;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 
 /// <summary>
 /// Role of a user within a discipline. Shared across services so that consumers

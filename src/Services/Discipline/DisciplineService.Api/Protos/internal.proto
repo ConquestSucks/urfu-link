@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option csharp_namespace = "Urfu.Link.Services.Discipline.Grpc";
+option csharp_namespace = "Urfu.Link.Services.Disciplines.Grpc";
 package discipline.internal.v1;
 
 service InternalApi {

@@ -1,5 +1,5 @@
 using Grpc.Core;
-using Urfu.Link.Services.Discipline.Grpc;
+using Urfu.Link.Services.Disciplines.Grpc;
 
 namespace DisciplineService.Api.Services;
 
