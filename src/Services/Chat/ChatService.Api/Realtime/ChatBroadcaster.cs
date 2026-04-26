@@ -24,6 +24,82 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
         return hub.Clients.Users(ToUserIds(participantUserIds)).ConversationUpdated(conversation);
     }
 
+    public Task NotifyConversationCreatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        ConversationDto conversation,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        ArgumentNullException.ThrowIfNull(conversation);
+        if (recipientUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).ConversationCreated(conversation);
+    }
+
+    public Task NotifyParticipantJoinedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        if (recipientUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .ParticipantJoined(conversationId, userId, role);
+    }
+
+    public Task NotifyParticipantLeftAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        if (recipientUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .ParticipantLeft(conversationId, userId);
+    }
+
+    public Task NotifyParticipantRoleChangedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid userId,
+        ParticipantRole newRole,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        if (recipientUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .ParticipantRoleChanged(conversationId, userId, newRole);
+    }
+
+    public Task NotifyConversationArchivedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        if (recipientUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .ConversationArchived(conversationId, archivedAtUtc);
+    }
+
     public Task NotifyMessageReceivedAsync(
         IReadOnlyList<Guid> recipientUserIds,
         MessageDto message,
