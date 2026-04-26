@@ -63,10 +63,14 @@ public sealed class EmailDispatcherWorker(
         await using var tx = await db.Database.BeginTransactionAsync(stoppingToken).ConfigureAwait(false);
 
         var batch = await db.Deliveries
-            .Where(d => d.Channel == DeliveryChannel.Email && d.Status == DeliveryStatus.Pending)
-            .Where(d => d.NextAttemptAtUtc == null || d.NextAttemptAtUtc <= now)
-            .OrderBy(d => d.LastAttemptAtUtc ?? DateTimeOffset.MinValue)
-            .Take(settings.BatchSize)
+            .FromSqlInterpolated($@"
+                SELECT * FROM notifications.deliveries
+                WHERE channel = {(short)DeliveryChannel.Email}
+                  AND status = {(short)DeliveryStatus.Pending}
+                  AND (next_attempt_at_utc IS NULL OR next_attempt_at_utc <= {now})
+                ORDER BY COALESCE(last_attempt_at_utc, '0001-01-01'::timestamptz)
+                LIMIT {settings.BatchSize}
+                FOR UPDATE SKIP LOCKED")
             .ToListAsync(stoppingToken)
             .ConfigureAwait(false);
 
@@ -76,12 +80,15 @@ public sealed class EmailDispatcherWorker(
             return 0;
         }
 
+        var notificationIds = batch.Select(d => d.NotificationId).Distinct().ToList();
+        var notificationsById = await db.Notifications
+            .Where(n => notificationIds.Contains(n.Id))
+            .ToDictionaryAsync(n => n.Id, stoppingToken)
+            .ConfigureAwait(false);
+
         foreach (var delivery in batch)
         {
-            var notification = await db.Notifications
-                .FirstOrDefaultAsync(n => n.Id == delivery.NotificationId, stoppingToken)
-                .ConfigureAwait(false);
-            if (notification is null)
+            if (!notificationsById.TryGetValue(delivery.NotificationId, out var notification))
             {
                 delivery.MarkSkipped(now, "notification_missing");
                 continue;

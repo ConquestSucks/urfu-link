@@ -64,15 +64,21 @@ public sealed class NotificationOutboxRelay(
         var db = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
         var now = scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow();
 
+        await using var tx = await db.Database.BeginTransactionAsync(stoppingToken).ConfigureAwait(false);
+
         var batch = await db.OutboxMessages
-            .Where(m => m.PublishedAtUtc == null && m.NextAttemptAtUtc <= now)
-            .OrderBy(m => m.CreatedAtUtc)
-            .Take(settings.BatchSize)
+            .FromSqlInterpolated($@"
+                SELECT * FROM notifications.outbox_messages
+                WHERE published_at_utc IS NULL AND next_attempt_at_utc <= {now}
+                ORDER BY created_at_utc
+                LIMIT {settings.BatchSize}
+                FOR UPDATE SKIP LOCKED")
             .ToListAsync(stoppingToken)
             .ConfigureAwait(false);
 
         if (batch.Count == 0)
         {
+            await tx.CommitAsync(stoppingToken).ConfigureAwait(false);
             return 0;
         }
 
@@ -83,7 +89,7 @@ public sealed class NotificationOutboxRelay(
                 await publisher.PublishSerializedAsync(message.Topic, message.Id.ToString("N"), message.Payload, stoppingToken).ConfigureAwait(false);
                 message.MarkPublished(now);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 var backoff = ComputeBackoff(message.Attempts, settings);
                 message.RecordFailure(now, ex.Message, backoff);
@@ -95,6 +101,7 @@ public sealed class NotificationOutboxRelay(
         }
 
         await db.SaveChangesAsync(stoppingToken).ConfigureAwait(false);
+        await tx.CommitAsync(stoppingToken).ConfigureAwait(false);
         return batch.Count;
     }
 
