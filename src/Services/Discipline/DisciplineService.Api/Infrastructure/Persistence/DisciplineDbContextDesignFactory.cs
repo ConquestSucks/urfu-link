@@ -10,10 +10,20 @@ namespace DisciplineService.Api.Infrastructure.Persistence;
 /// </summary>
 internal sealed class DisciplineDbContextDesignFactory : IDesignTimeDbContextFactory<DisciplineDbContext>
 {
+    private const string DefaultConnectionString =
+        "Host=localhost;Port=5433;Database=discipline_db;Username=postgres;Password=postgres";
+
     public DisciplineDbContext CreateDbContext(string[] args)
     {
+        // Allow CI / Docker-based migration jobs to override the placeholder via the
+        // DISCIPLINE_DESIGN_CONNECTION env var without editing this file. EF tooling
+        // never executes runtime SQL against the connection string when generating
+        // migrations — it just uses it to materialise the model — so the local
+        // fallback is fine for `dotnet ef migrations add`.
+        var fromEnv = Environment.GetEnvironmentVariable("DISCIPLINE_DESIGN_CONNECTION");
+        var connectionString = string.IsNullOrWhiteSpace(fromEnv) ? DefaultConnectionString : fromEnv;
         var options = new DbContextOptionsBuilder<DisciplineDbContext>()
-            .UseNpgsql("Host=localhost;Port=5433;Database=discipline_db;Username=postgres;Password=postgres")
+            .UseNpgsql(connectionString)
             .Options;
         return new DisciplineDbContext(options);
     }

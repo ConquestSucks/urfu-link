@@ -10,6 +10,11 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
 {
     public const string SchemeName = "TestScheme";
 
+    // Static field; the integration suite uses one xUnit collection (sequential by
+    // default), so cross-test interference is not a concern. AsyncLocal was tried but
+    // does not flow reliably through the in-memory test pipeline once
+    // WebApplicationFactory captures request scopes outside the test's logical-call
+    // context.
     public static ClaimsPrincipal? CurrentPrincipal { get; set; }
 
     public TestAuthHandler(

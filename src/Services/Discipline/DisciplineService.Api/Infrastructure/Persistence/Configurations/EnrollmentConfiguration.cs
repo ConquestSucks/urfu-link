@@ -25,5 +25,15 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
 
         builder.HasIndex(e => new { e.DisciplineId, e.UserId }).IsUnique();
         builder.HasIndex(e => new { e.UserId, e.Role });
+
+        // xmin concurrency token: tightens optimistic locking from "any change to the
+        // discipline aggregate" down to the specific enrollment row. Two operators
+        // promoting the same student concurrently now race on the row instead of
+        // squashing each other through the aggregate token.
+        builder.Property<uint>("xmin")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .IsConcurrencyToken()
+            .ValueGeneratedOnAddOrUpdate();
     }
 }

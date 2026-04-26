@@ -92,9 +92,12 @@ public sealed class DisciplineEventConsumer(
                 }
                 catch (Exception ex) when (ex is JsonException or InvalidOperationException)
                 {
-                    // Malformed envelopes are logged and skipped; we don't want to halt the
-                    // pipeline on a single poison message. Real DLQ wiring is out of MVP scope.
-                    logger.LogError(ex, "[ChatService] Failed to dispatch discipline event; dropping.");
+                    // Malformed envelopes are logged and skipped — we never want a single poison
+                    // message to halt the pipeline. Promoting these to a real DLQ topic
+                    // (urfu.discipline.events.v1.dlq) is tracked under the discipline-chat
+                    // follow-up issue (see eventing-conventions.md "Retry & DLQ"); until then,
+                    // every drop is loud at LogError so operators can detect drift via alerts.
+                    logger.LogError(ex, "[ChatService] Failed to dispatch discipline event; dropping (no DLQ yet).");
                 }
             }
         }
