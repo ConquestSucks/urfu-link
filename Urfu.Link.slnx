@@ -18,6 +18,9 @@
   <Folder Name="/src/Services/Chat/">
     <Project Path="src/Services/Chat/ChatService.Api/ChatService.Api.csproj" />
   </Folder>
+  <Folder Name="/src/Services/Discipline/">
+    <Project Path="src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj" />
+  </Folder>
   <Folder Name="/src/Services/Media/">
     <Project Path="src/Services/Media/MediaService.Api/MediaService.Api.csproj" />
     <Project Path="src/Services/Media/MediaService.Api.Contracts/MediaService.Api.Contracts.csproj" />
@@ -34,6 +37,7 @@
   <Folder Name="/tests/" />
   <Folder Name="/tests/unit/">
     <Project Path="tests/unit/ChatService.UnitTests/ChatService.UnitTests.csproj" />
+    <Project Path="tests/unit/DisciplineService.UnitTests/DisciplineService.UnitTests.csproj" />
     <Project Path="tests/unit/MediaService.UnitTests/MediaService.UnitTests.csproj" />
     <Project Path="tests/unit/PresenceService.UnitTests/PresenceService.UnitTests.csproj" />
     <Project Path="tests/unit/UserService.UnitTests/UserService.UnitTests.csproj" />
@@ -43,6 +47,7 @@
   </Folder>
   <Folder Name="/tests/integration/">
     <Project Path="tests/integration/ChatService.IntegrationTests/ChatService.IntegrationTests.csproj" />
+    <Project Path="tests/integration/DisciplineService.IntegrationTests/DisciplineService.IntegrationTests.csproj" />
     <Project Path="tests/integration/MediaService.IntegrationTests/MediaService.IntegrationTests.csproj" />
     <Project Path="tests/integration/PresenceService.IntegrationTests/PresenceService.IntegrationTests.csproj" />
     <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
