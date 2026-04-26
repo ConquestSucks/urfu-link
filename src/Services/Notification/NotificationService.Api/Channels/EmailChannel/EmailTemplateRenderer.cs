@@ -1,3 +1,4 @@
+using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -32,7 +33,7 @@ public sealed partial class EmailTemplateRenderer : ITemplateRenderer
         var txt = LoadTemplate(category, locale, "txt") ?? LoadTemplate(category, DefaultLocale, "txt") ?? DefaultPlain(model);
 
         var subject = $"[UrFU Link] {model.Title}";
-        return new EmailContent(subject, Substitute(html, model), Substitute(txt, model));
+        return new EmailContent(subject, Substitute(html, model, htmlEncode: true), Substitute(txt, model, htmlEncode: false));
     }
 
     private string? LoadTemplate(NotificationCategory category, string locale, string format)
@@ -48,7 +49,7 @@ public sealed partial class EmailTemplateRenderer : ITemplateRenderer
         return reader.ReadToEnd();
     }
 
-    private static string Substitute(string template, EmailModel model)
+    private static string Substitute(string template, EmailModel model, bool htmlEncode)
     {
         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -67,17 +68,25 @@ public sealed partial class EmailTemplateRenderer : ITemplateRenderer
         return PlaceholderRegex().Replace(template, match =>
         {
             var key = match.Groups[1].Value.Trim();
-            return values.TryGetValue(key, out var v) ? v : string.Empty;
+            if (!values.TryGetValue(key, out var v))
+            {
+                return string.Empty;
+            }
+
+            return htmlEncode ? WebUtility.HtmlEncode(v) : v;
         });
     }
 
-    private static string DefaultHtml(EmailModel model) => $"""
-        <html><body>
-        <h1>{model.Title}</h1>
-        <p>{model.Body}</p>
-        {(string.IsNullOrWhiteSpace(model.DeepLink) ? string.Empty : $"<p><a href=\"{model.DeepLink}\">Открыть</a></p>")}
-        </body></html>
-        """;
+    private static string DefaultHtml(EmailModel model)
+    {
+        var title = WebUtility.HtmlEncode(model.Title);
+        var body = WebUtility.HtmlEncode(model.Body);
+        var link = WebUtility.HtmlEncode(model.DeepLink ?? string.Empty);
+        var cta = string.IsNullOrWhiteSpace(model.DeepLink)
+            ? string.Empty
+            : $"<p><a href=\"{link}\">Открыть</a></p>";
+        return $"<html><body><h1>{title}</h1><p>{body}</p>{cta}</body></html>";
+    }
 
     private static string DefaultPlain(EmailModel model) => $"""
         {model.Title}

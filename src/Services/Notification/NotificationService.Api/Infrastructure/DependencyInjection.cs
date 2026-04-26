@@ -65,6 +65,10 @@ public static class ModuleRegistration
         });
         services.AddSingleton<IUserPreferencesClient, UserServiceClient>();
 
+        // Real PresenceService client is a future task; default to "offline" so push is
+        // never silently dropped.
+        services.AddSingleton<IPresenceClient, OfflinePresenceClient>();
+
         services.AddScoped<NotificationFactory>();
         services.AddScoped<NotificationRouter>();
         services.AddScoped<MarkAsReadService>();

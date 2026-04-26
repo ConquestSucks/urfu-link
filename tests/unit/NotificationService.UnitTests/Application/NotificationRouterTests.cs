@@ -17,6 +17,7 @@ namespace NotificationService.UnitTests.Application;
 public sealed class NotificationRouterTests
 {
     private readonly IUserPreferencesClient _prefs = Substitute.For<IUserPreferencesClient>();
+    private readonly IPresenceClient _presence = Substitute.For<IPresenceClient>();
     private readonly INotificationRepository _repository = Substitute.For<INotificationRepository>();
     private readonly IPushDeviceRepository _pushDevices = Substitute.For<IPushDeviceRepository>();
     private readonly IBadgeStore _badgeStore = Substitute.For<IBadgeStore>();
@@ -31,6 +32,8 @@ public sealed class NotificationRouterTests
             .Returns(UserPreferences.Default);
         _prefs.GetContactAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(new UserContact("user@urfu.ru", "User", "ru-RU"));
+        _presence.IsOnlineOnWebAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(false);
         _repository.TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
             .Returns(true);
         _pushDevices.ListActiveByUserAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -42,6 +45,7 @@ public sealed class NotificationRouterTests
 
         _router = new NotificationRouter(
             _prefs,
+            _presence,
             _repository,
             _pushDevices,
             _factory,

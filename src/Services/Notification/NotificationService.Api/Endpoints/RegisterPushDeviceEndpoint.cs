@@ -24,6 +24,8 @@ public sealed class RegisterPushDeviceEndpoint(
     {
         Post("/me/notifications/devices");
         Summary(s => s.Summary = "Register or refresh a push device for FCM/APNs delivery");
+        // Mobile clients retry register on app launch; require Idempotency-Key to dedupe.
+        Options(b => b.AddEndpointFilter<IdempotencyEndpointFilter>());
     }
 
     public override async Task HandleAsync(RegisterPushDeviceRequest req, CancellationToken ct)

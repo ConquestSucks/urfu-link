@@ -17,6 +17,7 @@ namespace Urfu.Link.Services.Notification.Application.Routing;
 /// </summary>
 public sealed class NotificationRouter(
     IUserPreferencesClient preferencesClient,
+    IPresenceClient presenceClient,
     INotificationRepository repository,
     IPushDeviceRepository pushDevices,
     NotificationFactory factory,
@@ -69,6 +70,20 @@ public sealed class NotificationRouter(
                 }
                 else if (channel == DeliveryChannel.Push)
                 {
+                    var onlineOnWeb = await presenceClient.IsOnlineOnWebAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
+                    if (PresenceAwareSkipPolicy.ShouldSkipPush(draft.Category, draft.Severity, onlineOnWeb))
+                    {
+                        if (logger.IsEnabled(LogLevel.Debug))
+                        {
+                            logger.LogDebug(
+                                "Skipping push for {Category} to {RecipientId} — user is online on web",
+                                draft.Category,
+                                draft.RecipientUserId);
+                        }
+
+                        continue;
+                    }
+
                     var devices = await pushDevices.ListActiveByUserAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
                     foreach (var device in devices)
                     {
