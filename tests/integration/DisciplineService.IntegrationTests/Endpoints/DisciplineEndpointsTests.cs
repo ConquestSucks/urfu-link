@@ -294,6 +294,52 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_Enrollments_PaginatesViaCursor()
+    {
+        var teacherId = Guid.NewGuid();
+        var disc = await CreateDisciplineAsync(teacherId);
+        var students = Enumerable.Range(0, 5).Select(_ => Guid.NewGuid()).ToList();
+        await EnrollAsync(disc.Id, teacherId, students.Select(s => (s, DisciplineRole.Student)).ToList());
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+        var firstResp = await CreateClient().GetAsync($"/api/v1/disciplines/{disc.Id}/enrollments?limit=2");
+        firstResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var first = await firstResp.Content.ReadFromJsonAsync<ListEnrollmentsResponse>();
+        first!.Items.Should().HaveCount(2);
+        first.NextCursor.Should().NotBeNullOrWhiteSpace();
+
+        var secondResp = await CreateClient().GetAsync(
+            $"/api/v1/disciplines/{disc.Id}/enrollments?limit=2&cursor={Uri.EscapeDataString(first.NextCursor!)}");
+        secondResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var second = await secondResp.Content.ReadFromJsonAsync<ListEnrollmentsResponse>();
+        second!.Items.Should().HaveCount(2);
+        second.Items.Select(i => i.UserId).Should().NotIntersectWith(first.Items.Select(i => i.UserId));
+    }
+
+    [Fact]
+    public async Task Get_Enrollments_NonMember_Returns403()
+    {
+        var teacherId = Guid.NewGuid();
+        var disc = await CreateDisciplineAsync(teacherId);
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Student(Guid.NewGuid());
+        var response = await CreateClient().GetAsync($"/api/v1/disciplines/{disc.Id}/enrollments");
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Get_Enrollments_BadCursor_Returns400()
+    {
+        var teacherId = Guid.NewGuid();
+        var disc = await CreateDisciplineAsync(teacherId);
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+        var response = await CreateClient().GetAsync(
+            $"/api/v1/disciplines/{disc.Id}/enrollments?cursor=not-a-valid-cursor");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
     public async Task Get_DisciplinesMe_ListsMyMemberships()
     {
         var teacherId = Guid.NewGuid();
