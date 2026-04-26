@@ -138,9 +138,6 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<IDisciplineRoleResolver>();
             services.AddSingleton<IDisciplineRoleResolver>(DisciplineRoleResolver);
 
-            services.RemoveAll<IChatBroadcaster>();
-            services.AddSingleton<IChatBroadcaster>(ChatBroadcaster);
-
             services.RemoveAll<IDisciplineServiceClient>();
             services.AddSingleton<IDisciplineServiceClient>(DisciplineServiceClient);
             // Drop the gRPC channel + InternalApiClient registration so it doesn't try to dial

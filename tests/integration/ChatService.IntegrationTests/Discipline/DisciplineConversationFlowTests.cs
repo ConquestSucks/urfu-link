@@ -520,9 +520,15 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
 
     private DisciplineConversationService ResolveService()
     {
+        // Build the service against the captured-by-fake broadcaster instead of the production
+        // SignalR-backed one — domain-flow tests assert on the broadcasts the service emits, and
+        // this lets the rest of the integration suite keep using the real broadcaster for hub
+        // tests that drive real SignalR clients.
         var scope = _factory.Services.CreateScope();
         _scopes.Add(scope);
-        return scope.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+        var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<Urfu.Link.Services.Chat.Application.ChatEventDispatcher>();
+        return new DisciplineConversationService(repo, _factory.ChatBroadcaster, dispatcher);
     }
 
     private IConversationRepository ResolveRepo()

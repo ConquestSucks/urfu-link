@@ -10,6 +10,9 @@ namespace ChatService.IntegrationTests.Infrastructure;
 public sealed class FakeDisciplineServiceClient : IDisciplineServiceClient
 {
     private readonly Dictionary<Guid, List<UserDisciplineSnapshot>> _disciplinesByUser = new();
+    private readonly System.Collections.Concurrent.ConcurrentBag<Guid> _calledForUsers = new();
+
+    public IReadOnlyCollection<Guid> CalledForUsers => _calledForUsers;
 
     public void Seed(Guid userId, params UserDisciplineSnapshot[] disciplines)
     {
@@ -17,12 +20,17 @@ public sealed class FakeDisciplineServiceClient : IDisciplineServiceClient
         _disciplinesByUser[userId] = disciplines.ToList();
     }
 
-    public void Reset() => _disciplinesByUser.Clear();
+    public void Reset()
+    {
+        _disciplinesByUser.Clear();
+        _calledForUsers.Clear();
+    }
 
     public Task<IReadOnlyList<UserDisciplineSnapshot>> ListUserDisciplinesAsync(
         Guid userId,
         CancellationToken cancellationToken)
     {
+        _calledForUsers.Add(userId);
         if (_disciplinesByUser.TryGetValue(userId, out var list))
         {
             return Task.FromResult<IReadOnlyList<UserDisciplineSnapshot>>(list.ToList());
