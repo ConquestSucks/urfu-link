@@ -9,12 +9,16 @@ using Urfu.Link.Services.Notification.Application.Handlers.Discipline;
 using Urfu.Link.Services.Notification.Application.Preferences;
 using Urfu.Link.Services.Notification.Application.Routing;
 using Urfu.Link.Services.Notification.Application.Services;
+using Urfu.Link.Services.Notification.Channels.PushChannel;
+using Urfu.Link.Services.Notification.Channels.PushChannel.Apns;
+using Urfu.Link.Services.Notification.Channels.PushChannel.Fcm;
 using Urfu.Link.Services.Notification.Domain;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence.Repositories;
 using Urfu.Link.Services.Notification.Infrastructure.Redis;
 using Urfu.Link.Services.Notification.Realtime;
+using Urfu.Link.Services.Notification.Workers;
 
 namespace Urfu.Link.Services.Notification.Infrastructure;
 
@@ -69,6 +73,27 @@ public static class ModuleRegistration
         services.AddScoped<DisciplineDeadlineHandler>();
         services.AddScoped<CallIncomingHandler>();
         services.AddScoped<CallMissedHandler>();
+
+        services.Configure<FcmOptions>(configuration.GetSection(FcmOptions.SectionName));
+        services.Configure<ApnsOptions>(configuration.GetSection(ApnsOptions.SectionName));
+        services.Configure<PushDispatcherOptions>(configuration.GetSection(PushDispatcherOptions.SectionName));
+
+        var pushProvider = configuration.GetValue("Notification:Push:Provider", "real")
+            ?? "real";
+
+        if (string.Equals(pushProvider, "fake", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IFcmClient, FakeFcmClient>();
+            services.AddSingleton<IApnsClient, FakeApnsClient>();
+        }
+        else
+        {
+            services.AddSingleton<IFcmClient, FcmClient>();
+            services.AddHttpClient("apns");
+            services.AddSingleton<IApnsClient, ApnsClient>();
+        }
+
+        services.AddScoped<PushDispatcher>();
 
         return services;
     }

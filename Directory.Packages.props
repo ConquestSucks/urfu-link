@@ -50,5 +50,12 @@
     <PackageVersion Include="Testcontainers.MongoDb" Version="4.4.0" />
 
     <PackageVersion Include="MongoDB.Driver" Version="3.5.0" />
+
+    <PackageVersion Include="FirebaseAdmin" Version="3.4.0" />
+    <PackageVersion Include="dotAPNS" Version="4.4.0" />
+    <PackageVersion Include="MailKit" Version="4.14.0" />
+    <PackageVersion Include="RazorLight" Version="2.3.1" />
+    <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="9.4.0" />
+    <PackageVersion Include="Testcontainers.Kafka" Version="4.4.0" />
   </ItemGroup>
 </Project>

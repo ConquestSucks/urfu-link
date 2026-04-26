@@ -17,6 +17,7 @@ public sealed class NotificationRouterTests
 {
     private readonly IUserPreferencesClient _prefs = Substitute.For<IUserPreferencesClient>();
     private readonly INotificationRepository _repository = Substitute.For<INotificationRepository>();
+    private readonly IPushDeviceRepository _pushDevices = Substitute.For<IPushDeviceRepository>();
     private readonly IBadgeStore _badgeStore = Substitute.For<IBadgeStore>();
     private readonly INotificationBroadcaster _broadcaster = Substitute.For<INotificationBroadcaster>();
     private readonly NotificationFactory _factory = new(TimeProvider.System);
@@ -30,6 +31,8 @@ public sealed class NotificationRouterTests
             .Returns(new UserContact("user@urfu.ru", "User", "ru-RU"));
         _repository.TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
             .Returns(true);
+        _pushDevices.ListActiveByUserAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<Urfu.Link.Services.Notification.Domain.Aggregates.PushDevice>());
         _badgeStore.GetSnapshotAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(BadgeSnapshot.Empty);
 
@@ -38,6 +41,7 @@ public sealed class NotificationRouterTests
         _router = new NotificationRouter(
             _prefs,
             _repository,
+            _pushDevices,
             _factory,
             TimeProvider.System,
             _badgeStore,

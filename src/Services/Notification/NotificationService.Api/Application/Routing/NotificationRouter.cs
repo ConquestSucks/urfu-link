@@ -16,6 +16,7 @@ namespace Urfu.Link.Services.Notification.Application.Routing;
 public sealed class NotificationRouter(
     IUserPreferencesClient preferencesClient,
     INotificationRepository repository,
+    IPushDeviceRepository pushDevices,
     NotificationFactory factory,
     TimeProvider timeProvider,
     IBadgeStore badgeStore,
@@ -63,9 +64,14 @@ public sealed class NotificationRouter(
                         notification.AddDelivery(Delivery.PendingEmail(notification.Id, contact.Email));
                     }
                 }
-
-                // Push deliveries are seeded by PushChannel.PrepareDeliveriesAsync (Wave 10) using the
-                // PushDevice registry. The router does not enumerate devices itself.
+                else if (channel == DeliveryChannel.Push)
+                {
+                    var devices = await pushDevices.ListActiveByUserAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
+                    foreach (var device in devices)
+                    {
+                        notification.AddDelivery(Delivery.PendingPush(notification.Id, device.Provider, device.Id, device.Token));
+                    }
+                }
             }
 
             var inserted = await repository.TryInsertAsync(notification, cancellationToken).ConfigureAwait(false);

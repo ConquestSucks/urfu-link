@@ -46,6 +46,7 @@ builder.Services.AddHostedService<ChatEventsConsumer>();
 builder.Services.AddHostedService<DisciplineEventsConsumer>();
 builder.Services.AddHostedService<CallEventsConsumer>();
 builder.Services.AddHostedService<UserEventsConsumer>();
+builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.PushDispatcherWorker>();
 
 var app = builder.Build();
 
