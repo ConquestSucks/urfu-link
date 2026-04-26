@@ -25,6 +25,19 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
 
     private HttpClient CreateClient() => _factory.CreateClient();
 
+    /// <summary>
+    /// Returns an HttpClient with a fresh <c>Idempotency-Key</c> header pre-attached.
+    /// CreateDiscipline and EnrollUsers reject requests without the header so every
+    /// mutating call needs a unique key — using a single static key would make the
+    /// second call collide on the dedup window.
+    /// </summary>
+    private HttpClient CreateIdempotentClient()
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+        return client;
+    }
+
     private static CreateDisciplineRequest SampleCreate(Guid ownerId)
         => new(
             Code: $"CS-{Guid.NewGuid():N}".Substring(0, 12),
@@ -40,7 +53,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         var teacherId = Guid.NewGuid();
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
 
-        var client = CreateClient();
+        var client = CreateIdempotentClient();
         var response = await client.PostAsJsonAsync(
             "/api/v1/disciplines",
             SampleCreate(teacherId));
@@ -60,7 +73,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
     public async Task Post_Disciplines_WithoutAuth_Returns401()
     {
         TestAuthHandler.CurrentPrincipal = null;
-        var client = CreateClient();
+        var client = CreateIdempotentClient();
         var response = await client.PostAsJsonAsync(
             "/api/v1/disciplines",
             SampleCreate(Guid.NewGuid()));
@@ -71,7 +84,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
     public async Task Post_Disciplines_AsTeacher_Returns403()
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(Guid.NewGuid());
-        var client = CreateClient();
+        var client = CreateIdempotentClient();
         var response = await client.PostAsJsonAsync(
             "/api/v1/disciplines",
             SampleCreate(Guid.NewGuid()));
@@ -84,12 +97,45 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
         var teacherId = Guid.NewGuid();
         var first = SampleCreate(teacherId);
-        var client = CreateClient();
-        var firstResponse = await client.PostAsJsonAsync("/api/v1/disciplines", first);
+
+        // Two distinct Idempotency-Keys: we need to surface the unique-code conflict,
+        // not have the second request rejected as a duplicate request envelope.
+        var firstResponse = await CreateIdempotentClient().PostAsJsonAsync("/api/v1/disciplines", first);
         firstResponse.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var dup = first with { Title = "Other" };
-        var secondResponse = await client.PostAsJsonAsync("/api/v1/disciplines", dup);
+        var secondResponse = await CreateIdempotentClient().PostAsJsonAsync("/api/v1/disciplines", dup);
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Post_Disciplines_WithoutIdempotencyKey_Returns400()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+        var response = await CreateClient().PostAsJsonAsync(
+            "/api/v1/disciplines",
+            SampleCreate(Guid.NewGuid()));
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Post_Disciplines_DuplicateIdempotencyKey_Returns409()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+        var key = Guid.NewGuid().ToString("N");
+
+        var first = _factory.CreateClient();
+        first.DefaultRequestHeaders.Add("Idempotency-Key", key);
+        var firstResponse = await first.PostAsJsonAsync(
+            "/api/v1/disciplines",
+            SampleCreate(Guid.NewGuid()));
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var second = _factory.CreateClient();
+        second.DefaultRequestHeaders.Add("Idempotency-Key", key);
+        var secondResponse = await second.PostAsJsonAsync(
+            "/api/v1/disciplines",
+            SampleCreate(Guid.NewGuid()));
         secondResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -272,7 +318,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         var s1 = Guid.NewGuid();
         var s2 = Guid.NewGuid();
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateClient().PostAsJsonAsync(
+        var response = await CreateIdempotentClient().PostAsJsonAsync(
             $"/api/v1/disciplines/{disc.Id}/enrollments",
             new
             {
@@ -297,7 +343,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         var disc = await CreateDisciplineAsync(teacherId);
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateClient().PostAsJsonAsync(
+        var response = await CreateIdempotentClient().PostAsJsonAsync(
             $"/api/v1/disciplines/{disc.Id}/enrollments",
             new
             {
@@ -369,7 +415,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
     private async Task<DisciplineResponse> CreateDisciplineAsync(Guid teacherId)
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var resp = await CreateClient().PostAsJsonAsync("/api/v1/disciplines", SampleCreate(teacherId));
+        var resp = await CreateIdempotentClient().PostAsJsonAsync("/api/v1/disciplines", SampleCreate(teacherId));
         resp.EnsureSuccessStatusCode();
         return (await resp.Content.ReadFromJsonAsync<DisciplineResponse>())!;
     }
@@ -380,7 +426,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var resp = await CreateClient().PostAsJsonAsync(
+        var resp = await CreateIdempotentClient().PostAsJsonAsync(
             $"/api/v1/disciplines/{disciplineId}/enrollments",
             new
             {

@@ -6,6 +6,7 @@ using DisciplineService.Api.Domain.Aggregates;
 using DisciplineService.Api.Domain.Interfaces;
 using DisciplineService.Api.Infrastructure.Auth;
 using FastEndpoints;
+using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace DisciplineService.Api.Endpoints;
 
@@ -18,7 +19,10 @@ public sealed class CreateDisciplineEndpoint(
     {
         Post(string.Empty);
         Group<DisciplinesGroup>();
-        Summary(s => s.Summary = "Create a new discipline (admin only).");
+        // Idempotency-Key is mandatory for create: a network blip on the client must
+        // not produce two disciplines with otherwise-different generated codes.
+        Options(x => x.AddEndpointFilter<IdempotencyEndpointFilter>());
+        Summary(s => s.Summary = "Create a new discipline (admin only). Requires Idempotency-Key header.");
     }
 
     public override async Task HandleAsync(CreateDisciplineRequest req, CancellationToken ct)

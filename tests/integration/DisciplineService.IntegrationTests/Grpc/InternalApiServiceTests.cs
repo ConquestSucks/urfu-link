@@ -158,6 +158,7 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
         var http = _factory.CreateClient();
+        http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
         var resp = await http.PostAsJsonAsync(
             "/api/v1/disciplines",
             new CreateDisciplineRequest(
@@ -178,6 +179,7 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
         var http = _factory.CreateClient();
+        http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
         var resp = await http.PostAsJsonAsync(
             $"/api/v1/disciplines/{disciplineId}/enrollments",
             new

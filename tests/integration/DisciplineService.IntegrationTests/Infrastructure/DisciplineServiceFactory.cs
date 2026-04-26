@@ -23,7 +23,7 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
 
     public FakeOutboxWriter OutboxWriter { get; } = new();
 
-    public IIdempotencyStore IdempotencyStore { get; } = Substitute.For<IIdempotencyStore>();
+    public InMemoryIdempotencyStore IdempotencyStore { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -40,6 +40,7 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
     public void ResetCapturedState()
     {
         OutboxWriter.Clear();
+        IdempotencyStore.Clear();
         TestAuthHandler.CurrentPrincipal = null;
     }
 
@@ -74,10 +75,9 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
         {
             services.RemoveAll<IHostedService>();
 
-            IdempotencyStore.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
-                .Returns(ValueTask.FromResult(true));
+            // Real idempotency semantics in tests so duplicate-key cases surface as 409.
             services.RemoveAll<IIdempotencyStore>();
-            services.AddSingleton(IdempotencyStore);
+            services.AddSingleton<IIdempotencyStore>(IdempotencyStore);
 
             services.RemoveAll<IConnectionMultiplexer>();
             services.AddSingleton(Substitute.For<IConnectionMultiplexer>());

@@ -6,6 +6,7 @@ using DisciplineService.Api.Domain.Exceptions;
 using DisciplineService.Api.Domain.Interfaces;
 using DisciplineService.Api.Infrastructure.Auth;
 using FastEndpoints;
+using Urfu.Link.BuildingBlocks.Idempotency;
 
 namespace DisciplineService.Api.Endpoints;
 
@@ -30,7 +31,11 @@ public sealed class EnrollUsersEndpoint(
     {
         Post("{id:guid}/enrollments");
         Group<DisciplinesGroup>();
-        Summary(s => s.Summary = "Batch enroll users into a discipline (admin or owner teacher).");
+        // Idempotency-Key is mandatory: a retried batch must not double-enroll students
+        // (which would manifest as 409 EnrollmentExists today, but the underlying retry
+        // could partially succeed if the first attempt was killed mid-loop).
+        Options(x => x.AddEndpointFilter<IdempotencyEndpointFilter>());
+        Summary(s => s.Summary = "Batch enroll users into a discipline (admin or owner teacher). Requires Idempotency-Key.");
     }
 
     public override async Task HandleAsync(EnrollUsersRouteRequest req, CancellationToken ct)
