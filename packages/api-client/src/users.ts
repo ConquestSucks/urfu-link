@@ -67,41 +67,14 @@ export type UpdateSoundVideoDto = {
   webcamDeviceId?: string | null;
 };
 
-type AuthHeaders = () => Record<string, string>;
-type HandleUnauthorized = (response: Response) => void;
+import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
 export function createUsersApi(
   baseUrl: string,
   authHeaders: AuthHeaders,
   handleUnauthorized: HandleUnauthorized
 ) {
-  async function request<T>(
-    path: string,
-    init?: RequestInit
-  ): Promise<T> {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: {
-        ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-        ...authHeaders(),
-        ...init?.headers,
-      },
-      credentials: "same-origin",
-      redirect: "manual",
-    });
-
-    handleUnauthorized(response);
-
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return response.json() as Promise<T>;
-  }
+  const request = createRequest(baseUrl, authHeaders, handleUnauthorized);
 
   return {
     getMe(): Promise<UserProfile> {

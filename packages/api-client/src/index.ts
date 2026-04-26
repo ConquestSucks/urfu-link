@@ -19,7 +19,34 @@ export type {
   UpdateSoundVideoDto,
 } from "./users";
 
+export type {
+  ConversationType,
+  ConversationPreview,
+  MessageState,
+  AttachmentType,
+  ChatAttachment,
+  MessageDto,
+  Paginated,
+} from "./chat";
+
+export type {
+  Visibility,
+  InitUploadRequest,
+  InitUploadResponse,
+  CompleteUploadRequest,
+  AssetMetadata,
+} from "./media";
+
+export type {
+  PresenceStatus,
+  Platform,
+  PresenceInfo,
+} from "./presence";
+
 import { createUsersApi } from "./users";
+import { createChatApi } from "./chat";
+import { createMediaApi } from "./media";
+import { createPresenceApi } from "./presence";
 
 type ApiClientConfig = {
   baseUrl: string;
@@ -55,6 +82,9 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
 
   return {
     users: createUsersApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    chat: createChatApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    media: createMediaApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    presence: createPresenceApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
 
     async health(): Promise<BackendHealth> {
       try {
