@@ -51,6 +51,7 @@
     <Project Path="tests/integration/ChatService.IntegrationTests/ChatService.IntegrationTests.csproj" />
     <Project Path="tests/integration/DisciplineService.IntegrationTests/DisciplineService.IntegrationTests.csproj" />
     <Project Path="tests/integration/MediaService.IntegrationTests/MediaService.IntegrationTests.csproj" />
+    <Project Path="tests/integration/NotificationService.IntegrationTests/NotificationService.IntegrationTests.csproj" />
     <Project Path="tests/integration/PresenceService.IntegrationTests/PresenceService.IntegrationTests.csproj" />
     <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
   </Folder>
