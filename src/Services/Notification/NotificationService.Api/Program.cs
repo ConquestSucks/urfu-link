@@ -1,3 +1,4 @@
+using FastEndpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Urfu.Link.BuildingBlocks.Outbox;
@@ -13,6 +14,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddGrpc();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();
+builder.Services.AddFastEndpoints();
 builder.Services.AddServiceDefaults(builder.Configuration, "notification-service");
 
 // SignalR clients can't set the Authorization header during the WebSocket upgrade handshake —
@@ -45,6 +47,7 @@ builder.Services.AddHostedService<ChatEventsConsumer>();
 var app = builder.Build();
 
 app.MapServiceDefaults();
+app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
 app.MapGrpcService<InternalApiService>();
 app.MapHub<NotificationHub>("/hubs/notifications");
 

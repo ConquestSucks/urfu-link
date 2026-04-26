@@ -6,6 +6,8 @@ public interface IUserPreferencesClient
 
     Task<UserContact> GetContactAsync(Guid userId, CancellationToken cancellationToken);
 
+    Task<UserPreferences> UpdateAsync(Guid userId, UserPreferences preferences, CancellationToken cancellationToken);
+
     void Invalidate(Guid userId);
 }
 

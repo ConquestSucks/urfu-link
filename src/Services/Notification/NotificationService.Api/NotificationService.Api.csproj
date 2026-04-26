@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" />
+    <PackageReference Include="FastEndpoints" />
     <PackageReference Include="Grpc.AspNetCore" />
     <PackageReference Include="Grpc.Tools">
       <PrivateAssets>all</PrivateAssets>

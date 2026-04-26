@@ -20,6 +20,14 @@ public sealed class StubUserPreferencesClient : IUserPreferencesClient
         return Task.FromResult(new UserContact(string.Empty, string.Empty, "ru-RU"));
     }
 
+    public Task<UserPreferences> UpdateAsync(Guid userId, UserPreferences preferences, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(preferences);
+        _ = userId;
+        _ = cancellationToken;
+        return Task.FromResult(preferences);
+    }
+
     public void Invalidate(Guid userId)
     {
         _ = userId;
