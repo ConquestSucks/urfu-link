@@ -12,6 +12,7 @@ using Testcontainers.Redis;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Application.Authorization;
+using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
 using Urfu.Link.Services.Chat.Realtime;
@@ -42,6 +43,8 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
 
     public FakeChatBroadcaster ChatBroadcaster { get; } = new();
 
+    public FakeDisciplineServiceClient DisciplineServiceClient { get; } = new();
+
     public IIdempotencyStore IdempotencyStore { get; } = Substitute.For<IIdempotencyStore>();
 
     public string MongoConnectionString => _mongo.GetConnectionString();
@@ -69,6 +72,7 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
         MediaServiceClient.Reset();
         DisciplineRoleResolver.Reset();
         ChatBroadcaster.Reset();
+        DisciplineServiceClient.Reset();
         TestAuthHandler.CurrentPrincipal = null;
     }
 
@@ -136,6 +140,12 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
 
             services.RemoveAll<IChatBroadcaster>();
             services.AddSingleton<IChatBroadcaster>(ChatBroadcaster);
+
+            services.RemoveAll<IDisciplineServiceClient>();
+            services.AddSingleton<IDisciplineServiceClient>(DisciplineServiceClient);
+            // Drop the gRPC channel + InternalApiClient registration so it doesn't try to dial
+            // the production discipline-service address during tests.
+            services.RemoveAll<Urfu.Link.Services.Disciplines.Grpc.InternalApi.InternalApiClient>();
 
             ReplaceAuthWithTestScheme(services);
         });

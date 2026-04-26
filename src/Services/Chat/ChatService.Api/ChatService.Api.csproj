@@ -14,6 +14,9 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Both" />
+    <Protobuf Include="..\..\Discipline\DisciplineService.Api\Protos\internal.proto"
+              GrpcServices="Client"
+              Link="Protos\DisciplineInternal.proto" />
   </ItemGroup>
 
   <ItemGroup>

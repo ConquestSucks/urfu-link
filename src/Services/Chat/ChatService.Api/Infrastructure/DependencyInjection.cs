@@ -94,6 +94,43 @@ public static class ModuleRegistration
         services.AddSingleton(sp => new InternalApi.InternalApiClient(sp.GetRequiredService<GrpcChannel>()));
         services.AddSingleton<IMediaServiceClient, MediaServiceClient>();
 
+        services.AddOptions<DisciplineServiceClientOptions>()
+            .Bind(configuration.GetSection(DisciplineServiceClientOptions.SectionName));
+        services.AddSingleton(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<DisciplineServiceClientOptions>>().Value;
+            if (string.IsNullOrWhiteSpace(opts.Address))
+            {
+                throw new InvalidOperationException(
+                    "DisciplineService gRPC address is not configured (GrpcClients:DisciplineService:Address).");
+            }
+
+            // Built-in Grpc.Net retry on transient errors. ChatService falls back to its local
+            // discipline-conversation projection if the bootstrap call fails, so this only smooths
+            // out short blips, not full outages.
+            var retryPolicy = new RetryPolicy
+            {
+                MaxAttempts = 3,
+                InitialBackoff = TimeSpan.FromMilliseconds(100),
+                MaxBackoff = TimeSpan.FromSeconds(2),
+                BackoffMultiplier = 2,
+                RetryableStatusCodes = { StatusCode.Unavailable, StatusCode.DeadlineExceeded },
+            };
+
+            var channel = GrpcChannel.ForAddress(opts.Address, new GrpcChannelOptions
+            {
+                ServiceConfig = new ServiceConfig
+                {
+                    MethodConfigs =
+                    {
+                        new MethodConfig { Names = { MethodName.Default }, RetryPolicy = retryPolicy },
+                    },
+                },
+            });
+            return new Urfu.Link.Services.Disciplines.Grpc.InternalApi.InternalApiClient(channel);
+        });
+        services.AddSingleton<IDisciplineServiceClient, DisciplineServiceClient>();
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ChatEventDispatcher>();
         services.AddScoped<OpenDirectConversationService>();
