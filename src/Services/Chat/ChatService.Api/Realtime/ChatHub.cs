@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.SignalR;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
+// PinMessageService and UnpinMessageService live in Application.Conversations.
 
 namespace Urfu.Link.Services.Chat.Realtime;
 
@@ -11,14 +13,24 @@ public sealed record SendMessageHubInput(
     string ConversationId,
     string Body,
     IReadOnlyList<Guid> AttachmentAssetIds,
-    string ClientMessageId);
+    string ClientMessageId,
+    Guid? ReplyToMessageId = null);
+
+public sealed record EditMessageHubInput(Guid MessageId, string NewBody);
 
 [Authorize]
 public sealed class ChatHub(
     OpenDirectConversationService openDirect,
     SendMessageService sendMessage,
     MarkDeliveredService markDelivered,
-    MarkReadService markRead) : Hub<IChatClient>
+    MarkReadService markRead,
+    EditMessageService editMessage,
+    DeleteMessageService deleteMessage,
+    ForwardMessagesService forwardMessages,
+    AddReactionService addReaction,
+    RemoveReactionService removeReaction,
+    PinMessageService pinMessage,
+    UnpinMessageService unpinMessage) : Hub<IChatClient>
 {
     public async Task<ConversationDto> OpenDirectConversation(Guid peerUserId)
     {
@@ -33,7 +45,13 @@ public sealed class ChatHub(
         var caller = Context.User!.GetUserId();
         var assetIds = input.AttachmentAssetIds ?? Array.Empty<Guid>();
         return sendMessage.SendAsync(
-            new SendMessageRequest(input.ConversationId, caller, input.Body ?? string.Empty, assetIds, input.ClientMessageId),
+            new SendMessageRequest(
+                input.ConversationId,
+                caller,
+                input.Body ?? string.Empty,
+                assetIds,
+                input.ClientMessageId,
+                input.ReplyToMessageId),
             Context.ConnectionAborted);
     }
 
@@ -52,4 +70,63 @@ public sealed class ChatHub(
             new MarkReadRequest(conversationId, caller, upToMessageId),
             Context.ConnectionAborted);
     }
+
+    public Task<MessageDto> EditMessage(EditMessageHubInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var caller = Context.User!.GetUserId();
+        return editMessage.EditAsync(
+            new EditMessageRequest(input.MessageId, caller, input.NewBody ?? string.Empty),
+            Context.ConnectionAborted);
+    }
+
+    public Task<MessageDto?> DeleteMessage(Guid messageId, string mode)
+    {
+        var caller = Context.User!.GetUserId();
+        var deleteMode = DeleteModes.Parse(mode);
+        return deleteMessage.DeleteAsync(
+            new DeleteMessageRequest(messageId, caller, deleteMode),
+            Context.ConnectionAborted);
+    }
+
+    public Task<IReadOnlyList<MessageDto>> ForwardMessages(string targetConversationId, IReadOnlyList<Guid> messageIds)
+    {
+        var caller = Context.User!.GetUserId();
+        return forwardMessages.ForwardAsync(
+            new ForwardMessagesRequest(targetConversationId, caller, messageIds ?? Array.Empty<Guid>()),
+            Context.ConnectionAborted);
+    }
+
+    public Task AddReaction(Guid messageId, string emoji)
+    {
+        var caller = Context.User!.GetUserId();
+        return addReaction.AddAsync(
+            new AddReactionRequest(messageId, caller, emoji ?? string.Empty),
+            Context.ConnectionAborted);
+    }
+
+    public Task RemoveReaction(Guid messageId, string emoji)
+    {
+        var caller = Context.User!.GetUserId();
+        return removeReaction.RemoveAsync(
+            new RemoveReactionRequest(messageId, caller, emoji ?? string.Empty),
+            Context.ConnectionAborted);
+    }
+
+    public Task<IReadOnlyList<MessageDto>> PinMessage(string conversationId, Guid messageId)
+    {
+        var caller = Context.User!.GetUserId();
+        return pinMessage.PinAsync(
+            new PinMessageRequest(conversationId, caller, messageId),
+            Context.ConnectionAborted);
+    }
+
+    public Task<IReadOnlyList<MessageDto>> UnpinMessage(string conversationId, Guid messageId)
+    {
+        var caller = Context.User!.GetUserId();
+        return unpinMessage.UnpinAsync(
+            new UnpinMessageRequest(conversationId, caller, messageId),
+            Context.ConnectionAborted);
+    }
+
 }

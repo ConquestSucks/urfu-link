@@ -1,9 +1,12 @@
+using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application.Contracts;
+using Urfu.Link.Services.Chat.Application.Mentions;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
+using Urfu.Link.Services.Chat.Infrastructure;
 using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
@@ -21,11 +24,14 @@ public sealed class SendMessageService(
     IIdempotencyStore idempotencyStore,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
-    TimeProvider clock)
+    TimeProvider clock,
+    IOptions<ChatOptions> options)
 {
-    public const int MaxBodyLength = 4000;
+    /// <summary>Backwards-compatible alias for <see cref="ChatBodyConstraints.MaxBodyLength"/>.</summary>
+    public const int MaxBodyLength = ChatBodyConstraints.MaxBodyLength;
 
-    public const int MaxAttachmentsPerMessage = 10;
+    /// <summary>Backwards-compatible alias for <see cref="ChatBodyConstraints.MaxAttachmentsPerMessage"/>.</summary>
+    public const int MaxAttachmentsPerMessage = ChatBodyConstraints.MaxAttachmentsPerMessage;
 
     public async Task<MessageDto> SendAsync(SendMessageRequest request, CancellationToken cancellationToken)
     {
@@ -62,6 +68,12 @@ public sealed class SendMessageService(
         var attachments = await ResolveAttachmentsAsync(request.AttachmentAssetIds, request.SenderId, cancellationToken)
             .ConfigureAwait(false);
 
+        var replyTo = await ResolveReplyToAsync(conversation.Id, request.ReplyToMessageId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var opts = options.Value;
+        var mentions = MentionsParser.Parse(request.Body, conversation.Participants, opts.MaxMentionsPerMessage);
+
         var now = clock.GetUtcNow();
         var message = Message.Send(
             id: Guid.NewGuid(),
@@ -70,7 +82,9 @@ public sealed class SendMessageService(
             body: request.Body,
             attachments: attachments,
             clientMessageId: request.ClientMessageId,
-            createdAtUtc: now);
+            createdAtUtc: now,
+            mentions: mentions,
+            replyTo: replyTo);
 
         try
         {
@@ -101,8 +115,21 @@ public sealed class SendMessageService(
                 recipients,
                 BuildPreviewText(request.Body, message.HasAttachments),
                 message.HasAttachments,
-                now),
+                now,
+                Mentions: mentions.Count == 0 ? null : mentions),
             cancellationToken).ConfigureAwait(false);
+
+        if (mentions.Count > 0)
+        {
+            await dispatcher.PublishAsync(
+                new ChatMentionCreatedEvent(
+                    conversation.Id,
+                    message.Id,
+                    request.SenderId,
+                    mentions,
+                    now),
+                cancellationToken).ConfigureAwait(false);
+        }
 
         var dto = MessageDto.FromDomain(message);
         await broadcaster.NotifyMessageReceivedAsync(recipients, dto, cancellationToken).ConfigureAwait(false);
@@ -128,6 +155,25 @@ public sealed class SendMessageService(
         {
             throw new ArgumentException("ClientMessageId is required.", nameof(request));
         }
+    }
+
+    private async Task<ReplyTo?> ResolveReplyToAsync(
+        string conversationId,
+        Guid? replyToMessageId,
+        CancellationToken cancellationToken)
+    {
+        if (replyToMessageId is not { } id)
+        {
+            return null;
+        }
+
+        var target = await messages.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        if (target is null || !string.Equals(target.ConversationId, conversationId, StringComparison.Ordinal))
+        {
+            throw new ChatReplyTargetNotFoundException(id, conversationId);
+        }
+
+        return ReplyTo.Create(target.Id, target.SenderId, target.Body);
     }
 
     private async Task<IReadOnlyList<Attachment>> ResolveAttachmentsAsync(

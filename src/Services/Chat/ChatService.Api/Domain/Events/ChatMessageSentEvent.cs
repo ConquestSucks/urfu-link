@@ -9,7 +9,8 @@ public sealed record ChatMessageSentEvent(
     IReadOnlyList<Guid> Recipients,
     string Preview,
     bool HasAttachments,
-    DateTimeOffset OccurredAtUtc) : IIntegrationEvent
+    DateTimeOffset OccurredAtUtc,
+    IReadOnlyList<Guid>? Mentions = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

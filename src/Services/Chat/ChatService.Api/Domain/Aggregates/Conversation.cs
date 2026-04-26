@@ -9,6 +9,7 @@ namespace Urfu.Link.Services.Chat.Domain.Aggregates;
 public sealed class Conversation
 {
     private readonly List<Guid> _participants;
+    private readonly List<Guid> _pinnedMessageIds;
 
     private Conversation(
         string id,
@@ -16,7 +17,8 @@ public sealed class Conversation
         IEnumerable<Guid> participants,
         DateTimeOffset createdAtUtc,
         DateTimeOffset lastMessageAtUtc,
-        MessagePreview? lastMessagePreview)
+        MessagePreview? lastMessagePreview,
+        IEnumerable<Guid>? pinnedMessageIds)
     {
         Id = id;
         Type = type;
@@ -24,6 +26,7 @@ public sealed class Conversation
         CreatedAtUtc = createdAtUtc;
         LastMessageAtUtc = lastMessageAtUtc;
         LastMessagePreview = lastMessagePreview;
+        _pinnedMessageIds = pinnedMessageIds?.ToList() ?? [];
     }
 
     public string Id { get; }
@@ -37,6 +40,8 @@ public sealed class Conversation
     public DateTimeOffset LastMessageAtUtc { get; private set; }
 
     public MessagePreview? LastMessagePreview { get; private set; }
+
+    public IReadOnlyList<Guid> PinnedMessageIds => _pinnedMessageIds;
 
     public static Conversation OpenDirect(Guid userA, Guid userB, DateTimeOffset nowUtc)
     {
@@ -54,7 +59,8 @@ public sealed class Conversation
             new[] { lo, hi },
             nowUtc,
             nowUtc,
-            lastMessagePreview: null);
+            lastMessagePreview: null,
+            pinnedMessageIds: null);
     }
 
     public static Conversation Hydrate(
@@ -63,8 +69,9 @@ public sealed class Conversation
         IEnumerable<Guid> participants,
         DateTimeOffset createdAtUtc,
         DateTimeOffset lastMessageAtUtc,
-        MessagePreview? lastMessagePreview)
-        => new(id, type, participants, createdAtUtc, lastMessageAtUtc, lastMessagePreview);
+        MessagePreview? lastMessagePreview,
+        IEnumerable<Guid>? pinnedMessageIds = null)
+        => new(id, type, participants, createdAtUtc, lastMessageAtUtc, lastMessagePreview, pinnedMessageIds);
 
     public bool IsParticipant(Guid userId) => _participants.Contains(userId);
 
@@ -74,6 +81,33 @@ public sealed class Conversation
         LastMessagePreview = preview;
         LastMessageAtUtc = sentAtUtc;
     }
+
+    public bool IsPinned(Guid messageId) => _pinnedMessageIds.Contains(messageId);
+
+    /// <summary>
+    /// Pins the message inside the in-memory aggregate. Returns <c>false</c> if the message is
+    /// already pinned (idempotent) or if the pinned-list is at <paramref name="maxPinned"/>.
+    /// Callers should distinguish the two by inspecting <see cref="IsPinned"/> before invoking.
+    /// </summary>
+    public bool PinMessage(Guid messageId, int maxPinned)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPinned);
+
+        if (IsPinned(messageId))
+        {
+            return false;
+        }
+
+        if (_pinnedMessageIds.Count >= maxPinned)
+        {
+            return false;
+        }
+
+        _pinnedMessageIds.Add(messageId);
+        return true;
+    }
+
+    public bool UnpinMessage(Guid messageId) => _pinnedMessageIds.Remove(messageId);
 
     // SHA1 is used here as a non-cryptographic deterministic hash to derive a stable
     // identifier for a sorted user pair. Collision resistance for the (Guid, Guid) input

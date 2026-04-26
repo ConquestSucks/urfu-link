@@ -13,7 +13,15 @@ public sealed record MessageDto(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset? DeliveredAtUtc,
     DateTimeOffset? ReadAtUtc,
-    string ClientMessageId)
+    string ClientMessageId,
+    DateTimeOffset? EditedAtUtc = null,
+    DateTimeOffset? DeletedAtUtc = null,
+    Guid? DeletedBy = null,
+    DeleteMode? DeleteMode = null,
+    IReadOnlyList<Guid>? Mentions = null,
+    ReplyToDto? ReplyTo = null,
+    ForwardedFromDto? ForwardedFrom = null,
+    IReadOnlyDictionary<string, IReadOnlyList<Guid>>? ReactionsSummary = null)
 {
     public static MessageDto FromDomain(Message message)
     {
@@ -28,6 +36,29 @@ public sealed record MessageDto(
             message.CreatedAtUtc,
             message.DeliveredAtUtc,
             message.ReadAtUtc,
-            message.ClientMessageId);
+            message.ClientMessageId,
+            EditedAtUtc: message.EditedAtUtc,
+            DeletedAtUtc: message.DeletedAtUtc,
+            DeletedBy: message.DeletedBy,
+            DeleteMode: message.DeleteMode,
+            Mentions: message.Mentions.Count == 0 ? Array.Empty<Guid>() : message.Mentions.ToList(),
+            ReplyTo: message.ReplyTo is { } r ? ReplyToDto.FromDomain(r) : null,
+            ForwardedFrom: message.ForwardedFrom is { } f ? ForwardedFromDto.FromDomain(f) : null,
+            ReactionsSummary: BuildReactionsSummary(message));
+    }
+
+    private static Dictionary<string, IReadOnlyList<Guid>> BuildReactionsSummary(Message message)
+    {
+        if (message.Reactions.Count == 0)
+        {
+            return new Dictionary<string, IReadOnlyList<Guid>>(StringComparer.Ordinal);
+        }
+
+        return message.Reactions
+            .GroupBy(r => r.Emoji, StringComparer.Ordinal)
+            .ToDictionary(
+                g => g.Key,
+                g => (IReadOnlyList<Guid>)g.Select(r => r.UserId).ToList(),
+                StringComparer.Ordinal);
     }
 }

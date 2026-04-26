@@ -50,6 +50,14 @@ internal sealed class MongoIndexInitializer(ChatMongoContext context) : IHostedS
                         Unique = true,
                         Sparse = true,
                     }),
+                new CreateIndexModel<MessageDocument>(
+                    Builders<MessageDocument>.IndexKeys.Ascending(m => m.Mentions),
+                    new CreateIndexOptions
+                    {
+                        Name = "ix_messages_mentions",
+                        Background = true,
+                        Sparse = true,
+                    }),
             },
             cancellationToken).ConfigureAwait(false);
     }

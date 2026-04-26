@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.SignalR;
 using Urfu.Link.Services.Chat.Application.Contracts;
+using Urfu.Link.Services.Chat.Domain.Enums;
 
 namespace Urfu.Link.Services.Chat.Realtime;
 
@@ -54,6 +55,63 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
         ArgumentNullException.ThrowIfNull(recipientUserIds);
         return hub.Clients.Users(ToUserIds(recipientUserIds))
             .MessageReadUpdate(conversationId, upToMessageId, readerUserId);
+    }
+
+    public Task NotifyMessageReadByAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid messageId,
+        Guid readerUserId,
+        DateTimeOffset readAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .MessageReadByUpdate(conversationId, messageId, readerUserId, readAtUtc);
+    }
+
+    public Task NotifyMessageEditedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        MessageDto message,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).MessageEdited(message);
+    }
+
+    public Task NotifyMessageDeletedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid messageId,
+        DeleteMode mode,
+        Guid deletedBy,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        return hub.Clients.Users(ToUserIds(recipientUserIds))
+            .MessageDeletedUpdate(conversationId, messageId, mode.ToWire(), deletedBy);
+    }
+
+    public Task NotifyReactionUpdatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        Guid messageId,
+        IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        ArgumentNullException.ThrowIfNull(summary);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).ReactionUpdated(messageId, summary);
+    }
+
+    public Task NotifyPinsUpdatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        IReadOnlyList<MessageDto> pinnedMessages,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(recipientUserIds);
+        ArgumentNullException.ThrowIfNull(pinnedMessages);
+        return hub.Clients.Users(ToUserIds(recipientUserIds)).PinsUpdated(conversationId, pinnedMessages);
     }
 
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)

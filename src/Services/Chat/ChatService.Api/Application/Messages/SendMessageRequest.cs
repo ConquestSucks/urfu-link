@@ -5,4 +5,5 @@ public sealed record SendMessageRequest(
     Guid SenderId,
     string Body,
     IReadOnlyList<Guid> AttachmentAssetIds,
-    string ClientMessageId);
+    string ClientMessageId,
+    Guid? ReplyToMessageId = null);

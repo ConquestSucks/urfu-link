@@ -39,6 +39,46 @@ internal sealed class MessageDocument
     [BsonIgnoreIfNull]
     public DateTime? ReadAtUtc { get; set; }
 
+    [BsonElement("editedAtUtc")]
+    [BsonIgnoreIfNull]
+    public DateTime? EditedAtUtc { get; set; }
+
+    [BsonElement("editHistory")]
+    public List<EditHistoryEntryDocument> EditHistory { get; set; } = new();
+
+    [BsonElement("deletedAtUtc")]
+    [BsonIgnoreIfNull]
+    public DateTime? DeletedAtUtc { get; set; }
+
+    [BsonElement("deletedBy")]
+    [BsonIgnoreIfNull]
+    public Guid? DeletedBy { get; set; }
+
+    [BsonElement("deleteMode")]
+    [BsonIgnoreIfNull]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public DeleteMode? DeleteMode { get; set; }
+
+    [BsonElement("hiddenFor")]
+    public List<Guid> HiddenFor { get; set; } = new();
+
+    [BsonElement("reactions")]
+    public List<ReactionDocument> Reactions { get; set; } = new();
+
+    [BsonElement("mentions")]
+    public List<Guid> Mentions { get; set; } = new();
+
+    [BsonElement("replyTo")]
+    [BsonIgnoreIfNull]
+    public ReplyToDocument? ReplyTo { get; set; }
+
+    [BsonElement("forwardedFrom")]
+    [BsonIgnoreIfNull]
+    public ForwardedFromDocument? ForwardedFrom { get; set; }
+
+    [BsonElement("readBy")]
+    public List<ReadReceiptDocument> ReadBy { get; set; } = new();
+
     public Message ToDomain() => Message.Hydrate(
         Id,
         ConversationId,
@@ -49,7 +89,18 @@ internal sealed class MessageDocument
         State,
         new DateTimeOffset(DateTime.SpecifyKind(CreatedAtUtc, DateTimeKind.Utc)),
         DeliveredAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(DeliveredAtUtc.Value, DateTimeKind.Utc)) : null,
-        ReadAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ReadAtUtc.Value, DateTimeKind.Utc)) : null);
+        ReadAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ReadAtUtc.Value, DateTimeKind.Utc)) : null,
+        EditedAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(EditedAtUtc.Value, DateTimeKind.Utc)) : null,
+        EditHistory.Select(e => e.ToDomain()),
+        DeletedAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(DeletedAtUtc.Value, DateTimeKind.Utc)) : null,
+        DeletedBy,
+        DeleteMode,
+        HiddenFor,
+        Reactions.Select(r => r.ToDomain()),
+        Mentions,
+        ReplyTo?.ToDomain(),
+        ForwardedFrom?.ToDomain(),
+        ReadBy.Select(r => r.ToDomain()));
 
     public static MessageDocument FromDomain(Message message) => new()
     {
@@ -63,5 +114,16 @@ internal sealed class MessageDocument
         CreatedAtUtc = message.CreatedAtUtc.UtcDateTime,
         DeliveredAtUtc = message.DeliveredAtUtc?.UtcDateTime,
         ReadAtUtc = message.ReadAtUtc?.UtcDateTime,
+        EditedAtUtc = message.EditedAtUtc?.UtcDateTime,
+        EditHistory = message.EditHistory.Select(EditHistoryEntryDocument.FromDomain).ToList(),
+        DeletedAtUtc = message.DeletedAtUtc?.UtcDateTime,
+        DeletedBy = message.DeletedBy,
+        DeleteMode = message.DeleteMode,
+        HiddenFor = message.HiddenFor.ToList(),
+        Reactions = message.Reactions.Select(ReactionDocument.FromDomain).ToList(),
+        Mentions = message.Mentions.ToList(),
+        ReplyTo = message.ReplyTo is { } r ? ReplyToDocument.FromDomain(r) : null,
+        ForwardedFrom = message.ForwardedFrom is { } f ? ForwardedFromDocument.FromDomain(f) : null,
+        ReadBy = message.ReadBy.Select(ReadReceiptDocument.FromDomain).ToList(),
     };
 }

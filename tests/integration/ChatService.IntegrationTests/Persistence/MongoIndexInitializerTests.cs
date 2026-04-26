@@ -37,6 +37,7 @@ public class MongoIndexInitializerTests : IClassFixture<MongoFixture>
             "ix_messages_conversation_createdAt_desc",
             "ix_messages_sender_createdAt_desc",
             "ux_messages_sender_clientMessageId",
+            "ix_messages_mentions",
         });
     }
 

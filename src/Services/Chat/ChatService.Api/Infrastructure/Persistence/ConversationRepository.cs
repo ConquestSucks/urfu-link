@@ -1,3 +1,4 @@
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
@@ -83,5 +84,57 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
             .ConfigureAwait(false);
 
         return docs.Select(d => d.ToDomain()).ToList();
+    }
+
+    public async Task<bool> AddPinnedMessageAsync(
+        string conversationId,
+        Guid messageId,
+        int maxPinned,
+        CancellationToken cancellationToken)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxPinned);
+
+        // Atomic precondition: conversation exists, messageId not yet pinned, and
+        // pinnedMessageIds size is below the cap. $ifNull guards against a missing field
+        // (rows persisted before the pinned-array existed).
+        var filter = new BsonDocument
+        {
+            { "_id", conversationId },
+            {
+                "pinnedMessageIds",
+                new BsonDocument("$ne", new BsonBinaryData(messageId, GuidRepresentation.Standard))
+            },
+            {
+                "$expr",
+                new BsonDocument("$lt", new BsonArray
+                {
+                    new BsonDocument("$size",
+                        new BsonDocument("$ifNull", new BsonArray { "$pinnedMessageIds", new BsonArray() })),
+                    maxPinned,
+                })
+            },
+        };
+
+        var update = Builders<ConversationDocument>.Update.AddToSet(c => c.PinnedMessageIds, messageId);
+        var result = await context.Conversations
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> RemovePinnedMessageAsync(
+        string conversationId,
+        Guid messageId,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.AnyEq(c => c.PinnedMessageIds, messageId));
+        var update = Builders<ConversationDocument>.Update.Pull(c => c.PinnedMessageIds, messageId);
+        var result = await context.Conversations
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
     }
 }
