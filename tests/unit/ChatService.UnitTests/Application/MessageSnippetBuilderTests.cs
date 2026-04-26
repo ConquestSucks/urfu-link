@@ -105,4 +105,38 @@ public class MessageSnippetBuilderTests
     {
         MessageSnippetBuilder.Build("some body content", query).Should().BeNull();
     }
+
+    [Fact]
+    public void Build_SurrogatePairAtStartBoundary_NotSplit()
+    {
+        // Emoji "🎉" is a surrogate pair (2 UTF-16 code units). Position it so the start
+        // boundary (matchIndex - 30) lands on the low surrogate — naive char-level slicing
+        // would orphan the high half, producing an invalid UTF-16 string.
+        const string emoji = "🎉"; // 🎉
+        var pre = new string('a', 28);
+        var post = new string('b', 29);
+        var body = pre + emoji + post + "match";
+
+        var snippet = MessageSnippetBuilder.Build(body, "match");
+
+        snippet.Should().NotBeNull();
+        snippet!.EnumerateRunes().Should()
+            .NotContain(r => r.Value == 0xFFFD,
+                "an unpaired surrogate half is decoded as the U+FFFD replacement character");
+    }
+
+    [Fact]
+    public void Build_SurrogatePairAtEndBoundary_NotSplit()
+    {
+        // Mirror of the start-boundary case: place the pair so the end boundary
+        // (matchIndex + term.Length + 30) lands on the high surrogate.
+        const string emoji = "🎉"; // 🎉
+        var body = "match" + new string('a', 29) + emoji + new string('b', 30);
+
+        var snippet = MessageSnippetBuilder.Build(body, "match");
+
+        snippet.Should().NotBeNull();
+        snippet!.EnumerateRunes().Should()
+            .NotContain(r => r.Value == 0xFFFD);
+    }
 }

@@ -33,6 +33,18 @@ internal static class MessageSnippetBuilder
         var start = Math.Max(0, matchIndex - ContextChars);
         var end = Math.Min(body.Length, matchIndex + firstTerm.Length + ContextChars);
 
+        // Don't split a surrogate pair at either boundary: a low surrogate at start means we'd
+        // orphan its high half (and vice-versa at end-1). Without these adjustments emoji like
+        // "🎉" near the slice edge end up as U+FFFD when re-decoded.
+        if (start > 0 && char.IsLowSurrogate(body[start]))
+        {
+            start++;
+        }
+        if (end < body.Length && end > 0 && char.IsHighSurrogate(body[end - 1]))
+        {
+            end--;
+        }
+
         var sb = new StringBuilder();
         if (start > 0)
         {
