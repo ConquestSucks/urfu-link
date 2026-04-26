@@ -181,4 +181,74 @@ public class MessageThreadTests
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*root*");
     }
+
+    [Fact]
+    public void Hydrate_WithoutThreadArgs_PreservesMainFlowDefaults()
+    {
+        var hydrated = Message.Hydrate(
+            id: Guid.NewGuid(),
+            conversationId: ConversationId,
+            senderId: Sender,
+            body: "hello",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "client-1",
+            state: MessageState.Sent,
+            createdAtUtc: Created,
+            deliveredAtUtc: null,
+            readAtUtc: null);
+
+        hydrated.ThreadRootId.Should().BeNull();
+        hydrated.IsThreadReply.Should().BeFalse();
+        hydrated.ThreadReplyCount.Should().Be(0);
+        hydrated.ThreadParticipants.Should().BeEmpty();
+        hydrated.ThreadLastReplyAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public void Hydrate_WithThreadRootId_RestoresAsReply()
+    {
+        var rootId = Guid.NewGuid();
+
+        var hydrated = Message.Hydrate(
+            id: Guid.NewGuid(),
+            conversationId: ConversationId,
+            senderId: Replier,
+            body: "reply",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "client-reply",
+            state: MessageState.Sent,
+            createdAtUtc: Created.AddSeconds(10),
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            threadRootId: rootId);
+
+        hydrated.ThreadRootId.Should().Be(rootId);
+        hydrated.IsThreadReply.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Hydrate_WithThreadDenorms_RestoresCountParticipantsLastReplyAt()
+    {
+        var participants = new[] { Replier, Guid.Parse("33333333-3333-3333-3333-333333333333") };
+        var lastReply = Created.AddSeconds(120);
+
+        var hydrated = Message.Hydrate(
+            id: Guid.NewGuid(),
+            conversationId: ConversationId,
+            senderId: Sender,
+            body: "root",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "client-root",
+            state: MessageState.Sent,
+            createdAtUtc: Created,
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            threadReplyCount: 2,
+            threadParticipants: participants,
+            threadLastReplyAtUtc: lastReply);
+
+        hydrated.ThreadReplyCount.Should().Be(2);
+        hydrated.ThreadParticipants.Should().BeEquivalentTo(participants);
+        hydrated.ThreadLastReplyAtUtc.Should().Be(lastReply);
+    }
 }

@@ -261,7 +261,11 @@ public sealed class Message
         IEnumerable<Guid>? mentions = null,
         ReplyTo? replyTo = null,
         ForwardedFrom? forwardedFrom = null,
-        IEnumerable<ReadReceipt>? readBy = null)
+        IEnumerable<ReadReceipt>? readBy = null,
+        Guid? threadRootId = null,
+        int threadReplyCount = 0,
+        IEnumerable<Guid>? threadParticipants = null,
+        DateTimeOffset? threadLastReplyAtUtc = null)
         => new(
             id,
             conversationId,
@@ -284,10 +288,10 @@ public sealed class Message
             replyTo,
             forwardedFrom,
             readBy,
-            threadRootId: null,
-            threadReplyCount: 0,
-            threadParticipants: null,
-            threadLastReplyAtUtc: null);
+            threadRootId,
+            threadReplyCount,
+            threadParticipants,
+            threadLastReplyAtUtc);
 
     public bool MarkDelivered(DateTimeOffset atUtc)
     {
