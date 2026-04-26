@@ -2,6 +2,7 @@ using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
+using Urfu.Link.Services.Chat.Infrastructure.Persistence.Documents;
 
 namespace ChatService.IntegrationTests.Persistence;
 
@@ -57,5 +58,35 @@ public class MongoIndexInitializerTests : IClassFixture<MongoFixture>
         var convCount = (await convIndexes.ToListAsync()).Count;
         // _id + 2 of ours = 3
         convCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task StartAsync_TextIndexAlreadyExistsWithDifferentLanguage_DoesNotThrow()
+    {
+        // Simulate a prior fallback run: a "none"-language text index already lives in the
+        // collection. The default code path tries Russian first; without an existence check
+        // Mongo would reject re-creation with IndexOptionsConflict (NOT an unsupported-language
+        // error), so the catch wouldn't match and startup would crash on every restart.
+        using var context = _mongo.CreateContext();
+        await context.Messages.Indexes.CreateOneAsync(
+            new CreateIndexModel<MessageDocument>(
+                Builders<MessageDocument>.IndexKeys.Text(m => m.Body),
+                new CreateIndexOptions
+                {
+                    Name = "ix_messages_body_text",
+                    Background = true,
+                    DefaultLanguage = "none",
+                }));
+
+        var initializer = new MongoIndexInitializer(context);
+        var act = () => initializer.StartAsync(CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+
+        var indexes = await context.Database
+            .GetCollection<dynamic>(ChatMongoContext.MessagesCollectionName)
+            .Indexes.ListAsync();
+        var names = (await indexes.ToListAsync()).Select(d => (string)d["name"]).ToList();
+        names.Should().Contain("ix_messages_body_text");
     }
 }

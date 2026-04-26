@@ -117,16 +117,24 @@ internal sealed class MongoIndexInitializer(
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     /// <summary>
-    /// Creates the full-text index on <c>messages.body</c>. Tries Russian Snowball stemming first
-    /// (works on stock MongoDB Community 8.0). On <see cref="MongoCommandException"/> indicating
-    /// the language is unavailable in the current build, falls back to <c>"none"</c> (literal
-    /// tokenization, no stemming) and logs a warning.
+    /// Creates the full-text index on <c>messages.body</c> if it does not already exist.
+    /// Tries Russian Snowball stemming first (works on stock MongoDB Community 8.0); on
+    /// <see cref="MongoCommandException"/> indicating the language is unavailable, falls back
+    /// to <c>"none"</c> (literal tokenization, no stemming) and logs a warning. The existence
+    /// check up front keeps subsequent restarts idempotent — if a previous run fell back to
+    /// <c>"none"</c>, we leave that index in place rather than failing on
+    /// <c>IndexOptionsConflict</c> when retrying with Russian.
     /// </summary>
     private async Task EnsureMessagesTextIndexAsync(
         IMongoCollection<MessageDocument> messages,
         CancellationToken cancellationToken)
     {
         const string IndexName = "ix_messages_body_text";
+
+        if (await IndexExistsAsync(messages, IndexName, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
 
         try
         {
@@ -158,6 +166,18 @@ internal sealed class MongoIndexInitializer(
                     }),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private static async Task<bool> IndexExistsAsync(
+        IMongoCollection<MessageDocument> messages,
+        string indexName,
+        CancellationToken cancellationToken)
+    {
+        using var cursor = await messages.Indexes
+            .ListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var documents = await cursor.ToListAsync(cancellationToken).ConfigureAwait(false);
+        return documents.Any(d => d.TryGetValue("name", out var value) && value.IsString && value.AsString == indexName);
     }
 
     private static bool IsUnsupportedLanguage(MongoCommandException ex)
