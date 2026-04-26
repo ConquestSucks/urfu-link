@@ -79,6 +79,20 @@ internal sealed class MessageDocument
     [BsonElement("readBy")]
     public List<ReadReceiptDocument> ReadBy { get; set; } = new();
 
+    [BsonElement("threadRootId")]
+    [BsonIgnoreIfNull]
+    public Guid? ThreadRootId { get; set; }
+
+    [BsonElement("threadReplyCount")]
+    public int ThreadReplyCount { get; set; }
+
+    [BsonElement("threadParticipants")]
+    public List<Guid> ThreadParticipants { get; set; } = new();
+
+    [BsonElement("threadLastReplyAtUtc")]
+    [BsonIgnoreIfNull]
+    public DateTime? ThreadLastReplyAtUtc { get; set; }
+
     public Message ToDomain() => Message.Hydrate(
         Id,
         ConversationId,
@@ -100,7 +114,11 @@ internal sealed class MessageDocument
         Mentions,
         ReplyTo?.ToDomain(),
         ForwardedFrom?.ToDomain(),
-        ReadBy.Select(r => r.ToDomain()));
+        ReadBy.Select(r => r.ToDomain()),
+        ThreadRootId,
+        ThreadReplyCount,
+        ThreadParticipants,
+        ThreadLastReplyAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ThreadLastReplyAtUtc.Value, DateTimeKind.Utc)) : null);
 
     public static MessageDocument FromDomain(Message message) => new()
     {
@@ -125,5 +143,9 @@ internal sealed class MessageDocument
         ReplyTo = message.ReplyTo is { } r ? ReplyToDocument.FromDomain(r) : null,
         ForwardedFrom = message.ForwardedFrom is { } f ? ForwardedFromDocument.FromDomain(f) : null,
         ReadBy = message.ReadBy.Select(ReadReceiptDocument.FromDomain).ToList(),
+        ThreadRootId = message.ThreadRootId,
+        ThreadReplyCount = message.ThreadReplyCount,
+        ThreadParticipants = message.ThreadParticipants.ToList(),
+        ThreadLastReplyAtUtc = message.ThreadLastReplyAtUtc?.UtcDateTime,
     };
 }
