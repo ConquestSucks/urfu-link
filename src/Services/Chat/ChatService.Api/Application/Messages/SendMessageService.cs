@@ -42,9 +42,21 @@ public sealed class SendMessageService(
         var conversation = await conversations.GetByIdAsync(request.ConversationId, cancellationToken).ConfigureAwait(false)
             ?? throw ConversationNotFoundException.For(request.ConversationId);
 
-        if (!conversation.IsParticipant(request.SenderId))
+        if (!conversation.IsParticipant(request.SenderId) && !request.CallerIsAdmin)
         {
             throw new ChatAccessDeniedException(request.ConversationId, request.SenderId);
+        }
+
+        if (conversation.IsArchived)
+        {
+            throw ChatConversationArchivedException.For(conversation.Id);
+        }
+
+        if (conversation.IsAnnouncementOnly
+            && !conversation.IsTeacher(request.SenderId)
+            && !request.CallerIsAdmin)
+        {
+            throw ChatAnnouncementOnlyException.For(conversation.Id, request.SenderId);
         }
 
         var idempotencyKey = $"chat:msg:{request.SenderId:N}:{request.ClientMessageId}";
@@ -84,7 +96,8 @@ public sealed class SendMessageService(
             clientMessageId: request.ClientMessageId,
             createdAtUtc: now,
             mentions: mentions,
-            replyTo: replyTo);
+            replyTo: replyTo,
+            authorRole: conversation.RoleOf(request.SenderId));
 
         try
         {

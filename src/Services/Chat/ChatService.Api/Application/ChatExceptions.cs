@@ -272,6 +272,59 @@ public sealed class ChatThreadCannotReplyToReplyException : InvalidOperationExce
     public Guid MessageId { get; private init; }
 }
 
+public sealed class ChatConversationArchivedException : InvalidOperationException
+{
+    public ChatConversationArchivedException()
+    {
+    }
+
+    public ChatConversationArchivedException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatConversationArchivedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public static ChatConversationArchivedException For(string conversationId)
+        => new($"Conversation '{conversationId}' is archived and is read-only.")
+        {
+            ConversationId = conversationId,
+        };
+
+    public string ConversationId { get; private init; } = string.Empty;
+}
+
+public sealed class ChatAnnouncementOnlyException : InvalidOperationException
+{
+    public ChatAnnouncementOnlyException()
+    {
+    }
+
+    public ChatAnnouncementOnlyException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatAnnouncementOnlyException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public static ChatAnnouncementOnlyException For(string conversationId, Guid userId)
+        => new($"Conversation '{conversationId}' is announcement-only; user '{userId:D}' is not allowed to post.")
+        {
+            ConversationId = conversationId,
+            UserId = userId,
+        };
+
+    public string ConversationId { get; private init; } = string.Empty;
+
+    public Guid UserId { get; private init; }
+}
+
 public sealed class ChatThreadReplyTargetNotInThreadException : InvalidOperationException
 {
     public ChatThreadReplyTargetNotInThreadException()

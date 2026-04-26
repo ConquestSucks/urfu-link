@@ -22,7 +22,11 @@ public sealed class Conversation
         IEnumerable<Guid>? pinnedMessageIds,
         IReadOnlyDictionary<Guid, ParticipantRole>? participantRoles,
         Guid? disciplineId,
-        DateTimeOffset? archivedAtUtc)
+        DateTimeOffset? archivedAtUtc,
+        string? title,
+        Guid? coverAssetId,
+        GroupSubtype? groupSubtype,
+        bool isAnnouncementOnly)
     {
         Id = id;
         Type = type;
@@ -36,6 +40,10 @@ public sealed class Conversation
             : new Dictionary<Guid, ParticipantRole>(participantRoles);
         DisciplineId = disciplineId;
         ArchivedAtUtc = archivedAtUtc;
+        Title = title;
+        CoverAssetId = coverAssetId;
+        GroupSubtype = groupSubtype;
+        IsAnnouncementOnly = isAnnouncementOnly;
     }
 
     public string Id { get; }
@@ -64,6 +72,32 @@ public sealed class Conversation
 
     public IReadOnlyDictionary<Guid, ParticipantRole> ParticipantRoles => _participantRoles;
 
+    /// <summary>
+    /// Display title for group conversations. Mirrors the source aggregate's title — for
+    /// discipline-bound groups it is kept in sync with the latest <c>discipline.updated.v1</c>
+    /// event. Null for direct conversations.
+    /// </summary>
+    public string? Title { get; private set; }
+
+    /// <summary>
+    /// Optional cover image for group conversations. Mirrors the source aggregate's cover —
+    /// for discipline-bound groups it tracks <c>discipline.updated.v1</c>. Null for direct.
+    /// </summary>
+    public Guid? CoverAssetId { get; private set; }
+
+    /// <summary>
+    /// Sub-classification of a <see cref="ConversationType.Group"/> conversation. Always
+    /// <see cref="Enums.GroupSubtype.Discipline"/> for discipline-sourced groups; null for direct.
+    /// </summary>
+    public GroupSubtype? GroupSubtype { get; }
+
+    /// <summary>
+    /// When true, only Teachers (or admins) may post in the conversation. Default false. Toggle
+    /// is intended to be controlled by Teachers/admins through a future endpoint; the domain
+    /// already enforces it at <see cref="IsParticipant"/> sites in <c>SendMessageService</c>.
+    /// </summary>
+    public bool IsAnnouncementOnly { get; private set; }
+
     public static Conversation OpenDirect(Guid userA, Guid userB, DateTimeOffset nowUtc)
     {
         if (userA == userB)
@@ -84,7 +118,11 @@ public sealed class Conversation
             pinnedMessageIds: null,
             participantRoles: null,
             disciplineId: null,
-            archivedAtUtc: null);
+            archivedAtUtc: null,
+            title: null,
+            coverAssetId: null,
+            groupSubtype: null,
+            isAnnouncementOnly: false);
     }
 
     /// <summary>
@@ -96,7 +134,9 @@ public sealed class Conversation
     public static Conversation OpenDiscipline(
         Guid disciplineId,
         Guid ownerTeacherId,
-        DateTimeOffset nowUtc)
+        DateTimeOffset nowUtc,
+        string? title = null,
+        Guid? coverAssetId = null)
     {
         if (disciplineId == Guid.Empty)
         {
@@ -121,7 +161,11 @@ public sealed class Conversation
                 [ownerTeacherId] = ParticipantRole.Teacher,
             },
             disciplineId: disciplineId,
-            archivedAtUtc: null);
+            archivedAtUtc: null,
+            title: title,
+            coverAssetId: coverAssetId,
+            groupSubtype: Enums.GroupSubtype.Discipline,
+            isAnnouncementOnly: false);
     }
 
     public static Conversation Hydrate(
@@ -134,7 +178,11 @@ public sealed class Conversation
         IEnumerable<Guid>? pinnedMessageIds = null,
         IReadOnlyDictionary<Guid, ParticipantRole>? participantRoles = null,
         Guid? disciplineId = null,
-        DateTimeOffset? archivedAtUtc = null)
+        DateTimeOffset? archivedAtUtc = null,
+        string? title = null,
+        Guid? coverAssetId = null,
+        GroupSubtype? groupSubtype = null,
+        bool isAnnouncementOnly = false)
         => new(
             id,
             type,
@@ -145,7 +193,11 @@ public sealed class Conversation
             pinnedMessageIds,
             participantRoles,
             disciplineId,
-            archivedAtUtc);
+            archivedAtUtc,
+            title,
+            coverAssetId,
+            groupSubtype,
+            isAnnouncementOnly);
 
     public bool IsParticipant(Guid userId) => _participants.Contains(userId);
 
@@ -245,6 +297,23 @@ public sealed class Conversation
 
         ArchivedAtUtc = nowUtc;
     }
+
+    /// <summary>
+    /// Refreshes the display metadata from the source aggregate (called from
+    /// <c>discipline.updated.v1</c> handlers). Always overwrites — partial updates are not
+    /// supported because the source publishes the full snapshot.
+    /// </summary>
+    public void UpdateMetadata(string? title, Guid? coverAssetId)
+    {
+        Title = title;
+        CoverAssetId = coverAssetId;
+    }
+
+    /// <summary>
+    /// Toggles the announcement-only flag. Authorisation of the caller is the responsibility
+    /// of the application layer.
+    /// </summary>
+    public void SetAnnouncementOnly(bool value) => IsAnnouncementOnly = value;
 
     // SHA1 is used here as a non-cryptographic deterministic hash to derive a stable
     // identifier for a sorted user pair. Collision resistance for the (Guid, Guid) input

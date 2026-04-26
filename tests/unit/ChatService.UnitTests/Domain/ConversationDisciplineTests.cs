@@ -151,4 +151,85 @@ public sealed class ConversationDisciplineTests
         conv.IsArchived.Should().BeTrue();
         conv.RoleOf(teacherId).Should().Be(ParticipantRole.Teacher);
     }
+
+    [Fact]
+    public void OpenDiscipline_StoresTitleAndCoverAssetId()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var coverId = Guid.NewGuid();
+
+        var conv = Conversation.OpenDiscipline(
+            disciplineId, teacherId, DateTimeOffset.UtcNow, "Algebra 101", coverId);
+
+        conv.Title.Should().Be("Algebra 101");
+        conv.CoverAssetId.Should().Be(coverId);
+    }
+
+    [Fact]
+    public void OpenDiscipline_HasGroupSubtypeDiscipline()
+    {
+        var conv = Conversation.OpenDiscipline(
+            Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        conv.GroupSubtype.Should().Be(GroupSubtype.Discipline);
+    }
+
+    [Fact]
+    public void OpenDirect_HasNullGroupSubtypeAndNoMetadata()
+    {
+        var conv = Conversation.OpenDirect(Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        conv.GroupSubtype.Should().BeNull();
+        conv.Title.Should().BeNull();
+        conv.CoverAssetId.Should().BeNull();
+        conv.IsAnnouncementOnly.Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsAnnouncementOnly_DefaultsFalse()
+    {
+        var conv = Conversation.OpenDiscipline(
+            Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        conv.IsAnnouncementOnly.Should().BeFalse();
+    }
+
+    [Fact]
+    public void SetAnnouncementOnly_TogglesFlag()
+    {
+        var conv = Conversation.OpenDiscipline(
+            Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        conv.SetAnnouncementOnly(true);
+        conv.IsAnnouncementOnly.Should().BeTrue();
+
+        conv.SetAnnouncementOnly(false);
+        conv.IsAnnouncementOnly.Should().BeFalse();
+    }
+
+    [Fact]
+    public void UpdateMetadata_OverwritesTitleAndCover()
+    {
+        var conv = Conversation.OpenDiscipline(
+            Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow, "Old", null);
+        var newCover = Guid.NewGuid();
+
+        conv.UpdateMetadata("New", newCover);
+
+        conv.Title.Should().Be("New");
+        conv.CoverAssetId.Should().Be(newCover);
+    }
+
+    [Fact]
+    public void UpdateMetadata_AcceptsNulls()
+    {
+        var conv = Conversation.OpenDiscipline(
+            Guid.NewGuid(), Guid.NewGuid(), DateTimeOffset.UtcNow, "Old", Guid.NewGuid());
+
+        conv.UpdateMetadata(null, null);
+
+        conv.Title.Should().BeNull();
+        conv.CoverAssetId.Should().BeNull();
+    }
 }

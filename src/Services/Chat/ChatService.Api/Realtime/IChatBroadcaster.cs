@@ -14,6 +14,37 @@ public interface IChatBroadcaster
         ConversationDto conversation,
         CancellationToken cancellationToken);
 
+    Task NotifyConversationCreatedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        ConversationDto conversation,
+        CancellationToken cancellationToken);
+
+    Task NotifyParticipantJoinedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken);
+
+    Task NotifyParticipantLeftAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid userId,
+        CancellationToken cancellationToken);
+
+    Task NotifyParticipantRoleChangedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        Guid userId,
+        ParticipantRole newRole,
+        CancellationToken cancellationToken);
+
+    Task NotifyConversationArchivedAsync(
+        IReadOnlyList<Guid> recipientUserIds,
+        string conversationId,
+        DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken);
+
     Task NotifyMessageReceivedAsync(
         IReadOnlyList<Guid> recipientUserIds,
         MessageDto message,

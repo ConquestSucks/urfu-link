@@ -60,6 +60,108 @@ public class SendMessageServiceTests
     }
 
     [Fact]
+    public async Task SendAsync_InArchivedConversation_ThrowsArchived()
+    {
+        var teacherId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, DateTimeOffset.UtcNow);
+        conv.Archive(DateTimeOffset.UtcNow);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+        _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
+
+        var request = new SendMessageRequest(conv.Id, teacherId, "x", Array.Empty<Guid>(), "c1");
+
+        await Build().Invoking(s => s.SendAsync(request, default))
+            .Should().ThrowAsync<ChatConversationArchivedException>();
+    }
+
+    [Fact]
+    public async Task SendAsync_InAnnouncementOnly_AsStudent_ThrowsAnnouncementOnly()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, DateTimeOffset.UtcNow);
+        conv.AddParticipant(studentId, ParticipantRole.Student);
+        conv.SetAnnouncementOnly(true);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+        _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
+
+        var request = new SendMessageRequest(conv.Id, studentId, "x", Array.Empty<Guid>(), "c1");
+
+        await Build().Invoking(s => s.SendAsync(request, default))
+            .Should().ThrowAsync<ChatAnnouncementOnlyException>();
+    }
+
+    [Fact]
+    public async Task SendAsync_InAnnouncementOnly_AsTeacher_Succeeds()
+    {
+        var teacherId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, DateTimeOffset.UtcNow);
+        conv.SetAnnouncementOnly(true);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+        _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
+
+        var dto = await Build().SendAsync(
+            new SendMessageRequest(conv.Id, teacherId, "x", Array.Empty<Guid>(), "c1"),
+            default);
+
+        dto.AuthorRole.Should().Be(ParticipantRole.Teacher);
+    }
+
+    [Fact]
+    public async Task SendAsync_InAnnouncementOnly_AsAdmin_Succeeds()
+    {
+        var teacherId = Guid.NewGuid();
+        var admin = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, DateTimeOffset.UtcNow);
+        conv.SetAnnouncementOnly(true);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+        _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
+
+        var dto = await Build().SendAsync(
+            new SendMessageRequest(conv.Id, admin, "x", Array.Empty<Guid>(), "c1", CallerIsAdmin: true),
+            default);
+
+        dto.SenderId.Should().Be(admin);
+    }
+
+    [Fact]
+    public async Task SendAsync_StoresAuthorRoleFromConversation_Student()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conv = Conversation.OpenDiscipline(disciplineId, teacherId, DateTimeOffset.UtcNow);
+        conv.AddParticipant(studentId, ParticipantRole.Student);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
+        _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
+
+        var dto = await Build().SendAsync(
+            new SendMessageRequest(conv.Id, studentId, "x", Array.Empty<Guid>(), "c1"),
+            default);
+
+        dto.AuthorRole.Should().Be(ParticipantRole.Student);
+    }
+
+    [Fact]
     public async Task SendAsync_ConversationMissing_ThrowsNotFound()
     {
         _conversations.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversation?)null);

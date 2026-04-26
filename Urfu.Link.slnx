@@ -20,6 +20,7 @@
   </Folder>
   <Folder Name="/src/Services/Discipline/">
     <Project Path="src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj" />
+    <Project Path="src/Services/Discipline/DisciplineService.Api.Contracts/DisciplineService.Api.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/Services/Media/">
     <Project Path="src/Services/Media/MediaService.Api/MediaService.Api.csproj" />

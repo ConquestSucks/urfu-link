@@ -204,9 +204,15 @@ public sealed class DisciplineEventConsumer(
                 }
 
             case "discipline.updated.v1":
-                // No-op for now: the conversation has no display metadata mirrored from the
-                // discipline. Hook into a name/cover update flow in a follow-up if needed.
-                break;
+                {
+                    var evt = payloadElement.Deserialize<DisciplineUpdatedEvent>(JsonOptions);
+                    if (evt is not null)
+                    {
+                        await service.HandleDisciplineUpdatedAsync(evt, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    break;
+                }
 
             default:
                 if (logger.IsEnabled(LogLevel.Debug))

@@ -1,5 +1,6 @@
 using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
+using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
@@ -95,7 +96,7 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
         await _repo.TryCreateAsync(c2, default);
         await _repo.TryCreateAsync(noise, default);
 
-        var results = await _repo.ListByParticipantAsync(user, cursor: null, limit: 50, default);
+        var results = await _repo.ListByParticipantAsync(user, cursor: null, limit: 50, ConversationListFilter.All, default);
 
         results.Should().HaveCount(2);
         results.Select(c => c.Id).Should().ContainInOrder(c2.Id, c1.Id);
@@ -114,9 +115,42 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
             user,
             cursor: new ConversationCursor(newer.LastMessageAtUtc, newer.Id),
             limit: 50,
+            ConversationListFilter.All,
             default);
 
         page.Should().ContainSingle().Which.Id.Should().Be(older.Id);
+    }
+
+    [Fact]
+    public async Task ListByParticipantAsync_FilterDiscipline_ReturnsOnlyDisciplineGroups()
+    {
+        var user = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var direct = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-2));
+        var group = Conversation.OpenDiscipline(disciplineId, user, DateTimeOffset.UtcNow.AddHours(-1));
+        await _repo.TryCreateAsync(direct, default);
+        await _repo.TryCreateAsync(group, default);
+
+        var results = await _repo.ListByParticipantAsync(
+            user, cursor: null, limit: 50, ConversationListFilter.Discipline, default);
+
+        results.Should().ContainSingle().Which.Id.Should().Be(group.Id);
+    }
+
+    [Fact]
+    public async Task ListByParticipantAsync_FilterDirect_ExcludesDisciplineGroups()
+    {
+        var user = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var direct = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-2));
+        var group = Conversation.OpenDiscipline(disciplineId, user, DateTimeOffset.UtcNow.AddHours(-1));
+        await _repo.TryCreateAsync(direct, default);
+        await _repo.TryCreateAsync(group, default);
+
+        var results = await _repo.ListByParticipantAsync(
+            user, cursor: null, limit: 50, ConversationListFilter.Direct, default);
+
+        results.Should().ContainSingle().Which.Id.Should().Be(direct.Id);
     }
 
     [Fact]

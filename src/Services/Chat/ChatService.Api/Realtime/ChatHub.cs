@@ -1,7 +1,11 @@
+using System.Globalization;
+using Grpc.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
+using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
+using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Application.Threads;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -43,19 +47,101 @@ public sealed class ChatHub(
     ReplyInThreadService replyInThread,
     JoinThreadService joinThread,
     LeaveThreadService leaveThread,
-    GetThreadMessagesQuery getThreadMessages) : Hub<IChatClient>
+    GetThreadMessagesQuery getThreadMessages,
+    IConversationRepository conversationRepository,
+    IDisciplineServiceClient disciplineServiceClient,
+    ILogger<ChatHub> logger) : Hub<IChatClient>
 {
+    /// <summary>
+    /// SignalR group name for a conversation. Connections are added to this group on
+    /// <see cref="OnConnectedAsync"/>; broadcasts addressed at <c>Clients.Group(name)</c>
+    /// reach every active connection a participant has open.
+    /// </summary>
+    internal static string GroupNameFor(string conversationId) => $"conv:{conversationId}";
+
+    /// <summary>
+    /// Called by SignalR right after the JWT-authenticated handshake. Joins the connection
+    /// to a group per conversation the user can see — discipline groups via the upstream
+    /// gRPC source-of-truth and direct chats via the local Mongo projection. The two paths
+    /// are merged so a connection ends up in a group even if a UserEnrolled event has not
+    /// been consumed yet (gRPC catches the gap).
+    /// </summary>
+    public override async Task OnConnectedAsync()
+    {
+        var principal = Context.User;
+        if (principal is null)
+        {
+            await base.OnConnectedAsync().ConfigureAwait(false);
+            return;
+        }
+
+        var userId = principal.GetUserId();
+        var ct = Context.ConnectionAborted;
+        var conversationIds = new HashSet<string>(StringComparer.Ordinal);
+
+        try
+        {
+            var disciplines = await disciplineServiceClient
+                .ListUserDisciplinesAsync(userId, ct)
+                .ConfigureAwait(false);
+            foreach (var d in disciplines)
+            {
+                conversationIds.Add($"discipline:{d.DisciplineId.ToString("N", CultureInfo.InvariantCulture)}");
+            }
+        }
+        catch (RpcException ex)
+        {
+            // DisciplineService gRPC outage shouldn't fail the SignalR handshake. The Mongo
+            // projection below still gives the user every conversation they were already in.
+            logger.LogWarning(
+                ex,
+                "DisciplineService gRPC ListUserDisciplines failed for {UserId}; falling back to local projection only.",
+                userId);
+        }
+
+        try
+        {
+            var localIds = await conversationRepository
+                .GetUserConversationIdsAsync(userId, ct)
+                .ConfigureAwait(false);
+            foreach (var id in localIds)
+            {
+                conversationIds.Add(id);
+            }
+        }
+        catch (Exception ex) when (ex is MongoException or TimeoutException)
+        {
+            // Mongo outage shouldn't fail the SignalR handshake — the gRPC pass above already
+            // covered the user's discipline groups, and broadcasts targeted via Clients.Users
+            // still reach the connection without group membership.
+            logger.LogWarning(
+                ex,
+                "Failed to load local conversation ids for {UserId}; some SignalR groups may not be joined.",
+                userId);
+        }
+
+        foreach (var convId in conversationIds)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupNameFor(convId), ct).ConfigureAwait(false);
+        }
+
+        await base.OnConnectedAsync().ConfigureAwait(false);
+    }
+
     public async Task<ConversationDto> OpenDirectConversation(Guid peerUserId)
     {
         var caller = Context.User!.GetUserId();
         var conversation = await openDirect.OpenAsync(caller, peerUserId, Context.ConnectionAborted).ConfigureAwait(false);
+        await Groups.AddToGroupAsync(Context.ConnectionId, GroupNameFor(conversation.Id), Context.ConnectionAborted)
+            .ConfigureAwait(false);
         return ConversationDto.FromDomain(conversation);
     }
 
     public Task<MessageDto> SendMessage(SendMessageHubInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var caller = Context.User!.GetUserId();
+        var principal = Context.User!;
+        var caller = principal.GetUserId();
         var assetIds = input.AttachmentAssetIds ?? Array.Empty<Guid>();
         return sendMessage.SendAsync(
             new SendMessageRequest(
@@ -64,7 +150,8 @@ public sealed class ChatHub(
                 input.Body ?? string.Empty,
                 assetIds,
                 input.ClientMessageId,
-                input.ReplyToMessageId),
+                input.ReplyToMessageId,
+                principal.IsAdmin()),
             Context.ConnectionAborted);
     }
 
@@ -95,10 +182,11 @@ public sealed class ChatHub(
 
     public Task<MessageDto?> DeleteMessage(Guid messageId, string mode)
     {
-        var caller = Context.User!.GetUserId();
+        var principal = Context.User!;
+        var caller = principal.GetUserId();
         var deleteMode = DeleteModes.Parse(mode);
         return deleteMessage.DeleteAsync(
-            new DeleteMessageRequest(messageId, caller, deleteMode),
+            new DeleteMessageRequest(messageId, caller, deleteMode, principal.IsAdmin()),
             Context.ConnectionAborted);
     }
 
