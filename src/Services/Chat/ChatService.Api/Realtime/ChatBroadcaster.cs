@@ -148,6 +148,22 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
             .ThreadRootUpdated(conversationId, rootMessageId, replyCount, participants, lastReplyAtUtc);
     }
 
+    public Task NotifyThreadParticipantJoinedAsync(
+        IReadOnlyList<Guid> subscriberUserIds,
+        Guid rootMessageId,
+        Guid joinedUserId,
+        ThreadSubscriptionReason reason,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(subscriberUserIds);
+        if (subscriberUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(subscriberUserIds))
+            .ThreadParticipantJoined(rootMessageId, joinedUserId, reason.ToString());
+    }
+
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)
         => userIds.Select(u => u.ToString("D", CultureInfo.InvariantCulture)).ToList();
 }

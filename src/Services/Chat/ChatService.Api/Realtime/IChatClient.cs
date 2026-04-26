@@ -38,4 +38,10 @@ public interface IChatClient
         int replyCount,
         IReadOnlyList<Guid> participants,
         DateTimeOffset lastReplyAtUtc);
+
+    /// <summary>
+    /// Delivered to current thread subscribers when a new user joins (manually or by reply).
+    /// Reason indicates why the user was added so clients can render different UI cues.
+    /// </summary>
+    Task ThreadParticipantJoined(Guid rootMessageId, Guid userId, string reason);
 }

@@ -80,4 +80,11 @@ public interface IChatBroadcaster
         IReadOnlyList<Guid> participants,
         DateTimeOffset lastReplyAtUtc,
         CancellationToken cancellationToken);
+
+    Task NotifyThreadParticipantJoinedAsync(
+        IReadOnlyList<Guid> subscriberUserIds,
+        Guid rootMessageId,
+        Guid joinedUserId,
+        ThreadSubscriptionReason reason,
+        CancellationToken cancellationToken);
 }
