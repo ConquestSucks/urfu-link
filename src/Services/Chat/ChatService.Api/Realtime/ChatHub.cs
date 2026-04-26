@@ -55,7 +55,8 @@ public sealed class ChatHub(
     public Task<MessageDto> SendMessage(SendMessageHubInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
-        var caller = Context.User!.GetUserId();
+        var principal = Context.User!;
+        var caller = principal.GetUserId();
         var assetIds = input.AttachmentAssetIds ?? Array.Empty<Guid>();
         return sendMessage.SendAsync(
             new SendMessageRequest(
@@ -64,7 +65,8 @@ public sealed class ChatHub(
                 input.Body ?? string.Empty,
                 assetIds,
                 input.ClientMessageId,
-                input.ReplyToMessageId),
+                input.ReplyToMessageId,
+                principal.IsAdmin()),
             Context.ConnectionAborted);
     }
 
