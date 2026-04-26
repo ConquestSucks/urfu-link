@@ -2,19 +2,41 @@
 
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" />
+    <PackageReference Include="dotAPNS" />
+    <PackageReference Include="FastEndpoints" />
+    <PackageReference Include="FirebaseAdmin" />
     <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Grpc.Tools">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="MailKit" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
+    <Protobuf Include="Protos\External\user_internal.proto" GrpcServices="Client" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Channels\EmailChannel\Templates\**\*.html;Channels\EmailChannel\Templates\**\*.txt">
+      <LogicalName>Urfu.Link.Services.Notification.Channels.EmailChannel.Templates.$([System.IO.Path]::GetFileName('$([System.IO.Path]::GetDirectoryName('%(FullPath)'))')).%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Contracts\Contracts.csproj" />
+    <ProjectReference Include="..\..\..\BuildingBlocks\Idempotency\Idempotency.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
@@ -23,6 +45,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <NoWarn>$(NoWarn);CA1008;CA1031;CA1724;CA1819;CA1873;CA2016;CA2227;NU1902</NoWarn>
   </PropertyGroup>
 
 </Project>

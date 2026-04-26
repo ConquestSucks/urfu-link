@@ -9,6 +9,7 @@ public static class KafkaTopicNames
     public const string NotificationEvents = "urfu.notification.events.v1";
     public const string CallEvents = "urfu.call.events.v1";
     public const string DisciplineEvents = "urfu.discipline.events.v1";
+    public const string SystemEvents = "urfu.system.events.v1";
 
     public const string DlqSuffix = ".dlq";
 }
