@@ -11,6 +11,11 @@ public interface IPushDeviceRepository
 
     Task<IReadOnlyList<PushDevice>> ListActiveByUserAsync(Guid userId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Loads active devices with change tracking enabled — call when you intend to mutate them.
+    /// </summary>
+    Task<IReadOnlyList<PushDevice>> ListActiveByUserForUpdateAsync(Guid userId, CancellationToken cancellationToken);
+
     Task AddAsync(PushDevice device, CancellationToken cancellationToken);
 
     Task RemoveAsync(PushDevice device, CancellationToken cancellationToken);

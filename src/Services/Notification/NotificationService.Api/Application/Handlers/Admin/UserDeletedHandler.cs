@@ -22,18 +22,18 @@ public sealed class UserDeletedHandler(
         var userId = integrationEvent.UserId;
         var now = timeProvider.GetUtcNow();
 
-        var devices = await pushDevices.ListActiveByUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        var devices = await pushDevices.ListActiveByUserForUpdateAsync(userId, cancellationToken).ConfigureAwait(false);
         foreach (var device in devices)
         {
             device.Deactivate(now, "user_deleted");
         }
 
+        await pushDevices.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
         var deletedNotifications = await db.Notifications
             .Where(n => n.RecipientUserId == userId && n.ReadAtUtc == null)
             .ExecuteDeleteAsync(cancellationToken)
             .ConfigureAwait(false);
-
-        await pushDevices.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         if (logger.IsEnabled(LogLevel.Information))
         {

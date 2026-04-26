@@ -29,6 +29,15 @@ public sealed class PushDeviceRepository(NotificationDbContext db) : IPushDevice
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<PushDevice>> ListActiveByUserForUpdateAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await db.PushDevices
+            .Where(d => d.UserId == userId && d.IsActive)
+            .OrderBy(d => d.CreatedAtUtc)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task AddAsync(PushDevice device, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(device);

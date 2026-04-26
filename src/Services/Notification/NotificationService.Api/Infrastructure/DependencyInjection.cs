@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Idempotency;
+using Urfu.Link.Services.Notification.Application.Direct;
 using Urfu.Link.Services.Notification.Application.Handlers.Admin;
 using Urfu.Link.Services.Notification.Application.Handlers.Call;
 using Urfu.Link.Services.Notification.Application.Handlers.Chat;
@@ -76,6 +77,7 @@ public static class ModuleRegistration
         services.AddScoped<CallIncomingHandler>();
         services.AddScoped<CallMissedHandler>();
         services.AddScoped<UserDeletedHandler>();
+        services.AddScoped<DirectNotificationHandler>();
 
         services.Configure<FcmOptions>(configuration.GetSection(FcmOptions.SectionName));
         services.Configure<ApnsOptions>(configuration.GetSection(ApnsOptions.SectionName));
