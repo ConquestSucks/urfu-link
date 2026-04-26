@@ -5,6 +5,10 @@ package discipline.internal.v1;
 
 service InternalApi {
   rpc Ping (PingRequest) returns (PingReply);
+  rpc CheckMembership (CheckMembershipRequest) returns (CheckMembershipReply);
+  rpc ListMembers (ListMembersRequest) returns (ListMembersReply);
+  rpc ListUserDisciplines (ListUserDisciplinesRequest) returns (ListUserDisciplinesReply);
+  rpc GetDiscipline (GetDisciplineRequest) returns (GetDisciplineReply);
 }
 
 message PingRequest {
@@ -15,4 +19,64 @@ message PingReply {
   string message = 1;
   string service = 2;
   string utc = 3;
+}
+
+enum MembershipRole {
+  MEMBERSHIP_ROLE_UNKNOWN = 0;
+  MEMBERSHIP_ROLE_TEACHER = 1;
+  MEMBERSHIP_ROLE_STUDENT = 2;
+}
+
+message CheckMembershipRequest {
+  string discipline_id = 1;
+  string user_id = 2;
+}
+
+message CheckMembershipReply {
+  bool is_member = 1;
+  MembershipRole role = 2;
+}
+
+message MemberInfo {
+  string user_id = 1;
+  MembershipRole role = 2;
+  string enrolled_at_utc = 3;
+}
+
+message ListMembersRequest {
+  string discipline_id = 1;
+}
+
+message ListMembersReply {
+  bool exists = 1;
+  repeated MemberInfo members = 2;
+}
+
+message UserDisciplineInfo {
+  string discipline_id = 1;
+  string code = 2;
+  string title = 3;
+  MembershipRole role = 4;
+}
+
+message ListUserDisciplinesRequest {
+  string user_id = 1;
+}
+
+message ListUserDisciplinesReply {
+  repeated UserDisciplineInfo disciplines = 1;
+}
+
+message GetDisciplineRequest {
+  string discipline_id = 1;
+}
+
+message GetDisciplineReply {
+  bool exists = 1;
+  string discipline_id = 2;
+  string code = 3;
+  string title = 4;
+  string owner_teacher_id = 5;
+  string cover_asset_id = 6;
+  bool is_archived = 7;
 }

@@ -47,7 +47,7 @@ app.UseFastEndpoints(c =>
 app.UseSwaggerGen();
 app.MapScalarApiReference(o =>
     o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
-app.MapGrpcService<InternalApiService>();
+app.MapGrpcService<InternalApiService>().RequireAuthorization();
 
 await app.RunAsync();
 
