@@ -331,8 +331,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__Authority: http://keycloak:8080/realms/urfu-link
-      Auth__Audience: urfu-link-api
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
       Infrastructure__Redis__Configuration: redis:6379
       Notification__Push__Provider: fake
