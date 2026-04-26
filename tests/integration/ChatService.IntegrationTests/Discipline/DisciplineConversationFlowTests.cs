@@ -206,6 +206,124 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DisciplineCreated_BroadcastsConversationCreatedToOwner()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC1", "Broadcast test", null, "2026", teacherId, null),
+            CancellationToken.None);
+
+        var broadcasts = _factory.ChatBroadcaster.ConversationCreated;
+        broadcasts.Should().ContainSingle()
+            .Which.Recipients.Should().ContainSingle().Which.Should().Be(teacherId);
+    }
+
+    [Fact]
+    public async Task UserEnrolled_BroadcastsParticipantJoined_AndConversationCreatedForNewUser()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC2", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+
+        _factory.ChatBroadcaster.ParticipantJoined.Should().ContainSingle()
+            .Which.Should().Match<FakeBroadcastParticipantJoinedRecord>(r =>
+                r.UserId == studentId
+                && r.Role == ParticipantRole.Student
+                && r.Recipients.Count == 1
+                && r.Recipients[0] == teacherId);
+        _factory.ChatBroadcaster.ConversationCreated.Should().ContainSingle()
+            .Which.Recipients.Should().ContainSingle().Which.Should().Be(studentId);
+    }
+
+    [Fact]
+    public async Task UserUnenrolled_BroadcastsParticipantLeftToAllPriorParticipants()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC3", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleUserUnenrolledAsync(
+            new UserUnenrolledEvent(disciplineId, studentId),
+            CancellationToken.None);
+
+        var record = _factory.ChatBroadcaster.ParticipantLeft.Should().ContainSingle().Which;
+        record.UserId.Should().Be(studentId);
+        record.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
+    }
+
+    [Fact]
+    public async Task EnrollmentRoleChanged_BroadcastsRoleChangedToAllParticipants()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC4", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleEnrollmentRoleChangedAsync(
+            new EnrollmentRoleChangedEvent(disciplineId, studentId, DisciplineRole.Student, DisciplineRole.Teacher),
+            CancellationToken.None);
+
+        var record = _factory.ChatBroadcaster.ParticipantRoleChanged.Should().ContainSingle().Which;
+        record.UserId.Should().Be(studentId);
+        record.NewRole.Should().Be(ParticipantRole.Teacher);
+        record.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
+    }
+
+    [Fact]
+    public async Task DisciplineDeleted_BroadcastsConversationArchivedToAllParticipants()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC5", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleDisciplineDeletedAsync(
+            new DisciplineDeletedEvent(disciplineId),
+            CancellationToken.None);
+
+        _factory.ChatBroadcaster.ConversationArchived.Should().ContainSingle()
+            .Which.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
+    }
+
+    [Fact]
     public async Task UserEnrolled_WithoutPrecedingDisciplineCreated_IsNoOp()
     {
         // Out-of-order delivery: enrollment arrives before the create. Since at-least-once
