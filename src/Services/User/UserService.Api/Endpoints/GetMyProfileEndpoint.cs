@@ -1,7 +1,9 @@
+using System.Globalization;
 using FastEndpoints;
 using UserService.Api.Application.Contracts.Responses;
 using UserService.Api.Domain;
 using UserService.Api.Domain.Interfaces;
+using UserService.Api.Domain.ValueObjects;
 using UserService.Api.Infrastructure.Auth;
 
 namespace UserService.Api.Endpoints;
@@ -33,6 +35,22 @@ public sealed class GetMyProfileEndpoint(IUserRepository userRepository)
 
     private UserProfileResponse MapToResponse(UserProfile user)
     {
+        var prefs = user.Notifications;
+
+        var categories = prefs.Categories.ToDictionary(
+            kv => kv.Key,
+            kv => new ChannelToggleResponse(kv.Value.Push, kv.Value.Email, kv.Value.InApp));
+
+        var quietHours = new QuietHoursResponse(
+            prefs.QuietHours.IanaTimezone,
+            prefs.QuietHours.Start?.ToString("HH:mm", CultureInfo.InvariantCulture),
+            prefs.QuietHours.End?.ToString("HH:mm", CultureInfo.InvariantCulture),
+            prefs.QuietHours.Enabled);
+
+        var legacyDirect = prefs.GetToggle(NotificationCategoryCode.ChatMessageDirect);
+        var legacyDiscipline = prefs.GetToggle(NotificationCategoryCode.ChatMessageDiscipline);
+        var legacyMentions = prefs.GetToggle(NotificationCategoryCode.ChatMessageMention);
+
         return new UserProfileResponse(
             UserId: user.Id,
             Identity: new IdentityResponse(
@@ -42,10 +60,16 @@ public sealed class GetMyProfileEndpoint(IUserRepository userRepository)
             Account: new AccountResponse(user.Account.AvatarUrl, user.Account.AboutMe),
             Privacy: new PrivacyResponse(user.Privacy.ShowOnlineStatus, user.Privacy.ShowLastVisitTime),
             Notifications: new NotificationsResponse(
-                user.Notifications.NewMessages,
-                user.Notifications.NotificationSound,
-                user.Notifications.DisciplineChatMessages,
-                user.Notifications.Mentions),
+                NewMessages: legacyDirect.Push || legacyDirect.InApp,
+                NotificationSound: prefs.Sound,
+                DisciplineChatMessages: legacyDiscipline.Push || legacyDiscipline.InApp,
+                Mentions: legacyMentions.Push || legacyMentions.InApp),
+            Preferences: new NotificationPreferencesResponse(
+                categories,
+                quietHours,
+                prefs.DndEnabled,
+                prefs.Locale,
+                prefs.Sound),
             SoundVideo: new SoundVideoResponse(
                 user.SoundVideo.PlaybackDeviceId,
                 user.SoundVideo.RecordingDeviceId,
