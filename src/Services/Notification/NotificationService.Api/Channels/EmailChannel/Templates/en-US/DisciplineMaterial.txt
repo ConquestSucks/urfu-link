@@ -1,0 +1,7 @@
+New course material: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

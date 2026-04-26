@@ -47,6 +47,7 @@ builder.Services.AddHostedService<DisciplineEventsConsumer>();
 builder.Services.AddHostedService<CallEventsConsumer>();
 builder.Services.AddHostedService<UserEventsConsumer>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.PushDispatcherWorker>();
+builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.EmailDispatcherWorker>();
 
 var app = builder.Build();
 

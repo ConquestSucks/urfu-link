@@ -9,6 +9,7 @@ using Urfu.Link.Services.Notification.Application.Handlers.Discipline;
 using Urfu.Link.Services.Notification.Application.Preferences;
 using Urfu.Link.Services.Notification.Application.Routing;
 using Urfu.Link.Services.Notification.Application.Services;
+using Urfu.Link.Services.Notification.Channels.EmailChannel;
 using Urfu.Link.Services.Notification.Channels.PushChannel;
 using Urfu.Link.Services.Notification.Channels.PushChannel.Apns;
 using Urfu.Link.Services.Notification.Channels.PushChannel.Fcm;
@@ -94,6 +95,23 @@ public static class ModuleRegistration
         }
 
         services.AddScoped<PushDispatcher>();
+
+        services.Configure<SmtpOptions>(configuration.GetSection(SmtpOptions.SectionName));
+        services.Configure<EmailDispatcherOptions>(configuration.GetSection(EmailDispatcherOptions.SectionName));
+
+        services.AddSingleton<ITemplateRenderer, EmailTemplateRenderer>();
+
+        var smtpProvider = configuration.GetValue("Notification:Smtp:Provider", "real") ?? "real";
+        if (string.Equals(smtpProvider, "fake", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IEmailSender, FakeEmailSender>();
+        }
+        else
+        {
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
+
+        services.AddScoped<EmailChannel>();
 
         return services;
     }

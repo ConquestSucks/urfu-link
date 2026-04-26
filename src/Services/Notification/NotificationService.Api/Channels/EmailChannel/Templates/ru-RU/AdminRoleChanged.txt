@@ -1,0 +1,7 @@
+Изменение роли: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

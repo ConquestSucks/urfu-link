@@ -19,12 +19,17 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
-    <PackageReference Include="RazorLight" />
     <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Channels\EmailChannel\Templates\**\*.html;Channels\EmailChannel\Templates\**\*.txt">
+      <LogicalName>Urfu.Link.Services.Notification.Channels.EmailChannel.Templates.$([System.IO.Path]::GetFileName('$([System.IO.Path]::GetDirectoryName('%(FullPath)'))')).%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
