@@ -29,7 +29,9 @@ public sealed class DisciplineConversationService(IConversationRepository conver
         var conversation = Conversation.OpenDiscipline(
             evt.DisciplineId,
             evt.OwnerTeacherId,
-            evt.OccurredAtUtc);
+            evt.OccurredAtUtc,
+            evt.Title,
+            evt.CoverAssetId);
         await conversations.TryCreateAsync(conversation, cancellationToken).ConfigureAwait(false);
     }
 
