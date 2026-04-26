@@ -1,12 +1,20 @@
-import React, { useState, useRef, useCallback } from "react";
-import { View, Pressable, TextInput, Keyboard, Animated, Dimensions } from "react-native";
-import { PaperPlaneRightIcon, PlusCircleIcon, SmileyIcon } from "@/shared/ui/phosphor";
+import React, { useEffect, useState, useRef, useCallback } from "react";
+import { View, Pressable, Text, TextInput, Keyboard, Animated, Dimensions } from "react-native";
+import {
+    PaperPlaneRightIcon,
+    PencilSimpleIcon,
+    PlusCircleIcon,
+    SmileyIcon,
+    XIcon,
+} from "@/shared/ui/phosphor";
 import { EmojiPicker } from "@/features/emoji-picker";
 import type { DocumentPickerAsset } from "expo-document-picker";
 
 import { useAttachments, FilesModal } from "@/features/attach-file";
 import { AttachmentsPreview } from "./AttachmentsPreview";
 import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
+import { useComposerStore } from "@/features/message-actions";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAX_INPUT_HEIGHT = SCREEN_HEIGHT * 0.35;
@@ -14,7 +22,7 @@ const MAX_FILES_LIMIT = 10;
 
 interface ChatInputProps {
     conversationId: string;
-    onSend: (text: string, files: DocumentPickerAsset[]) => void;
+    onSend: (text: string, files: DocumentPickerAsset[], replyToMessageId?: string) => void;
 }
 
 export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
@@ -25,6 +33,16 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
 
     const heightAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(320)).current;
+
+    const replyTo = useComposerStore((s) => s.replyTo);
+    const editing = useComposerStore((s) => s.editing);
+    const resetComposer = useComposerStore((s) => s.reset);
+    const setReply = useComposerStore((s) => s.setReply);
+    const editMessage = useChatStore((s) => s.editMessage);
+
+    useEffect(() => {
+        if (editing) setQuery(editing.body);
+    }, [editing?.id]);
 
     const animate = useCallback(
         (show: boolean) => {
@@ -59,19 +77,71 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
 
     const handlePickEmoji = useCallback((emoji: string) => setQuery((prev) => prev + emoji), []);
 
-    const handleSend = () => {
+    const handleSend = async () => {
         if (!canSend) return;
 
+        const trimmed = query.trim();
         notifyStopTyping();
-        onSend(query.trim(), attachments);
+
+        if (editing) {
+            try {
+                await editMessage(editing.id, trimmed);
+            } catch (e) {
+                console.error("Failed to edit", e);
+            }
+            setQuery("");
+            resetComposer();
+            setInputHeight(24);
+            return;
+        }
+
+        onSend(trimmed, attachments, replyTo?.id);
 
         setQuery("");
         clearAttachments();
+        if (replyTo) setReply(null);
         setInputHeight(24);
+    };
+
+    const composerHint = editing
+        ? { icon: "edit" as const, title: "Изменение", preview: editing.body }
+        : replyTo
+            ? { icon: "reply" as const, title: "Ответ", preview: replyTo.body }
+            : null;
+
+    const cancelComposerHint = () => {
+        if (editing) {
+            resetComposer();
+            setQuery("");
+        } else {
+            setReply(null);
+        }
     };
 
     return (
         <View className="border-t border-white/5 bg-app-card p-4">
+            {composerHint && (
+                <View className="flex-row items-start gap-2 mb-2 pl-2 border-l-2 border-brand-400">
+                    {composerHint.icon === "edit" ? (
+                        <PencilSimpleIcon size={14} className="text-brand-400 mt-0.5" />
+                    ) : null}
+                    <View className="flex-1 min-w-0">
+                        <Text className="text-brand-400 text-xs font-semibold">
+                            {composerHint.title}
+                        </Text>
+                        <Text
+                            className="text-text-subtle text-xs"
+                            numberOfLines={1}
+                        >
+                            {composerHint.preview}
+                        </Text>
+                    </View>
+                    <Pressable onPress={cancelComposerHint} hitSlop={8} className="p-1">
+                        <XIcon size={14} className="text-text-muted" />
+                    </Pressable>
+                </View>
+            )}
+
             <AttachmentsPreview
                 attachments={attachments}
                 onRemove={removeAttachment}
@@ -81,8 +151,8 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
             <View className="flex-row items-end gap-3">
                 <Pressable
                     onPress={handleAttachFiles}
-                    className={`active:opacity-60 mb-2 ${attachments.length >= MAX_FILES_LIMIT ? "opacity-30" : ""}`}
-                    disabled={attachments.length >= MAX_FILES_LIMIT}
+                    className={`active:opacity-60 mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing ? "opacity-30" : ""}`}
+                    disabled={attachments.length >= MAX_FILES_LIMIT || !!editing}
                 >
                     <PlusCircleIcon size={28} className="text-text-subtle" />
                 </Pressable>
@@ -90,12 +160,12 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                 <View className="flex-1 flex-row items-end bg-white/5 rounded-2xl px-4">
                     <TextInput
                         className="text-white flex-1 text-[15px]"
-                        placeholder="Сообщение"
+                        placeholder={editing ? "Изменение сообщения" : "Сообщение"}
                         placeholderTextColor="#8B8FA8"
                         value={query}
                         onChangeText={(text) => {
                             setQuery(text);
-                            notifyTyping(text);
+                            if (!editing) notifyTyping(text);
                             if (text === "") setInputHeight(24);
                         }}
                         onFocus={() => isEmojiVisible && animate(false)}
