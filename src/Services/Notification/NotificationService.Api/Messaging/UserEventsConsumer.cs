@@ -47,6 +47,15 @@ public sealed class UserEventsConsumer(
                     break;
                 }
 
+            case "user.deleted.v1":
+                {
+                    var evt = payload.Deserialize<UserDeletedEvent>(JsonOptions)
+                        ?? throw new JsonException("UserDeletedEvent payload null");
+                    var handler = scope.GetRequiredService<UserDeletedHandler>();
+                    await handler.HandleAsync(evt, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
             default:
                 break;
         }

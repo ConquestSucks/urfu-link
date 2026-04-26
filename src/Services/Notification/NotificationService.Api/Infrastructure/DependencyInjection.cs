@@ -75,6 +75,7 @@ public static class ModuleRegistration
         services.AddScoped<DisciplineDeadlineHandler>();
         services.AddScoped<CallIncomingHandler>();
         services.AddScoped<CallMissedHandler>();
+        services.AddScoped<UserDeletedHandler>();
 
         services.Configure<FcmOptions>(configuration.GetSection(FcmOptions.SectionName));
         services.Configure<ApnsOptions>(configuration.GetSection(ApnsOptions.SectionName));
