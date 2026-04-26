@@ -14,9 +14,6 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Both" />
-    <Protobuf Include="..\..\Discipline\DisciplineService.Api\Protos\internal.proto"
-              GrpcServices="Client"
-              Link="Protos\DisciplineInternal.proto" />
   </ItemGroup>
 
   <ItemGroup>
@@ -24,6 +21,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Idempotency\Idempotency.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Discipline\DisciplineService.Api.Contracts\DisciplineService.Api.Contracts.csproj" />
     <ProjectReference Include="..\..\Media\MediaService.Api.Contracts\MediaService.Api.Contracts.csproj" />
   </ItemGroup>
 
