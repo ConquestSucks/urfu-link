@@ -137,6 +137,57 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DisciplineCreated_StoresTitleAndCoverFromEvent()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var coverId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "CS210", "Compilers", null, "2026", teacherId, coverId),
+            CancellationToken.None);
+
+        var conv = await ResolveRepo().GetByDisciplineIdAsync(disciplineId, CancellationToken.None);
+        conv!.Title.Should().Be("Compilers");
+        conv.CoverAssetId.Should().Be(coverId);
+        conv.GroupSubtype.Should().Be(GroupSubtype.Discipline);
+    }
+
+    [Fact]
+    public async Task DisciplineUpdated_RefreshesTitleAndCover()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var initialCover = Guid.NewGuid();
+        var newCover = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "CS220", "Algorithms I", null, "2026", teacherId, initialCover),
+            CancellationToken.None);
+        await service.HandleDisciplineUpdatedAsync(
+            new DisciplineUpdatedEvent(disciplineId, "CS220", "Algorithms (renamed)", "desc", "2026", teacherId, newCover),
+            CancellationToken.None);
+
+        var conv = await ResolveRepo().GetByDisciplineIdAsync(disciplineId, CancellationToken.None);
+        conv!.Title.Should().Be("Algorithms (renamed)");
+        conv.CoverAssetId.Should().Be(newCover);
+    }
+
+    [Fact]
+    public async Task DisciplineUpdated_OnUnknownDiscipline_IsNoOp()
+    {
+        var service = ResolveService();
+
+        var act = () => service.HandleDisciplineUpdatedAsync(
+            new DisciplineUpdatedEvent(Guid.NewGuid(), "X", "Title", null, "2026", Guid.NewGuid(), null),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public async Task DisciplineDeleted_ArchivesConversation()
     {
         var disciplineId = Guid.NewGuid();

@@ -100,4 +100,15 @@ public interface IConversationRepository
         string conversationId,
         DateTimeOffset archivedAtUtc,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Refreshes display metadata (title and cover) projected from the source aggregate. Used
+    /// by the discipline.updated.v1 handler. Returns <see langword="true"/> when at least one
+    /// document was modified.
+    /// </summary>
+    Task<bool> UpdateMetadataAsync(
+        string conversationId,
+        string? title,
+        Guid? coverAssetId,
+        CancellationToken cancellationToken);
 }

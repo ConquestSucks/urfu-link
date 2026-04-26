@@ -35,6 +35,25 @@ public sealed class DisciplineConversationService(IConversationRepository conver
         await conversations.TryCreateAsync(conversation, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task HandleDisciplineUpdatedAsync(
+        DisciplineUpdatedEvent evt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        var conversation = await conversations
+            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+            .ConfigureAwait(false);
+        if (conversation is null)
+        {
+            return;
+        }
+
+        await conversations
+            .UpdateMetadataAsync(conversation.Id, evt.Title, evt.CoverAssetId, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task HandleUserEnrolledAsync(
         UserEnrolledEvent evt,
         CancellationToken cancellationToken)

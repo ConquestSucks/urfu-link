@@ -299,4 +299,19 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
             .ConfigureAwait(false);
         return result.ModifiedCount > 0;
     }
+
+    public async Task<bool> UpdateMetadataAsync(
+        string conversationId,
+        string? title,
+        Guid? coverAssetId,
+        CancellationToken cancellationToken)
+    {
+        var update = Builders<ConversationDocument>.Update
+            .Set(c => c.Title, title)
+            .Set(c => c.CoverAssetId, coverAssetId);
+        var result = await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
 }
