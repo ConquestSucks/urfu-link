@@ -18,10 +18,12 @@ using Urfu.Link.Services.Notification.Domain;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
 using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence;
+using Urfu.Link.Services.Notification.Infrastructure.Grpc;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence.Repositories;
 using Urfu.Link.Services.Notification.Infrastructure.Redis;
 using Urfu.Link.Services.Notification.Realtime;
 using Urfu.Link.Services.Notification.Workers;
+using Urfu.Link.Services.User.Grpc;
 
 namespace Urfu.Link.Services.Notification.Infrastructure;
 
@@ -55,8 +57,13 @@ public static class ModuleRegistration
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
 
-        // Replaced by gRPC-backed UserServiceClient in Wave 13.
-        services.AddSingleton<IUserPreferencesClient, StubUserPreferencesClient>();
+        services.Configure<UserServiceClientOptions>(configuration.GetSection(UserServiceClientOptions.SectionName));
+        services.AddGrpcClient<InternalApi.InternalApiClient>((sp, opts) =>
+        {
+            var userOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<UserServiceClientOptions>>().Value;
+            opts.Address = new Uri(userOpts.GrpcEndpoint);
+        });
+        services.AddSingleton<IUserPreferencesClient, UserServiceClient>();
 
         services.AddScoped<NotificationFactory>();
         services.AddScoped<NotificationRouter>();

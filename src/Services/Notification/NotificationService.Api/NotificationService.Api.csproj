@@ -6,6 +6,7 @@
     <PackageReference Include="FastEndpoints" />
     <PackageReference Include="FirebaseAdmin" />
     <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Grpc.Tools">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -24,6 +25,7 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
+    <Protobuf Include="Protos\External\user_internal.proto" GrpcServices="Client" />
   </ItemGroup>
 
   <ItemGroup>
