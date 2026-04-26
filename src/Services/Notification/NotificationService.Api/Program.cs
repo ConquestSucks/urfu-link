@@ -11,8 +11,8 @@ builder.Services.AddGrpc();
 builder.Services.AddServiceDefaults(builder.Configuration, "notification-service");
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
-builder.Services.AddHostedService<KafkaConsumerWorker>();
 builder.Services.AddNotificationModule(builder.Configuration);
+builder.Services.AddHostedService<ChatEventsConsumer>();
 
 var app = builder.Build();
 
