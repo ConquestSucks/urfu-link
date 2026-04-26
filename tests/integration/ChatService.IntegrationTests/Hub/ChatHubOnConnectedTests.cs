@@ -34,6 +34,36 @@ public sealed class ChatHubOnConnectedTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task OnConnected_JoinsDisciplineGroup_BroadcastReachesConnection()
+    {
+        var userId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        var conversationId = $"discipline:{disciplineId:N}";
+        _factory.DisciplineServiceClient.Seed(userId,
+            new UserDisciplineSnapshot(disciplineId, "C1", "Course 1", ParticipantRole.Teacher));
+
+        await using var conn = await TestChatHubClient.ConnectAsync(_factory, userId);
+
+        // Force a hub round-trip after connect so the LongPolling poll cycle is established
+        // before we send the broadcast — without this the broadcast can race the first poll
+        // and time out under TestServer's in-process transport.
+        await conn.InvokeAsync<ConversationDto>("OpenDirectConversation", Guid.NewGuid());
+
+        var archivedReceived = new TaskCompletionSource<(string ConvId, DateTimeOffset At)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        conn.On<string, DateTimeOffset>("ConversationArchived",
+            (cid, at) => archivedReceived.TrySetResult((cid, at)));
+
+        var hubContext = _factory.Services.GetRequiredService<IHubContext<ChatHub, IChatClient>>();
+        await hubContext.Clients
+            .Group(ChatHub.GroupNameFor(conversationId))
+            .ConversationArchived(conversationId, DateTimeOffset.UtcNow);
+
+        var got = await archivedReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        got.ConvId.Should().Be(conversationId);
+    }
+
+    [Fact]
     public async Task OpenDirectConversation_AddsCallerToGroup()
     {
         var alice = Guid.NewGuid();
