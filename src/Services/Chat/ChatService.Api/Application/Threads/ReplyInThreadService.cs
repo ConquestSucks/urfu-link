@@ -104,7 +104,8 @@ public sealed class ReplyInThreadService(
             createdAtUtc: now,
             threadRootId: root.Id,
             mentions: mentions,
-            replyTo: replyTo);
+            replyTo: replyTo,
+            authorRole: conversation.RoleOf(request.SenderId));
 
         try
         {

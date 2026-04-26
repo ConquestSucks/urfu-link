@@ -84,7 +84,8 @@ public sealed class SendMessageService(
             clientMessageId: request.ClientMessageId,
             createdAtUtc: now,
             mentions: mentions,
-            replyTo: replyTo);
+            replyTo: replyTo,
+            authorRole: conversation.RoleOf(request.SenderId));
 
         try
         {
