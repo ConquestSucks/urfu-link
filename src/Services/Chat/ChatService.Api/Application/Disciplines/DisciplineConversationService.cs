@@ -118,8 +118,10 @@ public sealed class DisciplineConversationService(
             return;
         }
 
-        // Notify everyone who was already in the conversation that a new participant joined.
-        var existingParticipants = conversation.Participants.Where(p => p != evt.UserId).ToList();
+        // Notify everyone who was already in the conversation that a new participant joined —
+        // computed against the pre-add roster so we don't notify the newly added user via this
+        // path (they get a ConversationCreated below instead).
+        var existingParticipants = conversation.Participants.ToList();
         if (existingParticipants.Count > 0)
         {
             await broadcaster
@@ -127,12 +129,10 @@ public sealed class DisciplineConversationService(
                 .ConfigureAwait(false);
         }
 
-        // The newly enrolled user gets a ConversationCreated so the chat appears in their list
-        // without a manual refresh. Re-load the document so the DTO reflects the post-add roles.
-        var refreshed = await conversations
-            .GetByIdAsync(conversation.Id, cancellationToken)
-            .ConfigureAwait(false);
-        var dto = ConversationDto.FromDomain(refreshed ?? conversation);
+        // Mirror the persistence write into the in-memory aggregate so the DTO carries the
+        // post-add roster without re-reading the document.
+        conversation.AddParticipant(evt.UserId, role);
+        var dto = ConversationDto.FromDomain(conversation);
         await broadcaster
             .NotifyConversationCreatedAsync([evt.UserId], dto, cancellationToken)
             .ConfigureAwait(false);
