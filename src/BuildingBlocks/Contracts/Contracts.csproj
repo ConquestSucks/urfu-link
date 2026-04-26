@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Description>Shared service, event, and API contracts.</Description>
+    <NoWarn>$(NoWarn);CA1008</NoWarn>
   </PropertyGroup>
 
 </Project>
