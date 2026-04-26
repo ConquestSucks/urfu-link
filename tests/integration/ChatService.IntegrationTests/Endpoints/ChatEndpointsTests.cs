@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
+using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
@@ -92,6 +93,67 @@ public class ChatEndpointsTests : IAsyncLifetime
 
         using var client = _factory.CreateClient();
         var response = await client.GetAsync("/api/v1/chat/conversations?cursor=not-base64!!");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Get_Conversations_TypeDiscipline_ReturnsOnlyDisciplineGroups()
+    {
+        var caller = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+            await open.OpenAsync(caller, Guid.NewGuid(), default);
+
+            var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+            await disc.HandleDisciplineCreatedAsync(
+                new Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineCreatedEvent(
+                    disciplineId, "EP1", "Endpoint test", null, "2026", caller, null),
+                default);
+        }
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
+        using var client = _factory.CreateClient();
+        var page = await client.GetFromJsonAsync<CursorPage<ConversationDto>>(
+            "/api/v1/chat/conversations?type=discipline&limit=50");
+
+        page!.Items.Should().ContainSingle()
+            .Which.DisciplineId.Should().Be(disciplineId);
+    }
+
+    [Fact]
+    public async Task Get_Conversations_TypeDirect_ExcludesDisciplineGroups()
+    {
+        var caller = Guid.NewGuid();
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+            await open.OpenAsync(caller, Guid.NewGuid(), default);
+
+            var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+            await disc.HandleDisciplineCreatedAsync(
+                new Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineCreatedEvent(
+                    Guid.NewGuid(), "EP2", "X", null, "2026", caller, null),
+                default);
+        }
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
+        using var client = _factory.CreateClient();
+        var page = await client.GetFromJsonAsync<CursorPage<ConversationDto>>(
+            "/api/v1/chat/conversations?type=direct&limit=50");
+
+        page!.Items.Should().ContainSingle()
+            .Which.DisciplineId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Get_Conversations_InvalidType_Returns400()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync("/api/v1/chat/conversations?type=bogus");
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }

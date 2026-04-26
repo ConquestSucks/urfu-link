@@ -1,3 +1,4 @@
+using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
@@ -26,6 +27,7 @@ public interface IConversationRepository
         Guid userId,
         ConversationCursor? cursor,
         int limit,
+        ConversationListFilter filter,
         CancellationToken cancellationToken);
 
     /// <summary>

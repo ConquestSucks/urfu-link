@@ -13,6 +13,7 @@ public sealed class GetUserConversationsQuery(IConversationRepository repository
         Guid userId,
         string? cursor,
         int? limit,
+        ConversationListFilter filter,
         CancellationToken cancellationToken)
     {
         var effectiveLimit = Math.Clamp(limit ?? DefaultLimit, 1, MaxLimit);
@@ -20,7 +21,7 @@ public sealed class GetUserConversationsQuery(IConversationRepository repository
 
         // Ask for one extra row so we can tell whether a next page exists.
         var fetched = await repository.ListByParticipantAsync(
-            userId, decodedCursor, effectiveLimit + 1, cancellationToken).ConfigureAwait(false);
+            userId, decodedCursor, effectiveLimit + 1, filter, cancellationToken).ConfigureAwait(false);
 
         var items = fetched.Take(effectiveLimit).Select(ConversationDto.FromDomain).ToList();
         string? nextCursor = null;
