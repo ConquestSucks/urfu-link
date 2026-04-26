@@ -17,6 +17,9 @@ import {
 } from "@/features/message-actions";
 import type { MessageDto, SearchResultDto } from "@urfu-link/api-client";
 import { PinnedBar } from "./PinnedBar";
+import { ThreadPanel } from "./thread/ThreadPanel";
+import { useWindowSize } from "@/shared/lib/useWindowSize";
+import { ModalOverlay } from "@/shared/ui";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
@@ -29,6 +32,8 @@ export const ChatView = () => {
     const [actionsTarget, setActionsTarget] = useState<MessageDto | null>(null);
     const [reactionTargetId, setReactionTargetId] = useState<string | null>(null);
     const [forwardIds, setForwardIds] = useState<string[] | null>(null);
+    const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
+    const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
 
     const chatId = params.id as string;
@@ -87,7 +92,7 @@ export const ChatView = () => {
         actionsTarget && pinnedIds.includes(actionsTarget.id)
     );
 
-    return (
+    const mainColumn = (
         <View className="bg-app-card flex-1">
             {type === "chat" ? (
                 isSearching ? (
@@ -112,8 +117,39 @@ export const ChatView = () => {
                 chatId={chatId}
                 type={type}
                 onMessageLongPress={setActionsTarget}
+                onThreadOpen={setOpenThreadRootId}
             />
             <ChatInput conversationId={chatId} onSend={handleSend} />
+        </View>
+    );
+
+    return (
+        <View className="flex-1 flex-row">
+            {mainColumn}
+
+            {!isMobile && openThreadRootId && (
+                <View className="w-[420px] max-w-[40%]">
+                    <ThreadPanel
+                        rootMessageId={openThreadRootId}
+                        onClose={() => setOpenThreadRootId(null)}
+                    />
+                </View>
+            )}
+
+            {isMobile && (
+                <ModalOverlay
+                    visible={!!openThreadRootId}
+                    onClose={() => setOpenThreadRootId(null)}
+                    contentClassName="bg-app-card w-full h-full"
+                >
+                    {openThreadRootId && (
+                        <ThreadPanel
+                            rootMessageId={openThreadRootId}
+                            onClose={() => setOpenThreadRootId(null)}
+                        />
+                    )}
+                </ModalOverlay>
+            )}
 
             <MessageActionsMenu
                 message={actionsTarget}
