@@ -4,6 +4,25 @@ using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Chat.Domain.Interfaces;
 
+/// <summary>
+/// Filter inputs for full-text message search. The conversation scope (which chats are
+/// visible to the caller) is provided separately to the repository so access control stays a
+/// single concern in the application layer.
+/// </summary>
+public sealed record MessageSearchCriteria(
+    string Query,
+    Guid? SenderId,
+    DateTimeOffset? DateFrom,
+    DateTimeOffset? DateTo,
+    bool? HasAttachments,
+    AttachmentType? AttachmentType);
+
+/// <summary>
+/// A single search result: the message plus its MongoDB <c>$meta:"textScore"</c> relevance
+/// score.
+/// </summary>
+public sealed record MessageSearchHit(Message Message, double Score);
+
 public interface IMessageRepository
 {
     Task<Message?> GetByIdAsync(Guid messageId, CancellationToken cancellationToken);
@@ -139,6 +158,18 @@ public interface IMessageRepository
         MessageCursor? cursor,
         int limit,
         CursorDirection direction,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Full-text search over message bodies, restricted to <paramref name="allowedConversationIds"/>
+    /// and the main flow (thread replies are excluded). Results are ordered by descending
+    /// MongoDB textScore, then descending createdAt and id as deterministic tie-breakers.
+    /// </summary>
+    Task<IReadOnlyList<MessageSearchHit>> SearchAsync(
+        MessageSearchCriteria criteria,
+        IReadOnlyList<string> allowedConversationIds,
+        MessageSearchCursor? cursor,
+        int limit,
         CancellationToken cancellationToken);
 }
 

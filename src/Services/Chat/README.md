@@ -81,8 +81,9 @@ participants to pin and rejects all group-chat pin attempts.
   - Collection `messages` — composite indexes `(conversationId, createdAtUtc desc)` and
     `(senderId, createdAtUtc desc)`, a unique sparse index on
     `(senderId, clientMessageId)` for `SendMessage` idempotency, a sparse index on
-    `mentions` for future mention search, and a sparse `(threadRootId, createdAtUtc asc)`
-    index that backs `ListThreadAsync`.
+    `mentions` for future mention search, a sparse `(threadRootId, createdAtUtc asc)`
+    index that backs `ListThreadAsync`, and a `text` index on `body` (Russian Snowball
+    stemmer with a `none` fallback) that powers `/chat/search`.
   - Collection `thread_subscriptions` — unique `(rootMessageId, userId)` (atomicity backstop
     for the upsert pipeline) and `(userId, lastActivityAtUtc desc, rootMessageId desc)` for
     the active-threads keyset pagination.
@@ -145,6 +146,7 @@ responsibility for now.
 | `POST` | `/messages/{id}/thread/subscribe` | Manually subscribe (`Manual` reason). |
 | `DELETE` | `/messages/{id}/thread/subscribe` | Unsubscribe. Reply history is untouched. |
 | `GET` | `/threads/active` | Caller's active threads, ordered by last activity desc. |
+| `GET` | `/search` | Full-text search across the caller's chat history. |
 
 ## Integration events (Kafka topic `urfu.chat.events.v1`)
 
@@ -196,3 +198,31 @@ responsibility for now.
 - **Authorization:** join, reply, and read all require participation in the parent
   conversation. Tombstoned roots reject new replies. A reply cannot point at itself or at
   another reply.
+
+## Message search — design notes (#213)
+
+- **Endpoint:** `GET /api/v1/chat/search?q=…&conversationId=&senderId=&from=&to=&hasAttachments=&attachmentType=&cursor=&limit=`.
+  The query (`q`) is required and must be at least two characters; `limit` is clamped to
+  `[1, 100]` and defaults to 20. Per-user rate limit is 30 requests per minute (Redis-backed
+  fixed window, registered in `BuildingBlocks/Idempotency`); excess requests get `429` with a
+  `Retry-After` header.
+- **Index:** `messages` carries a `text` index on `body` with `default_language: "russian"`.
+  MongoDB Community 8 ships with the Snowball Russian stemmer, so `"оплата"` matches
+  `"оплаты"` / `"оплате"`. `MongoIndexInitializer` falls back to `default_language: "none"`
+  if the stemmer is unavailable in the running build (logged as a warning).
+- **Pipeline:** `SearchAsync` runs an aggregate pipeline — `$text` plus all simple filters in
+  the first `$match`, `$addFields _score = $meta:"textScore"`, an optional cursor predicate
+  on `(_score, createdAtUtc, _id)`, then `$sort` desc on the same triple and `$limit`. The
+  cursor is opaque base64url JSON carrying `(score, ts, id)`.
+- **Access control:** the application layer fetches the caller's `conversationIds`
+  (`IConversationRepository.GetUserConversationIdsAsync`) and passes them as the `$in`
+  scope. A `conversationId` query param is intersected with that scope; outside-scope
+  requests return an empty page rather than `403` so the endpoint does not leak which
+  conversations exist.
+- **Threads:** thread replies (`threadRootId` set) are excluded from search — same convention
+  as `ListByConversationAsync`. Pulling threads into search is a future iteration.
+- **Highlighting:** best-effort. `MessageSnippetBuilder` returns ±30 chars around the first
+  case-insensitive literal occurrence of the first query term; if the stemmer matched a
+  different morphological form, no snippet is returned.
+- **Performance:** acceptance is p95 < 500ms on 100k messages — observed p50≈75ms / p95≈85ms
+  in `SearchPerformanceTests` (excluded from the default run via `Category=Performance`).

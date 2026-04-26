@@ -9,6 +9,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Conversations;
@@ -16,6 +17,7 @@ using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Application.Threads;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
+using Urfu.Link.Services.Chat.Endpoints.Messages;
 using Urfu.Link.Services.Chat.Infrastructure.Authorization;
 using Urfu.Link.Services.Chat.Infrastructure.Grpc;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
@@ -112,6 +114,14 @@ public static class ModuleRegistration
         services.AddScoped<LeaveThreadService>();
         services.AddScoped<GetThreadMessagesQuery>();
         services.AddScoped<GetUserActiveThreadsQuery>();
+        services.AddScoped<SearchMessagesQuery>();
+
+        // Per-user fixed window for /chat/search (issue #213 — 30 req/min per user).
+        // ChatSearchRateLimitFilter resolves this limiter via [FromKeyedServices(name)].
+        services.AddRedisRateLimiter(
+            ChatSearchRateLimiterPolicy.Name,
+            window: TimeSpan.FromMinutes(1),
+            maxRequests: 30);
 
         services.AddSingleton<IChatBroadcaster, ChatBroadcaster>();
 

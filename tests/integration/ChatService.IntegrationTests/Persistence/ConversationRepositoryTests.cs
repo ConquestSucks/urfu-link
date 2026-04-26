@@ -118,4 +118,43 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
 
         page.Should().ContainSingle().Which.Id.Should().Be(older.Id);
     }
+
+    [Fact]
+    public async Task GetUserConversationIdsAsync_ReturnsOnlyParticipantConversations()
+    {
+        var user = Guid.NewGuid();
+        var stranger = Guid.NewGuid();
+
+        var mine1 = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-1));
+        var mine2 = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-2));
+        var theirs = Conversation.OpenDirect(stranger, Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(-3));
+        await _repo.TryCreateAsync(mine1, default);
+        await _repo.TryCreateAsync(mine2, default);
+        await _repo.TryCreateAsync(theirs, default);
+
+        var ids = await _repo.GetUserConversationIdsAsync(user, default);
+
+        ids.Should().BeEquivalentTo(new[] { mine1.Id, mine2.Id });
+    }
+
+    [Fact]
+    public async Task GetByIdsAsync_ReturnsRequestedConversations_AndSilentlySkipsMissing()
+    {
+        var user = Guid.NewGuid();
+        var c1 = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow);
+        var c2 = Conversation.OpenDirect(user, Guid.NewGuid(), DateTimeOffset.UtcNow);
+        await _repo.TryCreateAsync(c1, default);
+        await _repo.TryCreateAsync(c2, default);
+
+        var loaded = await _repo.GetByIdsAsync(new[] { c1.Id, c2.Id, "missing-id" }, default);
+
+        loaded.Select(c => c.Id).Should().BeEquivalentTo(new[] { c1.Id, c2.Id });
+    }
+
+    [Fact]
+    public async Task GetByIdsAsync_EmptyInput_ReturnsEmpty()
+    {
+        var loaded = await _repo.GetByIdsAsync(Array.Empty<string>(), default);
+        loaded.Should().BeEmpty();
+    }
 }

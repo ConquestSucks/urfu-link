@@ -137,4 +137,35 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
             .ConfigureAwait(false);
         return result.ModifiedCount > 0;
     }
+
+    public async Task<IReadOnlyList<string>> GetUserConversationIdsAsync(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<ConversationDocument>.Filter.AnyEq(c => c.Participants, userId);
+        var ids = await context.Conversations
+            .Find(filter)
+            .Project(c => c.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return ids;
+    }
+
+    public async Task<IReadOnlyList<Conversation>> GetByIdsAsync(
+        IReadOnlyList<string> conversationIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(conversationIds);
+        if (conversationIds.Count == 0)
+        {
+            return Array.Empty<Conversation>();
+        }
+
+        var filter = Builders<ConversationDocument>.Filter.In(c => c.Id, conversationIds);
+        var docs = await context.Conversations
+            .Find(filter)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return docs.Select(d => d.ToDomain()).ToList();
+    }
 }

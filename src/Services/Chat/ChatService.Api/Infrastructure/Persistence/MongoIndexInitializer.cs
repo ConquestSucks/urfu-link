@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence.Documents;
 
@@ -8,8 +10,12 @@ namespace Urfu.Link.Services.Chat.Infrastructure.Persistence;
 /// Creates the chat collection indexes at process startup. Safe to run repeatedly because the
 /// driver no-ops on existing indexes with the same definition.
 /// </summary>
-internal sealed class MongoIndexInitializer(ChatMongoContext context) : IHostedService
+internal sealed class MongoIndexInitializer(
+    ChatMongoContext context,
+    ILogger<MongoIndexInitializer>? logger = null) : IHostedService
 {
+    private readonly ILogger _logger = logger ?? NullLogger<MongoIndexInitializer>.Instance;
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var conversations = context.Conversations;
@@ -74,6 +80,8 @@ internal sealed class MongoIndexInitializer(ChatMongoContext context) : IHostedS
             },
             cancellationToken).ConfigureAwait(false);
 
+        await EnsureMessagesTextIndexAsync(messages, cancellationToken).ConfigureAwait(false);
+
         var threadSubscriptions = context.ThreadSubscriptions;
         await threadSubscriptions.Indexes.CreateManyAsync(
             new[]
@@ -107,4 +115,73 @@ internal sealed class MongoIndexInitializer(ChatMongoContext context) : IHostedS
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    /// <summary>
+    /// Creates the full-text index on <c>messages.body</c> if it does not already exist.
+    /// Tries Russian Snowball stemming first (works on stock MongoDB Community 8.0); on
+    /// <see cref="MongoCommandException"/> indicating the language is unavailable, falls back
+    /// to <c>"none"</c> (literal tokenization, no stemming) and logs a warning. The existence
+    /// check up front keeps subsequent restarts idempotent — if a previous run fell back to
+    /// <c>"none"</c>, we leave that index in place rather than failing on
+    /// <c>IndexOptionsConflict</c> when retrying with Russian.
+    /// </summary>
+    private async Task EnsureMessagesTextIndexAsync(
+        IMongoCollection<MessageDocument> messages,
+        CancellationToken cancellationToken)
+    {
+        const string IndexName = "ix_messages_body_text";
+
+        if (await IndexExistsAsync(messages, IndexName, cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        try
+        {
+            await messages.Indexes.CreateOneAsync(
+                new CreateIndexModel<MessageDocument>(
+                    Builders<MessageDocument>.IndexKeys.Text(m => m.Body),
+                    new CreateIndexOptions
+                    {
+                        Name = IndexName,
+                        Background = true,
+                        DefaultLanguage = "russian",
+                    }),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (MongoCommandException ex) when (IsUnsupportedLanguage(ex))
+        {
+            _logger.LogWarning(
+                ex,
+                "MongoDB does not support Russian text-search language in this build; falling back to default_language=\"none\".");
+
+            await messages.Indexes.CreateOneAsync(
+                new CreateIndexModel<MessageDocument>(
+                    Builders<MessageDocument>.IndexKeys.Text(m => m.Body),
+                    new CreateIndexOptions
+                    {
+                        Name = IndexName,
+                        Background = true,
+                        DefaultLanguage = "none",
+                    }),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task<bool> IndexExistsAsync(
+        IMongoCollection<MessageDocument> messages,
+        string indexName,
+        CancellationToken cancellationToken)
+    {
+        using var cursor = await messages.Indexes
+            .ListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var documents = await cursor.ToListAsync(cancellationToken).ConfigureAwait(false);
+        return documents.Any(d => d.TryGetValue("name", out var value) && value.IsString && value.AsString == indexName);
+    }
+
+    private static bool IsUnsupportedLanguage(MongoCommandException ex)
+        => ex.Code == 17262
+            || ex.Message.Contains("language not supported", StringComparison.OrdinalIgnoreCase)
+            || ex.Message.Contains("language override", StringComparison.OrdinalIgnoreCase);
 }

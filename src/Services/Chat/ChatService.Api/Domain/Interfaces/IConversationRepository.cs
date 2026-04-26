@@ -43,4 +43,22 @@ public interface IConversationRepository
         string conversationId,
         Guid messageId,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns the ids of every conversation in which <paramref name="userId"/> is a participant.
+    /// No pagination — the full list is required by callers (e.g. global message search) that
+    /// then use it as an <c>$in</c> filter against the messages collection.
+    /// </summary>
+    Task<IReadOnlyList<string>> GetUserConversationIdsAsync(
+        Guid userId,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Bulk-loads conversations by id. Returns only conversations that exist; missing ids are
+    /// silently skipped. Used by search to hydrate <c>conversationPreview</c> per result without
+    /// an N+1.
+    /// </summary>
+    Task<IReadOnlyList<Conversation>> GetByIdsAsync(
+        IReadOnlyList<string> conversationIds,
+        CancellationToken cancellationToken);
 }

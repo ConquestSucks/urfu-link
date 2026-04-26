@@ -45,6 +45,36 @@ public class CursorCodecTests
         decoded.Should().Be(original);
     }
 
+    [Fact]
+    public void EncodeDecode_MessageSearch_RoundTrips()
+    {
+        var original = new MessageSearchCursor(
+            Score: 1.75,
+            CreatedAtUtc: new DateTimeOffset(2026, 04, 25, 10, 00, 00, TimeSpan.Zero),
+            MessageId: Guid.NewGuid());
+
+        var encoded = CursorCodec.EncodeMessageSearch(original);
+        var decoded = CursorCodec.DecodeMessageSearch(encoded);
+
+        decoded.Should().Be(original);
+    }
+
+    [Fact]
+    public void DecodeMessageSearch_Garbage_ThrowsInvalidChatCursorException()
+    {
+        var act = () => CursorCodec.DecodeMessageSearch("not-base64!!");
+        act.Should().Throw<InvalidChatCursorException>();
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" ")]
+    public void DecodeMessageSearch_NullOrEmpty_ReturnsNull(string? input)
+    {
+        CursorCodec.DecodeMessageSearch(input).Should().BeNull();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
