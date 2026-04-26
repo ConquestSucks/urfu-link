@@ -86,6 +86,32 @@ internal static class CursorCodec
         }
     }
 
+    public static string EncodeThreadActivity(ThreadActivityCursor cursor)
+    {
+        var payload = new ThreadActivityCursorPayload(cursor.LastActivityAtUtc.ToUnixTimeMilliseconds(), cursor.RootMessageId);
+        return EncodeBase64Url(JsonSerializer.SerializeToUtf8Bytes(payload, Options));
+    }
+
+    public static ThreadActivityCursor? DecodeThreadActivity(string? cursor)
+    {
+        if (string.IsNullOrWhiteSpace(cursor))
+        {
+            return null;
+        }
+
+        try
+        {
+            var bytes = DecodeBase64Url(cursor);
+            var payload = JsonSerializer.Deserialize<ThreadActivityCursorPayload>(bytes, Options)
+                ?? throw new FormatException("Empty cursor payload.");
+            return new ThreadActivityCursor(DateTimeOffset.FromUnixTimeMilliseconds(payload.Ts), payload.Id);
+        }
+        catch (Exception ex) when (ex is FormatException or JsonException)
+        {
+            throw new InvalidChatCursorException("Invalid cursor.", nameof(cursor), ex);
+        }
+    }
+
     private static string EncodeBase64Url(byte[] bytes)
         => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
@@ -102,4 +128,5 @@ internal static class CursorCodec
 
     private sealed record ConversationCursorPayload(long Ts, string Id);
     private sealed record MessageCursorPayload(long Ts, Guid Id);
+    private sealed record ThreadActivityCursorPayload(long Ts, Guid Id);
 }
