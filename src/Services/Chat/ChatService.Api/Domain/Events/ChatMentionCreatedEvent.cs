@@ -7,7 +7,8 @@ public sealed record ChatMentionCreatedEvent(
     Guid MessageId,
     Guid SenderId,
     IReadOnlyList<Guid> MentionedUserIds,
-    DateTimeOffset OccurredAtUtc) : IIntegrationEvent
+    DateTimeOffset OccurredAtUtc,
+    Guid? ThreadRootId = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 
