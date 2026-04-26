@@ -27,9 +27,11 @@ public sealed class SendMessageService(
     TimeProvider clock,
     IOptions<ChatOptions> options)
 {
-    public const int MaxBodyLength = 4000;
+    /// <summary>Backwards-compatible alias for <see cref="ChatBodyConstraints.MaxBodyLength"/>.</summary>
+    public const int MaxBodyLength = ChatBodyConstraints.MaxBodyLength;
 
-    public const int MaxAttachmentsPerMessage = 10;
+    /// <summary>Backwards-compatible alias for <see cref="ChatBodyConstraints.MaxAttachmentsPerMessage"/>.</summary>
+    public const int MaxAttachmentsPerMessage = ChatBodyConstraints.MaxAttachmentsPerMessage;
 
     public async Task<MessageDto> SendAsync(SendMessageRequest request, CancellationToken cancellationToken)
     {
