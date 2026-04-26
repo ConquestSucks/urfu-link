@@ -456,4 +456,25 @@ public sealed class Message
 
         return true;
     }
+
+    /// <summary>
+    /// Records a new thread reply by updating the denormalized counters on this root message.
+    /// Increments <see cref="ThreadReplyCount"/>, adds the replier to <see cref="ThreadParticipants"/>
+    /// (deduplicated), and refreshes <see cref="ThreadLastReplyAtUtc"/>. Must be called only on
+    /// root messages — calling on a reply throws.
+    /// </summary>
+    public void IncrementThreadDenorm(Guid replierUserId, DateTimeOffset atUtc)
+    {
+        if (IsThreadReply)
+        {
+            throw new InvalidOperationException("Thread denorm can only be incremented on root messages.");
+        }
+
+        ThreadReplyCount++;
+        if (!_threadParticipants.Contains(replierUserId))
+        {
+            _threadParticipants.Add(replierUserId);
+        }
+        ThreadLastReplyAtUtc = atUtc;
+    }
 }

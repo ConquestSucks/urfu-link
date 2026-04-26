@@ -111,4 +111,74 @@ public class MessageThreadTests
         reply.DeliveredAtUtc.Should().BeNull();
         reply.ReadAtUtc.Should().BeNull();
     }
+
+    [Fact]
+    public void IncrementThreadDenorm_OnRoot_IncrementsReplyCount()
+    {
+        var root = NewRootMessage();
+        var replyAt = Created.AddSeconds(10);
+
+        root.IncrementThreadDenorm(Replier, replyAt);
+
+        root.ThreadReplyCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void IncrementThreadDenorm_OnRoot_AddsParticipantOnFirstReplyFromUser()
+    {
+        var root = NewRootMessage();
+        var replyAt = Created.AddSeconds(10);
+
+        root.IncrementThreadDenorm(Replier, replyAt);
+
+        root.ThreadParticipants.Should().ContainSingle().Which.Should().Be(Replier);
+    }
+
+    [Fact]
+    public void IncrementThreadDenorm_OnRoot_DoesNotDuplicateParticipantOnRepeatReply()
+    {
+        var root = NewRootMessage();
+
+        root.IncrementThreadDenorm(Replier, Created.AddSeconds(10));
+        root.IncrementThreadDenorm(Replier, Created.AddSeconds(20));
+
+        root.ThreadParticipants.Should().ContainSingle().Which.Should().Be(Replier);
+        root.ThreadReplyCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void IncrementThreadDenorm_OnRoot_AccumulatesDistinctParticipants()
+    {
+        var root = NewRootMessage();
+        var otherReplier = Guid.Parse("33333333-3333-3333-3333-333333333333");
+
+        root.IncrementThreadDenorm(Replier, Created.AddSeconds(10));
+        root.IncrementThreadDenorm(otherReplier, Created.AddSeconds(20));
+
+        root.ThreadParticipants.Should().BeEquivalentTo(new[] { Replier, otherReplier });
+    }
+
+    [Fact]
+    public void IncrementThreadDenorm_OnRoot_UpdatesLastReplyAt()
+    {
+        var root = NewRootMessage();
+        var firstReply = Created.AddSeconds(10);
+        var secondReply = Created.AddSeconds(20);
+
+        root.IncrementThreadDenorm(Replier, firstReply);
+        root.IncrementThreadDenorm(Replier, secondReply);
+
+        root.ThreadLastReplyAtUtc.Should().Be(secondReply);
+    }
+
+    [Fact]
+    public void IncrementThreadDenorm_OnReply_Throws()
+    {
+        var root = NewRootMessage();
+        var reply = NewReply(root.Id);
+
+        var act = () => reply.IncrementThreadDenorm(Replier, Created.AddSeconds(10));
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*root*");
+    }
 }
