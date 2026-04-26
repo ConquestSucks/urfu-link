@@ -56,7 +56,10 @@ public class ForwardMessagesServiceTests
             attachments: Array.Empty<Attachment>(),
             clientMessageId: "c-source",
             createdAtUtc: _clock.GetUtcNow().AddMinutes(-1));
-        _messages.GetByIdAsync(msg.Id, Arg.Any<CancellationToken>()).Returns(msg);
+        _messages.GetManyAsync(
+                Arg.Is<IReadOnlyList<Guid>>(ids => ids.Contains(msg.Id)),
+                Arg.Any<CancellationToken>())
+            .Returns(new[] { msg });
 
         return (target, source, msg);
     }
@@ -98,15 +101,16 @@ public class ForwardMessagesServiceTests
     [Fact]
     public async Task ForwardAsync_NonParticipantInSource_ThrowsAccessDenied()
     {
-        var (target, source, msg) = Seed();
-        // Replace source so the caller is NOT a participant.
+        var (target, _, _) = Seed();
+        // Source conversation where caller is NOT a participant.
         var foreignSource = Conversation.OpenDirect(SourcePeer, Stranger, _clock.GetUtcNow().AddMinutes(-5));
-        _conversations.GetByIdAsync(source.Id, Arg.Any<CancellationToken>()).Returns(foreignSource);
-        // The forwarded message claims to live in source.Id, so we keep that wiring.
         var foreignMsg = Message.Send(
             Guid.NewGuid(), foreignSource.Id, SourcePeer, "x", Array.Empty<Attachment>(), "c-x", _clock.GetUtcNow());
         _conversations.GetByIdAsync(foreignSource.Id, Arg.Any<CancellationToken>()).Returns(foreignSource);
-        _messages.GetByIdAsync(foreignMsg.Id, Arg.Any<CancellationToken>()).Returns(foreignMsg);
+        _messages.GetManyAsync(
+                Arg.Is<IReadOnlyList<Guid>>(ids => ids.Contains(foreignMsg.Id)),
+                Arg.Any<CancellationToken>())
+            .Returns(new[] { foreignMsg });
 
         var act = () => Build().ForwardAsync(
             new ForwardMessagesRequest(target.Id, Caller, new[] { foreignMsg.Id }), default);
@@ -148,7 +152,10 @@ public class ForwardMessagesServiceTests
             attachments: new[] { new Attachment(attachmentId, AttachmentType.Image, null, "p.png", 10, "image/png") },
             clientMessageId: "c-attach",
             createdAtUtc: _clock.GetUtcNow().AddMinutes(-1));
-        _messages.GetByIdAsync(msg.Id, Arg.Any<CancellationToken>()).Returns(msg);
+        _messages.GetManyAsync(
+                Arg.Is<IReadOnlyList<Guid>>(ids => ids.Contains(msg.Id)),
+                Arg.Any<CancellationToken>())
+            .Returns(new[] { msg });
 
         await Build().ForwardAsync(new ForwardMessagesRequest(target.Id, Caller, new[] { msg.Id }), default);
 

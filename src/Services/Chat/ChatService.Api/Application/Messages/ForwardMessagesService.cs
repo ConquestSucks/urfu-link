@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
@@ -49,16 +50,26 @@ public sealed class ForwardMessagesService(
             throw new ChatAccessDeniedException(request.TargetConversationId, request.CallerUserId);
         }
 
-        // Load source messages individually so we can validate caller membership in each source
-        // conversation. Forwarding is rare and capped at MaxForwardedMessages, so the N round-trips
-        // are acceptable for the MVP.
+        // Single bulk read of all source messages — the previous N+1 had a round-trip per id.
+        var loadedById = (await messages.GetManyAsync(request.MessageIds, cancellationToken).ConfigureAwait(false))
+            .ToDictionary(m => m.Id);
+
+        // Preserve caller-supplied ordering (forward [c, a, b] should land as [c, a, b] in target).
         var sources = new List<Message>(request.MessageIds.Count);
-        var sourceConversationCache = new Dictionary<string, Conversation>(StringComparer.Ordinal);
         foreach (var id in request.MessageIds)
         {
-            var src = await messages.GetByIdAsync(id, cancellationToken).ConfigureAwait(false)
-                ?? throw ChatMessageNotFoundException.For(id);
+            if (!loadedById.TryGetValue(id, out var src))
+            {
+                throw ChatMessageNotFoundException.For(id);
+            }
+            sources.Add(src);
+        }
 
+        // One conversation lookup per unique source — caller membership must hold for every
+        // source the user is forwarding from.
+        var sourceConversationCache = new Dictionary<string, Conversation>(StringComparer.Ordinal);
+        foreach (var src in sources)
+        {
             if (!sourceConversationCache.TryGetValue(src.ConversationId, out var srcConv))
             {
                 srcConv = await conversations.GetByIdAsync(src.ConversationId, cancellationToken).ConfigureAwait(false)
@@ -69,8 +80,6 @@ public sealed class ForwardMessagesService(
             {
                 throw new ChatAccessDeniedException(src.ConversationId, request.CallerUserId);
             }
-
-            sources.Add(src);
         }
 
         var now = clock.GetUtcNow();
@@ -82,8 +91,16 @@ public sealed class ForwardMessagesService(
         var index = 0;
         foreach (var src in sources)
         {
-            var clientMessageId = $"forward:{src.Id:N}:{request.CallerUserId:N}:{now.UtcTicks}:{index++}";
-            var sentAt = now.AddTicks(index);
+            var sentAt = now.AddMilliseconds(index);
+            var clientMessageId = $"forward:{src.Id:N}:{request.CallerUserId:N}:{now.UtcTicks}:{index}";
+
+            // Hide source conversation id when forwarding into a group conversation — the
+            // forwarder shouldn't leak which (potentially private) chat the message came from.
+            // For direct forwards we keep it so the recipient can attribute the origin.
+            var originalConversationId = target.Type == ConversationType.Group
+                ? null
+                : src.ConversationId;
+
             var newMessage = Message.Send(
                 id: Guid.NewGuid(),
                 conversationId: target.Id,
@@ -92,7 +109,7 @@ public sealed class ForwardMessagesService(
                 attachments: src.Attachments,
                 clientMessageId: clientMessageId,
                 createdAtUtc: sentAt,
-                forwardedFrom: new ForwardedFrom(src.SenderId, src.CreatedAtUtc, src.ConversationId));
+                forwardedFrom: new ForwardedFrom(src.SenderId, src.CreatedAtUtc, originalConversationId));
 
             await messages.InsertAsync(newMessage, cancellationToken).ConfigureAwait(false);
             produced.Add(MessageDto.FromDomain(newMessage));
@@ -124,6 +141,8 @@ public sealed class ForwardMessagesService(
 
             await broadcaster.NotifyMessageReceivedAsync(
                 grantees, MessageDto.FromDomain(newMessage), cancellationToken).ConfigureAwait(false);
+
+            index++;
         }
 
         if (grantTasks.Count > 0)
