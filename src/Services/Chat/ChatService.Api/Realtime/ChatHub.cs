@@ -83,7 +83,7 @@ public sealed class ChatHub(
     public Task<MessageDto?> DeleteMessage(Guid messageId, string mode)
     {
         var caller = Context.User!.GetUserId();
-        var deleteMode = ParseMode(mode);
+        var deleteMode = DeleteModes.Parse(mode);
         return deleteMessage.DeleteAsync(
             new DeleteMessageRequest(messageId, caller, deleteMode),
             Context.ConnectionAborted);
@@ -129,15 +129,4 @@ public sealed class ChatHub(
             Context.ConnectionAborted);
     }
 
-    private static DeleteMode ParseMode(string mode)
-    {
-        return mode switch
-        {
-            "for-me" => DeleteMode.ForMe,
-            "for-everyone" => DeleteMode.ForEveryone,
-            _ => throw new ArgumentException(
-                $"Unsupported delete mode '{mode}'. Use 'for-me' or 'for-everyone'.",
-                nameof(mode)),
-        };
-    }
 }

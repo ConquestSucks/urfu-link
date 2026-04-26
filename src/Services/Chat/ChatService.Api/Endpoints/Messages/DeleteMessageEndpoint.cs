@@ -27,7 +27,7 @@ public sealed class DeleteMessageEndpoint(DeleteMessageService service)
     {
         ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
-        var mode = ParseMode(req.Mode);
+        var mode = DeleteModes.Parse(req.Mode);
         var dto = await service.DeleteAsync(
             new DeleteMessageRequest(req.Id, caller, mode), ct).ConfigureAwait(false);
         if (dto is null)
@@ -36,17 +36,5 @@ public sealed class DeleteMessageEndpoint(DeleteMessageService service)
             return;
         }
         await Send.OkAsync(dto, ct).ConfigureAwait(false);
-    }
-
-    private static DeleteMode ParseMode(string? raw)
-    {
-        return raw switch
-        {
-            "for-everyone" => DeleteMode.ForEveryone,
-            null or "" or "for-me" => DeleteMode.ForMe,
-            _ => throw new ArgumentException(
-                $"Unsupported delete mode '{raw}'. Use 'for-me' or 'for-everyone'.",
-                nameof(raw)),
-        };
     }
 }
