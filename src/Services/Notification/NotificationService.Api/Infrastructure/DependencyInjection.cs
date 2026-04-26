@@ -15,6 +15,7 @@ using Urfu.Link.Services.Notification.Channels.PushChannel.Apns;
 using Urfu.Link.Services.Notification.Channels.PushChannel.Fcm;
 using Urfu.Link.Services.Notification.Domain;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
+using Urfu.Link.Services.Notification.Infrastructure.Outbox;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence.Repositories;
 using Urfu.Link.Services.Notification.Infrastructure.Redis;
@@ -112,6 +113,11 @@ public static class ModuleRegistration
         }
 
         services.AddScoped<EmailChannel>();
+
+        services.Configure<NotificationOutboxOptions>(configuration.GetSection(NotificationOutboxOptions.SectionName));
+        services.Configure<RetentionOptions>(configuration.GetSection(RetentionOptions.SectionName));
+
+        services.AddScoped<IOutboxEnqueue, EfOutboxEnqueue>();
 
         return services;
     }

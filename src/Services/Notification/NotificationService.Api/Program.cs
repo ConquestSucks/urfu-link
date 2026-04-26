@@ -48,6 +48,8 @@ builder.Services.AddHostedService<CallEventsConsumer>();
 builder.Services.AddHostedService<UserEventsConsumer>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.PushDispatcherWorker>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.EmailDispatcherWorker>();
+builder.Services.AddHostedService<Urfu.Link.Services.Notification.Infrastructure.Outbox.NotificationOutboxRelay>();
+builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.RetentionCleanupWorker>();
 
 var app = builder.Build();
 
