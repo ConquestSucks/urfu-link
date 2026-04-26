@@ -24,6 +24,20 @@ public sealed class EditMessageService(
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // Edit must produce a non-empty body that fits the global length cap. Empty edits are
+        // a UX request to "delete" — clients should call DeleteMessage instead so they don't
+        // bypass author/TTL checks specific to deletion.
+        if (string.IsNullOrEmpty(request.NewBody))
+        {
+            throw new ArgumentException(
+                "New body cannot be empty. Use DeleteMessage to remove a message.", nameof(request));
+        }
+        if (request.NewBody.Length > ChatBodyConstraints.MaxBodyLength)
+        {
+            throw new ChatPayloadTooLargeException(
+                $"Edited body exceeds {ChatBodyConstraints.MaxBodyLength} characters.");
+        }
+
         var message = await messages.GetByIdAsync(request.MessageId, cancellationToken).ConfigureAwait(false)
             ?? throw ChatMessageNotFoundException.For(request.MessageId);
 
@@ -48,14 +62,13 @@ public sealed class EditMessageService(
             throw ChatEditTtlExpiredException.For(message.Id, ttl);
         }
 
-        var newBody = request.NewBody ?? string.Empty;
-        var mentions = MentionsParser.Parse(newBody, conversation.Participants, opts.MaxMentionsPerMessage);
+        var mentions = MentionsParser.Parse(request.NewBody, conversation.Participants, opts.MaxMentionsPerMessage);
         var priorMentions = new HashSet<Guid>(message.Mentions);
         var newlyAddedMentions = mentions.Where(m => !priorMentions.Contains(m)).ToList();
         var historyEntry = new EditHistoryEntry(message.Body, message.EditedAtUtc ?? message.CreatedAtUtc);
 
         var applied = await messages.ApplyEditAsync(
-            message.Id, newBody, mentions, historyEntry, now, cancellationToken).ConfigureAwait(false);
+            message.Id, request.NewBody, mentions, historyEntry, now, cancellationToken).ConfigureAwait(false);
         if (!applied)
         {
             // Race: someone deleted the message between our read and write. Re-load and return current state.
