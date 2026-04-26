@@ -1,6 +1,7 @@
 using FluentAssertions;
 using NSubstitute;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Application;

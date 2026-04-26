@@ -1,6 +1,7 @@
 using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR.Client;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Events;
 

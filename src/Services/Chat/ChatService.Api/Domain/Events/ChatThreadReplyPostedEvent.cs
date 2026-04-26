@@ -1,4 +1,5 @@
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 
 namespace Urfu.Link.Services.Chat.Domain.Events;
 

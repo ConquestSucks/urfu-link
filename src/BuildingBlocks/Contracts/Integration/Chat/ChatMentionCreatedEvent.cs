@@ -1,6 +1,4 @@
-using Urfu.Link.BuildingBlocks.Contracts.Integration;
-
-namespace Urfu.Link.Services.Chat.Domain.Events;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 
 public sealed record ChatMentionCreatedEvent(
     string ConversationId,
