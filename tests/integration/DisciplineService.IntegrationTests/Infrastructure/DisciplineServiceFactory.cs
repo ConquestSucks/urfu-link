@@ -48,7 +48,7 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
         await using var scope = Services.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<DisciplineDbContext>();
         await ctx.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE disciplines.enrollments, disciplines.disciplines RESTART IDENTITY CASCADE");
+            "TRUNCATE TABLE disciplines.enrollments, disciplines.disciplines, disciplines.outbox_messages RESTART IDENTITY CASCADE");
         ResetCapturedState();
     }
 

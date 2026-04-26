@@ -9,6 +9,8 @@ public sealed class DisciplineDbContext(DbContextOptions<DisciplineDbContext> op
 
     public DbSet<Enrollment> Enrollments => Set<Enrollment>();
 
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

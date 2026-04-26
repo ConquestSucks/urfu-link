@@ -23,7 +23,10 @@ builder.Services.SwaggerDocument(o =>
 });
 builder.Services.AddServiceDefaults(builder.Configuration, "discipline-service");
 
-builder.Services.AddOutbox(builder.Configuration);
+// Transactional outbox lives in AddDisciplineModule (EfOutboxWriter +
+// DisciplineOutboxRelay). Only the Kafka producer ships from BuildingBlocks
+// here — we never use the Redis-based outbox in this service because every
+// event has a corresponding domain row and must commit atomically with it.
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
 builder.Services.AddDisciplineModule(builder.Configuration);

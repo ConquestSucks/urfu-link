@@ -43,6 +43,10 @@ public sealed class DisciplineRepository(
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
     {
+        // Collect domain events from every tracked Discipline aggregate. We stage them
+        // through the outbox writer (which adds rows to dbContext.OutboxMessages) BEFORE
+        // SaveChanges so the integration events commit atomically with the aggregate
+        // change — no lost events between persist and enqueue.
         var entitiesWithEvents = dbContext.ChangeTracker
             .Entries<Discipline>()
             .Where(e => e.Entity.DomainEvents.Count > 0)
@@ -58,18 +62,15 @@ public sealed class DisciplineRepository(
             entity.ClearDomainEvents();
         }
 
-        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
         foreach (var domainEvent in domainEvents)
         {
-            await DispatchEventAsync(domainEvent, cancellationToken).ConfigureAwait(false);
+            var envelope = CreateEnvelope(domainEvent);
+            await outboxWriter
+                .EnqueueAsync(serviceProfile.TopicName, envelope, cancellationToken)
+                .ConfigureAwait(false);
         }
-    }
 
-    private async ValueTask DispatchEventAsync(IIntegrationEvent domainEvent, CancellationToken cancellationToken)
-    {
-        var envelope = CreateEnvelope(domainEvent);
-        await outboxWriter.EnqueueAsync(serviceProfile.TopicName, envelope, cancellationToken).ConfigureAwait(false);
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private IntegrationEnvelope<IIntegrationEvent> CreateEnvelope(IIntegrationEvent payload)
