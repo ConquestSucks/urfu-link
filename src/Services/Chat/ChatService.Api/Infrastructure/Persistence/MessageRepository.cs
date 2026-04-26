@@ -153,7 +153,7 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
         return transitioningIds;
     }
 
-    public async Task<Guid?> MarkReadUpToAsync(
+    public async Task<IReadOnlyList<Guid>> MarkReadUpToAsync(
         string conversationId,
         Guid upToMessageId,
         DateTimeOffset readAtUtc,
@@ -165,7 +165,7 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             .ConfigureAwait(false);
         if (anchor is null)
         {
-            return null;
+            return Array.Empty<Guid>();
         }
 
         var fb = Builders<MessageDocument>.Filter;
@@ -180,13 +180,16 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
 
         var transitioned = await context.Messages
             .Find(filter)
+            // Sort oldest → newest so callers see ids in chronological order. The anchor sits
+            // at the tail of the list.
+            .Sort(Builders<MessageDocument>.Sort.Ascending(m => m.CreatedAtUtc).Ascending(m => m.Id))
             .Project(m => new { m.Id, m.DeliveredAtUtc })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         if (transitioned.Count == 0)
         {
-            return null;
+            return Array.Empty<Guid>();
         }
 
         var ts = readAtUtc.UtcDateTime;
@@ -214,7 +217,7 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        return upToMessageId;
+        return transitioned.Select(t => t.Id).ToList();
     }
 
     public async Task<bool> ApplyEditAsync(

@@ -125,7 +125,7 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
     }
 
     [Fact]
-    public async Task MarkReadUpToAsync_TransitionsAllPriorMessages_AndReturnsAnchor()
+    public async Task MarkReadUpToAsync_TransitionsAllPriorMessages_AndReturnsTransitionedIdsInChronologicalOrder()
     {
         var sender = Guid.NewGuid();
         var conv = $"conv-read-{Guid.NewGuid():N}";
@@ -137,10 +137,11 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
             await _repo.InsertAsync(m, default);
         }
 
-        var anchor = messages[2].Id;
-        var result = await _repo.MarkReadUpToAsync(conv, anchor, DateTimeOffset.UtcNow, default);
+        var anchorId = messages[2].Id;
+        var result = await _repo.MarkReadUpToAsync(conv, anchorId, DateTimeOffset.UtcNow, default);
 
-        result.Should().Be(anchor);
+        result.Should().Equal(messages[0].Id, messages[1].Id, messages[2].Id);
+        result[^1].Should().Be(anchorId);
 
         for (var i = 0; i <= 2; i++)
         {
@@ -155,7 +156,7 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
     }
 
     [Fact]
-    public async Task MarkReadUpToAsync_AllAlreadyRead_ReturnsNull()
+    public async Task MarkReadUpToAsync_AllAlreadyRead_ReturnsEmpty()
     {
         var sender = Guid.NewGuid();
         var conv = $"conv-read-noop-{Guid.NewGuid():N}";
@@ -165,6 +166,6 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
 
         var second = await _repo.MarkReadUpToAsync(conv, msg.Id, DateTimeOffset.UtcNow, default);
 
-        second.Should().BeNull();
+        second.Should().BeEmpty();
     }
 }

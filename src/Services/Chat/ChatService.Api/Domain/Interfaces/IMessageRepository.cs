@@ -48,10 +48,10 @@ public interface IMessageRepository
 
     /// <summary>
     /// Marks all messages in the conversation up to and including <paramref name="upToMessageId"/>
-    /// as Read. Returns the actual highest <see cref="MessageState.Read"/> message id (or
-    /// <see langword="null"/> if no transition occurred).
+    /// as Read. Returns the ids that actually transitioned, ordered from oldest to newest
+    /// (so the last element is the new anchor). Returns an empty list if nothing transitioned.
     /// </summary>
-    Task<Guid?> MarkReadUpToAsync(
+    Task<IReadOnlyList<Guid>> MarkReadUpToAsync(
         string conversationId,
         Guid upToMessageId,
         DateTimeOffset readAtUtc,
