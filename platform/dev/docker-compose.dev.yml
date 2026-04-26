@@ -331,8 +331,22 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__Authority: http://keycloak:8080/realms/urfu-link
+      Auth__Audience: urfu-link-api
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+      Infrastructure__Redis__Configuration: redis:6379
+      Notification__Push__Provider: fake
+      Notification__Smtp__Host: mailhog
+      Notification__Smtp__Port: 1025
+      Notification__Smtp__EnableStartTls: "false"
+      Notification__Smtp__From: noreply@urfu-link.local
+      Notification__Smtp__FromDisplayName: UrFU Link
+      Notification__Retention__RetentionDays: "90"
+      UserService__GrpcEndpoint: http://user-service:8080
+      PresenceService__GrpcEndpoint: http://presence-service:8080
     depends_on:
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
@@ -341,6 +355,16 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: urfu-mailhog
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     restart: unless-stopped
 
   call-service:
