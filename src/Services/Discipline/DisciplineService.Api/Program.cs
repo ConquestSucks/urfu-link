@@ -1,10 +1,11 @@
-using DisciplineService.Api.Domain;
+using DisciplineService.Api.Infrastructure;
+using DisciplineService.Api.Infrastructure.Persistence;
 using DisciplineService.Api.Messaging;
 using DisciplineService.Api.Services;
 using FastEndpoints;
 using FastEndpoints.Swagger;
+using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
-using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 
@@ -22,19 +23,21 @@ builder.Services.SwaggerDocument(o =>
 });
 builder.Services.AddServiceDefaults(builder.Configuration, "discipline-service");
 
-// ServiceProfile is consumed by Outbox/Repository to label outgoing events.
-// Will be moved to AddDisciplineModule once Stage 4 lands.
-builder.Services.AddSingleton(new ServiceProfile(
-    "discipline-service",
-    "postgresql",
-    KafkaTopicNames.DisciplineEvents,
-    "discipline.created.v1"));
-
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
+builder.Services.AddDisciplineModule(builder.Configuration);
 
 var app = builder.Build();
+
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<DisciplineDbContext>();
+    if (db.Database.IsRelational())
+    {
+        await db.Database.MigrateAsync().ConfigureAwait(false);
+    }
+}
 
 app.MapServiceDefaults();
 app.UseFastEndpoints(c =>
