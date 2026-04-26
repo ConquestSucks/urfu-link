@@ -13,6 +13,7 @@ using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
+using Urfu.Link.Services.Chat.Application.Threads;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Infrastructure.Authorization;
@@ -47,6 +48,7 @@ public static class ModuleRegistration
         services.AddSingleton<ChatMongoContext>();
         services.AddScoped<IConversationRepository, ConversationRepository>();
         services.AddScoped<IMessageRepository, MessageRepository>();
+        services.AddScoped<IThreadSubscriptionRepository, ThreadSubscriptionRepository>();
         services.AddHostedService<MongoIndexInitializer>();
 
         services.AddOptions<ChatOptions>()
@@ -105,6 +107,11 @@ public static class ModuleRegistration
         services.AddScoped<GetConversationQuery>();
         services.AddScoped<GetConversationMessagesQuery>();
         services.AddScoped<GetReadReceiptsQuery>();
+        services.AddScoped<ReplyInThreadService>();
+        services.AddScoped<JoinThreadService>();
+        services.AddScoped<LeaveThreadService>();
+        services.AddScoped<GetThreadMessagesQuery>();
+        services.AddScoped<GetUserActiveThreadsQuery>();
 
         services.AddSingleton<IChatBroadcaster, ChatBroadcaster>();
 
