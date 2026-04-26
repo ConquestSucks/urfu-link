@@ -80,21 +80,12 @@ public sealed class DeleteMessageService(
             return refreshed is null ? null : MessageDto.FromDomain(refreshed);
         }
 
-        // ForMe: hide locally, no broadcast.
-        var added = await messages.AddHiddenForAsync(message.Id, request.CallerUserId, cancellationToken)
+        // ForMe is purely local: hide for the caller in the message document and return the
+        // current message state. No integration event is emitted (no consumer reacts to a
+        // local hide) and no broadcast is sent (other participants must keep seeing the
+        // message).
+        await messages.AddHiddenForAsync(message.Id, request.CallerUserId, cancellationToken)
             .ConfigureAwait(false);
-        if (added)
-        {
-            var nowForMe = clock.GetUtcNow();
-            await dispatcher.PublishAsync(
-                new ChatMessageDeletedEvent(
-                    conversation.Id,
-                    message.Id,
-                    DeleteMode.ForMe,
-                    request.CallerUserId,
-                    nowForMe),
-                cancellationToken).ConfigureAwait(false);
-        }
 
         var current = await messages.GetByIdAsync(message.Id, cancellationToken).ConfigureAwait(false);
         return current is null ? null : MessageDto.FromDomain(current);

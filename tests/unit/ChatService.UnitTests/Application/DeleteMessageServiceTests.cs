@@ -118,7 +118,7 @@ public class DeleteMessageServiceTests
     }
 
     [Fact]
-    public async Task DeleteAsync_ForMe_AnyParticipant_HidesAndPublishesEventWithoutBroadcast()
+    public async Task DeleteAsync_ForMe_AnyParticipant_HidesLocally_NoEventNoBroadcast()
     {
         var (_, msg) = Seed(Author, _clock.GetUtcNow());
 
@@ -126,8 +126,9 @@ public class DeleteMessageServiceTests
 
         dto.Should().NotBeNull();
         await _messages.Received().AddHiddenForAsync(msg.Id, Peer, Arg.Any<CancellationToken>());
-        _outbox.Captured.OfType<ChatMessageDeletedEvent>()
-            .Should().ContainSingle(e => e.Mode == DeleteMode.ForMe);
+
+        // ForMe is a local-only hide — no integration event, no broadcast.
+        _outbox.Captured.OfType<ChatMessageDeletedEvent>().Should().BeEmpty();
         await _broadcaster.DidNotReceive().NotifyMessageDeletedAsync(
             Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<string>(), Arg.Any<Guid>(), Arg.Any<DeleteMode>(), Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
