@@ -1,31 +1,59 @@
-import { InboxChatProps } from "@/entities/inbox-chat";
-import { chatsMockData, notificationsMockData, subjectsMockData, } from "@/shared/mocks";
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+import { InboxChatProps } from "@/entities/inbox-chat/model/types";
+import { InboxSubjectProps } from "@/entities/inbox-subject";
+import { apiClient } from "@/shared/lib/api";
+import { ConversationPreview } from "@urfu-link/api-client";
+import { useAuthStore } from "@/shared/store/auth-store";
+
+const mapConversation = (c: ConversationPreview): InboxChatProps => {
+    // Basic mapping, needs refinement for real user names/avatars
+    const currentUserId = useAuthStore.getState().accessToken ? "me" : null;
+    
+    return {
+        id: c.id,
+        avatarUrl: "", // Need user avatar
+        name: c.type === "Direct" ? "Direct Chat" : "Discipline Chat", // Need real peer/discipline name
+        message: c.lastMessagePreview?.body || "",
+        time: c.lastMessageAt ? new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "",
+        unreadCount: 0, // Not provided by preview yet
+        lastMessageFromSelf: c.lastMessagePreview?.senderId === currentUserId,
+        lastMessageRead: true // Need real read status
+    };
+};
+
 export const inboxApi = {
-    getChats: async () => {
-        await delay(500);
-        return chatsMockData;
+    getChats: async (): Promise<InboxChatProps[]> => {
+        try {
+            const res = await apiClient.chat.getConversations("Direct", undefined, 50);
+            return res.items.map(mapConversation);
+        } catch (error) {
+            console.error("Failed to fetch direct chats", error);
+            return [];
+        }
     },
-    getSubjects: async () => {
-        await delay(500);
-        return subjectsMockData;
+    getSubjects: async (): Promise<InboxSubjectProps[]> => {
+        try {
+            const res = await apiClient.chat.getConversations("Discipline", undefined, 50);
+            return res.items.map(c => ({
+                id: c.id,
+                title: "Discipline", // Need real discipline title
+                messages: [mapConversation(c)]
+            }));
+        } catch (error) {
+            console.error("Failed to fetch subjects", error);
+            return [];
+        }
     },
     getNotifications: async () => {
-        await delay(500);
-        return notificationsMockData;
+        // Still needs mock or actual implementation
+        return [];
     },
     getChatMeta: async (id: string, type: "chat" | "subject"): Promise<InboxChatProps | undefined> => {
-        await delay(300);
-        if (type === "chat") {
-            return chatsMockData.find((chat) => chat.id === id);
+        try {
+            const res = await apiClient.chat.getConversation(id);
+            return mapConversation(res);
+        } catch (error) {
+            console.error("Failed to fetch chat meta", error);
+            return undefined;
         }
-        if (type === "subject") {
-            for (const subject of subjectsMockData) {
-                const found = subject.messages.find((msg) => msg.id === id);
-                if (found)
-                    return found;
-            }
-        }
-        return undefined;
     },
 };

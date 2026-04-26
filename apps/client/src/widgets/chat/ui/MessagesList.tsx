@@ -1,5 +1,5 @@
 import { ChatMessage } from "@/entities/chat-message";
-import { useChatStore } from "@/shared/store/useChatStore";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { FileIcon } from "@/shared/ui/phosphor";
 import React, { useEffect } from "react";
@@ -13,7 +13,9 @@ interface MessagesListProps {
 }
 
 export const MessagesList = ({ chatId, type }: MessagesListProps) => {
-    const { messages, isLoading, hasMore, loadMessages, loadMore } = useChatStore();
+    const { messagesByConversation, isLoading, hasMoreByConversation, loadMessages, loadMore, markRead } = useChatStore();
+    const messages = messagesByConversation[chatId] || [];
+    const hasMore = hasMoreByConversation[chatId] || false;
     const { isMobile } = useWindowSize();
 
     useEffect(() => {
@@ -23,6 +25,18 @@ export const MessagesList = ({ chatId, type }: MessagesListProps) => {
     const shouldShowAvatars = type === "subject";
     
     const isInitialLoading = isLoading && messages.length === 0;
+
+    const handleViewableItemsChanged = React.useRef(({ viewableItems }: { viewableItems: Array<{ item: typeof messages[0], index: number | null }> }) => {
+        const unreadItems = viewableItems.filter(v => !v.item.isOwn && !v.item.seen);
+        if (unreadItems.length > 0) {
+            // Find the most recent message (since the list is inverted, index 0 is newest, so we take the first unread item we find)
+            // Actually, viewableItems are sorted by index. The lowest index is the newest message.
+            const newestUnread = unreadItems.reduce((prev, curr) => (curr.index ?? 0) < (prev.index ?? 0) ? curr : prev);
+            markRead(chatId, newestUnread.item.id);
+        }
+    }).current;
+
+    const viewabilityConfig = React.useRef({ itemVisiblePercentThreshold: 50 }).current;
 
     if (isInitialLoading) {
         return (
@@ -46,6 +60,8 @@ export const MessagesList = ({ chatId, type }: MessagesListProps) => {
                 gap: 24,
                 flexGrow: 1,
             }}
+            onViewableItemsChanged={handleViewableItemsChanged}
+            viewabilityConfig={viewabilityConfig}
             renderItem={({ item }) => (
                 <ChatMessage
                     id={item.id}
