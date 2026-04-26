@@ -13,6 +13,7 @@
 - `PresenceService` (Redis)
 - `NotificationService` (stateless workers)
 - `CallService` (signaling + media orchestration)
+- `DisciplineService` (PostgreSQL) — disciplines, enrollments, gRPC for ChatService
 
 ## Data and integration containers
 - Kafka (topics + DLQ)
@@ -23,3 +24,12 @@
 - North-South: HTTPS via ingress -> gateway
 - East-West sync: gRPC over Linkerd mTLS
 - East-West async: Kafka events
+
+### DisciplineService data flow
+- `ApiGateway` rewrites `/api/disciplines/...` to `discipline-service:8080/api/v1/disciplines/...`.
+- `discipline-service` publishes `urfu.discipline.events.v1` via the shared Outbox.
+- `chat-service` consumes the topic and projects each event onto the
+  conversation backing the discipline (creates / archives the group chat,
+  syncs participants and roles).
+- `chat-service` resolves teacher / student membership through
+  `DisciplineService.InternalApi` gRPC for non-pinning authorization paths.
