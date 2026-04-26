@@ -21,7 +21,11 @@ public sealed record MessageDto(
     IReadOnlyList<Guid>? Mentions = null,
     ReplyToDto? ReplyTo = null,
     ForwardedFromDto? ForwardedFrom = null,
-    IReadOnlyDictionary<string, IReadOnlyList<Guid>>? ReactionsSummary = null)
+    IReadOnlyDictionary<string, IReadOnlyList<Guid>>? ReactionsSummary = null,
+    Guid? ThreadRootId = null,
+    int? ThreadReplyCount = null,
+    IReadOnlyList<Guid>? ThreadParticipants = null,
+    DateTimeOffset? ThreadLastReplyAtUtc = null)
 {
     public static MessageDto FromDomain(Message message)
     {
@@ -44,7 +48,14 @@ public sealed record MessageDto(
             Mentions: message.Mentions.Count == 0 ? Array.Empty<Guid>() : message.Mentions.ToList(),
             ReplyTo: message.ReplyTo is { } r ? ReplyToDto.FromDomain(r) : null,
             ForwardedFrom: message.ForwardedFrom is { } f ? ForwardedFromDto.FromDomain(f) : null,
-            ReactionsSummary: BuildReactionsSummary(message));
+            ReactionsSummary: BuildReactionsSummary(message),
+            // Thread fields are surfaced only when set so clients without thread support see a
+            // shape identical to the pre-#212 contract. Replies carry ThreadRootId; roots that
+            // accumulated replies carry the denorm trio.
+            ThreadRootId: message.ThreadRootId,
+            ThreadReplyCount: message.ThreadReplyCount > 0 ? message.ThreadReplyCount : null,
+            ThreadParticipants: message.ThreadParticipants.Count == 0 ? null : message.ThreadParticipants.ToList(),
+            ThreadLastReplyAtUtc: message.ThreadLastReplyAtUtc);
     }
 
     private static Dictionary<string, IReadOnlyList<Guid>> BuildReactionsSummary(Message message)
