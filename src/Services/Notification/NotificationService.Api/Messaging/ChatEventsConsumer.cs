@@ -57,6 +57,15 @@ public sealed class ChatEventsConsumer(
                     break;
                 }
 
+            case "chat.discipline_conversation_created.v1":
+                {
+                    var evt = payload.Deserialize<ChatDisciplineConversationCreatedEvent>(JsonOptions)
+                        ?? throw new JsonException("ChatDisciplineConversationCreatedEvent payload null");
+                    var handler = scope.GetRequiredService<ChatDisciplineConversationCreatedHandler>();
+                    await handler.HandleAsync(evt, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
             default:
                 break;
         }

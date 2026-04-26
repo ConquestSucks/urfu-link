@@ -16,6 +16,8 @@ public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext
 
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
+    public DbSet<DisciplineConversation> DisciplineConversations => Set<DisciplineConversation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

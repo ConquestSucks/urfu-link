@@ -2,24 +2,26 @@ using System.Globalization;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Notification.Application.Routing;
 using Urfu.Link.Services.Notification.Domain.Enums;
+using Urfu.Link.Services.Notification.Domain.Interfaces;
 using Urfu.Link.Services.Notification.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Notification.Application.Handlers.Chat;
 
 /// <summary>
-/// Maps <see cref="ChatMessageSentEvent"/> into per-recipient drafts. Recipients listed
-/// in <see cref="ChatMessageSentEvent.Mentions"/> get a higher-severity Mention draft;
-/// the remaining recipients receive a regular direct-message draft. The discriminator
-/// between direct, mention, and discipline categories lives at the handler boundary.
+/// Maps <see cref="ChatMessageSentEvent"/> into per-recipient drafts. Mentions get a
+/// high-severity Mention draft; messages in known discipline conversations are
+/// classified as ChatMessageDiscipline (looked up from the projection populated by
+/// <see cref="ChatDisciplineConversationCreatedHandler"/>); everything else lands in
+/// ChatMessageDirect.
 /// </summary>
-public sealed class ChatMessageSentHandler : INotificationHandler<ChatMessageSentEvent>
+public sealed class ChatMessageSentHandler(IDisciplineConversationLookup disciplineLookup)
+    : INotificationHandler<ChatMessageSentEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public async Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
         ChatMessageSentEvent integrationEvent,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(integrationEvent);
-        _ = cancellationToken;
 
         var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
         var mentions = new HashSet<Guid>(integrationEvent.Mentions ?? []);
@@ -27,9 +29,12 @@ public sealed class ChatMessageSentHandler : INotificationHandler<ChatMessageSen
         var conversationId = integrationEvent.ConversationId;
         if (!Guid.TryParse(conversationId, out var conversationGuid))
         {
-            // Fallback: hash the string into a stable Guid so GroupKey remains deterministic.
             conversationGuid = StableGuids.From(conversationId);
         }
+
+        var isDisciplineConversation = await disciplineLookup
+            .IsDisciplineConversationAsync(conversationId, cancellationToken)
+            .ConfigureAwait(false);
 
         var preview = string.IsNullOrWhiteSpace(integrationEvent.Preview)
             ? "Новое сообщение"
@@ -43,17 +48,35 @@ public sealed class ChatMessageSentHandler : INotificationHandler<ChatMessageSen
             }
 
             var isMention = mentions.Contains(recipientId);
-            var category = isMention
-                ? NotificationCategory.ChatMessageMention
-                : NotificationCategory.ChatMessageDirect;
-            var severity = isMention ? NotificationSeverity.High : NotificationSeverity.Normal;
+            NotificationCategory category;
+            NotificationSeverity severity;
+            string title;
+            GroupKey groupKey;
 
-            var groupKey = isMention
-                ? GroupKey.ForChatMention(conversationGuid)
-                : GroupKey.ForDirectChat(conversationGuid);
+            if (isMention)
+            {
+                category = NotificationCategory.ChatMessageMention;
+                severity = NotificationSeverity.High;
+                title = "Вас упомянули";
+                groupKey = GroupKey.ForChatMention(conversationGuid);
+            }
+            else if (isDisciplineConversation)
+            {
+                category = NotificationCategory.ChatMessageDiscipline;
+                severity = NotificationSeverity.Normal;
+                title = "Сообщение в дисциплине";
+                groupKey = GroupKey.ForDisciplineChat(conversationGuid);
+            }
+            else
+            {
+                category = NotificationCategory.ChatMessageDirect;
+                severity = NotificationSeverity.Normal;
+                title = "Новое сообщение";
+                groupKey = GroupKey.ForDirectChat(conversationGuid);
+            }
 
             var content = NotificationContent.Create(
-                title: isMention ? "Вас упомянули" : "Новое сообщение",
+                title: title,
                 body: preview,
                 imageUrl: null,
                 deepLink: $"urfulink://chat/conv/{conversationId}/msg/{integrationEvent.MessageId:N}");
@@ -76,7 +99,6 @@ public sealed class ChatMessageSentHandler : INotificationHandler<ChatMessageSen
                 SourceEventType: integrationEvent.EventType));
         }
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        return drafts;
     }
-
 }

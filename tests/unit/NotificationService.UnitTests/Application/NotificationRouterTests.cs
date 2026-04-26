@@ -64,7 +64,7 @@ public sealed class NotificationRouterTests
             false,
             DateTimeOffset.UtcNow);
 
-        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(), default);
+        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
 
         outcome.Should().Be(RoutingOutcome.NoDrafts);
         await _repository.DidNotReceive().TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>());
@@ -84,7 +84,7 @@ public sealed class NotificationRouterTests
             false,
             DateTimeOffset.UtcNow);
 
-        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(), default);
+        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
 
         outcome.Created.Should().Be(1);
         outcome.Skipped.Should().Be(0);
@@ -110,7 +110,7 @@ public sealed class NotificationRouterTests
             false,
             DateTimeOffset.UtcNow);
 
-        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(), default);
+        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
 
         outcome.Created.Should().Be(0);
         outcome.Skipped.Should().Be(1);
@@ -142,7 +142,7 @@ public sealed class NotificationRouterTests
             false,
             DateTimeOffset.UtcNow);
 
-        await _router.RouteAsync(evt, new ChatMessageSentHandler(), default);
+        await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
 
         captured.Should().NotBeNull();
         captured!.Deliveries.Should().BeEmpty();

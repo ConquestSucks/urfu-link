@@ -72,8 +72,10 @@ public static class ModuleRegistration
         services.AddScoped<InAppChannel>();
         services.AddSingleton<INotificationBroadcaster, NotificationBroadcaster>();
 
+        services.AddScoped<IDisciplineConversationLookup, Infrastructure.Persistence.Repositories.DisciplineConversationLookup>();
         services.AddScoped<ChatMessageSentHandler>();
         services.AddScoped<ChatMentionCreatedHandler>();
+        services.AddScoped<ChatDisciplineConversationCreatedHandler>();
         services.AddScoped<AdminChatInviteHandler>();
         services.AddScoped<AdminRoleChangedHandler>();
         services.AddScoped<UserEnrolledHandler>();

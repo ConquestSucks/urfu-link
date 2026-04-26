@@ -1,12 +1,21 @@
 using FluentAssertions;
+using NSubstitute;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Notification.Application.Handlers.Chat;
 using Urfu.Link.Services.Notification.Domain.Enums;
+using Urfu.Link.Services.Notification.Domain.Interfaces;
 
 namespace NotificationService.UnitTests.Application;
 
 public sealed class ChatMessageSentHandlerTests
 {
+    private static IDisciplineConversationLookup NoDisciplineLookup()
+    {
+        var lookup = Substitute.For<IDisciplineConversationLookup>();
+        lookup.IsDisciplineConversationAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
+        return lookup;
+    }
+
     [Fact]
     public async Task PrepareAsync_SkipsSenderInRecipients()
     {
@@ -22,7 +31,7 @@ public sealed class ChatMessageSentHandlerTests
             HasAttachments: false,
             OccurredAtUtc: DateTimeOffset.UtcNow);
 
-        var drafts = await new ChatMessageSentHandler().PrepareAsync(evt, default);
+        var drafts = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
 
         drafts.Should().HaveCount(2);
         drafts.Select(d => d.RecipientUserId).Should().BeEquivalentTo([alice, bob]);
@@ -44,7 +53,7 @@ public sealed class ChatMessageSentHandlerTests
             OccurredAtUtc: DateTimeOffset.UtcNow,
             Mentions: [alice]);
 
-        var drafts = await new ChatMessageSentHandler().PrepareAsync(evt, default);
+        var drafts = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
 
         var mentionDraft = drafts.Single(d => d.RecipientUserId == alice);
         var directDraft = drafts.Single(d => d.RecipientUserId == bob);
@@ -71,7 +80,7 @@ public sealed class ChatMessageSentHandlerTests
             HasAttachments: false,
             OccurredAtUtc: DateTimeOffset.UtcNow);
 
-        var drafts = await new ChatMessageSentHandler().PrepareAsync(evt, default);
+        var drafts = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
 
         var draft = drafts.Single();
         draft.Content.DeepLink.Should().Contain(convId.ToString());
@@ -95,7 +104,7 @@ public sealed class ChatMessageSentHandlerTests
             HasAttachments: true,
             OccurredAtUtc: DateTimeOffset.UtcNow);
 
-        var drafts = await new ChatMessageSentHandler().PrepareAsync(evt, default);
+        var drafts = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
 
         drafts.Single().Content.Body.Should().Be("Новое сообщение");
     }
@@ -114,8 +123,8 @@ public sealed class ChatMessageSentHandlerTests
             HasAttachments: false,
             OccurredAtUtc: DateTimeOffset.UtcNow);
 
-        var firstRun = await new ChatMessageSentHandler().PrepareAsync(evt, default);
-        var secondRun = await new ChatMessageSentHandler().PrepareAsync(evt, default);
+        var firstRun = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
+        var secondRun = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
 
         firstRun.Single().GroupKey.Should().Be(secondRun.Single().GroupKey);
     }
