@@ -47,23 +47,21 @@ public sealed class EnrollmentRepository(DisciplineDbContext dbContext) : IEnrol
         Guid userId,
         CancellationToken cancellationToken)
     {
-        return await dbContext.Enrollments
-            .AsNoTracking()
-            .Where(e => e.UserId == userId)
-            .Join(
-                dbContext.Disciplines.AsNoTracking().Where(d => d.ArchivedAtUtc == null),
-                e => e.DisciplineId,
-                d => d.Id,
-                (e, d) => new DisciplineMembership(
-                    d.Id,
-                    d.Code,
-                    d.Title,
-                    d.Semester,
-                    d.OwnerTeacherId,
-                    d.CoverAssetId,
-                    e.Role))
-            .OrderBy(m => m.Semester)
-            .ThenBy(m => m.Code)
+        var query =
+            from e in dbContext.Enrollments.AsNoTracking()
+            join d in dbContext.Disciplines.AsNoTracking() on e.DisciplineId equals d.Id
+            where e.UserId == userId && d.ArchivedAtUtc == null
+            orderby d.Semester, d.Code
+            select new DisciplineMembership(
+                d.Id,
+                d.Code,
+                d.Title,
+                d.Semester,
+                d.OwnerTeacherId,
+                d.CoverAssetId,
+                e.Role);
+
+        return await query
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }

@@ -1,3 +1,4 @@
+using DisciplineService.Api.Application.Authorization;
 using DisciplineService.Api.Domain;
 using DisciplineService.Api.Domain.Interfaces;
 using DisciplineService.Api.Infrastructure.Persistence;
@@ -26,6 +27,7 @@ public static class ModuleRegistration
 
         services.AddScoped<IDisciplineRepository, DisciplineRepository>();
         services.AddScoped<IEnrollmentRepository, EnrollmentRepository>();
+        services.AddSingleton<DisciplineAuthorizationService>();
 
         return services;
     }
