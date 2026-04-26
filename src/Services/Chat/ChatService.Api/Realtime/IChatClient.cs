@@ -24,4 +24,18 @@ public interface IChatClient
     Task ReactionUpdated(Guid messageId, IReadOnlyDictionary<string, IReadOnlyList<Guid>> summary);
 
     Task PinsUpdated(string conversationId, IReadOnlyList<MessageDto> pinnedMessages);
+
+    /// <summary>Delivered only to thread subscribers — the new reply does not surface in the main flow.</summary>
+    Task ThreadReplyReceived(Guid rootMessageId, MessageDto reply);
+
+    /// <summary>
+    /// Delivered to every participant of the parent conversation so the main-flow UI can refresh
+    /// the "N replies" marker on the root message without re-fetching it.
+    /// </summary>
+    Task ThreadRootUpdated(
+        string conversationId,
+        Guid rootMessageId,
+        int replyCount,
+        IReadOnlyList<Guid> participants,
+        DateTimeOffset lastReplyAtUtc);
 }

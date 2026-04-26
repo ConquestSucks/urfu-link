@@ -114,6 +114,40 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
         return hub.Clients.Users(ToUserIds(recipientUserIds)).PinsUpdated(conversationId, pinnedMessages);
     }
 
+    public Task NotifyThreadReplyReceivedAsync(
+        IReadOnlyList<Guid> subscriberUserIds,
+        Guid rootMessageId,
+        MessageDto reply,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(subscriberUserIds);
+        ArgumentNullException.ThrowIfNull(reply);
+        if (subscriberUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(subscriberUserIds)).ThreadReplyReceived(rootMessageId, reply);
+    }
+
+    public Task NotifyThreadRootUpdatedAsync(
+        IReadOnlyList<Guid> participantUserIds,
+        string conversationId,
+        Guid rootMessageId,
+        int replyCount,
+        IReadOnlyList<Guid> participants,
+        DateTimeOffset lastReplyAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(participantUserIds);
+        ArgumentNullException.ThrowIfNull(participants);
+        if (participantUserIds.Count == 0)
+        {
+            return Task.CompletedTask;
+        }
+        return hub.Clients.Users(ToUserIds(participantUserIds))
+            .ThreadRootUpdated(conversationId, rootMessageId, replyCount, participants, lastReplyAtUtc);
+    }
+
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)
         => userIds.Select(u => u.ToString("D", CultureInfo.InvariantCulture)).ToList();
 }
