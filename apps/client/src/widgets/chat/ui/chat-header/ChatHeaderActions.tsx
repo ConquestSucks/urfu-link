@@ -3,10 +3,13 @@ import { DotsThreeVerticalIcon, MagnifyingGlassIcon, PhoneIcon } from "@/shared/
 import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getChatHeaderActions } from "../../config/headerActions";
+
 interface ChatHeaderActionsProps {
     onOpenProfile: () => void;
+    onSearchPress: () => void;
 }
-export const ChatHeaderActions = ({ onOpenProfile }: ChatHeaderActionsProps) => {
+
+export const ChatHeaderActions = ({ onOpenProfile, onSearchPress }: ChatHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getChatHeaderActions({
         onOpenProfile: () => {
@@ -19,11 +22,11 @@ export const ChatHeaderActions = ({ onOpenProfile }: ChatHeaderActionsProps) => 
             <Pressable className="p-2 rounded-xl active:bg-white/10">
                 <PhoneIcon size={24} className="text-text-muted" weight="regular" />
             </Pressable>
-            <Pressable className="p-2 rounded-xl active:bg-white/10">
+            <Pressable className="p-2 rounded-xl active:bg-white/10" onPress={onSearchPress}>
                 <MagnifyingGlassIcon size={24} className="text-text-muted" weight="regular" />
             </Pressable>
             <Pressable
-                className="p-2 rounded-xl active:bg-white/10 "
+                className="p-2 rounded-xl active:bg-white/10"
                 onPress={() => menuRef.current?.toggle()}
             >
                 <DotsThreeVerticalIcon size={24} className="text-text-muted" weight="bold" />

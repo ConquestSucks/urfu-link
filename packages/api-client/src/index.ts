@@ -27,6 +27,7 @@ export type {
   ChatAttachment,
   MessageDto,
   Paginated,
+  SearchResultDto,
 } from "./chat";
 
 export type {

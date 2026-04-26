@@ -44,6 +44,15 @@ export type Paginated<T> = {
   nextCursor?: string;
 };
 
+export type SearchResultDto = {
+  messageId: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  highlightedBody?: string;
+};
+
 export function createChatApi(
   baseUrl: string,
   authHeaders: AuthHeaders,
@@ -79,13 +88,13 @@ export function createChatApi(
       return request<Paginated<MessageDto>>(`/api/chat/conversations/${encodeURIComponent(id)}/messages?${params.toString()}`);
     },
 
-    searchMessages(query: string, conversationId?: string, cursor?: string, limit?: number): Promise<Paginated<any>> {
+    searchMessages(query: string, conversationId?: string, cursor?: string, limit?: number): Promise<Paginated<SearchResultDto>> {
       const params = new URLSearchParams();
       params.append("q", query);
       if (conversationId) params.append("conversationId", conversationId);
       if (cursor) params.append("cursor", cursor);
       if (limit) params.append("limit", limit.toString());
-      return request<Paginated<any>>(`/api/chat/search?${params.toString()}`);
+      return request<Paginated<SearchResultDto>>(`/api/chat/search?${params.toString()}`);
     }
   };
 }
