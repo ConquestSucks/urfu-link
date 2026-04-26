@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -527,5 +528,123 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             .ConfigureAwait(false);
 
         return docs.Select(d => d.ToDomain()).ToList();
+    }
+
+    public async Task<IReadOnlyList<MessageSearchHit>> SearchAsync(
+        MessageSearchCriteria criteria,
+        IReadOnlyList<string> allowedConversationIds,
+        MessageSearchCursor? cursor,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(criteria);
+        ArgumentNullException.ThrowIfNull(allowedConversationIds);
+
+        if (limit <= 0 || allowedConversationIds.Count == 0 || string.IsNullOrWhiteSpace(criteria.Query))
+        {
+            return Array.Empty<MessageSearchHit>();
+        }
+
+        // Mongo requires $text in the pipeline's first $match stage; all non-score filters share
+        // that stage so the text index can drive selection. Score-based cursor matching has to
+        // come after $addFields below, since $meta:textScore is only addressable as a regular
+        // field once it has been projected.
+        var matchStage = new BsonDocument
+        {
+            { "$text", new BsonDocument("$search", criteria.Query) },
+            { "conversationId", new BsonDocument("$in", new BsonArray(allowedConversationIds)) },
+            { "threadRootId", BsonNull.Value },
+        };
+
+        if (criteria.SenderId is { } senderId)
+        {
+            matchStage.Add("senderId", new BsonBinaryData(senderId, GuidRepresentation.Standard));
+        }
+
+        if (criteria.DateFrom is { } from || criteria.DateTo is { } to)
+        {
+            var range = new BsonDocument();
+            if (criteria.DateFrom is { } f)
+            {
+                range.Add("$gte", f.UtcDateTime);
+            }
+            if (criteria.DateTo is { } t)
+            {
+                range.Add("$lte", t.UtcDateTime);
+            }
+            matchStage.Add("createdAtUtc", range);
+        }
+
+        if (criteria.HasAttachments == true)
+        {
+            matchStage.Add("attachments.0", new BsonDocument("$exists", true));
+        }
+        else if (criteria.HasAttachments == false)
+        {
+            matchStage.Add("$or", new BsonArray
+            {
+                new BsonDocument("attachments", new BsonDocument("$exists", false)),
+                new BsonDocument("attachments", new BsonDocument("$size", 0)),
+            });
+        }
+
+        if (criteria.AttachmentType is { } type)
+        {
+            // AttachmentDocument.Type is serialized as a string via BsonRepresentation.String.
+            matchStage.Add("attachments.type", type.ToString());
+        }
+
+        var stages = new List<BsonDocument>
+        {
+            new("$match", matchStage),
+            new("$addFields", new BsonDocument("_score", new BsonDocument("$meta", "textScore"))),
+        };
+
+        if (cursor is { } c)
+        {
+            // Keyset predicate for descending sort on (_score, createdAtUtc, _id): documents come
+            // after the cursor position iff one of the three lexicographic comparisons holds.
+            var cursorTs = c.CreatedAtUtc.UtcDateTime;
+            stages.Add(new("$match", new BsonDocument("$or", new BsonArray
+            {
+                new BsonDocument("_score", new BsonDocument("$lt", c.Score)),
+                new BsonDocument
+                {
+                    { "_score", c.Score },
+                    { "createdAtUtc", new BsonDocument("$lt", cursorTs) },
+                },
+                new BsonDocument
+                {
+                    { "_score", c.Score },
+                    { "createdAtUtc", cursorTs },
+                    { "_id", new BsonDocument("$lt", new BsonBinaryData(c.MessageId, GuidRepresentation.Standard)) },
+                },
+            })));
+        }
+
+        stages.Add(new("$sort", new BsonDocument
+        {
+            { "_score", -1 },
+            { "createdAtUtc", -1 },
+            { "_id", -1 },
+        }));
+        stages.Add(new("$limit", limit));
+
+        PipelineDefinition<MessageDocument, BsonDocument> pipeline = stages;
+
+        var raw = await context.Messages
+            .Aggregate(pipeline, cancellationToken: cancellationToken)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var hits = new List<MessageSearchHit>(raw.Count);
+        foreach (var doc in raw)
+        {
+            var score = doc.GetValue("_score", BsonDouble.Create(0.0)).ToDouble();
+            doc.Remove("_score");
+            var msgDoc = BsonSerializer.Deserialize<MessageDocument>(doc);
+            hits.Add(new MessageSearchHit(msgDoc.ToDomain(), score));
+        }
+        return hits;
     }
 }
