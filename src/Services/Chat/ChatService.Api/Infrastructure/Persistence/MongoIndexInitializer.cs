@@ -58,6 +58,50 @@ internal sealed class MongoIndexInitializer(ChatMongoContext context) : IHostedS
                         Background = true,
                         Sparse = true,
                     }),
+                // Thread-reply chronological lookups: GetThreadMessages walks replies for a given
+                // root in createdAt order, so the keys are (threadRootId, createdAtUtc) ascending.
+                // Sparse since main-flow messages have no threadRootId.
+                new CreateIndexModel<MessageDocument>(
+                    Builders<MessageDocument>.IndexKeys
+                        .Ascending(m => m.ThreadRootId)
+                        .Ascending(m => m.CreatedAtUtc),
+                    new CreateIndexOptions
+                    {
+                        Name = "ix_messages_threadRoot_createdAt",
+                        Background = true,
+                        Sparse = true,
+                    }),
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        var threadSubscriptions = context.ThreadSubscriptions;
+        await threadSubscriptions.Indexes.CreateManyAsync(
+            new[]
+            {
+                // Uniqueness on (rootMessageId, userId) prevents duplicate subscriptions and lets
+                // UpsertAsync rely on it as an atomicity backstop.
+                new CreateIndexModel<ThreadSubscriptionDocument>(
+                    Builders<ThreadSubscriptionDocument>.IndexKeys
+                        .Ascending(d => d.RootMessageId)
+                        .Ascending(d => d.UserId),
+                    new CreateIndexOptions
+                    {
+                        Name = "ux_thread_subscriptions_root_user",
+                        Background = true,
+                        Unique = true,
+                    }),
+                // Active-threads keyset pagination: filter by userId, sort by lastActivityAtUtc desc
+                // then rootMessageId desc as a deterministic tie-breaker.
+                new CreateIndexModel<ThreadSubscriptionDocument>(
+                    Builders<ThreadSubscriptionDocument>.IndexKeys
+                        .Ascending(d => d.UserId)
+                        .Descending(d => d.LastActivityAtUtc)
+                        .Descending(d => d.RootMessageId),
+                    new CreateIndexOptions
+                    {
+                        Name = "ix_thread_subscriptions_user_lastActivity_desc",
+                        Background = true,
+                    }),
             },
             cancellationToken).ConfigureAwait(false);
     }

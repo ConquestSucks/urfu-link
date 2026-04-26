@@ -75,6 +75,8 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
             .DeleteManyAsync(MongoDB.Driver.FilterDefinition<dynamic>.Empty);
         await ctx.Database.GetCollection<dynamic>(ChatMongoContext.MessagesCollectionName)
             .DeleteManyAsync(MongoDB.Driver.FilterDefinition<dynamic>.Empty);
+        await ctx.Database.GetCollection<dynamic>(ChatMongoContext.ThreadSubscriptionsCollectionName)
+            .DeleteManyAsync(MongoDB.Driver.FilterDefinition<dynamic>.Empty);
 
         var multiplexer = Services.GetRequiredService<IConnectionMultiplexer>();
         var endpoints = multiplexer.GetEndPoints();

@@ -221,3 +221,81 @@ public sealed class ChatReactionNotAllowedException : InvalidOperationException
 
     public string Emoji { get; private init; } = string.Empty;
 }
+
+public sealed class ChatThreadRootNotFoundException : InvalidOperationException
+{
+    public ChatThreadRootNotFoundException()
+    {
+    }
+
+    public ChatThreadRootNotFoundException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatThreadRootNotFoundException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public static ChatThreadRootNotFoundException For(Guid rootMessageId)
+        => new($"Thread root message '{rootMessageId:D}' was not found.")
+        {
+            RootMessageId = rootMessageId,
+        };
+
+    public Guid RootMessageId { get; private init; }
+}
+
+public sealed class ChatThreadCannotReplyToReplyException : InvalidOperationException
+{
+    public ChatThreadCannotReplyToReplyException()
+    {
+    }
+
+    public ChatThreadCannotReplyToReplyException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatThreadCannotReplyToReplyException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public static ChatThreadCannotReplyToReplyException For(Guid messageId)
+        => new($"Message '{messageId:D}' is itself a thread reply and cannot be used as a thread root.")
+        {
+            MessageId = messageId,
+        };
+
+    public Guid MessageId { get; private init; }
+}
+
+public sealed class ChatThreadReplyTargetNotInThreadException : InvalidOperationException
+{
+    public ChatThreadReplyTargetNotInThreadException()
+    {
+    }
+
+    public ChatThreadReplyTargetNotInThreadException(string message)
+        : base(message)
+    {
+    }
+
+    public ChatThreadReplyTargetNotInThreadException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public static ChatThreadReplyTargetNotInThreadException For(Guid replyToMessageId, Guid rootMessageId)
+        => new($"Quote target '{replyToMessageId:D}' does not belong to thread '{rootMessageId:D}'.")
+        {
+            ReplyToMessageId = replyToMessageId,
+            RootMessageId = rootMessageId,
+        };
+
+    public Guid ReplyToMessageId { get; private init; }
+
+    public Guid RootMessageId { get; private init; }
+}

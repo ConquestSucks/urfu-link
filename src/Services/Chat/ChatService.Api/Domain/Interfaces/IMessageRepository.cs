@@ -115,6 +115,31 @@ public interface IMessageRepository
     Task<bool> AddReadByAsync(Guid messageId, ReadReceipt receipt, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<ReadReceipt>> GetReadReceiptsAsync(Guid messageId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Atomically updates the denormalized thread counters on the root message in a single
+    /// pipeline op: increments <c>threadReplyCount</c>, unions the replier into
+    /// <c>threadParticipants</c>, and bumps <c>threadLastReplyAtUtc</c>. The filter requires the
+    /// target to be a non-deleted root message (<c>threadRootId</c> null) so a thread reply
+    /// cannot be promoted into a root by mistake. Returns false if no document matched.
+    /// </summary>
+    Task<bool> IncrementThreadDenormAsync(
+        Guid rootMessageId,
+        Guid replierUserId,
+        DateTimeOffset atUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Cursor-paginated list of replies in the thread rooted at <paramref name="rootMessageId"/>,
+    /// ordered chronologically (Older direction returns newest-first; Newer returns oldest-first
+    /// past the cursor — same semantics as <see cref="ListByConversationAsync"/>).
+    /// </summary>
+    Task<IReadOnlyList<Message>> ListThreadAsync(
+        Guid rootMessageId,
+        MessageCursor? cursor,
+        int limit,
+        CursorDirection direction,
+        CancellationToken cancellationToken);
 }
 
 public sealed class DuplicateClientMessageException : InvalidOperationException

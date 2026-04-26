@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.SignalR;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
+using Urfu.Link.Services.Chat.Application.Threads;
 using Urfu.Link.Services.Chat.Domain.Enums;
+using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
 // PinMessageService and UnpinMessageService live in Application.Conversations.
 
@@ -18,6 +20,13 @@ public sealed record SendMessageHubInput(
 
 public sealed record EditMessageHubInput(Guid MessageId, string NewBody);
 
+public sealed record ReplyInThreadHubInput(
+    Guid RootMessageId,
+    string Body,
+    IReadOnlyList<Guid> AttachmentAssetIds,
+    string ClientMessageId,
+    Guid? ReplyToMessageId = null);
+
 [Authorize]
 public sealed class ChatHub(
     OpenDirectConversationService openDirect,
@@ -30,7 +39,11 @@ public sealed class ChatHub(
     AddReactionService addReaction,
     RemoveReactionService removeReaction,
     PinMessageService pinMessage,
-    UnpinMessageService unpinMessage) : Hub<IChatClient>
+    UnpinMessageService unpinMessage,
+    ReplyInThreadService replyInThread,
+    JoinThreadService joinThread,
+    LeaveThreadService leaveThread,
+    GetThreadMessagesQuery getThreadMessages) : Hub<IChatClient>
 {
     public async Task<ConversationDto> OpenDirectConversation(Guid peerUserId)
     {
@@ -129,4 +142,41 @@ public sealed class ChatHub(
             Context.ConnectionAborted);
     }
 
+    public Task<MessageDto> ReplyInThread(ReplyInThreadHubInput input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        var caller = Context.User!.GetUserId();
+        return replyInThread.ReplyAsync(
+            new ReplyInThreadRequest(
+                caller,
+                input.RootMessageId,
+                input.Body ?? string.Empty,
+                input.AttachmentAssetIds ?? Array.Empty<Guid>(),
+                input.ReplyToMessageId,
+                input.ClientMessageId),
+            Context.ConnectionAborted);
+    }
+
+    public Task JoinThread(Guid rootMessageId)
+    {
+        var caller = Context.User!.GetUserId();
+        return joinThread.JoinAsync(new JoinThreadRequest(caller, rootMessageId), Context.ConnectionAborted);
+    }
+
+    public Task LeaveThread(Guid rootMessageId)
+    {
+        var caller = Context.User!.GetUserId();
+        return leaveThread.LeaveAsync(new LeaveThreadRequest(caller, rootMessageId), Context.ConnectionAborted);
+    }
+
+    /// <summary>
+    /// Walks the thread reply list. Defaults to <see cref="CursorDirection.Older"/> so an empty
+    /// cursor returns the most recent replies first — matching the main-flow REST contract.
+    /// </summary>
+    public Task<CursorPage<MessageDto>> GetThreadMessages(Guid rootMessageId, string? cursor, int? limit)
+    {
+        var caller = Context.User!.GetUserId();
+        return getThreadMessages.ExecuteAsync(
+            rootMessageId, caller, cursor, limit, CursorDirection.Older, Context.ConnectionAborted);
+    }
 }

@@ -13,6 +13,7 @@ public sealed class ChatMongoContext : IDisposable
 {
     public const string ConversationsCollectionName = "conversations";
     public const string MessagesCollectionName = "messages";
+    public const string ThreadSubscriptionsCollectionName = "thread_subscriptions";
 
     private readonly MongoClient _client;
     private readonly IMongoDatabase _database;
@@ -47,4 +48,7 @@ public sealed class ChatMongoContext : IDisposable
 
     internal IMongoCollection<MessageDocument> Messages
         => _database.GetCollection<MessageDocument>(MessagesCollectionName);
+
+    internal IMongoCollection<ThreadSubscriptionDocument> ThreadSubscriptions
+        => _database.GetCollection<ThreadSubscriptionDocument>(ThreadSubscriptionsCollectionName);
 }

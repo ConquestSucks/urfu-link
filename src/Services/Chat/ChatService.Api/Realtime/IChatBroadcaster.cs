@@ -65,4 +65,26 @@ public interface IChatBroadcaster
         string conversationId,
         IReadOnlyList<MessageDto> pinnedMessages,
         CancellationToken cancellationToken);
+
+    Task NotifyThreadReplyReceivedAsync(
+        IReadOnlyList<Guid> subscriberUserIds,
+        Guid rootMessageId,
+        MessageDto reply,
+        CancellationToken cancellationToken);
+
+    Task NotifyThreadRootUpdatedAsync(
+        IReadOnlyList<Guid> participantUserIds,
+        string conversationId,
+        Guid rootMessageId,
+        int replyCount,
+        IReadOnlyList<Guid> participants,
+        DateTimeOffset lastReplyAtUtc,
+        CancellationToken cancellationToken);
+
+    Task NotifyThreadParticipantJoinedAsync(
+        IReadOnlyList<Guid> subscriberUserIds,
+        Guid rootMessageId,
+        Guid joinedUserId,
+        ThreadSubscriptionReason reason,
+        CancellationToken cancellationToken);
 }

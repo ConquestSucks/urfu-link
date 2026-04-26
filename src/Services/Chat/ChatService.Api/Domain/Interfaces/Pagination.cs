@@ -9,3 +9,5 @@ public enum CursorDirection
 public readonly record struct ConversationCursor(DateTimeOffset LastMessageAtUtc, string ConversationId);
 
 public readonly record struct MessageCursor(DateTimeOffset CreatedAtUtc, Guid MessageId);
+
+public readonly record struct ThreadActivityCursor(DateTimeOffset LastActivityAtUtc, Guid RootMessageId);
