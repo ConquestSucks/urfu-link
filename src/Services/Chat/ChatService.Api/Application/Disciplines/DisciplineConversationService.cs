@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.Services.Chat.Application.Contracts;
@@ -15,11 +16,17 @@ namespace Urfu.Link.Services.Chat.Application.Disciplines;
 /// notification is emitted so connected clients see participant updates in real time, and
 /// the matching chat integration event is published on <c>urfu.chat.events.v1</c> for any
 /// downstream consumer (notifications, search, analytics).
+///
+/// Invariant ownership: the source of truth for discipline membership (incl. the rule
+/// "≥1 Teacher per discipline") is DisciplineService — the upstream aggregate enforces it.
+/// This projection follows whatever events arrive; any drift (e.g. the last Teacher leaving)
+/// is logged at Warning so operators can detect upstream invariant violations.
 /// </summary>
 public sealed class DisciplineConversationService(
     IConversationRepository conversations,
     IChatBroadcaster broadcaster,
-    ChatEventDispatcher dispatcher)
+    ChatEventDispatcher dispatcher,
+    ILogger<DisciplineConversationService> logger)
 {
     public async Task HandleDisciplineCreatedAsync(
         DisciplineCreatedEvent evt,
@@ -164,6 +171,8 @@ public sealed class DisciplineConversationService(
             return;
         }
 
+        WarnIfLastTeacherLost(conversation, evt.UserId);
+
         // Notify the pre-removal participant list — including the unenrolled user themselves so
         // their other open sessions can drop the chat from their list.
         await broadcaster
@@ -189,6 +198,7 @@ public sealed class DisciplineConversationService(
             return;
         }
 
+        var oldRole = conversation.RoleOf(evt.UserId);
         var newRole = MapRole(evt.NewRole);
         var changed = await conversations
             .ChangeParticipantRoleAsync(conversation.Id, evt.UserId, newRole, cancellationToken)
@@ -196,6 +206,11 @@ public sealed class DisciplineConversationService(
         if (!changed)
         {
             return;
+        }
+
+        if (oldRole == ParticipantRole.Teacher && newRole != ParticipantRole.Teacher)
+        {
+            WarnIfLastTeacherLost(conversation, evt.UserId);
         }
 
         await broadcaster
@@ -240,6 +255,27 @@ public sealed class DisciplineConversationService(
         await dispatcher.PublishAsync(
             new ChatConversationArchivedEvent(conversation.Id, evt.OccurredAtUtc),
             cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// DisciplineService owns the "≥1 Teacher per discipline" invariant. If we observe an event
+    /// that would leave the chat without any Teacher, that's a sign the upstream invariant
+    /// failed (or there's a race / replay we should look at). Loud Warning + structured
+    /// payload so operators can alert on it.
+    /// </summary>
+    private void WarnIfLastTeacherLost(Conversation conversation, Guid userIdLeavingTeacherRole)
+    {
+        var remainingTeachers = conversation.ParticipantRoles
+            .Where(kv => kv.Key != userIdLeavingTeacherRole && kv.Value == ParticipantRole.Teacher)
+            .Count();
+        if (remainingTeachers == 0)
+        {
+            logger.LogWarning(
+                "Discipline conversation {ConversationId} has no Teacher participants left after {UserId} stepped down. " +
+                "DisciplineService is expected to enforce the ≥1 Teacher invariant — this is a drift signal.",
+                conversation.Id,
+                userIdLeavingTeacherRole);
+        }
     }
 
     private static ParticipantRole MapRole(DisciplineRole role) => role switch

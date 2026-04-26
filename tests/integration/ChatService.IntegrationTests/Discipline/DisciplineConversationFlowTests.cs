@@ -528,7 +528,8 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
         _scopes.Add(scope);
         var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
         var dispatcher = scope.ServiceProvider.GetRequiredService<Urfu.Link.Services.Chat.Application.ChatEventDispatcher>();
-        return new DisciplineConversationService(repo, _factory.ChatBroadcaster, dispatcher);
+        var logger = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DisciplineConversationService>>();
+        return new DisciplineConversationService(repo, _factory.ChatBroadcaster, dispatcher, logger);
     }
 
     private IConversationRepository ResolveRepo()
