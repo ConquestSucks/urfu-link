@@ -13,8 +13,10 @@ using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Conversations;
+using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Application.Threads;
+using Urfu.Link.Services.Chat.Messaging;
 using Urfu.Link.Services.Chat.Domain;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Endpoints.Messages;
@@ -115,6 +117,8 @@ public static class ModuleRegistration
         services.AddScoped<GetThreadMessagesQuery>();
         services.AddScoped<GetUserActiveThreadsQuery>();
         services.AddScoped<SearchMessagesQuery>();
+        services.AddScoped<DisciplineConversationService>();
+        services.AddHostedService<DisciplineEventConsumer>();
 
         // Per-user fixed window for /chat/search (issue #213 — 30 req/min per user).
         // ChatSearchRateLimitFilter resolves this limiter via [FromKeyedServices(name)].

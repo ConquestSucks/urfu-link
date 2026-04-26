@@ -1,6 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence.Documents;
@@ -167,5 +168,113 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         return docs.Select(d => d.ToDomain()).ToList();
+    }
+
+    public async Task<Conversation?> GetByDisciplineIdAsync(Guid disciplineId, CancellationToken cancellationToken)
+    {
+        var doc = await context.Conversations
+            .Find(c => c.DisciplineId == disciplineId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return doc?.ToDomain();
+    }
+
+    public async Task<bool> AddParticipantAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken)
+    {
+        // Step 1: append to participants only if not already present.
+        var addParticipantFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Ne(
+                "participants",
+                new BsonBinaryData(userId, GuidRepresentation.Standard)));
+        var addResult = await context.Conversations
+            .UpdateOneAsync(
+                addParticipantFilter,
+                Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        var added = addResult.ModifiedCount > 0;
+
+        // Step 2: upsert role entry. Always replaces to keep role consistent if it drifted.
+        var pull = Builders<ConversationDocument>.Update.PullFilter(
+            "participantRoles",
+            Builders<ParticipantRoleEntry>.Filter.Eq(e => e.UserId, userId));
+        await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, pull, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        var push = Builders<ConversationDocument>.Update.Push(
+            "participantRoles",
+            new ParticipantRoleEntry(userId, role));
+        await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, push, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return added;
+    }
+
+    public async Task<bool> RemoveParticipantAsync(
+        string conversationId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var update = Builders<ConversationDocument>.Update
+            .Pull(c => c.Participants, userId)
+            .PullFilter(
+                "participantRoles",
+                Builders<ParticipantRoleEntry>.Filter.Eq(e => e.UserId, userId));
+        var result = await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> ChangeParticipantRoleAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole newRole,
+        CancellationToken cancellationToken)
+    {
+        var pullFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.AnyEq(c => c.Participants, userId));
+        var pull = Builders<ConversationDocument>.Update.PullFilter(
+            "participantRoles",
+            Builders<ParticipantRoleEntry>.Filter.Eq(e => e.UserId, userId));
+        var pulled = await context.Conversations
+            .UpdateOneAsync(pullFilter, pull, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (pulled.MatchedCount == 0)
+        {
+            return false;
+        }
+
+        var push = Builders<ConversationDocument>.Update.Push(
+            "participantRoles",
+            new ParticipantRoleEntry(userId, newRole));
+        var pushed = await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, push, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return pushed.ModifiedCount > 0;
+    }
+
+    public async Task<bool> ArchiveAsync(
+        string conversationId,
+        DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Eq(c => c.ArchivedAtUtc, (DateTime?)null));
+        var update = Builders<ConversationDocument>.Update.Set(c => c.ArchivedAtUtc, archivedAtUtc.UtcDateTime);
+        var result = await context.Conversations
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
     }
 }
