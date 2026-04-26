@@ -109,6 +109,7 @@ public static class ModuleRegistration
         services.AddScoped<UnpinMessageService>();
         services.AddScoped<GetUserConversationsQuery>();
         services.AddScoped<GetConversationQuery>();
+        services.AddScoped<GetConversationParticipantsQuery>();
         services.AddScoped<GetConversationMessagesQuery>();
         services.AddScoped<GetReadReceiptsQuery>();
         services.AddScoped<ReplyInThreadService>();

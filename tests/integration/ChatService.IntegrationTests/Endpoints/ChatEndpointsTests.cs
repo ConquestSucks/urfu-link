@@ -159,6 +159,95 @@ public class ChatEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Get_ConversationParticipants_AsParticipant_ReturnsRoles()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        string conversationId;
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+            await disc.HandleDisciplineCreatedAsync(
+                new Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineCreatedEvent(
+                    disciplineId, "PT1", "Participants test", null, "2026", teacherId, null),
+                default);
+            await disc.HandleUserEnrolledAsync(
+                new Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.UserEnrolledEvent(
+                    disciplineId, studentId,
+                    Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineRole.Student,
+                    teacherId),
+                default);
+            var repo = seed.ServiceProvider.GetRequiredService<Urfu.Link.Services.Chat.Domain.Interfaces.IConversationRepository>();
+            var conv = await repo.GetByDisciplineIdAsync(disciplineId, default);
+            conversationId = conv!.Id;
+        }
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(teacherId);
+        using var client = _factory.CreateClient();
+        var participants = await client.GetFromJsonAsync<List<ConversationParticipantDto>>(
+            $"/api/v1/chat/conversations/{conversationId}/participants");
+
+        participants.Should().NotBeNull();
+        participants!.Should().HaveCount(2);
+        participants.Should().Contain(p => p.UserId == teacherId
+            && p.Role == Urfu.Link.Services.Chat.Domain.Enums.ParticipantRole.Teacher);
+        participants.Should().Contain(p => p.UserId == studentId
+            && p.Role == Urfu.Link.Services.Chat.Domain.Enums.ParticipantRole.Student);
+    }
+
+    [Fact]
+    public async Task Get_ConversationParticipants_AsNonParticipant_NonSuccess()
+    {
+        var teacherId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        string conversationId;
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+            await disc.HandleDisciplineCreatedAsync(
+                new Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineCreatedEvent(
+                    disciplineId, "PT2", "x", null, "2026", teacherId, null),
+                default);
+            var repo = seed.ServiceProvider.GetRequiredService<Urfu.Link.Services.Chat.Domain.Interfaces.IConversationRepository>();
+            var conv = await repo.GetByDisciplineIdAsync(disciplineId, default);
+            conversationId = conv!.Id;
+        }
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/v1/chat/conversations/{conversationId}/participants");
+
+        response.IsSuccessStatusCode.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Get_ConversationParticipants_AsAdmin_BypassesParticipantCheck()
+    {
+        var teacherId = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+        string conversationId;
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+            await disc.HandleDisciplineCreatedAsync(
+                new Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineCreatedEvent(
+                    disciplineId, "PT3", "x", null, "2026", teacherId, null),
+                default);
+            var repo = seed.ServiceProvider.GetRequiredService<Urfu.Link.Services.Chat.Domain.Interfaces.IConversationRepository>();
+            var conv = await repo.GetByDisciplineIdAsync(disciplineId, default);
+            conversationId = conv!.Id;
+        }
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin(Guid.NewGuid());
+        using var client = _factory.CreateClient();
+        var participants = await client.GetFromJsonAsync<List<ConversationParticipantDto>>(
+            $"/api/v1/chat/conversations/{conversationId}/participants");
+
+        participants.Should().ContainSingle().Which.UserId.Should().Be(teacherId);
+    }
+
+    [Fact]
     public async Task Get_ConversationMessages_ReturnsCursorPage()
     {
         var caller = Guid.NewGuid();
