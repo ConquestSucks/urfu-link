@@ -38,7 +38,7 @@ public class PinningServicesTests
         _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(conv);
         var msg = Message.Send(Guid.NewGuid(), conv.Id, Caller, "x", Array.Empty<Attachment>(), "c", _clock.GetUtcNow());
         _messages.GetByIdAsync(msg.Id, Arg.Any<CancellationToken>()).Returns(msg);
-        _roles.CanPinAsync(Arg.Any<Guid>(), conv, Arg.Any<CancellationToken>()).Returns(canPin);
+        _roles.CanPinAsync(Arg.Any<Guid>(), Arg.Any<bool>(), conv, Arg.Any<CancellationToken>()).Returns(canPin);
         return (conv, msg);
     }
 
@@ -64,9 +64,29 @@ public class PinningServicesTests
     {
         var (conv, msg) = Seed();
 
-        var act = () => BuildPin().PinAsync(new PinMessageRequest(conv.Id, Stranger, msg.Id), default);
+        var act = () => BuildPin().PinAsync(new PinMessageRequest(conv.Id, Stranger, false, msg.Id), default);
 
         await act.Should().ThrowAsync<ChatAccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task PinAsync_AdminNotParticipant_AllowedWhenResolverApproves()
+    {
+        var (conv, msg) = Seed();
+        _conversations.AddPinnedMessageAsync(conv.Id, msg.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>())
+            .Returns(conv,
+                Conversation.Hydrate(conv.Id, ConversationType.Direct, conv.Participants, conv.CreatedAtUtc,
+                    conv.LastMessageAtUtc, conv.LastMessagePreview, new[] { msg.Id }));
+        _messages.GetByIdsAsync(conv.Id, Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new[] { msg });
+
+        var dtos = await BuildPin().PinAsync(
+            new PinMessageRequest(conv.Id, Stranger, CallerIsAdmin: true, msg.Id), default);
+
+        dtos.Should().ContainSingle();
+        _outbox.Captured.OfType<ChatMessagePinnedEvent>().Should().ContainSingle();
     }
 
     [Fact]
@@ -74,7 +94,7 @@ public class PinningServicesTests
     {
         var (conv, msg) = Seed(canPin: false);
 
-        var act = () => BuildPin().PinAsync(new PinMessageRequest(conv.Id, Caller, msg.Id), default);
+        var act = () => BuildPin().PinAsync(new PinMessageRequest(conv.Id, Caller, false, msg.Id), default);
 
         await act.Should().ThrowAsync<ChatAccessDeniedException>();
     }
@@ -92,7 +112,7 @@ public class PinningServicesTests
         _messages.GetByIdsAsync(conv.Id, Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new[] { msg });
 
-        var dtos = await BuildPin().PinAsync(new PinMessageRequest(conv.Id, Caller, msg.Id), default);
+        var dtos = await BuildPin().PinAsync(new PinMessageRequest(conv.Id, Caller, false, msg.Id), default);
 
         dtos.Should().ContainSingle();
         _outbox.Captured.OfType<ChatMessagePinnedEvent>().Should().ContainSingle();
@@ -108,7 +128,7 @@ public class PinningServicesTests
         _conversations.AddPinnedMessageAsync(conv.Id, msg.Id, Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(false);
 
-        var act = () => BuildPin(maxPinned: 5).PinAsync(new PinMessageRequest(conv.Id, Caller, msg.Id), default);
+        var act = () => BuildPin(maxPinned: 5).PinAsync(new PinMessageRequest(conv.Id, Caller, false, msg.Id), default);
 
         await act.Should().ThrowAsync<ChatPinLimitExceededException>();
     }
@@ -120,11 +140,11 @@ public class PinningServicesTests
         var withPinned = Conversation.Hydrate(conv.Id, ConversationType.Direct, conv.Participants, conv.CreatedAtUtc,
             conv.LastMessageAtUtc, conv.LastMessagePreview, new[] { msg.Id });
         _conversations.GetByIdAsync(conv.Id, Arg.Any<CancellationToken>()).Returns(withPinned);
-        _roles.CanPinAsync(Arg.Any<Guid>(), Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(true);
+        _roles.CanPinAsync(Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(true);
         _messages.GetByIdsAsync(conv.Id, Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new[] { msg });
 
-        await BuildPin().PinAsync(new PinMessageRequest(conv.Id, Caller, msg.Id), default);
+        await BuildPin().PinAsync(new PinMessageRequest(conv.Id, Caller, false, msg.Id), default);
 
         _outbox.Captured.OfType<ChatMessagePinnedEvent>().Should().BeEmpty();
         await _conversations.DidNotReceive().AddPinnedMessageAsync(
@@ -139,7 +159,7 @@ public class PinningServicesTests
         _messages.GetByIdsAsync(conv.Id, Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Message>());
 
-        var dtos = await BuildUnpin().UnpinAsync(new UnpinMessageRequest(conv.Id, Caller, msg.Id), default);
+        var dtos = await BuildUnpin().UnpinAsync(new UnpinMessageRequest(conv.Id, Caller, false, msg.Id), default);
 
         dtos.Should().BeEmpty();
         _outbox.Captured.OfType<ChatMessageUnpinnedEvent>().Should().ContainSingle();
@@ -154,7 +174,7 @@ public class PinningServicesTests
         var (conv, msg) = Seed();
         _conversations.RemovePinnedMessageAsync(conv.Id, msg.Id, Arg.Any<CancellationToken>()).Returns(false);
 
-        await BuildUnpin().UnpinAsync(new UnpinMessageRequest(conv.Id, Caller, msg.Id), default);
+        await BuildUnpin().UnpinAsync(new UnpinMessageRequest(conv.Id, Caller, false, msg.Id), default);
 
         _outbox.Captured.OfType<ChatMessageUnpinnedEvent>().Should().BeEmpty();
     }

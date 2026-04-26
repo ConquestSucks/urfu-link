@@ -27,7 +27,8 @@ public sealed class PinMessageEndpoint(PinMessageService service)
         ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
         var dtos = await service.PinAsync(
-            new PinMessageRequest(req.Id, caller, req.MessageId), ct).ConfigureAwait(false);
+            new PinMessageRequest(req.Id, caller, User.IsAdmin(), req.MessageId),
+            ct).ConfigureAwait(false);
         await Send.OkAsync(dtos, ct).ConfigureAwait(false);
     }
 }

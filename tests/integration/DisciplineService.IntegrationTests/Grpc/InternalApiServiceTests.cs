@@ -25,10 +25,22 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
 
     private InternalApi.InternalApiClient CreateClient()
     {
-        // gRPC service is wired with .RequireAuthorization(); short-circuit the
-        // JWT pipeline by seeding the test principal that TestAuthHandler will
-        // surface for any incoming request.
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid(), "service");
+        // gRPC service requires the dedicated service-role policy. The test principal
+        // mirrors the chat-service-internal Keycloak service-account: authenticated +
+        // bearing the service:discipline-read realm role.
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(
+            Guid.NewGuid(),
+            "service:discipline-read");
+        var handler = _factory.Server.CreateHandler();
+        var channel = GrpcChannel.ForAddress(
+            _factory.Server.BaseAddress,
+            new GrpcChannelOptions { HttpHandler = handler });
+        return new InternalApi.InternalApiClient(channel);
+    }
+
+    private InternalApi.InternalApiClient CreateClientAs(params string[] roles)
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid(), roles);
         var handler = _factory.Server.CreateHandler();
         var channel = GrpcChannel.ForAddress(
             _factory.Server.BaseAddress,
@@ -43,6 +55,29 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
         var reply = await grpc.PingAsync(new PingRequest { Message = "hi" });
         reply.Service.Should().Be("discipline-service");
         reply.Message.Should().Be("pong:hi");
+    }
+
+    [Fact]
+    public async Task CallerWithoutDisciplineReadRole_GetsPermissionDenied()
+    {
+        // Authenticated end-user (student) has no service:discipline-read role and no admin
+        // override, so the gRPC policy must reject before the handler executes — otherwise an
+        // enrolled student could fetch any other discipline's roster.
+        var grpc = CreateClientAs("student");
+        var act = async () => await grpc.PingAsync(new PingRequest { Message = "denied" });
+
+        var rpc = await act.Should().ThrowAsync<global::Grpc.Core.RpcException>();
+        rpc.Which.StatusCode.Should().BeOneOf(
+            global::Grpc.Core.StatusCode.PermissionDenied,
+            global::Grpc.Core.StatusCode.Unauthenticated);
+    }
+
+    [Fact]
+    public async Task AdminCaller_Allowed()
+    {
+        var grpc = CreateClientAs("admin");
+        var reply = await grpc.PingAsync(new PingRequest { Message = "admin" });
+        reply.Service.Should().Be("discipline-service");
     }
 
     [Fact]

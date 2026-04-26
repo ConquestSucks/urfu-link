@@ -148,7 +148,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
         await using (var pinScope = _factory.Services.CreateAsyncScope())
         {
             var pin = pinScope.ServiceProvider.GetRequiredService<PinMessageService>();
-            await pin.PinAsync(new PinMessageRequest(conv.Id, caller, msg.Id), default);
+            await pin.PinAsync(new PinMessageRequest(conv.Id, caller, false, msg.Id), default);
         }
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 

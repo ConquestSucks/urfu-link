@@ -7,7 +7,11 @@ using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Conversations;
 
-public sealed record UnpinMessageRequest(string ConversationId, Guid CallerUserId, Guid MessageId);
+public sealed record UnpinMessageRequest(
+    string ConversationId,
+    Guid CallerUserId,
+    bool CallerIsAdmin,
+    Guid MessageId);
 
 public sealed class UnpinMessageService(
     IConversationRepository conversations,
@@ -24,12 +28,14 @@ public sealed class UnpinMessageService(
         var conversation = await conversations.GetByIdAsync(request.ConversationId, cancellationToken).ConfigureAwait(false)
             ?? throw ConversationNotFoundException.For(request.ConversationId);
 
-        if (!conversation.IsParticipant(request.CallerUserId))
+        if (!request.CallerIsAdmin && !conversation.IsParticipant(request.CallerUserId))
         {
             throw new ChatAccessDeniedException(request.ConversationId, request.CallerUserId);
         }
 
-        var canPin = await roleResolver.CanPinAsync(request.CallerUserId, conversation, cancellationToken).ConfigureAwait(false);
+        var canPin = await roleResolver
+            .CanPinAsync(request.CallerUserId, request.CallerIsAdmin, conversation, cancellationToken)
+            .ConfigureAwait(false);
         if (!canPin)
         {
             throw new ChatAccessDeniedException(request.ConversationId, request.CallerUserId);

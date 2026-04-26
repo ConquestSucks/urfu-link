@@ -12,7 +12,8 @@
       { "name": "user" },
       { "name": "service" },
       { "name": "teacher", "description": "Discipline owner / instructor" },
-      { "name": "student", "description": "Discipline participant" }
+      { "name": "student", "description": "Discipline participant" },
+      { "name": "service:discipline-read", "description": "Allows internal gRPC reads on DisciplineService.InternalApi (membership/listing)" }
     ]
   },
   "clients": [
@@ -210,6 +211,43 @@
       "secret": "user-service-admin-dev-secret"
     },
     {
+      "clientId": "chat-service-internal",
+      "name": "Chat Service (internal)",
+      "description": "Service-account client used by ChatService to call DisciplineService.InternalApi gRPC. The associated service-account user holds the realm role 'service:discipline-read'.",
+      "enabled": true,
+      "publicClient": false,
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "protocol": "openid-connect",
+      "secret": "chat-service-internal-dev-secret",
+      "protocolMappers": [
+        {
+          "name": "urfu-link-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "urfu-link-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm roles to roles claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    },
+    {
       "clientId": "minio-console",
       "name": "MinIO Console",
       "enabled": true,
@@ -293,6 +331,12 @@
       "clientRoles": {
         "realm-management": ["view-users", "manage-users", "query-users"]
       }
+    },
+    {
+      "username": "service-account-chat-service-internal",
+      "enabled": true,
+      "serviceAccountClientId": "chat-service-internal",
+      "realmRoles": ["service:discipline-read"]
     }
   ]
 }

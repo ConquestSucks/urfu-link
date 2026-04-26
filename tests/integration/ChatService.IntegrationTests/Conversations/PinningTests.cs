@@ -33,7 +33,7 @@ public class PinningTests : IAsyncLifetime
         await using var scope = _factory.Services.CreateAsyncScope();
         var pin = scope.ServiceProvider.GetRequiredService<PinMessageService>();
 
-        var pinned = await pin.PinAsync(new PinMessageRequest(conv.Id, sender, msg.Id), default);
+        var pinned = await pin.PinAsync(new PinMessageRequest(conv.Id, sender, false, msg.Id), default);
 
         pinned.Should().ContainSingle(m => m.Id == msg.Id);
         var loaded = await scope.ServiceProvider.GetRequiredService<IConversationRepository>()
@@ -63,7 +63,7 @@ public class PinningTests : IAsyncLifetime
             default);
 
         var pin = scope.ServiceProvider.GetRequiredService<PinMessageService>();
-        var act = () => pin.PinAsync(new PinMessageRequest(conv.Id, sender, sixthMsg.Id), default);
+        var act = () => pin.PinAsync(new PinMessageRequest(conv.Id, sender, false, sixthMsg.Id), default);
 
         await act.Should().ThrowAsync<ChatPinLimitExceededException>();
     }
@@ -86,7 +86,7 @@ public class PinningTests : IAsyncLifetime
         await convRepo.TryCreateAsync(groupConv, default);
 
         // Tighten the fake to match production stub: only Direct conversations allow pinning.
-        _factory.DisciplineRoleResolver.Predicate = (_, c) => c.Type == ConversationType.Direct;
+        _factory.DisciplineRoleResolver.Predicate = (_, _, c) => c.Type == ConversationType.Direct;
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var msg = await send.SendAsync(
@@ -94,7 +94,7 @@ public class PinningTests : IAsyncLifetime
             default);
 
         var pin = scope.ServiceProvider.GetRequiredService<PinMessageService>();
-        var act = () => pin.PinAsync(new PinMessageRequest(groupConv.Id, caller, msg.Id), default);
+        var act = () => pin.PinAsync(new PinMessageRequest(groupConv.Id, caller, false, msg.Id), default);
 
         await act.Should().ThrowAsync<ChatAccessDeniedException>();
     }
@@ -106,11 +106,11 @@ public class PinningTests : IAsyncLifetime
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var pin = scope.ServiceProvider.GetRequiredService<PinMessageService>();
-        await pin.PinAsync(new PinMessageRequest(conv.Id, sender, msg.Id), default);
+        await pin.PinAsync(new PinMessageRequest(conv.Id, sender, false, msg.Id), default);
         _factory.OutboxWriter.Clear();
 
         var unpin = scope.ServiceProvider.GetRequiredService<UnpinMessageService>();
-        var pinnedAfter = await unpin.UnpinAsync(new UnpinMessageRequest(conv.Id, sender, msg.Id), default);
+        var pinnedAfter = await unpin.UnpinAsync(new UnpinMessageRequest(conv.Id, sender, false, msg.Id), default);
 
         pinnedAfter.Should().BeEmpty();
         _factory.OutboxWriter.Published

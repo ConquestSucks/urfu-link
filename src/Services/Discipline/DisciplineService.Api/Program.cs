@@ -1,4 +1,5 @@
 using DisciplineService.Api.Infrastructure;
+using DisciplineService.Api.Infrastructure.Auth;
 using DisciplineService.Api.Infrastructure.Persistence;
 using DisciplineService.Api.Messaging;
 using DisciplineService.Api.Services;
@@ -22,6 +23,16 @@ builder.Services.SwaggerDocument(o =>
     };
 });
 builder.Services.AddServiceDefaults(builder.Configuration, "discipline-service");
+
+// Internal gRPC API is only callable by callers that carry either the dedicated
+// service:discipline-read realm role (granted to chat-service-internal in
+// Keycloak) or the global admin role. End-user JWTs without one of these roles
+// land on 403 even after authentication, so an enrolled student cannot fetch
+// another discipline's roster through gRPC.
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(InternalGrpcAuthorizationPolicy.PolicyName, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(InternalGrpcAuthorizationPolicy.AllowedRoles));
 
 // Transactional outbox lives in AddDisciplineModule (EfOutboxWriter +
 // DisciplineOutboxRelay). Only the Kafka producer ships from BuildingBlocks
@@ -50,7 +61,8 @@ app.UseFastEndpoints(c =>
 app.UseSwaggerGen();
 app.MapScalarApiReference(o =>
     o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
-app.MapGrpcService<InternalApiService>().RequireAuthorization();
+app.MapGrpcService<InternalApiService>()
+    .RequireAuthorization(InternalGrpcAuthorizationPolicy.PolicyName);
 
 await app.RunAsync();
 
