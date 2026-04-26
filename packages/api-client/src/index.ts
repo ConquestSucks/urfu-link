@@ -22,12 +22,21 @@ export type {
 export type {
   ConversationType,
   ConversationPreview,
+  ConversationPreviewSnippet,
   MessageState,
   AttachmentType,
   ChatAttachment,
+  ReplyToDto,
+  ForwardedFromDto,
+  ReactionsSummary,
+  DeleteMode,
   MessageDto,
   Paginated,
   SearchResultDto,
+  SearchFilters,
+  ReadReceiptDto,
+  ThreadSubscriptionReason,
+  ActiveThreadDto,
 } from "./chat";
 
 export type {

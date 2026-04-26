@@ -7,6 +7,7 @@ import { InboxSubjectSkeleton } from "@/entities/inbox-subject";
 import { Header } from "./Header";
 import { List } from "./List";
 import { InboxListProps } from "../model/components";
+import { GlobalSearchPanel, useSearchStore } from "@/features/chat-search";
 
 interface InboxProps<T> extends InboxListProps<T> {
     data: T[];
@@ -16,6 +17,8 @@ interface InboxProps<T> extends InboxListProps<T> {
 
 export const Inbox = <T,>({ data, renderItem, isLoading }: InboxProps<T>) => {
     const { currentTab, currentView } = useInboxRouting();
+    const globalQuery = useSearchStore((s) => s.globalQuery);
+    const isSearchActive = globalQuery.length >= 2;
 
     const title = currentTab === "chats" ? "Личные чаты" : "Предметы";
 
@@ -23,7 +26,9 @@ export const Inbox = <T,>({ data, renderItem, isLoading }: InboxProps<T>) => {
         <View className="bg-app-panel w-[calc(384/1359*100vw)] h-full gap-4 border-r border-white/5">
             <Header title={title} />
 
-            {isLoading ? (
+            {isSearchActive ? (
+                <GlobalSearchPanel />
+            ) : isLoading ? (
                 <View className="px-3 gap-2 overflow-hidden">
                     {[...Array(currentTab === "subjects" ? 3 : 7)].map((_, index) =>
                         currentView === "notifications" ? (

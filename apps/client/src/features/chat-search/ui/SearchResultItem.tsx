@@ -32,12 +32,16 @@ const HighlightedText = ({ text }: { text: string }) => {
 };
 
 export const SearchResultItem = ({ item, onPress }: SearchResultItemProps) => {
-    const time = new Date(item.createdAt).toLocaleString([], {
+    const time = new Date(item.createdAtUtc).toLocaleString([], {
         month: "short",
         day: "numeric",
         hour: "2-digit",
         minute: "2-digit",
     });
+
+    const previewTitle =
+        item.conversationPreview?.title ??
+        (item.conversationPreview?.type === "Direct" ? "Личный чат" : null);
 
     return (
         <Pressable
@@ -45,10 +49,20 @@ export const SearchResultItem = ({ item, onPress }: SearchResultItemProps) => {
             className="px-4 py-3 active:bg-white/5"
         >
             <View className="flex-row justify-between items-start mb-1">
-                <Text className="text-text-muted text-xs">{time}</Text>
+                {previewTitle ? (
+                    <Text
+                        className="text-white text-xs font-semibold flex-1"
+                        numberOfLines={1}
+                    >
+                        {previewTitle}
+                    </Text>
+                ) : (
+                    <View className="flex-1" />
+                )}
+                <Text className="text-text-muted text-xs ml-2">{time}</Text>
             </View>
-            {item.highlightedBody ? (
-                <HighlightedText text={item.highlightedBody} />
+            {item.highlightedSnippet ? (
+                <HighlightedText text={item.highlightedSnippet} />
             ) : (
                 <Text className="text-text-subtle text-sm" numberOfLines={2}>
                     {item.body}

@@ -21,13 +21,16 @@ const presenceStatusToIndicator = (status?: string): UserStatus => {
     }
 };
 
-export const ChatHeader = ({ chatId }: { chatId: string }) => {
+interface ChatHeaderProps {
+    chatId: string;
+    onOpenSearch?: () => void;
+}
+
+export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
     const chatMeta = useInboxStore((state) => state.getChatById(chatId));
 
-    // Get presence for the peer — we use chatId as a proxy for the peer user id for now.
-    // In a real scenario the peer's userId should come from conversation metadata.
     const peerPresence = useUserPresence(chatId);
     const typers = useConversationTypers(chatId);
 
@@ -86,7 +89,10 @@ export const ChatHeader = ({ chatId }: { chatId: string }) => {
                     </View>
                 </View>
 
-                <ChatHeaderActions onOpenProfile={() => setIsProfileOpen(true)} />
+                <ChatHeaderActions
+                    onOpenProfile={() => setIsProfileOpen(true)}
+                    onSearchPress={() => onOpenSearch?.()}
+                />
             </View>
 
             <UserProfileModal
