@@ -89,7 +89,7 @@ internal sealed class ChatBroadcaster(IHubContext<ChatHub, IChatClient> hub) : I
     {
         ArgumentNullException.ThrowIfNull(recipientUserIds);
         return hub.Clients.Users(ToUserIds(recipientUserIds))
-            .MessageDeletedUpdate(conversationId, messageId, mode.ToString(), deletedBy);
+            .MessageDeletedUpdate(conversationId, messageId, mode.ToWire(), deletedBy);
     }
 
     public Task NotifyReactionUpdatedAsync(
