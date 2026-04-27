@@ -1,6 +1,7 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
+using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using Urfu.Link.Services.Notification.Domain;
@@ -12,7 +13,24 @@ using Urfu.Link.Services.Notification.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
-builder.Services.AddSignalR();
+builder.Services
+    .AddSignalR(options =>
+    {
+        options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+        options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+        options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+        options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+        options.MaximumReceiveMessageSize = 64 * 1024;
+    })
+    .AddStackExchangeRedis(
+        builder.Configuration["Infrastructure:Redis:Configuration"]
+            ?? throw new InvalidOperationException("Infrastructure:Redis:Configuration is missing"),
+        options =>
+        {
+            options.Configuration.ChannelPrefix = RedisChannel.Literal("urfu:signalr:notifications");
+            options.Configuration.AbortOnConnectFail = false;
+            options.Configuration.ConnectRetry = 5;
+        });
 builder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();
 builder.Services.AddFastEndpoints();
 builder.Services.AddServiceDefaults(builder.Configuration, "notification-service");

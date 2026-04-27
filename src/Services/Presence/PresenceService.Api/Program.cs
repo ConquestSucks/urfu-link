@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
+using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using Urfu.Link.Services.Presence.Infrastructure;
@@ -40,7 +41,24 @@ if (args.Any(a => string.Equals(a, "--migrate", StringComparison.OrdinalIgnoreCa
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddGrpc();
-builder.Services.AddSignalR();
+builder.Services
+    .AddSignalR(options =>
+    {
+        options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+        options.KeepAliveInterval = TimeSpan.FromSeconds(15);
+        options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+        options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+        options.MaximumReceiveMessageSize = 64 * 1024;
+    })
+    .AddStackExchangeRedis(
+        builder.Configuration["Infrastructure:Redis:Configuration"]
+            ?? throw new InvalidOperationException("Infrastructure:Redis:Configuration is missing"),
+        options =>
+        {
+            options.Configuration.ChannelPrefix = RedisChannel.Literal("urfu:signalr:presence");
+            options.Configuration.AbortOnConnectFail = false;
+            options.Configuration.ConnectRetry = 5;
+        });
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(o =>
 {
