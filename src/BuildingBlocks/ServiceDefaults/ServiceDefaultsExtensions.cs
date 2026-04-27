@@ -42,8 +42,17 @@ public static class ServiceDefaultsExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
-        app.MapHealthChecks("/health/live", new HealthCheckOptions());
-        app.MapHealthChecks("/health/ready", new HealthCheckOptions());
+        // Liveness must not depend on external resources — kubelet liveness failures restart the pod.
+        // Readiness aggregates checks tagged "ready" (e.g. SignalR Redis backplane); a degraded
+        // dependency takes the pod out of rotation but does not trigger a restart.
+        app.MapHealthChecks("/health/live", new HealthCheckOptions
+        {
+            Predicate = _ => false,
+        });
+        app.MapHealthChecks("/health/ready", new HealthCheckOptions
+        {
+            Predicate = check => check.Tags.Contains("ready"),
+        });
         app.MapOpenApi();
 
         return app;
