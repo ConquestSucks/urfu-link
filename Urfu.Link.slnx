@@ -10,6 +10,7 @@
   </Folder>
   <Folder Name="/src/Gateway/">
     <Project Path="src/Gateway/ApiGateway/ApiGateway.csproj" />
+    <Project Path="src/Gateway/ApiGateway.Tests/ApiGateway.Tests.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
   <Folder Name="/src/Services/Call/">

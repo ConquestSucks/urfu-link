@@ -71,7 +71,6 @@ public sealed class GatewayTestFactory : WebApplicationFactory<Program>
                 options.DefaultScheme = TestAuthHandler.SchemeName;
                 options.DefaultAuthenticateScheme = TestAuthHandler.SchemeName;
                 options.DefaultChallengeScheme = TestAuthHandler.SchemeName;
-                options.DefaultForbidScheme = TestAuthHandler.SchemeName;
             });
 
             services.RemoveAll<ISessionRevocationStore>();
