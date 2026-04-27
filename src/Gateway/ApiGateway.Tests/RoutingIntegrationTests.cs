@@ -102,16 +102,30 @@ public sealed class RoutingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DirectHubRoute_PresenceConnect_ProxiesWebSocketHandshake()
+    public async Task HubRoute_WithoutAccessToken_Returns401_BeforeDownstream()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/presence/negotiate")
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/chat/negotiate")
         {
             Content = new StringContent(string.Empty),
         };
 
-        // chat stub also serves as presence stub for this test (same shape).
-        // Switch the factory cluster mapping when we need both Hubs in one test.
-        var presenceFactory = new GatewayTestFactory(new Dictionary<string, string>
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        response.Headers.WwwAuthenticate.ToString().Should().Contain("Bearer");
+        _chatStub.Requests.Should().BeEmpty(
+            "anonymous hub traffic is rejected at the gateway before reaching downstream");
+    }
+
+    [Fact]
+    public async Task DirectHubRoute_PresenceConnect_ProxiesWebSocketHandshake()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/presence/negotiate?access_token=user-42")
+        {
+            Content = new StringContent(string.Empty),
+        };
+
+        await using var presenceFactory = new GatewayTestFactory(new Dictionary<string, string>
         {
             ["presence-cluster"] = _chatStub.BaseUrl,
         });
@@ -121,7 +135,5 @@ public sealed class RoutingIntegrationTests : IAsyncLifetime
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         _chatStub.Requests.Should().Contain(r => r.Path == "/hubs/presence/negotiate");
-
-        await presenceFactory.DisposeAsync();
     }
 }

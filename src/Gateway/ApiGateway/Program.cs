@@ -1,9 +1,11 @@
 using System.Diagnostics;
 using System.IO.Compression;
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Yarp.ReverseProxy.Model;
 using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Observability;
 using Urfu.Link.BuildingBlocks.SessionRevocation;
@@ -41,78 +43,60 @@ builder.Services.AddResponseCompression(options =>
     options.Providers.Add<BrotliCompressionProvider>();
     options.Providers.Add<GzipCompressionProvider>();
     options.MimeTypes = ResponseCompressionDefaults.MimeTypes
-        .Concat(["application/json", "application/problem+json"]);
+        .Concat(["application/problem+json"]);
 });
-builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
-builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Fastest);
+builder.Services.Configure<BrotliCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
+builder.Services.Configure<GzipCompressionProviderOptions>(o => o.Level = CompressionLevel.Optimal);
 
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-    {
-        var partitionKey =
-            context.User.FindFirst("sub")?.Value
-            ?? context.Connection.RemoteIpAddress?.ToString()
-            ?? "anonymous";
-
-        return RateLimitPartition.GetTokenBucketLimiter(partitionKey, _ => new TokenBucketRateLimiterOptions
+        RateLimitPartition.GetTokenBucketLimiter(ResolvePartitionKey(context), _ => new TokenBucketRateLimiterOptions
         {
             TokenLimit = 200,
             TokensPerPeriod = 200,
             ReplenishmentPeriod = TimeSpan.FromSeconds(1),
             QueueLimit = 0,
             AutoReplenishment = true,
-        });
-    });
+        }));
 
     options.AddPolicy("chat-send", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.User.FindFirst("sub")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 60,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true,
-            }));
+        RateLimitPartition.GetFixedWindowLimiter(ResolvePartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true,
+        }));
 
     options.AddPolicy("media-upload", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.User.FindFirst("sub")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true,
-            }));
-
-    options.AddPolicy("search", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.User.FindFirst("sub")?.Value ?? context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 30,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true,
-            }));
+        RateLimitPartition.GetFixedWindowLimiter(ResolvePartitionKey(context), _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 30,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true,
+        }));
 });
 
 builder.Services
     .AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
-builder.Services.AddHttpClient();
+builder.Services.AddSingleton<YarpClusterStateRegistry>();
+builder.Services.AddSingleton<IClusterChangeListener>(sp =>
+    sp.GetRequiredService<YarpClusterStateRegistry>());
+builder.Services.AddSingleton<YarpDestinationsHealthCheck>();
 
 builder.Services
     .AddHealthChecks()
-    .AddCheck<YarpDestinationsHealthCheck>(
+    .Add(new HealthCheckRegistration(
         name: "yarp-destinations",
-        failureStatus: HealthStatus.Degraded,
-        tags: ["ready"]);
+        factory: sp => sp.GetRequiredService<YarpDestinationsHealthCheck>(),
+        failureStatus: HealthStatus.Unhealthy,
+        tags: ["ready"]));
 
 var app = builder.Build();
 
@@ -142,6 +126,10 @@ app.Use((context, next) =>
     return next();
 });
 
+// Defence in depth for SignalR hub routes: gateway does not validate the JWT (downstream does), but
+// it requires the access_token query parameter to be present so anonymous traffic is rejected here.
+app.UseMiddleware<HubAccessTokenPresenceMiddleware>();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -157,6 +145,13 @@ app.MapGet("/", () => Results.Ok(new
     utc = DateTimeOffset.UtcNow,
 }));
 
+var readinessStatusCodes = new Dictionary<HealthStatus, int>
+{
+    [HealthStatus.Healthy] = StatusCodes.Status200OK,
+    [HealthStatus.Degraded] = StatusCodes.Status503ServiceUnavailable,
+    [HealthStatus.Unhealthy] = StatusCodes.Status503ServiceUnavailable,
+};
+
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = _ => false,
@@ -164,11 +159,17 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("ready"),
+    ResultStatusCodes = readinessStatusCodes,
 });
 
 app.MapOpenApi();
 app.MapReverseProxy();
 
 await app.RunAsync().ConfigureAwait(false);
+
+static string ResolvePartitionKey(HttpContext context) =>
+    context.User.FindFirstValue("sub")
+    ?? context.Connection.RemoteIpAddress?.ToString()
+    ?? "anonymous";
 
 public partial class Program;
