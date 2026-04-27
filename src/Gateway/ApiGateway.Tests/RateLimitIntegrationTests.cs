@@ -64,11 +64,17 @@ public sealed class RateLimitIntegrationTests : IAsyncLifetime
             using var _ = await _client.SendAsync(exhausting);
         }
 
-        using var anotherUserRequest = BuildSendMessage("user-B", conversationId: "conv-1");
-        using var anotherResponse = await _client.SendAsync(anotherUserRequest);
+        using var userARequest = BuildSendMessage("user-A", conversationId: "conv-1");
+        using var userAOverflow = await _client.SendAsync(userARequest);
 
-        anotherResponse.StatusCode.Should().Be(HttpStatusCode.OK,
-            "rate limit partitions by Keycloak sub claim, so user-B has its own bucket");
+        userAOverflow.StatusCode.Should().Be(HttpStatusCode.TooManyRequests,
+            "user-A has exhausted its bucket — proves the policy is enforced");
+
+        using var userBRequest = BuildSendMessage("user-B", conversationId: "conv-1");
+        using var userBResponse = await _client.SendAsync(userBRequest);
+
+        userBResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+            "user-B has its own bucket — proves partitioning by Keycloak sub claim");
     }
 
     [Fact]
