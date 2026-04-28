@@ -40,6 +40,12 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\Idempotency\Idempotency.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\..\Presence\PresenceService.Api.Contracts\PresenceService.Api.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NotificationService.UnitTests" />
+    <InternalsVisibleTo Include="NotificationService.IntegrationTests" />
   </ItemGroup>
 
   <PropertyGroup>

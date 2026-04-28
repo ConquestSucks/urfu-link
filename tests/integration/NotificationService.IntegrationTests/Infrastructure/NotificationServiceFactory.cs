@@ -12,7 +12,9 @@ using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
+using Urfu.Link.Services.Notification.Application.Preferences;
 using Urfu.Link.Services.Notification.Infrastructure.Persistence;
+using Urfu.Link.Services.Notification.Realtime;
 
 namespace NotificationService.IntegrationTests.Infrastructure;
 
@@ -25,6 +27,19 @@ public sealed class NotificationServiceFactory : WebApplicationFactory<Program>,
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7.4.2-alpine")
         .Build();
+
+    /// <summary>
+    /// Mutable presence stub injected in place of the real <see cref="IPresenceClient"/>
+    /// so individual tests can flip the user's web state and assert the resulting
+    /// routing decision (e.g. push must be skipped for chat categories when online on web).
+    /// </summary>
+    public TestPresenceClient PresenceClient { get; } = new();
+
+    /// <summary>
+    /// Test stub for <see cref="IUserPreferencesClient"/> so tests don't depend on a real
+    /// UserService gRPC endpoint. Defaults to <see cref="UserPreferences.Default"/> per user.
+    /// </summary>
+    public TestUserPreferencesClient PreferencesClient { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -41,6 +56,7 @@ public sealed class NotificationServiceFactory : WebApplicationFactory<Program>,
 
     public async Task ResetDataAsync()
     {
+        PresenceClient.OnlineOnWeb = false;
         await using var scope = Services.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
         await ctx.Database.ExecuteSqlRawAsync(
@@ -98,6 +114,22 @@ public sealed class NotificationServiceFactory : WebApplicationFactory<Program>,
             // Outbox publisher needs Kafka — replace with a no-op since we don't run Kafka.
             services.RemoveAll<IKafkaPublisher>();
             services.AddSingleton<IKafkaPublisher, NoopKafkaPublisher>();
+
+            // Replace whichever IPresenceClient was wired (real GrpcPresenceClient when
+            // PresenceService:GrpcEndpoint is set, OfflinePresenceClient otherwise) with
+            // a controllable fake so each test owns the recipient's web state.
+            services.RemoveAll<IPresenceClient>();
+            services.AddSingleton<IPresenceClient>(PresenceClient);
+
+            // Same for user preferences — tests don't run a UserService gRPC server.
+            services.RemoveAll<IUserPreferencesClient>();
+            services.AddSingleton<IUserPreferencesClient>(PreferencesClient);
+
+            // Replace the SignalR-backed broadcaster with a no-op: tests don't run
+            // WebSocket clients and the real broadcaster's Redis backplane is wired
+            // before the test factory rewrites configuration.
+            services.RemoveAll<INotificationBroadcaster>();
+            services.AddSingleton<INotificationBroadcaster, NoopNotificationBroadcaster>();
 
             ReplaceAuthWithTestScheme(services);
         });
