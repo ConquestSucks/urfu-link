@@ -26,6 +26,16 @@ public sealed class LastSeenRepository(
         {
             dbContext.LastSeens.Add(lastSeen);
         }
+
+        // Write-through: every snapshot update also appends an audit row to the
+        // partitioned history table so analytics can answer "when was this user online
+        // during March?" without joining Kafka logs. The history table is partitioned by
+        // RecordedAtUtc so this insert lands directly in the current month partition.
+        dbContext.LastSeenHistory.Add(LastSeenHistoryEntry.Record(
+            userId: lastSeen.UserId,
+            lastSeenAtUtc: lastSeen.LastSeenAt,
+            platform: lastSeen.LastPlatform,
+            recordedAtUtc: DateTimeOffset.UtcNow));
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken)
