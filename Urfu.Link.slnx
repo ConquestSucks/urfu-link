@@ -32,6 +32,7 @@
   </Folder>
   <Folder Name="/src/Services/Presence/">
     <Project Path="src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj" />
+    <Project Path="src/Services/Presence/PresenceService.Api.Contracts/PresenceService.Api.Contracts.csproj" />
   </Folder>
   <Folder Name="/src/Services/User/">
     <Project Path="src/Services/User/UserService.Api/UserService.Api.csproj" />
