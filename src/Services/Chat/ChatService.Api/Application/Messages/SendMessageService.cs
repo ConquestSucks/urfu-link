@@ -3,6 +3,7 @@ using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Mentions;
+using Urfu.Link.Services.Chat.Application.Presence;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
@@ -25,6 +26,8 @@ public sealed class SendMessageService(
     IIdempotencyStore idempotencyStore,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
+    IPresenceServiceClient presenceClient,
+    MentionResolver mentionResolver,
     TimeProvider clock,
     IOptions<ChatOptions> options)
 {
@@ -85,7 +88,9 @@ public sealed class SendMessageService(
             .ConfigureAwait(false);
 
         var opts = options.Value;
-        var mentions = MentionsParser.Parse(request.Body, conversation.Participants, opts.MaxMentionsPerMessage);
+        var mentions = await mentionResolver
+            .ResolveAsync(request.Body, conversation, opts.MaxMentionsPerMessage, cancellationToken)
+            .ConfigureAwait(false);
 
         var now = clock.GetUtcNow();
         var message = Message.Send(
@@ -147,6 +152,13 @@ public sealed class SendMessageService(
 
         var dto = MessageDto.FromDomain(message);
         await broadcaster.NotifyMessageReceivedAsync(recipients, dto, cancellationToken).ConfigureAwait(false);
+
+        // Auto-clear the sender's typing indicator on PresenceService — sending a message
+        // implies the user is no longer typing, even if their client did not fire the
+        // explicit StopTyping. Failures are swallowed by the client (fail-open contract).
+        await presenceClient
+            .SetTypingAsync(request.ConversationId, request.SenderId, isTyping: false, cancellationToken)
+            .ConfigureAwait(false);
 
         return dto;
     }

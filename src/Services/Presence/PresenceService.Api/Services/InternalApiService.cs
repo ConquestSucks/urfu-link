@@ -69,6 +69,23 @@ public sealed class InternalApiService(
         return new IsTypingReply { IsTyping = typingNow };
     }
 
+    public override async Task<SetTypingReply> SetTyping(SetTypingRequest request, ServerCallContext context)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
+        var conv = ParseConversationId(request.ConversationId);
+        var user = ParseUserId(request.UserId);
+
+        // The store reports `changed = true` when it actually mutated state (created a
+        // fresh entry on Start, or removed an existing one on Stop). Callers can use
+        // this to avoid emitting redundant typing broadcasts for keep-alive refreshes.
+        var changed = request.IsTyping
+            ? await typing.StartTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false)
+            : await typing.StopTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false);
+
+        return new SetTypingReply { Changed = changed };
+    }
+
     private async Task<Domain.ValueObjects.AggregatedPresence> BuildAggregatedAsync(
         Guid userId, CancellationToken ct)
     {

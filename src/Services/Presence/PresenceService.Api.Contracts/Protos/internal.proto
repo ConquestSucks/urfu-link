@@ -9,6 +9,11 @@ service InternalApi {
   rpc GetPresenceBatch(GetPresenceBatchRequest) returns (GetPresenceBatchReply);
   rpc IsOnline(IsOnlineRequest) returns (IsOnlineReply);
   rpc IsTyping(IsTypingRequest) returns (IsTypingReply);
+  // Server-to-server signal that a user started or stopped typing in a conversation.
+  // ChatHub.StartTyping/StopTyping fan out to this endpoint instead of clients calling
+  // PresenceHub directly, so chat-internal authorization (IsParticipant) is enforced
+  // before the typing indicator becomes visible.
+  rpc SetTyping(SetTypingRequest) returns (SetTypingReply);
 }
 
 message PingRequest {
@@ -72,4 +77,17 @@ message IsTypingRequest {
 
 message IsTypingReply {
   bool is_typing = 1;
+}
+
+message SetTypingRequest {
+  string conversation_id = 1;
+  string user_id = 2;
+  // true = StartTyping (refreshes the per-user TTL), false = StopTyping (deletes the key).
+  bool is_typing = 3;
+}
+
+message SetTypingReply {
+  // True when the underlying Redis state actually changed
+  // (a new typing entry was created, or a stale one was removed).
+  bool changed = 1;
 }

@@ -19,6 +19,7 @@ public sealed class EditMessageService(
     IOptions<ChatOptions> options,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
+    MentionResolver mentionResolver,
     TimeProvider clock)
 {
     public async Task<MessageDto> EditAsync(EditMessageRequest request, CancellationToken cancellationToken)
@@ -63,7 +64,9 @@ public sealed class EditMessageService(
             throw ChatEditTtlExpiredException.For(message.Id, ttl);
         }
 
-        var mentions = MentionsParser.Parse(request.NewBody, conversation.Participants, opts.MaxMentionsPerMessage);
+        var mentions = await mentionResolver
+            .ResolveAsync(request.NewBody, conversation, opts.MaxMentionsPerMessage, cancellationToken)
+            .ConfigureAwait(false);
         var priorMentions = new HashSet<Guid>(message.Mentions);
         var newlyAddedMentions = mentions.Where(m => !priorMentions.Contains(m)).ToList();
         var historyEntry = new EditHistoryEntry(message.Body, message.EditedAtUtc ?? message.CreatedAtUtc);

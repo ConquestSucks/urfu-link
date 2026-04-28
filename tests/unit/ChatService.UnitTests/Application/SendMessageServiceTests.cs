@@ -26,6 +26,8 @@ public class SendMessageServiceTests
     private readonly IMediaServiceClient _media = Substitute.For<IMediaServiceClient>();
     private readonly IIdempotencyStore _idempotency = Substitute.For<IIdempotencyStore>();
     private readonly IChatBroadcaster _broadcaster = Substitute.For<IChatBroadcaster>();
+    private readonly Urfu.Link.Services.Chat.Application.Presence.IPresenceServiceClient _presence
+        = Substitute.For<Urfu.Link.Services.Chat.Application.Presence.IPresenceServiceClient>();
     private readonly RecordingOutboxWriter _outbox = new();
 
     private SendMessageService Build()
@@ -34,7 +36,9 @@ public class SendMessageServiceTests
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
         var options = Microsoft.Extensions.Options.Options.Create(new Urfu.Link.Services.Chat.Infrastructure.ChatOptions());
-        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, TimeProvider.System, options);
+        var disciplineClient = Substitute.For<Urfu.Link.Services.Chat.Application.Disciplines.IDisciplineServiceClient>();
+        var mentions = new Urfu.Link.Services.Chat.Application.Mentions.MentionResolver(disciplineClient);
+        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, _presence, mentions, TimeProvider.System, options);
     }
 
     private Conversation SeedConversation()
