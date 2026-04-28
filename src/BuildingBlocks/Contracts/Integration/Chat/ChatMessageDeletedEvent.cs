@@ -1,7 +1,4 @@
-using Urfu.Link.BuildingBlocks.Contracts.Integration;
-using Urfu.Link.Services.Chat.Domain.Enums;
-
-namespace Urfu.Link.Services.Chat.Domain.Events;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 
 public sealed record ChatMessageDeletedEvent(
     string ConversationId,

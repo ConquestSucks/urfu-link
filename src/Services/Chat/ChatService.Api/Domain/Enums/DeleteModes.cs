@@ -1,3 +1,5 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
+
 namespace Urfu.Link.Services.Chat.Domain.Enums;
 
 /// <summary>
