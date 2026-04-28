@@ -1,16 +1,31 @@
 using FastEndpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using Urfu.Link.Services.Notification.Domain;
 using Urfu.Link.Services.Notification.Infrastructure;
+using Urfu.Link.Services.Notification.Infrastructure.Persistence;
 using Urfu.Link.Services.Notification.Messaging;
 using Urfu.Link.Services.Notification.Realtime;
 using Urfu.Link.Services.Notification.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Migration mode: invoked by the Helm pre-upgrade Job (or the docker-compose `*-migrations`
+// sidecar in dev). When triggered, applies pending EF migrations and exits — no web host
+// is started, no HostedServices run. Normal app startup must NEVER auto-migrate, otherwise
+// every replica races on the schema upgrade at boot.
+if (await MigrationCliRunner.TryRunMigrationsAsync<NotificationDbContext>(
+    args,
+    "NotificationService",
+    services => services.AddDbContext<NotificationDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+{
+    return;
+}
 
 builder.Services.AddGrpc();
 builder.Services
@@ -84,6 +99,6 @@ app.MapGet("/", (ServiceProfile descriptor) => Results.Ok(new
     utc = DateTimeOffset.UtcNow,
 }));
 
-app.Run();
+await app.RunAsync();
 
 public partial class Program;
