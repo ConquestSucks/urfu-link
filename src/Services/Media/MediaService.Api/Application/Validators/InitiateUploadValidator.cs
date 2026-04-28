@@ -30,12 +30,39 @@ public sealed class InitiateUploadValidator : Validator<InitiateUploadRequest>
             .Custom((req, context) =>
             {
                 if (!MimeTypeCatalog.TryResolve(req.MimeType, out var kind)) return;
-                var max = limits.For(kind).MaxSizeBytes;
-                if (req.Size > max)
+                var kindLimit = limits.For(kind);
+
+                if (req.Size > kindLimit.MaxSizeBytes)
                 {
                     context.AddFailure(
                         nameof(req.Size),
-                        $"File size {req.Size} exceeds the limit {max} for kind {kind}.");
+                        $"File size {req.Size} exceeds the limit {kindLimit.MaxSizeBytes} for kind {kind}.");
+                }
+
+                // Voice (and any future kind with MaxDurationSeconds set) requires the
+                // recorder to declare the recording length. The size cap alone allows a
+                // 30-minute high-bitrate recording to slip through (EPIC #206 caps voice
+                // at 5 minutes specifically because long voice messages are a chat anti-pattern).
+                if (kindLimit.MaxDurationSeconds is int maxDuration)
+                {
+                    if (req.DurationSeconds is null)
+                    {
+                        context.AddFailure(
+                            nameof(req.DurationSeconds),
+                            $"DurationSeconds is required for {kind}.");
+                    }
+                    else if (req.DurationSeconds < 1)
+                    {
+                        context.AddFailure(
+                            nameof(req.DurationSeconds),
+                            "DurationSeconds must be positive.");
+                    }
+                    else if (req.DurationSeconds > maxDuration)
+                    {
+                        context.AddFailure(
+                            nameof(req.DurationSeconds),
+                            $"Duration {req.DurationSeconds}s exceeds the {kind} limit of {maxDuration}s.");
+                    }
                 }
             });
     }
