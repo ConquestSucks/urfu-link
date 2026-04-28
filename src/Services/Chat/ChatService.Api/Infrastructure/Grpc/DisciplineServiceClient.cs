@@ -36,6 +36,32 @@ internal sealed class DisciplineServiceClient(DisciplineGrpc.InternalApi.Interna
             .ToList();
     }
 
+    public async Task<IReadOnlyList<DisciplineMember>> ListMembersAsync(
+        Guid disciplineId,
+        CancellationToken cancellationToken)
+    {
+        var request = new DisciplineGrpc.ListMembersRequest
+        {
+            DisciplineId = disciplineId.ToString("D", CultureInfo.InvariantCulture),
+        };
+
+        var reply = await grpcClient
+            .ListMembersAsync(request, cancellationToken: cancellationToken)
+            .ResponseAsync
+            .ConfigureAwait(false);
+
+        if (!reply.Exists)
+        {
+            return [];
+        }
+
+        return reply.Members
+            .Select(m => new DisciplineMember(
+                UserId: Guid.Parse(m.UserId),
+                Role: MapRole(m.Role)))
+            .ToList();
+    }
+
     private static ParticipantRole MapRole(DisciplineGrpc.MembershipRole role) => role switch
     {
         DisciplineGrpc.MembershipRole.Teacher => ParticipantRole.Teacher,
