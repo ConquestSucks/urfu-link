@@ -1,3 +1,4 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
@@ -390,7 +391,8 @@ public sealed class Message
         State = MessageState.Deleted;
         DeletedAtUtc = atUtc;
         DeletedBy = byUserId;
-        DeleteMode = Enums.DeleteMode.ForEveryone;
+        // Fully qualified to disambiguate from the property of the same name on this aggregate.
+        DeleteMode = BuildingBlocks.Contracts.Integration.Chat.DeleteMode.ForEveryone;
         Body = string.Empty;
         _attachments.Clear();
         _reactions.Clear();

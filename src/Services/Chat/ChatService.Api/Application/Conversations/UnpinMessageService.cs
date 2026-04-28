@@ -1,7 +1,7 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
-using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Realtime;
 

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.AspNetCore.SignalR;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Enums;
 

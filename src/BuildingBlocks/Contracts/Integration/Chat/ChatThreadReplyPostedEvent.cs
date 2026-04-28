@@ -1,7 +1,4 @@
-using Urfu.Link.BuildingBlocks.Contracts.Integration;
-using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
-
-namespace Urfu.Link.Services.Chat.Domain.Events;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 
 /// <summary>
 /// A new reply was posted in a thread. NotificationService consumes this event to deliver

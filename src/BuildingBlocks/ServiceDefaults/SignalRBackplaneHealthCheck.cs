@@ -35,11 +35,24 @@ public static class SignalRBackplaneHealthCheckExtensions
     /// already wired by <see cref="ServiceDefaultsExtensions.AddServiceDefaults"/> via
     /// <c>AddIdempotency</c>.
     /// </summary>
+    /// <remarks>
+    /// Idempotent: the registration is added at most once per <see cref="IServiceCollection"/>
+    /// via a marker singleton. <see cref="ServiceDefaultsExtensions.AddServiceDefaults"/>
+    /// auto-registers the check, and a service that still calls this method explicitly will
+    /// not produce a duplicate readiness probe.
+    /// </remarks>
     public static IHealthChecksBuilder AddSignalRBackplaneHealthCheck(
         this IHealthChecksBuilder builder,
         string name = "signalr-backplane")
     {
         ArgumentNullException.ThrowIfNull(builder);
+
+        if (builder.Services.Any(static d => d.ServiceType == typeof(SignalRBackplaneHealthCheckMarker)))
+        {
+            return builder;
+        }
+
+        builder.Services.AddSingleton<SignalRBackplaneHealthCheckMarker>();
 
         return builder.Add(new HealthCheckRegistration(
             name,
@@ -47,4 +60,6 @@ public static class SignalRBackplaneHealthCheckExtensions
             HealthStatus.Unhealthy,
             ["ready"]));
     }
+
+    private sealed class SignalRBackplaneHealthCheckMarker;
 }

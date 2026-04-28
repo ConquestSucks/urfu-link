@@ -1,4 +1,5 @@
 using MongoDB.Bson.Serialization.Attributes;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 

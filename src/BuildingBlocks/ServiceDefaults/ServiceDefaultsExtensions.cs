@@ -33,6 +33,12 @@ public static class ServiceDefaultsExtensions
         services.AddPlatformJwtAuthentication(configuration);
         services.AddPlatformObservability(configuration, serviceName);
 
+        // Every service that uses SignalR for realtime depends on the Redis backplane.
+        // Registering the readiness probe here guarantees no SignalR service can be Ready
+        // while broadcasts cannot propagate cross-replica. Services without SignalR pay
+        // the same probe — it doubles as a Redis connectivity check for Idempotency.
+        services.AddHealthChecks().AddSignalRBackplaneHealthCheck();
+
         return services;
     }
 

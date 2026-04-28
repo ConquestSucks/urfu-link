@@ -1,4 +1,4 @@
-namespace Urfu.Link.Services.Chat.Domain.Enums;
+namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 
 /// <summary>
 /// Why a user is subscribed to a thread. Higher values represent stronger ownership and
