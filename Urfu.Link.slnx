@@ -38,6 +38,7 @@
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/unit/">
+    <Project Path="tests/unit/BuildingBlocks.UnitTests/BuildingBlocks.UnitTests.csproj" />
     <Project Path="tests/unit/ChatService.UnitTests/ChatService.UnitTests.csproj" />
     <Project Path="tests/unit/DisciplineService.UnitTests/DisciplineService.UnitTests.csproj" />
     <Project Path="tests/unit/MediaService.UnitTests/MediaService.UnitTests.csproj" />
