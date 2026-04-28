@@ -42,6 +42,7 @@ public sealed class ReplyInThreadService(
     IIdempotencyStore idempotencyStore,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
+    MentionResolver mentionResolver,
     TimeProvider clock,
     IOptions<ChatOptions> options)
 {
@@ -92,7 +93,9 @@ public sealed class ReplyInThreadService(
         var replyTo = await ResolveReplyToInThreadAsync(root, request.ReplyToMessageId, cancellationToken).ConfigureAwait(false);
 
         var opts = options.Value;
-        var mentions = MentionsParser.Parse(request.Body, conversation.Participants, opts.MaxMentionsPerMessage);
+        var mentions = await mentionResolver
+            .ResolveAsync(request.Body, conversation, opts.MaxMentionsPerMessage, cancellationToken)
+            .ConfigureAwait(false);
 
         var now = clock.GetUtcNow();
         var reply = Message.SendAsThreadReply(

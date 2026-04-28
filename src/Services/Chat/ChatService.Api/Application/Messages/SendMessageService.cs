@@ -27,6 +27,7 @@ public sealed class SendMessageService(
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
     IPresenceServiceClient presenceClient,
+    MentionResolver mentionResolver,
     TimeProvider clock,
     IOptions<ChatOptions> options)
 {
@@ -87,7 +88,9 @@ public sealed class SendMessageService(
             .ConfigureAwait(false);
 
         var opts = options.Value;
-        var mentions = MentionsParser.Parse(request.Body, conversation.Participants, opts.MaxMentionsPerMessage);
+        var mentions = await mentionResolver
+            .ResolveAsync(request.Body, conversation, opts.MaxMentionsPerMessage, cancellationToken)
+            .ConfigureAwait(false);
 
         var now = clock.GetUtcNow();
         var message = Message.Send(

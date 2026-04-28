@@ -36,7 +36,9 @@ public class SendMessageServiceTests
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
         var options = Microsoft.Extensions.Options.Options.Create(new Urfu.Link.Services.Chat.Infrastructure.ChatOptions());
-        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, _presence, TimeProvider.System, options);
+        var disciplineClient = Substitute.For<Urfu.Link.Services.Chat.Application.Disciplines.IDisciplineServiceClient>();
+        var mentions = new Urfu.Link.Services.Chat.Application.Mentions.MentionResolver(disciplineClient);
+        return new SendMessageService(_conversations, _messages, _media, _idempotency, dispatcher, _broadcaster, _presence, mentions, TimeProvider.System, options);
     }
 
     private Conversation SeedConversation()

@@ -195,6 +195,7 @@ public static class ModuleRegistration
         services.AddScoped<GetUserActiveThreadsQuery>();
         services.AddScoped<SearchMessagesQuery>();
         services.AddScoped<DisciplineConversationService>();
+        services.AddScoped<Urfu.Link.Services.Chat.Application.Mentions.MentionResolver>();
         services.AddHostedService<DisciplineEventConsumer>();
 
         // Per-user fixed window for /chat/search (issue #213 — 30 req/min per user).
