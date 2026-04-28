@@ -14,32 +14,19 @@ using StackExchange.Redis;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 
-if (args.Any(a => string.Equals(a, "--migrate", StringComparison.OrdinalIgnoreCase)))
-{
-    try
-    {
-        var migrateBuilder = WebApplication.CreateBuilder(args);
-        migrateBuilder.Services.AddDbContextPool<MediaDbContext>(options =>
-            options.UseNpgsql(migrateBuilder.Configuration.GetConnectionString("Primary")));
-        var migrateApp = migrateBuilder.Build();
-        await using var migrateScope = migrateApp.Services.CreateAsyncScope();
-        var migrateDb = migrateScope.ServiceProvider.GetRequiredService<MediaDbContext>();
-        await migrateDb.Database.MigrateAsync();
-        await Console.Out.WriteLineAsync("MediaService migrations applied successfully.");
-        return;
-    }
-#pragma warning disable CA1031 // Migration entry-point must catch any failure to surface it as a non-zero exit code for Helm.
-    catch (Exception ex)
-#pragma warning restore CA1031
-    {
-        await Console.Error.WriteLineAsync($"MediaService migration failed: {ex.GetType().Name}: {ex.Message}");
-        await Console.Error.WriteLineAsync(ex.ToString());
-        Environment.ExitCode = 1;
-        return;
-    }
-}
-
 var builder = WebApplication.CreateBuilder(args);
+
+// Migration mode: invoked by the Helm pre-upgrade Job (or the docker-compose
+// `media-migrations` sidecar in dev). When triggered, applies pending EF
+// migrations and exits — no web host is started, no HostedServices run.
+if (await MigrationCliRunner.TryRunMigrationsAsync<MediaDbContext>(
+    args,
+    "MediaService",
+    services => services.AddDbContext<MediaDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+{
+    return;
+}
 
 builder.Services.AddGrpc();
 builder.Services.AddFastEndpoints();
