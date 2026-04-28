@@ -70,7 +70,6 @@ builder.Services.SwaggerDocument(o =>
 });
 
 builder.Services.AddServiceDefaults(builder.Configuration, "presence-service");
-builder.Services.AddHealthChecks().AddSignalRBackplaneHealthCheck();
 
 // SignalR clients can't set the Authorization header during the WebSocket
 // upgrade handshake — accept the bearer token via ?access_token= for /hubs/*.

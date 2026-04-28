@@ -34,7 +34,6 @@ builder.Services
 builder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();
 builder.Services.AddFastEndpoints();
 builder.Services.AddServiceDefaults(builder.Configuration, "notification-service");
-builder.Services.AddHealthChecks().AddSignalRBackplaneHealthCheck();
 
 // SignalR clients can't set the Authorization header during the WebSocket upgrade handshake —
 // accept the bearer token via ?access_token= for /hubs/* paths.
