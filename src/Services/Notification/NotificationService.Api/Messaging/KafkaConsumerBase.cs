@@ -11,9 +11,13 @@ namespace Urfu.Link.Services.Notification.Messaging;
 
 /// <summary>
 /// Base hosted service that consumes a single Kafka topic, deduplicates by envelope
-/// MessageId via Redis SET NX, and dispatches each event to <see cref="HandleEventAsync"/>.
-/// Each derived consumer owns a distinct Kafka group id so that lag and offsets are
-/// independent across event domains.
+/// MessageId via the shared <see cref="IIdempotencyStore"/> from
+/// <c>BuildingBlocks.Idempotency</c> (Redis-backed <c>SET NX</c> with platform-wide TTL),
+/// and dispatches each event to <see cref="HandleEventAsync"/>. Each derived consumer
+/// owns a distinct Kafka group id so that lag and offsets are independent across event
+/// domains. Each consumer also owns a distinct <see cref="DedupKeyPrefix"/> so the same
+/// envelope (e.g. UserDeletedEvent) consumed by multiple topics does not de-duplicate
+/// across consumers.
 /// </summary>
 public abstract class KafkaConsumerBase(
     IServiceScopeFactory scopeFactory,
