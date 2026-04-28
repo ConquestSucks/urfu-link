@@ -59,7 +59,9 @@ public static class ModuleRegistration
         services.AddScoped<IPushDeviceRepository, PushDeviceRepository>();
 
         services.Configure<UserServiceClientOptions>(configuration.GetSection(UserServiceClientOptions.SectionName));
-        services.AddGrpcClient<InternalApi.InternalApiClient>((sp, opts) =>
+        // Named because PresenceService also exposes InternalApi.InternalApiClient under
+        // a different namespace and the gRPC factory dedupes by simple type name.
+        services.AddGrpcClient<InternalApi.InternalApiClient>("user-service", (sp, opts) =>
         {
             var userOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<UserServiceClientOptions>>().Value;
             opts.Address = new Uri(userOpts.GrpcEndpoint);
@@ -76,7 +78,7 @@ public static class ModuleRegistration
         var presenceEndpoint = configuration[$"{PresenceServiceClientOptions.SectionName}:GrpcEndpoint"];
         if (!string.IsNullOrWhiteSpace(presenceEndpoint))
         {
-            services.AddGrpcClient<PresenceGrpc.InternalApi.InternalApiClient>((sp, opts) =>
+            services.AddGrpcClient<PresenceGrpc.InternalApi.InternalApiClient>("presence-service", (sp, opts) =>
             {
                 var presenceOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PresenceServiceClientOptions>>().Value;
                 opts.Address = new Uri(presenceOpts.GrpcEndpoint);
