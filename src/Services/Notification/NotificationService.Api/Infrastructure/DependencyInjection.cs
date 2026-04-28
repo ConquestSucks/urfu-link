@@ -24,6 +24,7 @@ using Urfu.Link.Services.Notification.Infrastructure.Redis;
 using Urfu.Link.Services.Notification.Realtime;
 using Urfu.Link.Services.Notification.Workers;
 using Urfu.Link.Services.User.Grpc;
+using PresenceGrpc = Urfu.Link.Services.Presence.Grpc;
 
 namespace Urfu.Link.Services.Notification.Infrastructure;
 
@@ -65,9 +66,27 @@ public static class ModuleRegistration
         });
         services.AddSingleton<IUserPreferencesClient, UserServiceClient>();
 
-        // Real PresenceService client is a future task; default to "offline" so push is
-        // never silently dropped.
-        services.AddSingleton<IPresenceClient, OfflinePresenceClient>();
+        // PresenceService gRPC client. When PresenceService:GrpcEndpoint is configured
+        // (production, dev compose), use the real client so the router can skip Push
+        // when the user is online on web. Otherwise fall back to OfflinePresenceClient
+        // (tests, on-prem profile without presence) so push is delivered for everyone —
+        // duplicate Push for online users is preferable to no Push for offline users.
+        services.Configure<PresenceServiceClientOptions>(
+            configuration.GetSection(PresenceServiceClientOptions.SectionName));
+        var presenceEndpoint = configuration[$"{PresenceServiceClientOptions.SectionName}:GrpcEndpoint"];
+        if (!string.IsNullOrWhiteSpace(presenceEndpoint))
+        {
+            services.AddGrpcClient<PresenceGrpc.InternalApi.InternalApiClient>((sp, opts) =>
+            {
+                var presenceOpts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PresenceServiceClientOptions>>().Value;
+                opts.Address = new Uri(presenceOpts.GrpcEndpoint);
+            });
+            services.AddSingleton<IPresenceClient, GrpcPresenceClient>();
+        }
+        else
+        {
+            services.AddSingleton<IPresenceClient, OfflinePresenceClient>();
+        }
 
         services.AddScoped<NotificationFactory>();
         services.AddScoped<NotificationRouter>();
