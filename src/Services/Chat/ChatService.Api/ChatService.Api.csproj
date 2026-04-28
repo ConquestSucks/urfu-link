@@ -24,6 +24,7 @@
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\Discipline\DisciplineService.Api.Contracts\DisciplineService.Api.Contracts.csproj" />
     <ProjectReference Include="..\..\Media\MediaService.Api.Contracts\MediaService.Api.Contracts.csproj" />
+    <ProjectReference Include="..\..\Presence\PresenceService.Api.Contracts\PresenceService.Api.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

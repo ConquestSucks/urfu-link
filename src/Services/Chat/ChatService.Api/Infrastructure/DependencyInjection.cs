@@ -131,6 +131,45 @@ public static class ModuleRegistration
         });
         services.AddSingleton<IDisciplineServiceClient, DisciplineServiceClient>();
 
+        services.AddOptions<PresenceServiceClientOptions>()
+            .Bind(configuration.GetSection(PresenceServiceClientOptions.SectionName));
+        var presenceAddress = configuration[$"{PresenceServiceClientOptions.SectionName}:Address"];
+        if (!string.IsNullOrWhiteSpace(presenceAddress))
+        {
+            services.AddSingleton(sp =>
+            {
+                var opts = sp.GetRequiredService<IOptions<PresenceServiceClientOptions>>().Value;
+                var retryPolicy = new RetryPolicy
+                {
+                    MaxAttempts = 3,
+                    InitialBackoff = TimeSpan.FromMilliseconds(100),
+                    MaxBackoff = TimeSpan.FromSeconds(2),
+                    BackoffMultiplier = 2,
+                    RetryableStatusCodes = { StatusCode.Unavailable, StatusCode.DeadlineExceeded },
+                };
+
+                var channel = GrpcChannel.ForAddress(opts.Address, new GrpcChannelOptions
+                {
+                    ServiceConfig = new ServiceConfig
+                    {
+                        MethodConfigs =
+                        {
+                            new MethodConfig { Names = { MethodName.Default }, RetryPolicy = retryPolicy },
+                        },
+                    },
+                });
+                return new Urfu.Link.Services.Presence.Grpc.InternalApi.InternalApiClient(channel);
+            });
+            services.AddSingleton<Urfu.Link.Services.Chat.Application.Presence.IPresenceServiceClient,
+                PresenceServiceClient>();
+        }
+        else
+        {
+            // Stub for tests and on-prem deployments without PresenceService.
+            services.AddSingleton<Urfu.Link.Services.Chat.Application.Presence.IPresenceServiceClient,
+                NoopPresenceServiceClient>();
+        }
+
         services.TryAddSingleton(TimeProvider.System);
         services.AddScoped<ChatEventDispatcher>();
         services.AddScoped<OpenDirectConversationService>();

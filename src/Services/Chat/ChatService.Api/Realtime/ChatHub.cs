@@ -3,6 +3,7 @@ using Grpc.Core;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using MongoDB.Driver;
+using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Disciplines;
@@ -50,6 +51,7 @@ public sealed class ChatHub(
     GetThreadMessagesQuery getThreadMessages,
     IConversationRepository conversationRepository,
     IDisciplineServiceClient disciplineServiceClient,
+    Application.Presence.IPresenceServiceClient presenceServiceClient,
     ILogger<ChatHub> logger) : Hub<IChatClient>
 {
     /// <summary>
@@ -268,5 +270,46 @@ public sealed class ChatHub(
         var caller = Context.User!.GetUserId();
         return getThreadMessages.ExecuteAsync(
             rootMessageId, caller, cursor, limit, CursorDirection.Older, Context.ConnectionAborted);
+    }
+
+    /// <summary>
+    /// Marks the caller as currently typing in the conversation. Refreshes the per-user TTL
+    /// on PresenceService so the indicator stays alive while the user keeps typing. Verifies
+    /// chat-side participation first so a non-member cannot pollute another conversation's
+    /// typing state.
+    /// </summary>
+    public async Task StartTyping(string conversationId)
+    {
+        await SetTypingAsync(conversationId, isTyping: true).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Clears the caller's typing indicator in the conversation immediately, regardless of TTL.
+    /// Called when the user blurs the input or sends the message; SendMessageService also
+    /// fires this server-side after a successful send.
+    /// </summary>
+    public async Task StopTyping(string conversationId)
+    {
+        await SetTypingAsync(conversationId, isTyping: false).ConfigureAwait(false);
+    }
+
+    private async Task SetTypingAsync(string conversationId, bool isTyping)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
+        var caller = Context.User!.GetUserId();
+
+        var conversation = await conversationRepository
+            .GetByIdAsync(conversationId, Context.ConnectionAborted)
+            .ConfigureAwait(false);
+        if (conversation is null || !conversation.Participants.Contains(caller))
+        {
+            // Match the rest of the hub: typing in a conversation you're not in is a no-op,
+            // not a leak. The exception type aligns with PinMessage / DeleteMessage paths.
+            throw new ChatAccessDeniedException(conversationId, caller);
+        }
+
+        await presenceServiceClient
+            .SetTypingAsync(conversationId, caller, isTyping, Context.ConnectionAborted)
+            .ConfigureAwait(false);
     }
 }
