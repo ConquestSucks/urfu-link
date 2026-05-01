@@ -116,7 +116,11 @@ export type SearchFilters = {
   attachmentType?: AttachmentType;
 };
 
-const PREFIX = "/api/v1/chat";
+// Gateway матчит /api/chat/* и снимает этот префикс при проксировании
+// в chat-service (см. src/Gateway/ApiGateway/appsettings.json). Префикс
+// /api/v1 на уровне самого сервиса — задача Gateway (issue #215),
+// а не фронта. Единый паттерн со всеми остальными сервисами (users/media/...).
+const PREFIX = "/api/chat";
 
 export function createChatApi(
   baseUrl: string,
