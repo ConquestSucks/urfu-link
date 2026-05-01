@@ -250,6 +250,7 @@ services:
       Keycloak__ClientSecret: user-service-admin-dev-secret
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       Storage__PublicEndpoint: http://localhost:9000
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       user-migrations:
         condition: service_completed_successfully
@@ -274,6 +275,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       mongo:
         condition: service_healthy
@@ -317,6 +319,7 @@ services:
       Storage__SecretKey: minio123
       Storage__PrivateBucket: media-private
       Storage__PublicBucket: media-public
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       media-migrations:
         condition: service_completed_successfully
@@ -506,9 +509,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Cors__AllowedOrigins__0: http://localhost:3000
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Infrastructure__Redis__Configuration: redis:6379
     ports:
       - "5080:8080"
     depends_on:
+      redis:
+        condition: service_healthy
       keycloak:
         condition: service_healthy
       user-service:
