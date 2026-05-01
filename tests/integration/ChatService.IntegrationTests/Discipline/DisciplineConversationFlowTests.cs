@@ -4,6 +4,7 @@ using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -137,6 +138,57 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task DisciplineCreated_StoresTitleAndCoverFromEvent()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var coverId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "CS210", "Compilers", null, "2026", teacherId, coverId),
+            CancellationToken.None);
+
+        var conv = await ResolveRepo().GetByDisciplineIdAsync(disciplineId, CancellationToken.None);
+        conv!.Title.Should().Be("Compilers");
+        conv.CoverAssetId.Should().Be(coverId);
+        conv.GroupSubtype.Should().Be(GroupSubtype.Discipline);
+    }
+
+    [Fact]
+    public async Task DisciplineUpdated_RefreshesTitleAndCover()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var initialCover = Guid.NewGuid();
+        var newCover = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "CS220", "Algorithms I", null, "2026", teacherId, initialCover),
+            CancellationToken.None);
+        await service.HandleDisciplineUpdatedAsync(
+            new DisciplineUpdatedEvent(disciplineId, "CS220", "Algorithms (renamed)", "desc", "2026", teacherId, newCover),
+            CancellationToken.None);
+
+        var conv = await ResolveRepo().GetByDisciplineIdAsync(disciplineId, CancellationToken.None);
+        conv!.Title.Should().Be("Algorithms (renamed)");
+        conv.CoverAssetId.Should().Be(newCover);
+    }
+
+    [Fact]
+    public async Task DisciplineUpdated_OnUnknownDiscipline_IsNoOp()
+    {
+        var service = ResolveService();
+
+        var act = () => service.HandleDisciplineUpdatedAsync(
+            new DisciplineUpdatedEvent(Guid.NewGuid(), "X", "Title", null, "2026", Guid.NewGuid(), null),
+            CancellationToken.None);
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
     public async Task DisciplineDeleted_ArchivesConversation()
     {
         var disciplineId = Guid.NewGuid();
@@ -152,6 +204,251 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
 
         var conv = await ResolveRepo().GetByDisciplineIdAsync(disciplineId, CancellationToken.None);
         conv!.IsArchived.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DisciplineCreated_BroadcastsConversationCreatedToOwner()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC1", "Broadcast test", null, "2026", teacherId, null),
+            CancellationToken.None);
+
+        var broadcasts = _factory.ChatBroadcaster.ConversationCreated;
+        broadcasts.Should().ContainSingle()
+            .Which.Recipients.Should().ContainSingle().Which.Should().Be(teacherId);
+    }
+
+    [Fact]
+    public async Task UserEnrolled_BroadcastsParticipantJoined_AndConversationCreatedForNewUser()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC2", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+
+        _factory.ChatBroadcaster.ParticipantJoined.Should().ContainSingle()
+            .Which.Should().Match<FakeBroadcastParticipantJoinedRecord>(r =>
+                r.UserId == studentId
+                && r.Role == ParticipantRole.Student
+                && r.Recipients.Count == 1
+                && r.Recipients[0] == teacherId);
+        _factory.ChatBroadcaster.ConversationCreated.Should().ContainSingle()
+            .Which.Recipients.Should().ContainSingle().Which.Should().Be(studentId);
+    }
+
+    [Fact]
+    public async Task UserUnenrolled_BroadcastsParticipantLeftToAllPriorParticipants()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC3", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleUserUnenrolledAsync(
+            new UserUnenrolledEvent(disciplineId, studentId),
+            CancellationToken.None);
+
+        var record = _factory.ChatBroadcaster.ParticipantLeft.Should().ContainSingle().Which;
+        record.UserId.Should().Be(studentId);
+        record.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
+    }
+
+    [Fact]
+    public async Task EnrollmentRoleChanged_BroadcastsRoleChangedToAllParticipants()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC4", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleEnrollmentRoleChangedAsync(
+            new EnrollmentRoleChangedEvent(disciplineId, studentId, DisciplineRole.Student, DisciplineRole.Teacher),
+            CancellationToken.None);
+
+        var record = _factory.ChatBroadcaster.ParticipantRoleChanged.Should().ContainSingle().Which;
+        record.UserId.Should().Be(studentId);
+        record.NewRole.Should().Be(ParticipantRole.Teacher);
+        record.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
+    }
+
+    [Fact]
+    public async Task DisciplineCreated_PublishesChatDisciplineConversationCreated()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var coverId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB1", "Pub", null, "2026", teacherId, coverId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatDisciplineConversationCreatedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatDisciplineConversationCreatedEvent>(e =>
+                e.DisciplineId == disciplineId
+                && e.OwnerTeacherId == teacherId
+                && e.Title == "Pub"
+                && e.CoverAssetId == coverId);
+    }
+
+    [Fact]
+    public async Task UserEnrolled_PublishesChatParticipantJoined()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB2", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatParticipantJoinedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatParticipantJoinedEvent>(e =>
+                e.UserId == studentId && e.Role == ChatParticipantRole.Student);
+    }
+
+    [Fact]
+    public async Task UserUnenrolled_PublishesChatParticipantLeft()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB3", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleUserUnenrolledAsync(
+            new UserUnenrolledEvent(disciplineId, studentId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatParticipantLeftEvent>()
+            .Should().ContainSingle()
+            .Which.UserId.Should().Be(studentId);
+    }
+
+    [Fact]
+    public async Task EnrollmentRoleChanged_PublishesChatParticipantRoleChanged()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB4", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleEnrollmentRoleChangedAsync(
+            new EnrollmentRoleChangedEvent(disciplineId, studentId, DisciplineRole.Student, DisciplineRole.Teacher),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatParticipantRoleChangedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatParticipantRoleChangedEvent>(e =>
+                e.UserId == studentId
+                && e.OldRole == ChatParticipantRole.Student
+                && e.NewRole == ChatParticipantRole.Teacher);
+    }
+
+    [Fact]
+    public async Task DisciplineDeleted_PublishesChatConversationArchived()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "PUB5", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        _factory.OutboxWriter.Clear();
+
+        await service.HandleDisciplineDeletedAsync(
+            new DisciplineDeletedEvent(disciplineId),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatConversationArchivedEvent>()
+            .Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task DisciplineDeleted_BroadcastsConversationArchivedToAllParticipants()
+    {
+        var disciplineId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleDisciplineCreatedAsync(
+            new DisciplineCreatedEvent(disciplineId, "BC5", "x", null, "2026", teacherId, null),
+            CancellationToken.None);
+        await service.HandleUserEnrolledAsync(
+            new UserEnrolledEvent(disciplineId, studentId, DisciplineRole.Student, teacherId),
+            CancellationToken.None);
+        _factory.ChatBroadcaster.Reset();
+
+        await service.HandleDisciplineDeletedAsync(
+            new DisciplineDeletedEvent(disciplineId),
+            CancellationToken.None);
+
+        _factory.ChatBroadcaster.ConversationArchived.Should().ContainSingle()
+            .Which.Recipients.Should().BeEquivalentTo(new[] { teacherId, studentId });
     }
 
     [Fact]
@@ -223,9 +520,16 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
 
     private DisciplineConversationService ResolveService()
     {
+        // Build the service against the captured-by-fake broadcaster instead of the production
+        // SignalR-backed one — domain-flow tests assert on the broadcasts the service emits, and
+        // this lets the rest of the integration suite keep using the real broadcaster for hub
+        // tests that drive real SignalR clients.
         var scope = _factory.Services.CreateScope();
         _scopes.Add(scope);
-        return scope.ServiceProvider.GetRequiredService<DisciplineConversationService>();
+        var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        var dispatcher = scope.ServiceProvider.GetRequiredService<Urfu.Link.Services.Chat.Application.ChatEventDispatcher>();
+        var logger = scope.ServiceProvider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<DisciplineConversationService>>();
+        return new DisciplineConversationService(repo, _factory.ChatBroadcaster, dispatcher, logger);
     }
 
     private IConversationRepository ResolveRepo()

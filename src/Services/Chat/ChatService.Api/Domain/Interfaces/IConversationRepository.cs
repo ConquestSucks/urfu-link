@@ -1,3 +1,4 @@
+using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
@@ -26,6 +27,7 @@ public interface IConversationRepository
         Guid userId,
         ConversationCursor? cursor,
         int limit,
+        ConversationListFilter filter,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -99,5 +101,16 @@ public interface IConversationRepository
     Task<bool> ArchiveAsync(
         string conversationId,
         DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Refreshes display metadata (title and cover) projected from the source aggregate. Used
+    /// by the discipline.updated.v1 handler. Returns <see langword="true"/> when at least one
+    /// document was modified.
+    /// </summary>
+    Task<bool> UpdateMetadataAsync(
+        string conversationId,
+        string? title,
+        Guid? coverAssetId,
         CancellationToken cancellationToken);
 }

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -109,7 +110,8 @@ public sealed class ForwardMessagesService(
                 attachments: src.Attachments,
                 clientMessageId: clientMessageId,
                 createdAtUtc: sentAt,
-                forwardedFrom: new ForwardedFrom(src.SenderId, src.CreatedAtUtc, originalConversationId));
+                forwardedFrom: new ForwardedFrom(src.SenderId, src.CreatedAtUtc, originalConversationId),
+                authorRole: target.RoleOf(request.CallerUserId));
 
             await messages.InsertAsync(newMessage, cancellationToken).ConfigureAwait(false);
             produced.Add(MessageDto.FromDomain(newMessage));

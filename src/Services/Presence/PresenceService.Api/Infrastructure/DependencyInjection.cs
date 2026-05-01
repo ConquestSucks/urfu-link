@@ -45,6 +45,8 @@ public static class ModuleRegistration
             sp.GetRequiredService<IOutboxWriter>(),
             ServiceName));
 
+        services.AddScoped<PartitionManager>();
+
         services.AddSingleton<IPresenceSessionStore, RedisPresenceSessionStore>();
         services.AddSingleton<ITypingStore, RedisTypingStore>();
         services.AddSingleton<IPrivacyProjectionStore, RedisPrivacyProjectionStore>();

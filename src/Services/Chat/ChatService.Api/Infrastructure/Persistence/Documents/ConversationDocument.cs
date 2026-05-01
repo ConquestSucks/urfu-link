@@ -47,6 +47,22 @@ internal sealed class ConversationDocument
     [BsonIgnoreIfNull]
     public DateTime? ArchivedAtUtc { get; set; }
 
+    [BsonElement("title")]
+    [BsonIgnoreIfNull]
+    public string? Title { get; set; }
+
+    [BsonElement("coverAssetId")]
+    [BsonIgnoreIfNull]
+    public Guid? CoverAssetId { get; set; }
+
+    [BsonElement("groupSubtype")]
+    [BsonIgnoreIfNull]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public GroupSubtype? GroupSubtype { get; set; }
+
+    [BsonElement("isAnnouncementOnly")]
+    public bool IsAnnouncementOnly { get; set; }
+
     public Conversation ToDomain() => Conversation.Hydrate(
         Id,
         Type,
@@ -59,7 +75,11 @@ internal sealed class ConversationDocument
         DisciplineId,
         ArchivedAtUtc is { } archived
             ? new DateTimeOffset(DateTime.SpecifyKind(archived, DateTimeKind.Utc))
-            : null);
+            : null,
+        Title,
+        CoverAssetId,
+        GroupSubtype,
+        IsAnnouncementOnly);
 
     public static ConversationDocument FromDomain(Conversation conversation)
     {
@@ -83,6 +103,10 @@ internal sealed class ConversationDocument
                     .ToList(),
             DisciplineId = conversation.DisciplineId,
             ArchivedAtUtc = conversation.ArchivedAtUtc?.UtcDateTime,
+            Title = conversation.Title,
+            CoverAssetId = conversation.CoverAssetId,
+            GroupSubtype = conversation.GroupSubtype,
+            IsAnnouncementOnly = conversation.IsAnnouncementOnly,
         };
     }
 }

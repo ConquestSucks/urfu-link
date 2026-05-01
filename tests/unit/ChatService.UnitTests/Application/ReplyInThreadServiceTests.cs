@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Application;
@@ -52,9 +53,11 @@ public class ReplyInThreadServiceTests
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
         var options = Options.Create(new ChatOptions { MaxMentionsPerMessage = 50 });
+        var disciplineClient = Substitute.For<Urfu.Link.Services.Chat.Application.Disciplines.IDisciplineServiceClient>();
+        var mentions = new Urfu.Link.Services.Chat.Application.Mentions.MentionResolver(disciplineClient);
         return new ReplyInThreadService(
             _conversations, _messages, _subscriptions, _media, _idempotency,
-            dispatcher, _broadcaster, _clock, options);
+            dispatcher, _broadcaster, mentions, _clock, options);
     }
 
     private (Conversation conv, Message root) SeedRoot(DateTimeOffset rootCreatedAt)

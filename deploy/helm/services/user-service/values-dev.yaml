@@ -33,3 +33,7 @@ resources:
     cpu: 200m
     memory: 256Mi
 
+migrations:
+  enabled: true
+  command: ["dotnet", "UserService.Api.dll", "--migrate"]
+

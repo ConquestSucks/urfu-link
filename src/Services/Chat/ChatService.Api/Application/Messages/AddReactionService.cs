@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using Urfu.Link.Services.Chat.Domain.Events;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 using Urfu.Link.Services.Chat.Infrastructure;

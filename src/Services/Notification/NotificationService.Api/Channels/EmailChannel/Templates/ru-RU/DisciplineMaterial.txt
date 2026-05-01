@@ -1,0 +1,7 @@
+Новый материал: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

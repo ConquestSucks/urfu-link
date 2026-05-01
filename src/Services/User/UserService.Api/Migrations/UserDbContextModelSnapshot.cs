@@ -33,6 +33,11 @@ namespace UserService.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at_utc");
 
+                    b.Property<string>("Notifications")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("notification_settings");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at_utc");
@@ -63,35 +68,6 @@ namespace UserService.Api.Migrations
                             b1.Property<string>("AvatarUrl")
                                 .HasColumnType("text")
                                 .HasColumnName("avatar_url");
-
-                            b1.HasKey("UserProfileId");
-
-                            b1.ToTable("user_profiles", "users");
-
-                            b1.WithOwner()
-                                .HasForeignKey("UserProfileId");
-                        });
-
-                    b.OwnsOne("UserService.Api.Domain.ValueObjects.NotificationSettings", "Notifications", b1 =>
-                        {
-                            b1.Property<Guid>("UserProfileId")
-                                .HasColumnType("uuid");
-
-                            b1.Property<bool>("DisciplineChatMessages")
-                                .HasColumnType("boolean")
-                                .HasColumnName("notify_discipline_chats");
-
-                            b1.Property<bool>("Mentions")
-                                .HasColumnType("boolean")
-                                .HasColumnName("notify_mentions");
-
-                            b1.Property<bool>("NewMessages")
-                                .HasColumnType("boolean")
-                                .HasColumnName("notify_new_messages");
-
-                            b1.Property<bool>("NotificationSound")
-                                .HasColumnType("boolean")
-                                .HasColumnName("notify_sound");
 
                             b1.HasKey("UserProfileId");
 
@@ -148,9 +124,6 @@ namespace UserService.Api.Migrations
                         });
 
                     b.Navigation("Account")
-                        .IsRequired();
-
-                    b.Navigation("Notifications")
                         .IsRequired();
 
                     b.Navigation("Privacy")

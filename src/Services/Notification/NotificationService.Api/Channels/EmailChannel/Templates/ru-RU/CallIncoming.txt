@@ -1,0 +1,7 @@
+Входящий звонок: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

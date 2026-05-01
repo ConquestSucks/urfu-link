@@ -1,4 +1,5 @@
 using Urfu.Link.Services.Chat.Application.Contracts;
+using Urfu.Link.Services.Chat.Domain.Enums;
 
 namespace Urfu.Link.Services.Chat.Realtime;
 
@@ -8,6 +9,36 @@ namespace Urfu.Link.Services.Chat.Realtime;
 public interface IChatClient
 {
     Task ConversationUpdated(ConversationDto conversation);
+
+    /// <summary>
+    /// Delivered to a user when a new conversation appears in their list. For discipline groups
+    /// this fires for the owner Teacher on DisciplineCreated and for every newly enrolled user
+    /// on UserEnrolled.
+    /// </summary>
+    Task ConversationCreated(ConversationDto conversation);
+
+    /// <summary>
+    /// Delivered to existing participants of a group when a new participant joins.
+    /// </summary>
+    Task ParticipantJoined(string conversationId, Guid userId, ParticipantRole role);
+
+    /// <summary>
+    /// Delivered to remaining participants (and the unenrolled user themselves on their other
+    /// open connections) when a user is removed from a group.
+    /// </summary>
+    Task ParticipantLeft(string conversationId, Guid userId);
+
+    /// <summary>
+    /// Delivered to participants when a role transition happens — e.g. a Student is promoted
+    /// to Teacher inside a discipline group.
+    /// </summary>
+    Task ParticipantRoleChanged(string conversationId, Guid userId, ParticipantRole newRole);
+
+    /// <summary>
+    /// Delivered to participants when a conversation transitions to read-only archived state
+    /// (currently only DisciplineDeleted).
+    /// </summary>
+    Task ConversationArchived(string conversationId, DateTimeOffset archivedAtUtc);
 
     Task MessageReceived(MessageDto message);
 

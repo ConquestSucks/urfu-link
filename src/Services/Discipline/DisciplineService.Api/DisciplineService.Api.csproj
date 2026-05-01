@@ -18,14 +18,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\internal.proto" GrpcServices="Both" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Idempotency\Idempotency.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
+    <ProjectReference Include="..\DisciplineService.Api.Contracts\DisciplineService.Api.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

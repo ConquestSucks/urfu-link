@@ -47,6 +47,36 @@ namespace PresenceService.Api.Infrastructure.Persistence.Migrations
 
                     b.ToTable("last_seen", "presence");
                 });
+
+            modelBuilder.Entity("Urfu.Link.Services.Presence.Domain.Aggregates.LastSeenHistoryEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("RecordedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("recorded_at_utc");
+
+                    b.Property<int>("LastPlatform")
+                        .HasColumnType("integer")
+                        .HasColumnName("last_platform");
+
+                    b.Property<DateTimeOffset>("LastSeenAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_seen_at_utc");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id", "RecordedAtUtc");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_last_seen_history_user_id");
+
+                    b.ToTable("last_seen_history", "presence");
+                });
 #pragma warning restore 612, 618
         }
     }

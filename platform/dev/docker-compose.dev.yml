@@ -218,6 +218,27 @@ services:
 
   # ── .NET Services ──────────────────────────────────────────────────────────
 
+  # ── Migration sidecars ─────────────────────────────────────────────────────
+  # One-shot containers that mirror the production Helm pre-upgrade Job: run
+  # `dotnet *.Api.dll --migrate` once, then exit. Main app pods depend on
+  # `service_completed_successfully` so the schema is applied before anything
+  # else opens a connection. This intentionally matches the prod flow — devs
+  # should never see "auto-migrate on startup" behaviour locally either.
+
+  user-migrations:
+    build:
+      context: ../..
+      dockerfile: src/Services/User/UserService.Api/Dockerfile
+    container_name: urfu-user-migrations
+    command: ["dotnet", "UserService.Api.dll", "--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   user-service:
     build:
       context: ../..
@@ -229,7 +250,10 @@ services:
       Keycloak__ClientSecret: user-service-admin-dev-secret
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       Storage__PublicEndpoint: http://localhost:9000
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      user-migrations:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -251,6 +275,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       mongo:
         condition: service_healthy
@@ -263,6 +288,20 @@ services:
       kafka-init:
         condition: service_completed_successfully
     restart: unless-stopped
+
+  media-migrations:
+    build:
+      context: ../..
+      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+    container_name: urfu-media-migrations
+    command: ["dotnet", "MediaService.Api.dll", "--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   media-service:
     build:
@@ -280,7 +319,10 @@ services:
       Storage__SecretKey: minio123
       Storage__PrivateBucket: media-private
       Storage__PublicBucket: media-public
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      media-migrations:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -297,6 +339,20 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  presence-migrations:
+    build:
+      context: ../..
+      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+    container_name: urfu-presence-migrations
+    command: ["dotnet", "PresenceService.Api.dll", "--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   presence-service:
     build:
       context: ../..
@@ -311,6 +367,8 @@ services:
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      presence-migrations:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -323,6 +381,20 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  notification-migrations:
+    build:
+      context: ../..
+      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+    container_name: urfu-notification-migrations
+    command: ["dotnet", "NotificationService.Api.dll", "--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   notification-service:
     build:
       context: ../..
@@ -332,7 +404,22 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+      Infrastructure__Redis__Configuration: redis:6379
+      Notification__Push__Provider: fake
+      Notification__Smtp__Host: mailhog
+      Notification__Smtp__Port: 1025
+      Notification__Smtp__EnableStartTls: "false"
+      Notification__Smtp__From: noreply@urfu-link.local
+      Notification__Smtp__FromDisplayName: UrFU Link
+      Notification__Retention__RetentionDays: "90"
+      UserService__GrpcEndpoint: http://user-service:8080
+      PresenceService__GrpcEndpoint: http://presence-service:8080
     depends_on:
+      notification-migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
@@ -341,6 +428,16 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: urfu-mailhog
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     restart: unless-stopped
 
   call-service:
@@ -363,6 +460,20 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  discipline-migrations:
+    build:
+      context: ../..
+      dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
+    container_name: urfu-discipline-migrations
+    command: ["dotnet", "DisciplineService.Api.dll", "--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   discipline-service:
     build:
       context: ../..
@@ -375,6 +486,8 @@ services:
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      discipline-migrations:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -396,9 +509,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Cors__AllowedOrigins__0: http://localhost:3000
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Infrastructure__Redis__Configuration: redis:6379
     ports:
       - "5080:8080"
     depends_on:
+      redis:
+        condition: service_healthy
       keycloak:
         condition: service_healthy
       user-service:

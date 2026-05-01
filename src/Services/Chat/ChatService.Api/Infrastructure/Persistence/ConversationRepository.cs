@@ -1,5 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
+using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
@@ -53,6 +54,7 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         Guid userId,
         ConversationCursor? cursor,
         int limit,
+        ConversationListFilter filter,
         CancellationToken cancellationToken)
     {
         if (limit <= 0)
@@ -61,7 +63,25 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         }
 
         var filterBuilder = Builders<ConversationDocument>.Filter;
-        var filter = filterBuilder.AnyEq(c => c.Participants, userId);
+        var mongoFilter = filterBuilder.AnyEq(c => c.Participants, userId);
+
+        switch (filter)
+        {
+            case ConversationListFilter.Direct:
+                mongoFilter = filterBuilder.And(
+                    mongoFilter,
+                    filterBuilder.Eq(c => c.Type, ConversationType.Direct));
+                break;
+            case ConversationListFilter.Discipline:
+                mongoFilter = filterBuilder.And(
+                    mongoFilter,
+                    filterBuilder.Eq(c => c.Type, ConversationType.Group),
+                    filterBuilder.Ne(c => c.DisciplineId, (Guid?)null));
+                break;
+            case ConversationListFilter.All:
+            default:
+                break;
+        }
 
         if (cursor is { } c)
         {
@@ -72,11 +92,11 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
                 filterBuilder.And(
                     filterBuilder.Eq(d => d.LastMessageAtUtc, ts),
                     filterBuilder.Lt(d => d.Id, c.ConversationId)));
-            filter = filterBuilder.And(filter, cursorFilter);
+            mongoFilter = filterBuilder.And(mongoFilter, cursorFilter);
         }
 
         var docs = await context.Conversations
-            .Find(filter)
+            .Find(mongoFilter)
             .Sort(Builders<ConversationDocument>.Sort
                 .Descending(c => c.LastMessageAtUtc)
                 .Descending(c => c.Id))
@@ -296,6 +316,21 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         var update = Builders<ConversationDocument>.Update.Set(c => c.ArchivedAtUtc, archivedAtUtc.UtcDateTime);
         var result = await context.Conversations
             .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> UpdateMetadataAsync(
+        string conversationId,
+        string? title,
+        Guid? coverAssetId,
+        CancellationToken cancellationToken)
+    {
+        var update = Builders<ConversationDocument>.Update
+            .Set(c => c.Title, title)
+            .Set(c => c.CoverAssetId, coverAssetId);
+        var result = await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, update, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         return result.ModifiedCount > 0;
     }

@@ -1,0 +1,7 @@
+Приглашение в чат: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

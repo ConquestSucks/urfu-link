@@ -1,3 +1,4 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
@@ -38,7 +39,8 @@ public sealed class Message
         Guid? threadRootId,
         int threadReplyCount,
         IEnumerable<Guid>? threadParticipants,
-        DateTimeOffset? threadLastReplyAtUtc)
+        DateTimeOffset? threadLastReplyAtUtc,
+        ParticipantRole authorRole)
     {
         Id = id;
         ConversationId = conversationId;
@@ -65,6 +67,7 @@ public sealed class Message
         ThreadReplyCount = threadReplyCount;
         _threadParticipants = threadParticipants?.ToList() ?? [];
         ThreadLastReplyAtUtc = threadLastReplyAtUtc;
+        AuthorRole = authorRole;
     }
 
     public Guid Id { get; }
@@ -136,6 +139,14 @@ public sealed class Message
 
     public bool IsThreadReply => ThreadRootId.HasValue;
 
+    /// <summary>
+    /// Denormalised role of the author at the moment the message was persisted. For direct
+    /// chats this is <see cref="ParticipantRole.Member"/>; for discipline groups it captures
+    /// whether the sender was a Teacher or Student. Stored on the message so the UI can render
+    /// the role badge without a follow-up lookup against the conversation.
+    /// </summary>
+    public ParticipantRole AuthorRole { get; }
+
     public static Message Send(
         Guid id,
         string conversationId,
@@ -146,7 +157,8 @@ public sealed class Message
         DateTimeOffset createdAtUtc,
         IEnumerable<Guid>? mentions = null,
         ReplyTo? replyTo = null,
-        ForwardedFrom? forwardedFrom = null)
+        ForwardedFrom? forwardedFrom = null,
+        ParticipantRole authorRole = ParticipantRole.Member)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
         ArgumentNullException.ThrowIfNull(attachments);
@@ -177,7 +189,8 @@ public sealed class Message
             threadRootId: null,
             threadReplyCount: 0,
             threadParticipants: null,
-            threadLastReplyAtUtc: null);
+            threadLastReplyAtUtc: null,
+            authorRole: authorRole);
     }
 
     /// <summary>
@@ -196,7 +209,8 @@ public sealed class Message
         DateTimeOffset createdAtUtc,
         Guid threadRootId,
         IEnumerable<Guid>? mentions = null,
-        ReplyTo? replyTo = null)
+        ReplyTo? replyTo = null,
+        ParticipantRole authorRole = ParticipantRole.Member)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
         ArgumentNullException.ThrowIfNull(attachments);
@@ -237,7 +251,8 @@ public sealed class Message
             threadRootId: threadRootId,
             threadReplyCount: 0,
             threadParticipants: null,
-            threadLastReplyAtUtc: null);
+            threadLastReplyAtUtc: null,
+            authorRole: authorRole);
     }
 
     public static Message Hydrate(
@@ -265,7 +280,8 @@ public sealed class Message
         Guid? threadRootId = null,
         int threadReplyCount = 0,
         IEnumerable<Guid>? threadParticipants = null,
-        DateTimeOffset? threadLastReplyAtUtc = null)
+        DateTimeOffset? threadLastReplyAtUtc = null,
+        ParticipantRole authorRole = ParticipantRole.Member)
         => new(
             id,
             conversationId,
@@ -291,7 +307,8 @@ public sealed class Message
             threadRootId,
             threadReplyCount,
             threadParticipants,
-            threadLastReplyAtUtc);
+            threadLastReplyAtUtc,
+            authorRole);
 
     public bool MarkDelivered(DateTimeOffset atUtc)
     {
@@ -374,7 +391,8 @@ public sealed class Message
         State = MessageState.Deleted;
         DeletedAtUtc = atUtc;
         DeletedBy = byUserId;
-        DeleteMode = Enums.DeleteMode.ForEveryone;
+        // Fully qualified to disambiguate from the property of the same name on this aggregate.
+        DeleteMode = BuildingBlocks.Contracts.Integration.Chat.DeleteMode.ForEveryone;
         Body = string.Empty;
         _attachments.Clear();
         _reactions.Clear();

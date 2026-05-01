@@ -12,6 +12,18 @@ using Urfu.Link.BuildingBlocks.ServiceDefaults;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Migration mode: invoked by the Helm pre-upgrade Job (or the docker-compose
+// `discipline-migrations` sidecar in dev). When triggered, applies pending EF
+// migrations and exits — no web host is started, no HostedServices run.
+if (await MigrationCliRunner.TryRunMigrationsAsync<DisciplineDbContext>(
+    args,
+    "DisciplineService",
+    services => services.AddDbContext<DisciplineDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+{
+    return;
+}
+
 builder.Services.AddGrpc();
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(o =>
@@ -44,15 +56,10 @@ builder.Services.AddDisciplineModule(builder.Configuration);
 
 var app = builder.Build();
 
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<DisciplineDbContext>();
-    if (db.Database.IsRelational())
-    {
-        await db.Database.MigrateAsync().ConfigureAwait(false);
-    }
-}
-
+// Schema is owned by the Helm pre-upgrade migrations Job (or the dev sidecar)
+// and applied via `dotnet DisciplineService.Api.dll --migrate` exactly once
+// per release. Auto-migrating in startup raced replicas on the schema upgrade
+// at boot — moved out deliberately.
 app.MapServiceDefaults();
 app.UseFastEndpoints(c =>
 {

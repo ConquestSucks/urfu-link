@@ -1,4 +1,5 @@
 using MongoDB.Bson.Serialization.Attributes;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 
@@ -93,6 +94,14 @@ internal sealed class MessageDocument
     [BsonIgnoreIfNull]
     public DateTime? ThreadLastReplyAtUtc { get; set; }
 
+    /// <summary>
+    /// Role of the author at the moment the message was persisted. Default <c>Member</c>
+    /// is what legacy documents missing this field deserialise to.
+    /// </summary>
+    [BsonElement("authorRole")]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public ParticipantRole AuthorRole { get; set; }
+
     public Message ToDomain() => Message.Hydrate(
         Id,
         ConversationId,
@@ -118,7 +127,8 @@ internal sealed class MessageDocument
         ThreadRootId,
         ThreadReplyCount,
         ThreadParticipants,
-        ThreadLastReplyAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ThreadLastReplyAtUtc.Value, DateTimeKind.Utc)) : null);
+        ThreadLastReplyAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ThreadLastReplyAtUtc.Value, DateTimeKind.Utc)) : null,
+        AuthorRole);
 
     public static MessageDocument FromDomain(Message message) => new()
     {
@@ -147,5 +157,6 @@ internal sealed class MessageDocument
         ThreadReplyCount = message.ThreadReplyCount,
         ThreadParticipants = message.ThreadParticipants.ToList(),
         ThreadLastReplyAtUtc = message.ThreadLastReplyAtUtc?.UtcDateTime,
+        AuthorRole = message.AuthorRole,
     };
 }

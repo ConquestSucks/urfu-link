@@ -1,0 +1,7 @@
+Role updated: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

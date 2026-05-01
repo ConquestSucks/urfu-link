@@ -1,3 +1,4 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 
@@ -25,7 +26,8 @@ public sealed record MessageDto(
     Guid? ThreadRootId = null,
     int? ThreadReplyCount = null,
     IReadOnlyList<Guid>? ThreadParticipants = null,
-    DateTimeOffset? ThreadLastReplyAtUtc = null)
+    DateTimeOffset? ThreadLastReplyAtUtc = null,
+    ParticipantRole AuthorRole = ParticipantRole.Member)
 {
     public static MessageDto FromDomain(Message message)
     {
@@ -55,7 +57,8 @@ public sealed record MessageDto(
             ThreadRootId: message.ThreadRootId,
             ThreadReplyCount: message.ThreadReplyCount > 0 ? message.ThreadReplyCount : null,
             ThreadParticipants: message.ThreadParticipants.Count == 0 ? null : message.ThreadParticipants.ToList(),
-            ThreadLastReplyAtUtc: message.ThreadLastReplyAtUtc);
+            ThreadLastReplyAtUtc: message.ThreadLastReplyAtUtc,
+            AuthorRole: message.AuthorRole);
     }
 
     private static Dictionary<string, IReadOnlyList<Guid>> BuildReactionsSummary(Message message)

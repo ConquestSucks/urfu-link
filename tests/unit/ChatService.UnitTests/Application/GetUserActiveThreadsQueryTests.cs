@@ -1,6 +1,7 @@
 using System.Globalization;
 using FluentAssertions;
 using NSubstitute;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.Services.Chat.Application.Threads;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;

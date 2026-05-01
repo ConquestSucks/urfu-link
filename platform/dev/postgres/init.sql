@@ -27,3 +27,10 @@ CREATE USER discipline WITH PASSWORD 'discipline';
 GRANT ALL PRIVILEGES ON DATABASE discipline_db TO discipline;
 \c discipline_db
 GRANT ALL ON SCHEMA public TO discipline;
+
+\c postgres
+CREATE DATABASE notification_db;
+CREATE USER notification WITH PASSWORD 'notification';
+GRANT ALL PRIVILEGES ON DATABASE notification_db TO notification;
+\c notification_db
+GRANT ALL ON SCHEMA public TO notification;

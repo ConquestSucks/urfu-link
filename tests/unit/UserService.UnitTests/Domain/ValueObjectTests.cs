@@ -23,14 +23,63 @@ public sealed class ValueObjectTests
     }
 
     [Fact]
-    public void NotificationSettingsDefaultShouldBeTrueForAll()
+    public void NotificationSettingsDefaultEnablesAllCategoriesOnAllChannels()
     {
         var settings = NotificationSettings.Default;
 
-        Assert.True(settings.NewMessages);
-        Assert.True(settings.NotificationSound);
-        Assert.True(settings.DisciplineChatMessages);
-        Assert.True(settings.Mentions);
+        Assert.True(settings.Sound);
+        Assert.False(settings.DndEnabled);
+        Assert.Equal("ru-RU", settings.Locale);
+        Assert.False(settings.QuietHours.Enabled);
+        Assert.Equal(NotificationCategoryCode.All.Count, settings.Categories.Count);
+        foreach (var code in NotificationCategoryCode.All)
+        {
+            var toggle = settings.GetToggle(code);
+            Assert.True(toggle.Push);
+            Assert.True(toggle.Email);
+            Assert.True(toggle.InApp);
+        }
+    }
+
+    [Fact]
+    public void NotificationSettingsFromLegacyMapsBooleansToCategoryToggles()
+    {
+        var settings = NotificationSettings.FromLegacy(
+            newMessages: true,
+            sound: false,
+            disciplineChatMessages: false,
+            mentions: true);
+
+        Assert.False(settings.Sound);
+        Assert.True(settings.GetToggle(NotificationCategoryCode.ChatMessageDirect).Push);
+        Assert.False(settings.GetToggle(NotificationCategoryCode.ChatMessageDiscipline).Push);
+        Assert.True(settings.GetToggle(NotificationCategoryCode.ChatMessageMention).Push);
+        Assert.True(settings.GetToggle(NotificationCategoryCode.CallIncoming).Push);
+    }
+
+    [Fact]
+    public void NotificationSettingsWithCategoryReturnsNewInstance()
+    {
+        var original = NotificationSettings.Default;
+        var updated = original.WithCategory(NotificationCategoryCode.SystemUpdate, ChannelToggle.AllOff);
+
+        Assert.NotSame(original, updated);
+        Assert.True(original.GetToggle(NotificationCategoryCode.SystemUpdate).Push);
+        Assert.False(updated.GetToggle(NotificationCategoryCode.SystemUpdate).Push);
+    }
+
+    [Fact]
+    public void QuietHoursCreateValidatesTimezoneAndDistinctBoundaries()
+    {
+        var quiet = QuietHours.Create("Asia/Yekaterinburg", new TimeOnly(22, 0), new TimeOnly(8, 0));
+
+        Assert.True(quiet.Enabled);
+        Assert.Equal(new TimeOnly(22, 0), quiet.Start);
+
+        Assert.Throws<ArgumentException>(() =>
+            QuietHours.Create("Asia/Yekaterinburg", new TimeOnly(22, 0), new TimeOnly(22, 0)));
+        Assert.Throws<ArgumentException>(() =>
+            QuietHours.Create("Not/A_Real_Zone", new TimeOnly(1, 0), new TimeOnly(2, 0)));
     }
 
     [Fact]

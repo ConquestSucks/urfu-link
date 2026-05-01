@@ -19,4 +19,15 @@ public interface IDisciplineRoleResolver
         bool callerIsAdmin,
         Conversation conversation,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether the caller is allowed to moderate (delete-for-everyone) a message authored
+    /// by someone else. Direct conversations: never (only the author may delete).
+    /// Discipline groups: any Teacher participant. Admins bypass both checks.
+    /// </summary>
+    Task<bool> CanModerateAsync(
+        Guid userId,
+        bool callerIsAdmin,
+        Conversation conversation,
+        CancellationToken cancellationToken);
 }

@@ -67,4 +67,74 @@ public class InitiateUploadValidatorTests
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(InitiateUploadRequest.MimeType));
     }
+
+    [Fact]
+    public void RejectsVoiceUploadWithoutDeclaredDuration()
+    {
+        // EPIC #206 caps voice at 5 minutes. The size cap alone allows a 30-minute
+        // high-bitrate recording to slip through, so DurationSeconds is mandatory.
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest("note.ogg", 1024, "audio/ogg", Visibility.Private);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e =>
+            e.PropertyName == nameof(InitiateUploadRequest.DurationSeconds)
+            && e.ErrorMessage.Contains("required", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RejectsVoiceUploadExceedingMaxDuration()
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            "note.ogg", 1024, "audio/ogg", Visibility.Private, DurationSeconds: 301);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e =>
+            e.PropertyName == nameof(InitiateUploadRequest.DurationSeconds)
+            && e.ErrorMessage.Contains("exceeds", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void RejectsVoiceUploadWithNonPositiveDuration()
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            "note.ogg", 1024, "audio/ogg", Visibility.Private, DurationSeconds: 0);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(InitiateUploadRequest.DurationSeconds));
+    }
+
+    [Fact]
+    public void AcceptsVoiceUploadAtMaxDurationBoundary()
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            "note.ogg", 1024, "audio/ogg", Visibility.Private, DurationSeconds: 300);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void IgnoresDurationForKindsWithoutMaxDuration()
+    {
+        // Image / document have no MaxDurationSeconds — the field is optional and ignored
+        // even if a malformed client sends a value.
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            "photo.png", 1024, "image/png", Visibility.Private, DurationSeconds: 9999);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeTrue();
+    }
 }

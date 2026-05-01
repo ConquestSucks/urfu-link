@@ -1,3 +1,4 @@
+using Urfu.Link.BuildingBlocks.Contracts.Integration.User;
 using UserService.Api.Domain;
 using UserService.Api.Domain.Events;
 using UserService.Api.Domain.ValueObjects;
@@ -18,10 +19,12 @@ public sealed class UserTests
         Assert.Null(user.Account.AboutMe);
         Assert.True(user.Privacy.ShowOnlineStatus);
         Assert.True(user.Privacy.ShowLastVisitTime);
-        Assert.True(user.Notifications.NewMessages);
-        Assert.True(user.Notifications.NotificationSound);
-        Assert.True(user.Notifications.DisciplineChatMessages);
-        Assert.True(user.Notifications.Mentions);
+        Assert.True(user.Notifications.Sound);
+        Assert.False(user.Notifications.DndEnabled);
+        Assert.Equal("ru-RU", user.Notifications.Locale);
+        Assert.False(user.Notifications.QuietHours.Enabled);
+        Assert.True(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageDirect).Push);
+        Assert.Equal(NotificationCategoryCode.All.Count, user.Notifications.Categories.Count);
         Assert.Null(user.SoundVideo.PlaybackDeviceId);
         Assert.Null(user.SoundVideo.RecordingDeviceId);
         Assert.Null(user.SoundVideo.WebcamDeviceId);
@@ -131,7 +134,7 @@ public sealed class UserTests
     }
 
     [Fact]
-    public void UpdateNotificationsShouldChangeAllFlagsAndRaiseEvent()
+    public void UpdateNotificationsShouldMapLegacyFlagsAndRaiseEvent()
     {
         var user = UserProfile.CreateDefault(TestUserId);
 
@@ -141,17 +144,39 @@ public sealed class UserTests
             disciplineChatMessages: true,
             mentions: false);
 
-        Assert.False(user.Notifications.NewMessages);
-        Assert.False(user.Notifications.NotificationSound);
-        Assert.True(user.Notifications.DisciplineChatMessages);
-        Assert.False(user.Notifications.Mentions);
+        Assert.False(user.Notifications.Sound);
+        Assert.False(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageDirect).Push);
+        Assert.True(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageDiscipline).Push);
+        Assert.False(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageMention).Push);
+
         var evt = Assert.Single(user.DomainEvents);
         var notifEvent = Assert.IsType<UserNotificationSettingsChangedEvent>(evt);
         Assert.Equal(TestUserId, notifEvent.UserId);
-        Assert.False(notifEvent.NewMessages);
-        Assert.False(notifEvent.NotificationSound);
-        Assert.True(notifEvent.DisciplineChatMessages);
-        Assert.False(notifEvent.Mentions);
+        Assert.Equal("ru-RU", notifEvent.Preferences.Locale);
+        Assert.False(notifEvent.Preferences.DndEnabled);
+        Assert.False(notifEvent.Preferences.Categories[NotificationCategoryCode.ChatMessageDirect].Push);
+        Assert.True(notifEvent.Preferences.Categories[NotificationCategoryCode.ChatMessageDiscipline].Push);
+    }
+
+    [Fact]
+    public void UpdateNotificationPreferencesReplacesEntireSettings()
+    {
+        var user = UserProfile.CreateDefault(TestUserId);
+        var custom = NotificationSettings.Default
+            .WithCategory(NotificationCategoryCode.CallIncoming, ChannelToggle.AllOff)
+            .WithDnd(true)
+            .WithLocale("en-US");
+
+        user.UpdateNotificationPreferences(custom);
+
+        Assert.True(user.Notifications.DndEnabled);
+        Assert.Equal("en-US", user.Notifications.Locale);
+        Assert.False(user.Notifications.GetToggle(NotificationCategoryCode.CallIncoming).Push);
+
+        var evt = Assert.Single(user.DomainEvents);
+        var notifEvent = Assert.IsType<UserNotificationSettingsChangedEvent>(evt);
+        Assert.Equal("en-US", notifEvent.Preferences.Locale);
+        Assert.True(notifEvent.Preferences.DndEnabled);
     }
 
     [Fact]

@@ -121,9 +121,16 @@ just queries subscribers on each call).
 
 ### Typing indicators
 
-ChatService does **not** track typing. Clients should call `PresenceHub.StartTyping` /
-`PresenceHub.StopTyping` from #208 directly. Auto-stop on `SendMessage` is the client's
-responsibility for now.
+`ChatHub.StartTyping(conversationId)` / `ChatHub.StopTyping(conversationId)` are the
+chat-side façade for the typing indicator. They authorise the caller (must be a
+participant of the conversation; non-participants get `ChatAccessDeniedException`)
+and fan the signal out to PresenceService over gRPC (`InternalApi.SetTyping`). The
+chat-side authorization is the reason this lives on ChatHub instead of clients
+calling PresenceHub directly — typing in a conversation you cannot see is a
+security boundary, not a no-op.
+
+`SendMessageService` also fires `SetTyping(isTyping=false)` after a successful send,
+so clients no longer need to remember the explicit `StopTyping` transition.
 
 ## REST endpoints (`/api/v1/chat/*`)
 

@@ -1,0 +1,7 @@
+App update: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

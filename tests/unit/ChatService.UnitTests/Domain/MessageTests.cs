@@ -94,4 +94,64 @@ public class MessageTests
 
         message.ReadAtUtc.Should().Be(firstReadAt);
     }
+
+    [Fact]
+    public void Send_DefaultsAuthorRoleToMember()
+    {
+        var message = NewMessage();
+
+        message.AuthorRole.Should().Be(ParticipantRole.Member);
+    }
+
+    [Fact]
+    public void Send_StoresExplicitAuthorRole()
+    {
+        var message = Message.Send(
+            id: Guid.NewGuid(),
+            conversationId: ConversationId,
+            senderId: Sender,
+            body: "x",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c",
+            createdAtUtc: Created,
+            authorRole: ParticipantRole.Teacher);
+
+        message.AuthorRole.Should().Be(ParticipantRole.Teacher);
+    }
+
+    [Fact]
+    public void SendAsThreadReply_StoresAuthorRole()
+    {
+        var rootId = Guid.NewGuid();
+        var reply = Message.SendAsThreadReply(
+            id: Guid.NewGuid(),
+            conversationId: ConversationId,
+            senderId: Sender,
+            body: "x",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c",
+            createdAtUtc: Created,
+            threadRootId: rootId,
+            authorRole: ParticipantRole.Student);
+
+        reply.AuthorRole.Should().Be(ParticipantRole.Student);
+    }
+
+    [Fact]
+    public void Hydrate_LegacyDoc_DefaultsAuthorRoleToMember()
+    {
+        var message = Message.Hydrate(
+            id: Guid.NewGuid(),
+            conversationId: ConversationId,
+            senderId: Sender,
+            body: "x",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c",
+            state: MessageState.Sent,
+            createdAtUtc: Created,
+            deliveredAtUtc: null,
+            readAtUtc: null);
+
+        message.AuthorRole.Should().Be(ParticipantRole.Member);
+    }
 }

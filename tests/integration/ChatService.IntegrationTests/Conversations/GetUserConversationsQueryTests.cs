@@ -37,11 +37,11 @@ public class GetUserConversationsQueryTests : IAsyncLifetime
         await using var queryScope = _factory.Services.CreateAsyncScope();
         var query = queryScope.ServiceProvider.GetRequiredService<GetUserConversationsQuery>();
 
-        var firstPage = await query.ExecuteAsync(user, cursor: null, limit: 3, default);
+        var firstPage = await query.ExecuteAsync(user, cursor: null, limit: 3, ConversationListFilter.All, default);
         firstPage.Items.Should().HaveCount(3);
         firstPage.NextCursor.Should().NotBeNullOrEmpty();
 
-        var secondPage = await query.ExecuteAsync(user, cursor: firstPage.NextCursor, limit: 3, default);
+        var secondPage = await query.ExecuteAsync(user, cursor: firstPage.NextCursor, limit: 3, ConversationListFilter.All, default);
         secondPage.Items.Should().HaveCount(2);
         secondPage.NextCursor.Should().BeNull();
 
@@ -65,7 +65,7 @@ public class GetUserConversationsQueryTests : IAsyncLifetime
 
         await using var queryScope = _factory.Services.CreateAsyncScope();
         var query = queryScope.ServiceProvider.GetRequiredService<GetUserConversationsQuery>();
-        var page = await query.ExecuteAsync(user, cursor: null, limit: 50, default);
+        var page = await query.ExecuteAsync(user, cursor: null, limit: 50, ConversationListFilter.All, default);
 
         page.Items.Should().HaveCount(1);
         page.Items[0].Participants.Should().Contain(user);

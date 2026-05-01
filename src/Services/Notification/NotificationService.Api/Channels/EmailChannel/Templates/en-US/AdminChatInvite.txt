@@ -1,0 +1,7 @@
+Chat invitation: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

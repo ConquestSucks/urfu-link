@@ -8,6 +8,7 @@ public sealed record UserProfileResponse(
     AccountResponse Account,
     PrivacyResponse Privacy,
     NotificationsResponse Notifications,
+    NotificationPreferencesResponse Preferences,
     SoundVideoResponse SoundVideo);
 
 public sealed record AccountResponse(string? AvatarUrl, string? AboutMe);
@@ -19,6 +20,17 @@ public sealed record NotificationsResponse(
     bool NotificationSound,
     bool DisciplineChatMessages,
     bool Mentions);
+
+public sealed record NotificationPreferencesResponse(
+    IReadOnlyDictionary<int, ChannelToggleResponse> Categories,
+    QuietHoursResponse QuietHours,
+    bool DndEnabled,
+    string Locale,
+    bool Sound);
+
+public sealed record ChannelToggleResponse(bool Push, bool Email, bool InApp);
+
+public sealed record QuietHoursResponse(string IanaTimezone, string? Start, string? End, bool Enabled);
 
 public sealed record SoundVideoResponse(
     string? PlaybackDeviceId,

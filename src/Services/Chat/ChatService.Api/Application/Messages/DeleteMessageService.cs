@@ -1,14 +1,19 @@
 using Microsoft.Extensions.Options;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
+using Urfu.Link.Services.Chat.Application.Authorization;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Enums;
-using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Infrastructure;
 using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Messages;
 
-public sealed record DeleteMessageRequest(Guid MessageId, Guid CallerUserId, DeleteMode Mode);
+public sealed record DeleteMessageRequest(
+    Guid MessageId,
+    Guid CallerUserId,
+    DeleteMode Mode,
+    bool CallerIsAdmin = false);
 
 public sealed class DeleteMessageService(
     IConversationRepository conversations,
@@ -16,7 +21,8 @@ public sealed class DeleteMessageService(
     IOptions<ChatOptions> options,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
-    TimeProvider clock)
+    TimeProvider clock,
+    IDisciplineRoleResolver roleResolver)
 {
     public async Task<MessageDto?> DeleteAsync(DeleteMessageRequest request, CancellationToken cancellationToken)
     {
@@ -31,24 +37,35 @@ public sealed class DeleteMessageService(
         var conversation = await conversations.GetByIdAsync(message.ConversationId, cancellationToken).ConfigureAwait(false)
             ?? throw ConversationNotFoundException.For(message.ConversationId);
 
-        if (!conversation.IsParticipant(request.CallerUserId))
+        if (!conversation.IsParticipant(request.CallerUserId) && !request.CallerIsAdmin)
         {
             throw new ChatAccessDeniedException(message.ConversationId, request.CallerUserId);
         }
 
         if (request.Mode == DeleteMode.ForEveryone)
         {
-            if (!message.IsAuthor(request.CallerUserId))
-            {
-                throw new ChatNotMessageAuthorException(message.Id, request.CallerUserId);
-            }
+            // Two paths to delete-for-everyone:
+            //   1) author within TTL — the original direct-chat semantics
+            //   2) moderator (Teacher in a discipline group, or admin everywhere) — TTL is
+            //      bypassed because moderation is policy enforcement, not message authorship
+            var canModerate = await roleResolver
+                .CanModerateAsync(request.CallerUserId, request.CallerIsAdmin, conversation, cancellationToken)
+                .ConfigureAwait(false);
 
-            var opts = options.Value;
-            var ttl = opts.DeleteForEveryoneTtl;
             var now = clock.GetUtcNow();
-            if (now - message.CreatedAtUtc > ttl)
+            if (!canModerate)
             {
-                throw ChatEditTtlExpiredException.For(message.Id, ttl);
+                if (!message.IsAuthor(request.CallerUserId))
+                {
+                    throw new ChatNotMessageAuthorException(message.Id, request.CallerUserId);
+                }
+
+                var opts = options.Value;
+                var ttl = opts.DeleteForEveryoneTtl;
+                if (now - message.CreatedAtUtc > ttl)
+                {
+                    throw ChatEditTtlExpiredException.For(message.Id, ttl);
+                }
             }
 
             var applied = await messages.ApplyDeleteForEveryoneAsync(

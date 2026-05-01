@@ -15,8 +15,8 @@ public sealed class InternalApiService(
 {
     public override Task<PingReply> Ping(PingRequest request, ServerCallContext context)
     {
-        _ = context;
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
         return Task.FromResult(new PingReply
         {
             Message = string.IsNullOrWhiteSpace(request.Message) ? "pong" : $"pong:{request.Message}",
@@ -28,7 +28,7 @@ public sealed class InternalApiService(
     public override async Task<PresenceInfo> GetPresence(GetPresenceRequest request, ServerCallContext context)
     {
         ArgumentNullException.ThrowIfNull(request);
-        _ = context;
+        ArgumentNullException.ThrowIfNull(context);
         var userId = ParseUserId(request.UserId);
         var aggregated = await BuildAggregatedAsync(userId, context.CancellationToken).ConfigureAwait(false);
         return ToProto(aggregated);
@@ -38,7 +38,7 @@ public sealed class InternalApiService(
         GetPresenceBatchRequest request, ServerCallContext context)
     {
         ArgumentNullException.ThrowIfNull(request);
-        _ = context;
+        ArgumentNullException.ThrowIfNull(context);
         var reply = new GetPresenceBatchReply();
         foreach (var raw in request.UserIds)
         {
@@ -52,6 +52,7 @@ public sealed class InternalApiService(
     public override async Task<IsOnlineReply> IsOnline(IsOnlineRequest request, ServerCallContext context)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
         var userId = ParseUserId(request.UserId);
         var userSessions = await sessions.GetSessionsAsync(userId, context.CancellationToken).ConfigureAwait(false);
         var aggregated = aggregator.Aggregate(userId, userSessions, lastSeenAt: null);
@@ -61,10 +62,28 @@ public sealed class InternalApiService(
     public override async Task<IsTypingReply> IsTyping(IsTypingRequest request, ServerCallContext context)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
         var conv = ParseConversationId(request.ConversationId);
         var user = ParseUserId(request.UserId);
         var typingNow = await typing.IsTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false);
         return new IsTypingReply { IsTyping = typingNow };
+    }
+
+    public override async Task<SetTypingReply> SetTyping(SetTypingRequest request, ServerCallContext context)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
+        var conv = ParseConversationId(request.ConversationId);
+        var user = ParseUserId(request.UserId);
+
+        // The store reports `changed = true` when it actually mutated state (created a
+        // fresh entry on Start, or removed an existing one on Stop). Callers can use
+        // this to avoid emitting redundant typing broadcasts for keep-alive refreshes.
+        var changed = request.IsTyping
+            ? await typing.StartTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false)
+            : await typing.StopTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false);
+
+        return new SetTypingReply { Changed = changed };
     }
 
     private async Task<Domain.ValueObjects.AggregatedPresence> BuildAggregatedAsync(

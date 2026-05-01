@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Mentions;
@@ -41,6 +42,7 @@ public sealed class ReplyInThreadService(
     IIdempotencyStore idempotencyStore,
     ChatEventDispatcher dispatcher,
     IChatBroadcaster broadcaster,
+    MentionResolver mentionResolver,
     TimeProvider clock,
     IOptions<ChatOptions> options)
 {
@@ -91,7 +93,9 @@ public sealed class ReplyInThreadService(
         var replyTo = await ResolveReplyToInThreadAsync(root, request.ReplyToMessageId, cancellationToken).ConfigureAwait(false);
 
         var opts = options.Value;
-        var mentions = MentionsParser.Parse(request.Body, conversation.Participants, opts.MaxMentionsPerMessage);
+        var mentions = await mentionResolver
+            .ResolveAsync(request.Body, conversation, opts.MaxMentionsPerMessage, cancellationToken)
+            .ConfigureAwait(false);
 
         var now = clock.GetUtcNow();
         var reply = Message.SendAsThreadReply(
@@ -104,7 +108,8 @@ public sealed class ReplyInThreadService(
             createdAtUtc: now,
             threadRootId: root.Id,
             mentions: mentions,
-            replyTo: replyTo);
+            replyTo: replyTo,
+            authorRole: conversation.RoleOf(request.SenderId));
 
         try
         {

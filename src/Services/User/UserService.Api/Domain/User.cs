@@ -1,4 +1,6 @@
+using System.Globalization;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.User;
 using UserService.Api.Domain.Events;
 using UserService.Api.Domain.ValueObjects;
 
@@ -59,16 +61,30 @@ public sealed class UserProfile
         _domainEvents.Add(new UserPrivacySettingsChangedEvent(Id, showOnlineStatus, showLastVisitTime));
     }
 
+    /// <summary>
+    /// Legacy entry point used by <c>PUT /me/notifications</c> with four boolean toggles.
+    /// Maps onto the modern per-category structure for backwards compatibility.
+    /// </summary>
     public void UpdateNotifications(
         bool newMessages,
         bool notificationSound,
         bool disciplineChatMessages,
         bool mentions)
     {
-        Notifications = new NotificationSettings(newMessages, notificationSound, disciplineChatMessages, mentions);
+        Notifications = NotificationSettings.FromLegacy(newMessages, notificationSound, disciplineChatMessages, mentions);
         Touch();
-        _domainEvents.Add(new UserNotificationSettingsChangedEvent(
-            Id, newMessages, notificationSound, disciplineChatMessages, mentions));
+        _domainEvents.Add(BuildSettingsChangedEvent());
+    }
+
+    /// <summary>
+    /// Replace the entire notification preferences set (per-category, quiet hours, DND, locale).
+    /// </summary>
+    public void UpdateNotificationPreferences(NotificationSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        Notifications = settings;
+        Touch();
+        _domainEvents.Add(BuildSettingsChangedEvent());
     }
 
     public void UpdateSoundVideo(string? playbackDeviceId, string? recordingDeviceId, string? webcamDeviceId)
@@ -78,6 +94,27 @@ public sealed class UserProfile
     }
 
     public void ClearDomainEvents() => _domainEvents.Clear();
+
+    private UserNotificationSettingsChangedEvent BuildSettingsChangedEvent()
+    {
+        var categories = Notifications.Categories.ToDictionary(
+            kv => kv.Key,
+            kv => new ChannelTogglePayload(kv.Value.Push, kv.Value.Email, kv.Value.InApp));
+
+        var quietHours = new QuietHoursPayload(
+            Notifications.QuietHours.IanaTimezone,
+            Notifications.QuietHours.Start?.ToString("HH:mm", CultureInfo.InvariantCulture),
+            Notifications.QuietHours.End?.ToString("HH:mm", CultureInfo.InvariantCulture),
+            Notifications.QuietHours.Enabled);
+
+        var preferences = new NotificationPreferencesPayload(
+            categories,
+            quietHours,
+            Notifications.DndEnabled,
+            Notifications.Locale);
+
+        return new UserNotificationSettingsChangedEvent(Id, preferences);
+    }
 
     private void Touch() => UpdatedAtUtc = DateTimeOffset.UtcNow;
 }

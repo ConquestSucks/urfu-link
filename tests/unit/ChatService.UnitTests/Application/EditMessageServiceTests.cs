@@ -3,6 +3,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Contracts;
@@ -35,7 +36,9 @@ public class EditMessageServiceTests
             _outbox,
             new ServiceProfile("chat-service", "mongodb", KafkaTopicNames.ChatEvents, "chat.message.sent.v1"));
         var options = Options.Create(new ChatOptions { EditTtlHours = 48, MaxMentionsPerMessage = 50 });
-        return new EditMessageService(_conversations, _messages, options, dispatcher, _broadcaster, _clock);
+        var disciplineClient = Substitute.For<Urfu.Link.Services.Chat.Application.Disciplines.IDisciplineServiceClient>();
+        var mentions = new Urfu.Link.Services.Chat.Application.Mentions.MentionResolver(disciplineClient);
+        return new EditMessageService(_conversations, _messages, options, dispatcher, _broadcaster, mentions, _clock);
     }
 
     private (Conversation conversation, Message message) Seed(Guid sender, DateTimeOffset createdAt)

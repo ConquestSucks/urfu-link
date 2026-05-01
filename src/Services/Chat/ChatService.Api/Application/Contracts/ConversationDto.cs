@@ -10,7 +10,14 @@ public sealed record ConversationDto(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset LastMessageAtUtc,
     MessagePreviewDto? LastMessagePreview,
-    IReadOnlyList<Guid>? PinnedMessageIds = null)
+    IReadOnlyList<Guid>? PinnedMessageIds = null,
+    string? Title = null,
+    Guid? CoverAssetId = null,
+    Guid? DisciplineId = null,
+    GroupSubtype? GroupSubtype = null,
+    bool IsAnnouncementOnly = false,
+    DateTimeOffset? ArchivedAtUtc = null,
+    IReadOnlyDictionary<Guid, ParticipantRole>? ParticipantRoles = null)
 {
     public static ConversationDto FromDomain(Conversation conversation)
     {
@@ -26,7 +33,16 @@ public sealed record ConversationDto(
                 : null,
             PinnedMessageIds: conversation.PinnedMessageIds.Count == 0
                 ? Array.Empty<Guid>()
-                : conversation.PinnedMessageIds.ToList());
+                : conversation.PinnedMessageIds.ToList(),
+            Title: conversation.Title,
+            CoverAssetId: conversation.CoverAssetId,
+            DisciplineId: conversation.DisciplineId,
+            GroupSubtype: conversation.GroupSubtype,
+            IsAnnouncementOnly: conversation.IsAnnouncementOnly,
+            ArchivedAtUtc: conversation.ArchivedAtUtc,
+            ParticipantRoles: conversation.ParticipantRoles.Count == 0
+                ? null
+                : conversation.ParticipantRoles.ToDictionary(kv => kv.Key, kv => kv.Value));
     }
 }
 

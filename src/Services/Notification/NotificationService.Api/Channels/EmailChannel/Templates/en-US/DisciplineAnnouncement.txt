@@ -1,0 +1,7 @@
+Discipline announcement: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

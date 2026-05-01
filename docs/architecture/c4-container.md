@@ -7,11 +7,11 @@
   - Correlation and edge rate limiting
 
 ## Logic containers
-- `MediaService` (PostgreSQL)
-- `UserService` (PostgreSQL)
-- `ChatService` (MongoDB)
-- `PresenceService` (Redis)
-- `NotificationService` (stateless workers)
+- `MediaService` (PostgreSQL + MinIO) — asset metadata; presigned upload/download to MinIO
+- `UserService` (PostgreSQL) — profile, JSONB notification settings, gRPC for downstream services
+- `ChatService` (MongoDB + Redis) — conversations and messages in Mongo, idempotency + outbox in Redis
+- `PresenceService` (Redis + PostgreSQL with `last_seen_history`) — Redis is the hot session/typing/projection store; PG keeps the partitioned long-term last-seen history for analytics
+- `NotificationService` (PostgreSQL partitioned + Redis) — notifications/deliveries in PG with monthly partitions (90-day retention), badge counters in Redis
 - `CallService` (signaling + media orchestration)
 - `DisciplineService` (PostgreSQL) — disciplines, enrollments, gRPC for ChatService
 

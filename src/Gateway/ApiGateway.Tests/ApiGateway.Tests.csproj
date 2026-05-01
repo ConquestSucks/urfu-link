@@ -6,8 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <!-- Test naming convention uses underscores; null validation is unnecessary in test code -->
-    <NoWarn>$(NoWarn);CA1707;CA1062</NoWarn>
+    <NoWarn>$(NoWarn);CA1707;CA1062;CA1001;CA2234</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="xunit" />
