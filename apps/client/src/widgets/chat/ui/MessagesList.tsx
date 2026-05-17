@@ -10,7 +10,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } fr
 import { FlatList, View } from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
 import type { MessageDto } from "@urfu-link/api-client";
-import { useAuthStore } from "@/shared/store/auth-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 
 interface MessagesListProps {
     chatId: string;
@@ -37,7 +37,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const hasMore = hasMoreByConversation[chatId] || false;
         const listRef = useRef<FlatList<MessageDto>>(null);
 
-        const currentUserId = useAuthStore((s) => (s.accessToken ? "me" : null));
+        const currentUserId = useCurrentUserId();
 
         useEffect(() => {
             loadMessages(chatId, type, true);

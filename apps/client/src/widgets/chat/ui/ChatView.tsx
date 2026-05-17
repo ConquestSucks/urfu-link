@@ -20,6 +20,7 @@ import { PinnedBar } from "./PinnedBar";
 import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
@@ -35,6 +36,7 @@ export const ChatView = () => {
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
     const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
+    const currentUserId = useCurrentUserId();
 
     const chatId = params.id as string;
     const type = currentTab === "chats" ? "chat" : "subject";
@@ -153,7 +155,7 @@ export const ChatView = () => {
 
             <MessageActionsMenu
                 message={actionsTarget}
-                isOwn={actionsTarget?.senderId === "me"}
+                isOwn={!!currentUserId && actionsTarget?.senderId === currentUserId}
                 isPinned={isActionsTargetPinned}
                 onClose={() => setActionsTarget(null)}
                 onForwardRequest={() => {

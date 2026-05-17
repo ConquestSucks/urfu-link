@@ -5,7 +5,7 @@ import { EmptyState } from "@/shared/ui";
 import { useThreadStore } from "@/entities/conversation/model/thread-store";
 import { useChatStore, mapMessageToProps } from "@/entities/conversation/model/chat-store";
 import { ChatMessage } from "@/entities/chat-message";
-import { useAuthStore } from "@/shared/store/auth-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { MessageDto } from "@urfu-link/api-client";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 
@@ -33,7 +33,7 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
         return undefined;
     });
 
-    const currentUserId = useAuthStore((s) => (s.accessToken ? "me" : null));
+    const currentUserId = useCurrentUserId();
     const [body, setBody] = React.useState("");
 
     useEffect(() => {
