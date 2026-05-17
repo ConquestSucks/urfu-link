@@ -229,6 +229,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
             },
         );
 
+        newConnection.onclose((err) => {
+            if (err) {
+                console.warn("ChatHub connection closed with error", err);
+            }
+            set({ isConnected: false });
+        });
+
+        newConnection.onreconnected(() => {
+            // После потери соединения часть сообщений могла пройти мимо. Сбрасываем
+            // курсоры и hasMore, чтобы следующий loadMessages(reset=true) подтянул
+            // свежий снэпшот.
+            set({ cursors: {}, hasMoreByConversation: {}, isConnected: true });
+        });
+
+        newConnection.onreconnecting((err) => {
+            console.warn("ChatHub reconnecting", err);
+            set({ isConnected: false });
+        });
+
         try {
             await newConnection.start();
             set({ connection: newConnection, isConnected: true });
