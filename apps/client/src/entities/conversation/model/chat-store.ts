@@ -602,17 +602,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const next = [...state.conversations];
             next[idx] = updated;
 
+            // Если pinned-сообщения уже в буфере — обновляем их инкрементально,
+            // НЕ перересортировывая весь список (иначе сообщение "телепортируется"
+            // при unpin, потому что reactions/state поменялся и порядок поедет).
             const list = state.messagesByConversation[conversationId];
             let nextMessages = state.messagesByConversation;
-            if (list) {
-                const byId = new Map(list.map((m) => [m.id, m]));
-                pinned.forEach((p) => byId.set(p.id, p));
-                nextMessages = {
-                    ...state.messagesByConversation,
-                    [conversationId]: Array.from(byId.values()).sort(
-                        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-                    ),
-                };
+            if (list && pinned.length > 0) {
+                const pinnedById = new Map(pinned.map((p) => [p.id, p]));
+                let touched = false;
+                const merged = list.map((m) => {
+                    const fresh = pinnedById.get(m.id);
+                    if (!fresh) return m;
+                    touched = true;
+                    return fresh;
+                });
+                if (touched) {
+                    nextMessages = {
+                        ...state.messagesByConversation,
+                        [conversationId]: merged,
+                    };
+                }
+                // Pinned messages, отсутствующие в текущем буфере, мы НЕ вставляем
+                // в середину массива по createdAt — это сбивало бы pagination и
+                // мог бы вызвать дубль при lazy-load. PinnedBar показывает их
+                // независимо, поднимая полный pinned-snapshot через отдельный API.
             }
 
             return { conversations: next, messagesByConversation: nextMessages };
