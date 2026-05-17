@@ -316,17 +316,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     sendMessage: async (chatId, text, attachments = [], replyToMessageId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
-            const clientMessageId = crypto.randomUUID();
-            await connection.invoke(
-                "SendMessage",
-                chatId,
-                text,
-                attachments,
-                clientMessageId,
-                replyToMessageId ?? null,
-            );
+        if (connection?.state !== HubConnectionState.Connected) {
+            throw new Error("ChatHub is not connected");
         }
+        const clientMessageId = crypto.randomUUID();
+        // ChatHub.SendMessage принимает один record SendMessageHubInput, а не
+        // позиционные аргументы — JSON-биндинг иначе не совпадает с C# record'ом
+        // и invoke падает на сервере.
+        await connection.invoke("SendMessage", {
+            conversationId: chatId,
+            body: text,
+            attachmentAssetIds: attachments,
+            clientMessageId,
+            replyToMessageId: replyToMessageId ?? null,
+        });
     },
 
     markRead: async (chatId, messageId) => {
