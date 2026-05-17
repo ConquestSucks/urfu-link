@@ -60,7 +60,7 @@ export default ({ config }: ConfigContext): AppExpoConfig => {
         experiments: {
             typedRoutes: true
         },
-        plugins: ["expo-router", "expo-web-browser", "expo-image-picker"],
+        plugins: ["expo-router", "expo-web-browser", "expo-image-picker", "expo-font", "expo-image"],
         extra: {
             appEnv,
             apiUrl,
