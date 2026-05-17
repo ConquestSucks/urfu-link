@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, View, Text } from "react-native";
-import { useConversationTypers } from "@/entities/presence";
+import { useConversationTypers } from "../model/presence-store";
 
 interface TypingIndicatorProps {
     conversationId: string;

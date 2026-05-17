@@ -25,7 +25,9 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<UserDbContext>(
     args,
     "UserService",
     services => services.AddDbContext<UserDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("Primary"),
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")))))
 {
     return;
 }
