@@ -229,6 +229,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/User/UserService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-user-migrations
     command: ["dotnet", "UserService.Api.dll", "--migrate"]
     environment:
@@ -243,6 +244,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/User/UserService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-user-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -270,6 +272,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-chat-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -293,6 +296,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-media-migrations
     command: ["dotnet", "MediaService.Api.dll", "--migrate"]
     environment:
@@ -307,6 +311,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-media-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -343,6 +348,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-presence-migrations
     command: ["dotnet", "PresenceService.Api.dll", "--migrate"]
     environment:
@@ -357,6 +363,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-presence-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -385,6 +392,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-notification-migrations
     command: ["dotnet", "NotificationService.Api.dll", "--migrate"]
     environment:
@@ -399,6 +407,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-notification-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -444,6 +453,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Call/CallService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-call-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -464,6 +474,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-discipline-migrations
     command: ["dotnet", "DisciplineService.Api.dll", "--migrate"]
     environment:
@@ -478,6 +489,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
+    platform: linux/amd64
     container_name: urfu-discipline-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -504,6 +516,7 @@ services:
     build:
       context: ../..
       dockerfile: src/Gateway/ApiGateway/Dockerfile
+    platform: linux/amd64
     container_name: urfu-api-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
