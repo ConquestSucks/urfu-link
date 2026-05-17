@@ -4,9 +4,10 @@ import {
     useChatStore,
 } from "@/entities/conversation/model/chat-store";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
-import { FileIcon } from "@/shared/ui/phosphor";
+import { EmptyState } from "@/shared/ui";
+import { ChatCircleTextIcon } from "@/shared/ui/phosphor";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, View } from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
 import type { MessageDto } from "@urfu-link/api-client";
 import { useAuthStore } from "@/shared/store/auth-store";
@@ -126,6 +127,21 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             );
         }
 
+        // EmptyState вынесен за пределы FlatList: в inverted FlatList ListEmptyComponent
+        // рендерится перевёрнутым на 180°. Early-return даёт корректную ориентацию.
+        if (messages.length === 0) {
+            return (
+                <View className="flex-1 px-6 py-6 justify-end overflow-hidden">
+                    <EmptyState
+                        size="full"
+                        icon={ChatCircleTextIcon}
+                        title="Начните общение"
+                        description="Отправьте первое сообщение в этом чате"
+                    />
+                </View>
+            );
+        }
+
         return (
             <FlatList
                 ref={listRef}
@@ -142,17 +158,19 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 renderItem={renderItem}
                 onEndReached={() => loadMore(chatId, type)}
                 onEndReachedThreshold={0.2}
-                onScrollToIndexFailed={() => {}}
-                ListEmptyComponent={
-                    <View className="flex-1 items-center justify-center py-20 px-6 min-h-[280px]">
-                        <View className="w-24 h-24 rounded-full bg-white/5 items-center justify-center mb-5">
-                            <FileIcon size={40} className="text-text-disabled" weight="regular" />
-                        </View>
-                        <Text className="text-text-muted text-base font-medium text-center">
-                            Начните общение
-                        </Text>
-                    </View>
-                }
+                onScrollToIndexFailed={(info) => {
+                    // Стандартный fallback для inverted FlatList: прокатываем к
+                    // приблизительной позиции, ждём рендер и повторяем точный scrollToIndex.
+                    const offset = info.averageItemLength * info.index;
+                    listRef.current?.scrollToOffset({ offset, animated: false });
+                    setTimeout(() => {
+                        listRef.current?.scrollToIndex({
+                            index: info.index,
+                            viewPosition: 0.5,
+                            animated: true,
+                        });
+                    }, 50);
+                }}
                 ListFooterComponent={() =>
                     isLoading && hasMore ? (
                         <View className="py-4">
