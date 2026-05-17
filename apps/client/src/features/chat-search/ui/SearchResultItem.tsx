@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { SearchResultDto } from "@urfu-link/api-client";
+import { Avatar } from "@/shared/ui";
 
 interface SearchResultItemProps {
     item: SearchResultDto;
@@ -12,7 +13,6 @@ interface SearchResultItemProps {
  * The server returns HTML-like <mark>word</mark> tags for highlights.
  */
 const HighlightedText = ({ text }: { text: string }) => {
-    // Simple parser: split on <mark>...</mark>
     const parts = text.split(/(<mark>.*?<\/mark>)/g);
     return (
         <Text className="text-text-subtle text-sm leading-5">
@@ -39,35 +39,48 @@ export const SearchResultItem = ({ item, onPress }: SearchResultItemProps) => {
         minute: "2-digit",
     });
 
+    const preview = item.conversationPreview;
     const previewTitle =
-        item.conversationPreview?.title ??
-        (item.conversationPreview?.type === "Direct" ? "Личный чат" : null);
+        preview?.title ??
+        (preview?.type === "Direct" ? "Личный чат" : null);
+    const senderName = preview?.senderName;
 
     return (
         <Pressable
             onPress={() => onPress?.(item)}
-            className="px-4 py-3 active:bg-white/5"
+            className="px-4 py-3 active:bg-white/5 flex-row gap-3"
         >
-            <View className="flex-row justify-between items-start mb-1">
-                {previewTitle ? (
+            <Avatar size={40} src={preview?.avatarUrl} name={previewTitle ?? "?"} />
+            <View className="flex-1 min-w-0">
+                <View className="flex-row justify-between items-start mb-1">
+                    {previewTitle ? (
+                        <Text
+                            className="text-white text-sm font-semibold flex-1"
+                            numberOfLines={1}
+                        >
+                            {previewTitle}
+                        </Text>
+                    ) : (
+                        <View className="flex-1" />
+                    )}
+                    <Text className="text-text-muted text-xs ml-2">{time}</Text>
+                </View>
+                {senderName && (
                     <Text
-                        className="text-white text-xs font-semibold flex-1"
+                        className="text-text-subtle text-xs mb-0.5"
                         numberOfLines={1}
                     >
-                        {previewTitle}
+                        {senderName}
                     </Text>
-                ) : (
-                    <View className="flex-1" />
                 )}
-                <Text className="text-text-muted text-xs ml-2">{time}</Text>
+                {item.highlightedSnippet ? (
+                    <HighlightedText text={item.highlightedSnippet} />
+                ) : (
+                    <Text className="text-text-subtle text-sm" numberOfLines={2}>
+                        {item.body}
+                    </Text>
+                )}
             </View>
-            {item.highlightedSnippet ? (
-                <HighlightedText text={item.highlightedSnippet} />
-            ) : (
-                <Text className="text-text-subtle text-sm" numberOfLines={2}>
-                    {item.body}
-                </Text>
-            )}
         </Pressable>
     );
 };

@@ -78,6 +78,8 @@ export type ConversationPreviewSnippet = {
   type: ConversationType;
   title?: string;
   peerUserId?: string;
+  avatarUrl?: string;
+  senderName?: string;
 };
 
 export type SearchResultDto = {
