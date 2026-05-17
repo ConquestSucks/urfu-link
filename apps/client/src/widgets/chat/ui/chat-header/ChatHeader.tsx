@@ -7,10 +7,14 @@ import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ChatHeaderActions } from "./ChatHeaderActions";
 import { UserProfileModal } from "./UserProfileModal";
-import { useUserPresence, presenceStatusToLabel } from "@/entities/presence";
+import {
+    LastSeenLabel,
+    TypingIndicator,
+    presenceStatusToLabel,
+    useConversationTypers,
+    useUserPresence,
+} from "@/entities/presence";
 import type { UserStatus } from "@/shared/ui/StatusIndicator";
-import { TypingIndicator } from "@/entities/presence";
-import { useConversationTypers } from "@/entities/presence";
 
 const presenceStatusToIndicator = (status?: string): UserStatus => {
     switch (status) {
@@ -76,20 +80,38 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                             >
                                 {chatName}
                             </Text>
-                            {typers.length > 0 ? (
-                                <TypingIndicator conversationId={chatId} showNames={false} />
-                            ) : (
-                                <Text
-                                    numberOfLines={1}
-                                    className={`leading-none text-xs font-medium ${
-                                        indicatorStatus === "online"
-                                            ? "text-success-600"
-                                            : "text-text-muted"
-                                    }`}
-                                >
-                                    {statusLabel ?? "Не в сети"}
-                                </Text>
-                            )}
+                            {(() => {
+                                // Приоритет: typing > online/status label > last seen > "Не в сети".
+                                if (typers.length > 0) {
+                                    return <TypingIndicator conversationId={chatId} showNames={false} />;
+                                }
+                                if (indicatorStatus === "online" && statusLabel) {
+                                    return (
+                                        <Text
+                                            numberOfLines={1}
+                                            className="leading-none text-xs font-medium text-success-600"
+                                        >
+                                            {statusLabel}
+                                        </Text>
+                                    );
+                                }
+                                if (peerPresence?.lastSeenAt) {
+                                    return (
+                                        <LastSeenLabel
+                                            lastSeenAt={peerPresence.lastSeenAt}
+                                            className="leading-none text-xs font-medium text-text-muted"
+                                        />
+                                    );
+                                }
+                                return (
+                                    <Text
+                                        numberOfLines={1}
+                                        className="leading-none text-xs font-medium text-text-muted"
+                                    >
+                                        {statusLabel ?? "Не в сети"}
+                                    </Text>
+                                );
+                            })()}
                         </View>
                     </View>
                 </View>
@@ -103,7 +125,12 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
             <UserProfileModal
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
-                user={{ name: chatName, avatarUrl: chatAvatarUrl }}
+                user={{
+                    name: chatName,
+                    avatarUrl: chatAvatarUrl,
+                    status: peerPresence?.status,
+                    lastSeenAt: peerPresence?.lastSeenAt,
+                }}
             />
         </>
     );
