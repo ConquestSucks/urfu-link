@@ -4,11 +4,12 @@ import { router, useSegments } from "expo-router";
 
 import { InboxChat } from "@/entities/inbox-chat";
 import { InboxNotification } from "@/entities/inbox-notification";
-import { InboxSubjectGroup, type InboxSubjectProps } from "@/entities/inbox-subject";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { MasterDetailLayout } from "@/shared/ui";
-import { useInboxData, useInboxActions } from "@/shared/store/useInboxStore";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useInboxStore } from "@/shared/store/useInboxStore";
+import { useInboxConversations } from "../model/use-inbox-conversations";
 import { Inbox } from "./Inbox";
 import { InboxMobile } from "./InboxMobile";
 
@@ -18,16 +19,14 @@ export const InboxLayout = () => {
 
     const { currentTab, currentView, params } = useInboxRouting();
 
-    const {
-        chats,
-        subjects,
-        notifications,
-        isChatsLoading,
-        isSubjectsLoading,
-        isNotificationsLoading,
-    } = useInboxData();
+    const conversationsLoading = useChatStore((s) => s.isLoading);
+    const loadConversations = useChatStore((s) => s.loadConversations);
+    const chats = useInboxConversations("chats");
+    const subjects = useInboxConversations("subjects");
 
-    const { fetchChats, fetchSubjects, fetchNotifications } = useInboxActions();
+    const notifications = useInboxStore((s) => s.notifications);
+    const isNotificationsLoading = useInboxStore((s) => s.isNotificationsLoading);
+    const fetchNotifications = useInboxStore((s) => s.fetchNotifications);
 
     const isDetailView = segments.includes("[id]");
 
@@ -40,11 +39,10 @@ export const InboxLayout = () => {
     useEffect(() => {
         if (currentView === "notifications") {
             fetchNotifications();
-        } else {
-            if (currentTab === "chats") fetchChats();
-            if (currentTab === "subjects") fetchSubjects();
+            return;
         }
-    }, [currentView, currentTab, fetchChats, fetchSubjects, fetchNotifications]);
+        loadConversations(currentTab === "chats" ? "Direct" : "Discipline");
+    }, [currentView, currentTab, fetchNotifications, loadConversations]);
 
     const currentData = useMemo(() => {
         if (currentView === "notifications") {
@@ -54,11 +52,7 @@ export const InboxLayout = () => {
     }, [currentView, currentTab, chats, subjects, notifications]);
 
     const isLoading =
-        currentView === "notifications"
-            ? isNotificationsLoading
-            : currentTab === "chats"
-              ? isChatsLoading
-              : isSubjectsLoading;
+        currentView === "notifications" ? isNotificationsLoading : conversationsLoading;
 
     const renderItem = useCallback(
         (item: any) => {
@@ -82,12 +76,14 @@ export const InboxLayout = () => {
                 );
             }
 
+            // For "subjects" tab we currently render the same chat-row variant.
+            // A dedicated subject grouping is tracked separately in a follow-up.
             return (
                 <View key={item.id}>
-                    <InboxSubjectGroup
-                        subject={item as InboxSubjectProps}
-                        activeChatId={params.id}
-                        onChatPress={(id) => router.push(`/subjects/${id}`)}
+                    <InboxChat
+                        {...item}
+                        isActive={item.id === params.id}
+                        onPress={() => router.push(`/subjects/${item.id}`)}
                     />
                 </View>
             );

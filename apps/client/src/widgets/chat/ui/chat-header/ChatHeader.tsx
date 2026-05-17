@@ -1,7 +1,7 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar, StatusIndicator } from "@/shared/ui";
-import { useInboxStore } from "@/shared/store/useInboxStore";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -29,12 +29,17 @@ interface ChatHeaderProps {
 export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
-    const chatMeta = useInboxStore((state) => state.getChatById(chatId));
+    const conversation = useChatStore((s) =>
+        s.conversations.find((c) => c.id === chatId),
+    );
 
     const peerPresence = useUserPresence(chatId);
     const typers = useConversationTypers(chatId);
 
-    if (!chatMeta) return null;
+    if (!conversation) return null;
+
+    const chatName = conversation.title ?? "Личный чат";
+    const chatAvatarUrl = "";
 
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
@@ -56,7 +61,7 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                     )}
                     <View className="flex-row gap-3 items-center">
                         <View className="relative z-1 p-0.5">
-                            <Avatar size={38} src={chatMeta.avatarUrl} name={chatMeta.name} />
+                            <Avatar size={38} src={chatAvatarUrl} name={chatName} />
                             <StatusIndicator
                                 status={indicatorStatus}
                                 size={12}
@@ -69,7 +74,7 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                                 numberOfLines={1}
                                 className="text-white leading-none text-base font-semibold"
                             >
-                                {chatMeta.name}
+                                {chatName}
                             </Text>
                             {typers.length > 0 ? (
                                 <TypingIndicator conversationId={chatId} showNames={false} />
@@ -98,7 +103,7 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
             <UserProfileModal
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
-                user={{ name: chatMeta.name, avatarUrl: chatMeta.avatarUrl }}
+                user={{ name: chatName, avatarUrl: chatAvatarUrl }}
             />
         </>
     );

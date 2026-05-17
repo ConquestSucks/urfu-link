@@ -3,7 +3,6 @@ import { FlatList, Pressable, Text, View } from "react-native";
 import { ModalOverlay, Avatar, EmptyState } from "@/shared/ui";
 import { ChatsCircleIcon } from "@/shared/ui/phosphor";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
-import { useInboxStore } from "@/shared/store/useInboxStore";
 
 interface ForwardPickerModalProps {
     messageIds: string[] | null;
@@ -13,7 +12,6 @@ interface ForwardPickerModalProps {
 export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalProps) => {
     const conversations = useChatStore((s) => s.conversations);
     const forwardMessages = useChatStore((s) => s.forwardMessages);
-    const getChatById = useInboxStore((s) => s.getChatById);
 
     if (!messageIds || messageIds.length === 0) return null;
 
@@ -41,12 +39,10 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                 data={conversations}
                 keyExtractor={(c) => c.id}
                 renderItem={({ item }) => {
-                    const meta = getChatById(item.id);
                     const name =
-                        meta?.name ??
                         item.title ??
                         (item.type === "Direct" ? "Личный чат" : "Дисциплина");
-                    const avatarUrl = meta?.avatarUrl ?? "";
+                    const avatarUrl = "";
                     return (
                         <Pressable
                             onPress={() => handlePick(item.id)}
