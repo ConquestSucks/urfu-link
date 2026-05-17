@@ -518,7 +518,7 @@ export const mapMessageToProps = (
         seen: dto.readAt !== null,
         attachments: dto.attachments.map((a) => ({
             name: a.fileName,
-            url: `/api/v1/media/${a.mediaAssetId}/download-url`,
+            url: `/api/media/${a.mediaAssetId}/download-url`,
         })),
     };
 };
