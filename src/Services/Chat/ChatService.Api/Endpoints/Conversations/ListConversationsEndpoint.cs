@@ -6,22 +6,11 @@ using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Conversations;
 
-public sealed class ListConversationsRequest
-{
-    [QueryParam] public string? Cursor { get; set; }
-
-    [QueryParam] public int? Limit { get; set; }
-
-    /// <summary>
-    /// Optional kind filter. Accepted values: <c>direct</c> (only one-to-one chats) or
-    /// <c>discipline</c> (only discipline-bound group chats). Anything else is rejected
-    /// with a 400 so typos surface during integration rather than silently widening the list.
-    /// </summary>
-    [QueryParam] public string? Type { get; set; }
-}
-
+// GET-эндпоинт без тела. FastEndpoints с базовым классом Endpoint<TReq, TResp>
+// всё равно пытается JSON-десериализовать Request.Body, поэтому используем
+// EndpointWithoutRequest<TResp> и читаем query вручную через Query<T>().
 public sealed class ListConversationsEndpoint(GetUserConversationsQuery query)
-    : Endpoint<ListConversationsRequest, CursorPage<ConversationDto>>
+    : EndpointWithoutRequest<CursorPage<ConversationDto>>
 {
     public override void Configure()
     {
@@ -30,26 +19,28 @@ public sealed class ListConversationsEndpoint(GetUserConversationsQuery query)
         Summary(s => s.Summary = "List conversations of the caller, ordered by most recent message.");
     }
 
-    public override async Task HandleAsync(ListConversationsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
+        var cursor = Query<string?>("cursor", isRequired: false);
+        var limit = Query<int?>("limit", isRequired: false);
+        var typeRaw = Query<string?>("type", isRequired: false);
 
-        if (!TryParseFilter(req.Type, out var filter))
+        if (!TryParseFilter(typeRaw, out var filter))
         {
-            AddError(r => r.Type!, "Invalid conversation type filter. Allowed: direct, discipline.");
+            AddError("type", "Invalid conversation type filter. Allowed: direct, discipline.");
             await Send.ErrorsAsync(StatusCodes.Status400BadRequest, ct).ConfigureAwait(false);
             return;
         }
 
         try
         {
-            var page = await query.ExecuteAsync(caller, req.Cursor, req.Limit, filter, ct).ConfigureAwait(false);
+            var page = await query.ExecuteAsync(caller, cursor, limit, filter, ct).ConfigureAwait(false);
             await Send.OkAsync(page, ct).ConfigureAwait(false);
         }
         catch (InvalidChatCursorException)
         {
-            AddError(r => r.Cursor!, "Invalid cursor.");
+            AddError("cursor", "Invalid cursor.");
             await Send.ErrorsAsync(StatusCodes.Status400BadRequest, ct).ConfigureAwait(false);
         }
     }
