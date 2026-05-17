@@ -49,18 +49,33 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
             get().setUserPresence(info);
         });
 
-        newConnection.on("UserTyping", (userId: string, conversationId: string, displayName?: string) => {
-            const store = get();
-            store.setTyping({ userId, conversationId, displayName });
+        // Сервер шлёт UserTyping(conversationId, userId, isTyping) — см.
+        // IPresenceClient.cs и PresenceBroadcaster.BroadcastTypingAsync.
+        // displayName на текущий момент не передаётся (см. follow-up issue).
+        newConnection.on(
+            "UserTyping",
+            (conversationId: string, userId: string, isTyping: boolean) => {
+                const store = get();
+                const key = `${conversationId}:${userId}`;
 
-            // Auto-clear after timeout
-            const key = `${conversationId}:${userId}`;
-            if (typingTimers[key]) clearTimeout(typingTimers[key]);
-            typingTimers[key] = setTimeout(() => {
-                store.clearTyping(userId, conversationId);
-                delete typingTimers[key];
-            }, TYPING_TIMEOUT_MS);
-        });
+                if (typingTimers[key]) {
+                    clearTimeout(typingTimers[key]);
+                    delete typingTimers[key];
+                }
+
+                if (isTyping) {
+                    store.setTyping({ userId, conversationId });
+                    // Защита от потерянного StopTyping: чистим запись, если очередной
+                    // StartTyping не подоспеет за TYPING_TIMEOUT_MS.
+                    typingTimers[key] = setTimeout(() => {
+                        store.clearTyping(userId, conversationId);
+                        delete typingTimers[key];
+                    }, TYPING_TIMEOUT_MS);
+                } else {
+                    store.clearTyping(userId, conversationId);
+                }
+            },
+        );
 
         try {
             await newConnection.start();
