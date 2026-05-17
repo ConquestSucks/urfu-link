@@ -159,7 +159,14 @@ export function createChatApi(
       return request<Paginated<MessageDto>>(`${PREFIX}/conversations/${encodeURIComponent(id)}/messages?${params.toString()}`);
     },
 
-    searchMessages(query: string, conversationId?: string, cursor?: string, limit?: number, filters?: SearchFilters): Promise<Paginated<SearchResultDto>> {
+    searchMessages(
+      query: string,
+      conversationId?: string,
+      cursor?: string,
+      limit?: number,
+      filters?: SearchFilters,
+      signal?: AbortSignal,
+    ): Promise<Paginated<SearchResultDto>> {
       const params = new URLSearchParams();
       params.append("q", query);
       if (conversationId) params.append("conversationId", conversationId);
@@ -170,7 +177,7 @@ export function createChatApi(
       if (filters?.to) params.append("to", filters.to);
       if (typeof filters?.hasAttachments === "boolean") params.append("hasAttachments", String(filters.hasAttachments));
       if (filters?.attachmentType) params.append("attachmentType", filters.attachmentType);
-      return request<Paginated<SearchResultDto>>(`${PREFIX}/search?${params.toString()}`);
+      return request<Paginated<SearchResultDto>>(`${PREFIX}/search?${params.toString()}`, { signal });
     },
 
     editMessage(messageId: string, body: string): Promise<MessageDto> {
