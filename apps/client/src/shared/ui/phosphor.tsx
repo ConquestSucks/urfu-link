@@ -31,6 +31,7 @@ const iconBases = {
   ChatsCircleIcon: Phosphor.ChatsCircleIcon,
   CheckIcon: Phosphor.CheckIcon,
   ChecksIcon: Phosphor.ChecksIcon,
+  ClockIcon: Phosphor.ClockIcon,
   CopyIcon: Phosphor.CopyIcon,
   DeviceMobileIcon: Phosphor.DeviceMobileIcon,
   DotsThreeVerticalIcon: Phosphor.DotsThreeVerticalIcon,
@@ -60,6 +61,7 @@ const iconBases = {
   UserIcon: Phosphor.UserIcon,
   UsersIcon: Phosphor.UsersIcon,
   VideoCameraIcon: Phosphor.VideoCameraIcon,
+  WarningCircleIcon: Phosphor.WarningCircleIcon,
   XIcon: Phosphor.XIcon,
 } as const;
 
@@ -83,6 +85,7 @@ export const {
   ChatsCircleIcon,
   CheckIcon,
   ChecksIcon,
+  ClockIcon,
   CopyIcon,
   DeviceMobileIcon,
   DotsThreeVerticalIcon,
@@ -112,5 +115,6 @@ export const {
   UserIcon,
   UsersIcon,
   VideoCameraIcon,
+  WarningCircleIcon,
   XIcon,
 } = wrappedIcons;

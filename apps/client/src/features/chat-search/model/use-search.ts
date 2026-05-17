@@ -7,7 +7,17 @@ const DEBOUNCE_MS = 300;
  * Local search hook — search within a specific conversation.
  */
 export function useLocalSearch(conversationId: string) {
-    const { localQuery, localResults, isLocalLoading, localNextCursor, setLocalQuery, searchLocal, loadMoreLocal, clearLocal } = useSearchStore();
+    const {
+        localQuery,
+        localResults,
+        isLocalLoading,
+        localError,
+        localNextCursor,
+        setLocalQuery,
+        searchLocal,
+        loadMoreLocal,
+        clearLocal,
+    } = useSearchStore();
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const onQueryChange = useCallback(
@@ -21,6 +31,12 @@ export function useLocalSearch(conversationId: string) {
         [conversationId, searchLocal, setLocalQuery]
     );
 
+    const retry = useCallback(() => {
+        if (localQuery.length >= 2) {
+            searchLocal(conversationId, localQuery);
+        }
+    }, [conversationId, localQuery, searchLocal]);
+
     useEffect(() => {
         return () => {
             if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -32,9 +48,11 @@ export function useLocalSearch(conversationId: string) {
         query: localQuery,
         results: localResults,
         isLoading: isLocalLoading,
+        error: localError,
         hasMore: !!localNextCursor,
         onQueryChange,
         loadMore: loadMoreLocal,
+        retry,
         clear: clearLocal,
     };
 }
@@ -43,7 +61,16 @@ export function useLocalSearch(conversationId: string) {
  * Global search hook — search across all conversations.
  */
 export function useGlobalSearch() {
-    const { globalQuery, globalResults, isGlobalLoading, globalNextCursor, setGlobalQuery, searchGlobal, loadMoreGlobal } = useSearchStore();
+    const {
+        globalQuery,
+        globalResults,
+        isGlobalLoading,
+        globalError,
+        globalNextCursor,
+        setGlobalQuery,
+        searchGlobal,
+        loadMoreGlobal,
+    } = useSearchStore();
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const onQueryChange = useCallback(
@@ -57,12 +84,20 @@ export function useGlobalSearch() {
         [searchGlobal, setGlobalQuery]
     );
 
+    const retry = useCallback(() => {
+        if (globalQuery.length >= 2) {
+            searchGlobal(globalQuery);
+        }
+    }, [globalQuery, searchGlobal]);
+
     return {
         query: globalQuery,
         results: globalResults,
         isLoading: isGlobalLoading,
+        error: globalError,
         hasMore: !!globalNextCursor,
         onQueryChange,
         loadMore: loadMoreGlobal,
+        retry,
     };
 }

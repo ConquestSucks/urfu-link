@@ -7,7 +7,7 @@ import {
     Text,
     ActivityIndicator as RNActivityIndicator,
 } from "react-native";
-import { MagnifyingGlassIcon, XIcon } from "@/shared/ui/phosphor";
+import { MagnifyingGlassIcon, WarningCircleIcon, XIcon } from "@/shared/ui/phosphor";
 import { EmptyState } from "@/shared/ui";
 import { SearchResultDto } from "@urfu-link/api-client";
 import { useLocalSearch } from "../model/use-search";
@@ -20,7 +20,8 @@ interface LocalSearchPanelProps {
 }
 
 export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: LocalSearchPanelProps) => {
-    const { query, results, isLoading, hasMore, onQueryChange, loadMore, clear } = useLocalSearch(conversationId);
+    const { query, results, isLoading, error, hasMore, onQueryChange, loadMore, retry, clear } =
+        useLocalSearch(conversationId);
     const inputRef = useRef<TextInput>(null);
 
     const handleClose = () => {
@@ -59,6 +60,22 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                     {isLoading && results.length === 0 ? (
                         <View className="py-6 items-center">
                             <RNActivityIndicator color="#6B6FFF" />
+                        </View>
+                    ) : error && results.length === 0 ? (
+                        <View className="py-2">
+                            <EmptyState
+                                size="compact"
+                                icon={WarningCircleIcon}
+                                title="Не удалось выполнить поиск"
+                            />
+                            <Pressable
+                                onPress={retry}
+                                className="mx-auto mt-1 px-3 py-1 rounded-full bg-brand-500/20 active:opacity-70"
+                            >
+                                <Text className="text-brand-300 text-xs font-medium">
+                                    Повторить
+                                </Text>
+                            </Pressable>
                         </View>
                     ) : results.length === 0 ? (
                         <EmptyState

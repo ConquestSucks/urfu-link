@@ -5,8 +5,8 @@ import {
     ActivityIndicator as RNActivityIndicator,
 } from "react-native";
 import { SearchResultDto } from "@urfu-link/api-client";
-import { EmptyState } from "@/shared/ui";
-import { MagnifyingGlassIcon } from "@/shared/ui/phosphor";
+import { Button, EmptyState } from "@/shared/ui";
+import { MagnifyingGlassIcon, WarningCircleIcon } from "@/shared/ui/phosphor";
 import { useGlobalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
 import { useRouter } from "expo-router";
@@ -18,7 +18,7 @@ interface GlobalSearchPanelProps {
 }
 
 export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => {
-    const { query, results, isLoading, hasMore, loadMore } = useGlobalSearch();
+    const { query, results, isLoading, error, hasMore, loadMore, retry } = useGlobalSearch();
     const router = useRouter();
     const setPendingScrollToMessageId = useChatStore((s) => s.setPendingScrollToMessageId);
 
@@ -38,6 +38,18 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
             <View className="flex-1 items-center justify-center py-8">
                 <RNActivityIndicator color="#6B6FFF" />
             </View>
+        );
+    }
+
+    if (error && results.length === 0) {
+        return (
+            <EmptyState
+                size="full"
+                icon={WarningCircleIcon}
+                title="Не удалось загрузить результаты"
+                description={error}
+                action={<Button label="Повторить" onPress={retry} />}
+            />
         );
     }
 
