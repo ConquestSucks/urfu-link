@@ -8,6 +8,7 @@ import {
     ActivityIndicator as RNActivityIndicator,
 } from "react-native";
 import { MagnifyingGlassIcon, XIcon } from "@/shared/ui/phosphor";
+import { EmptyState } from "@/shared/ui";
 import { SearchResultDto } from "@urfu-link/api-client";
 import { useLocalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
@@ -60,9 +61,11 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                             <RNActivityIndicator color="#6B6FFF" />
                         </View>
                     ) : results.length === 0 ? (
-                        <View className="py-6 items-center">
-                            <Text className="text-text-muted text-sm">Ничего не найдено</Text>
-                        </View>
+                        <EmptyState
+                            size="compact"
+                            icon={MagnifyingGlassIcon}
+                            title="Ничего не найдено"
+                        />
                     ) : (
                         <FlatList
                             data={results}

@@ -1,6 +1,7 @@
 import React from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { ModalOverlay, Avatar } from "@/shared/ui";
+import { ModalOverlay, Avatar, EmptyState } from "@/shared/ui";
+import { ChatsCircleIcon } from "@/shared/ui/phosphor";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useInboxStore } from "@/shared/store/useInboxStore";
 
@@ -62,9 +63,11 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                     );
                 }}
                 ListEmptyComponent={
-                    <View className="py-8 items-center">
-                        <Text className="text-text-muted text-sm">Нет доступных чатов</Text>
-                    </View>
+                    <EmptyState
+                        size="compact"
+                        icon={ChatsCircleIcon}
+                        title="Нет доступных чатов"
+                    />
                 }
             />
         </ModalOverlay>

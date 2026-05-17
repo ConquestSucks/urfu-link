@@ -4,9 +4,11 @@ import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { InboxChatSkeleton } from "@/entities/inbox-chat";
 import { InboxNotificationSkeleton } from "@/entities/inbox-notification";
 import { InboxSubjectSkeleton } from "@/entities/inbox-subject";
+import { EmptyState } from "@/shared/ui";
 import { Header } from "./Header";
 import { List } from "./List";
 import { InboxListProps } from "../model/components";
+import { getInboxEmptyState } from "../lib/empty-state-config";
 import { GlobalSearchPanel, useSearchStore } from "@/features/chat-search";
 
 interface InboxProps<T> extends InboxListProps<T> {
@@ -40,6 +42,8 @@ export const Inbox = <T,>({ data, renderItem, isLoading }: InboxProps<T>) => {
                         ),
                     )}
                 </View>
+            ) : data.length === 0 ? (
+                <EmptyState size="full" {...getInboxEmptyState(currentTab, currentView)} />
             ) : (
                 <List key={`${currentTab}-${currentView}`} data={data} renderItem={renderItem} />
             )}

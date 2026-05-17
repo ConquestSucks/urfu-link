@@ -1,6 +1,7 @@
 export { Avatar } from "./Avatar";
 export { ModalOverlay } from "./ModalOverlay";
 export { Button } from "./Button";
+export { EmptyState } from "./EmptyState";
 export { Input } from "./Input";
 export { LabeledCard } from "./LabeledCard";
 export { LinearProgress } from "./LinearProgress";

@@ -6,7 +6,6 @@ import { InboxListProps } from "../model/components";
 
 export const List = <T,>({ data, renderItem }: InboxListProps<T>) => {
     const { isMobile } = useWindowSize();
-    if (data.length === 0) return null;
 
     const bottomPad = isMobile ? 16 + MOBILE_TAB_BAR_HEIGHT : 16;
 

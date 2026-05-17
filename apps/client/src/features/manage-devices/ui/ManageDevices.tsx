@@ -1,4 +1,6 @@
 import { useDevices, useTerminateAllDevices, useTerminateDevice } from "@/entities/user";
+import { EmptyState } from "@/shared/ui";
+import { DeviceMobileIcon } from "@/shared/ui/phosphor";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import { DeviceCard } from "./DeviceCard";
 import { EndSessions } from "./EndSessions";
@@ -16,10 +18,21 @@ export const ManageDevices = () => {
     );
   }
 
+  if (!devices || devices.length === 0) {
+    return (
+      <EmptyState
+        size="full"
+        icon={DeviceMobileIcon}
+        title="Активных сессий нет"
+        description="Войдите в аккаунт на другом устройстве, чтобы оно появилось здесь"
+      />
+    );
+  }
+
   return (
     <ScrollView contentContainerClassName="gap-4">
       <View className="gap-3">
-        {devices?.map((device) => (
+        {devices.map((device) => (
           <DeviceCard
             key={device.sessionId}
             platform={device.os ?? "Web"}

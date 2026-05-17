@@ -2,10 +2,11 @@ import React from "react";
 import {
     View,
     FlatList,
-    Text,
     ActivityIndicator as RNActivityIndicator,
 } from "react-native";
 import { SearchResultDto } from "@urfu-link/api-client";
+import { EmptyState } from "@/shared/ui";
+import { MagnifyingGlassIcon } from "@/shared/ui/phosphor";
 import { useGlobalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
 import { useRouter } from "expo-router";
@@ -42,9 +43,12 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
 
     if (results.length === 0) {
         return (
-            <View className="flex-1 items-center justify-center py-8">
-                <Text className="text-text-muted text-sm">Ничего не найдено</Text>
-            </View>
+            <EmptyState
+                size="full"
+                icon={MagnifyingGlassIcon}
+                title="Ничего не найдено"
+                description="Попробуйте изменить запрос или поискать в другой вкладке"
+            />
         );
     }
 
