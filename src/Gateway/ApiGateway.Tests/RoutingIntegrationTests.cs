@@ -118,6 +118,28 @@ public sealed class RoutingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HubRoute_WithBearerHeader_ProxiesToDownstream()
+    {
+        // SignalR JS-клиент на HTTP-фазе negotiate передаёт токен в Authorization header,
+        // а не в query. Gateway-middleware обязан принимать оба источника, иначе валидный
+        // запрос отвергается до того, как стандартный JWT-pipeline проверит подпись.
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/chat/negotiate")
+        {
+            Content = new StringContent(string.Empty),
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "user-42");
+
+        var response = await _client.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        _chatStub.Requests.Should().HaveCount(1);
+        var recorded = _chatStub.Requests.First();
+        recorded.Path.Should().Be("/hubs/chat/negotiate");
+        recorded.Headers.Should().ContainKey("Authorization")
+            .WhoseValue.Should().Be("Bearer user-42");
+    }
+
+    [Fact]
     public async Task DirectHubRoute_PresenceConnect_ProxiesWebSocketHandshake()
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/presence/negotiate?access_token=user-42")
