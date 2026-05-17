@@ -5,10 +5,13 @@ import {
     ArrowBendDoubleUpRightIcon,
     ChatsCircleIcon,
     ChecksIcon,
+    ClockIcon,
     FileIcon,
     PencilSimpleIcon,
     TrashIcon,
+    WarningCircleIcon,
 } from "@/shared/ui/phosphor";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 
 const renderBodyWithMentions = (text: string) => {
     const parts = text.split(/(@[A-Za-zА-Яа-я0-9_.-]+)/g);
@@ -37,9 +40,14 @@ export const ChatMessage = ({
     forwardedFrom,
     isDeleted,
     threadReplyCount = 0,
+    localStatus,
     onLongPress,
     onThreadOpen,
+    onReactionPress,
 }: ChatMessageProps) => {
+    const currentUserId = useCurrentUserId();
+    const isOptimistic = localStatus === "sending";
+    const isFailed = localStatus === "failed";
     if (isDeleted) {
         return (
             <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
@@ -61,6 +69,7 @@ export const ChatMessage = ({
             <Pressable
                 onLongPress={onLongPress}
                 delayLongPress={350}
+                style={{ opacity: isOptimistic ? 0.6 : 1 }}
                 className={`max-w-[85%] gap-1 px-3 py-3 rounded-2xl ${
                     isOwn ? "bg-brand-600" : "bg-white/5"
                 }`}
@@ -125,15 +134,29 @@ export const ChatMessage = ({
 
                 {reactionEntries.length > 0 && (
                     <View className="flex-row flex-wrap gap-1 mt-1">
-                        {reactionEntries.map(([emoji, userIds]) => (
-                            <View
-                                key={emoji}
-                                className="flex-row items-center gap-1 px-2 py-0.5 rounded-full bg-white/10"
-                            >
-                                <Text className="text-[12px]">{emoji}</Text>
-                                <Text className="text-[11px] text-white/80">{userIds.length}</Text>
-                            </View>
-                        ))}
+                        {reactionEntries.map(([emoji, userIds]) => {
+                            const reactedByMe =
+                                !!currentUserId && userIds.includes(currentUserId);
+                            const Container: any = onReactionPress ? Pressable : View;
+                            return (
+                                <Container
+                                    key={emoji}
+                                    onPress={
+                                        onReactionPress
+                                            ? () => onReactionPress(emoji)
+                                            : undefined
+                                    }
+                                    className={`flex-row items-center gap-1 px-2 py-0.5 rounded-full ${
+                                        reactedByMe ? "bg-brand-500/30" : "bg-white/10"
+                                    } ${onReactionPress ? "active:opacity-70" : ""}`}
+                                >
+                                    <Text className="text-[12px]">{emoji}</Text>
+                                    <Text className="text-[11px] text-white/80">
+                                        {userIds.length}
+                                    </Text>
+                                </Container>
+                            );
+                        })}
                     </View>
                 )}
 
@@ -173,10 +196,20 @@ export const ChatMessage = ({
                     >
                         {time}
                     </Text>
-                    {isOwn && (
+                    {isOwn && !isOptimistic && !isFailed && (
                         <ChecksIcon
                             size={12}
                             className={seen ? "text-white" : "text-brand-300"}
+                            weight="bold"
+                        />
+                    )}
+                    {isOwn && isOptimistic && (
+                        <ClockIcon size={12} className="text-white/70" />
+                    )}
+                    {isOwn && isFailed && (
+                        <WarningCircleIcon
+                            size={12}
+                            className="text-danger-400"
                             weight="bold"
                         />
                     )}

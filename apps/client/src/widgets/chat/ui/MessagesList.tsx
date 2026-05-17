@@ -2,6 +2,7 @@ import { ChatMessage } from "@/entities/chat-message";
 import {
     mapMessageToProps,
     useChatStore,
+    type LocalMessageDto,
 } from "@/entities/conversation/model/chat-store";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { EmptyState } from "@/shared/ui";
@@ -80,10 +81,14 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         const viewabilityConfig = React.useRef({ itemVisiblePercentThreshold: 50 }).current;
 
+        const addReaction = useChatStore((s) => s.addReaction);
+        const removeReaction = useChatStore((s) => s.removeReaction);
+
         const renderItem = useMemo(
             () =>
                 ({ item }: { item: MessageDto }) => {
                     const view = mapMessageToProps(item, currentUserId);
+                    const localStatus = (item as LocalMessageDto)._localStatus;
                     return (
                         <ChatMessage
                             id={view.id}
@@ -100,7 +105,20 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                             forwardedFrom={item.forwardedFrom ?? null}
                             isDeleted={item.state === "Deleted"}
                             threadReplyCount={item.threadReplyCount ?? 0}
+                            localStatus={localStatus}
                             onLongPress={() => onMessageLongPress?.(item)}
+                            onReactionPress={
+                                currentUserId
+                                    ? (emoji) => {
+                                          const reacters = item.reactions?.[emoji] ?? [];
+                                          if (reacters.includes(currentUserId)) {
+                                              removeReaction(item.id, emoji);
+                                          } else {
+                                              addReaction(item.id, emoji);
+                                          }
+                                      }
+                                    : undefined
+                            }
                             onThreadOpen={
                                 item.threadReplyCount && item.threadReplyCount > 0
                                     ? () => onThreadOpen?.(item.id)
@@ -109,7 +127,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         />
                     );
                 },
-            [currentUserId, shouldShowAvatars, onMessageLongPress, onThreadOpen],
+            [currentUserId, shouldShowAvatars, onMessageLongPress, onThreadOpen, addReaction, removeReaction],
         );
 
         if (isInitialLoading) {

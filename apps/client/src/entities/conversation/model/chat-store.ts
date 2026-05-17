@@ -8,6 +8,15 @@ import {
 import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
 import { apiClient } from "@/shared/lib/api";
+import { useAuthStore } from "@/shared/store/auth-store";
+
+/** Локальный (только клиентский) статус сообщения, не приходящий с сервера. */
+export type LocalMessageStatus = "sending" | "sent" | "failed";
+
+/** MessageDto + локальная разметка статуса для optimistic UI. */
+export type LocalMessageDto = MessageDto & {
+    _localStatus?: LocalMessageStatus;
+};
 
 export type ChatMessagePropsMapped = {
     id: string;
@@ -319,17 +328,83 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (connection?.state !== HubConnectionState.Connected) {
             throw new Error("ChatHub is not connected");
         }
-        const clientMessageId = crypto.randomUUID();
-        // ChatHub.SendMessage принимает один record SendMessageHubInput, а не
-        // позиционные аргументы — JSON-биндинг иначе не совпадает с C# record'ом
-        // и invoke падает на сервере.
-        await connection.invoke("SendMessage", {
+        const currentUserId = useAuthStore.getState().userId;
+        if (!currentUserId) {
+            throw new Error("Not authenticated");
+        }
+
+        const clientMessageId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : `cmid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        // Поднимаем reply preview из локального состояния — для optimistic-карточки
+        // достаточно messageId/senderId/preview-текста, сервер вернёт авторитетную версию.
+        const replyTo = (() => {
+            if (!replyToMessageId) return null;
+            const list = get().messagesByConversation[chatId] ?? [];
+            const target = list.find((m) => m.id === replyToMessageId);
+            if (!target) return null;
+            return {
+                messageId: target.id,
+                senderId: target.senderId,
+                preview: target.body,
+            };
+        })();
+
+        const nowIso = new Date().toISOString();
+        const optimistic: LocalMessageDto = {
+            id: `optimistic:${clientMessageId}`,
             conversationId: chatId,
+            senderId: currentUserId,
             body: text,
-            attachmentAssetIds: attachments,
+            attachments: [],
+            state: "Sent",
+            createdAt: nowIso,
+            deliveredAt: null,
+            readAt: null,
             clientMessageId,
-            replyToMessageId: replyToMessageId ?? null,
-        });
+            editedAtUtc: null,
+            replyTo,
+            reactions: {},
+            mentions: [],
+            forwardedFrom: null,
+            _localStatus: "sending",
+        };
+
+        get().addMessage(optimistic);
+
+        try {
+            // ChatHub.SendMessage принимает один record SendMessageHubInput, а не
+            // позиционные аргументы — JSON-биндинг иначе не совпадает с C# record'ом
+            // и invoke падает на сервере.
+            const real = await connection.invoke<MessageDto>("SendMessage", {
+                conversationId: chatId,
+                body: text,
+                attachmentAssetIds: attachments,
+                clientMessageId,
+                replyToMessageId: replyToMessageId ?? null,
+            });
+            // Sender не получает MessageReceived (recipients = participants кроме отправителя),
+            // поэтому подменяем оптимистичный экземпляр на серверный сами.
+            get().addMessage({ ...real, _localStatus: "sent" } as LocalMessageDto);
+        } catch (error) {
+            console.error("Failed to send message", error);
+            set((state) => {
+                const list = state.messagesByConversation[chatId] ?? [];
+                return {
+                    messagesByConversation: {
+                        ...state.messagesByConversation,
+                        [chatId]: list.map((m) =>
+                            (m as LocalMessageDto).clientMessageId === clientMessageId
+                                ? ({ ...m, _localStatus: "failed" } as LocalMessageDto)
+                                : m,
+                        ),
+                    },
+                };
+            });
+            throw error;
+        }
     },
 
     markRead: async (chatId, messageId) => {
@@ -417,6 +492,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const conversationId = message.conversationId;
             const existing = state.messagesByConversation[conversationId] || [];
 
+            const incomingCmid = (message as LocalMessageDto).clientMessageId;
+            // Если приходит реальный (не optimistic) экземпляр с тем же clientMessageId —
+            // заменяем оптимистичный плейсхолдер на него.
+            if (incomingCmid && !message.id.startsWith("optimistic:")) {
+                const optimisticIdx = existing.findIndex(
+                    (m) =>
+                        (m as LocalMessageDto).clientMessageId === incomingCmid &&
+                        m.id.startsWith("optimistic:"),
+                );
+                if (optimisticIdx !== -1) {
+                    const next = [...existing];
+                    next[optimisticIdx] = message;
+                    return {
+                        messagesByConversation: {
+                            ...state.messagesByConversation,
+                            [conversationId]: next,
+                        },
+                    };
+                }
+            }
+
+            // Дедуп по реальному id (повторный MessageReceived).
             if (existing.some((m) => m.id === message.id)) {
                 return state;
             }
