@@ -202,7 +202,7 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-50100:50000-50100/udp"
+      - "60100-60150:60100-60150/udp"
 
   coturn:
     image: coturn/coturn:4.8.0-r0
@@ -228,10 +228,12 @@ services:
   user-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/User/UserService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/User/UserService.Api/UserService.Api.csproj
+        SERVICE_DLL: UserService.Api.dll
     container_name: urfu-user-migrations
-    command: ["dotnet", "UserService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user
@@ -243,8 +245,10 @@ services:
   user-service:
     build:
       context: ../..
-      dockerfile: src/Services/User/UserService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/User/UserService.Api/UserService.Api.csproj
+        SERVICE_DLL: UserService.Api.dll
     container_name: urfu-user-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -271,8 +275,10 @@ services:
   chat-service:
     build:
       context: ../..
-      dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Chat/ChatService.Api/ChatService.Api.csproj
+        SERVICE_DLL: ChatService.Api.dll
     container_name: urfu-chat-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -295,10 +301,12 @@ services:
   media-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Media/MediaService.Api/MediaService.Api.csproj
+        SERVICE_DLL: MediaService.Api.dll
     container_name: urfu-media-migrations
-    command: ["dotnet", "MediaService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
@@ -310,8 +318,10 @@ services:
   media-service:
     build:
       context: ../..
-      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Media/MediaService.Api/MediaService.Api.csproj
+        SERVICE_DLL: MediaService.Api.dll
     container_name: urfu-media-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -347,10 +357,12 @@ services:
   presence-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj
+        SERVICE_DLL: PresenceService.Api.dll
     container_name: urfu-presence-migrations
-    command: ["dotnet", "PresenceService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
@@ -362,8 +374,10 @@ services:
   presence-service:
     build:
       context: ../..
-      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj
+        SERVICE_DLL: PresenceService.Api.dll
     container_name: urfu-presence-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -391,10 +405,12 @@ services:
   notification-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj
+        SERVICE_DLL: NotificationService.Api.dll
     container_name: urfu-notification-migrations
-    command: ["dotnet", "NotificationService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
@@ -406,8 +422,10 @@ services:
   notification-service:
     build:
       context: ../..
-      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj
+        SERVICE_DLL: NotificationService.Api.dll
     container_name: urfu-notification-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -452,8 +470,10 @@ services:
   call-service:
     build:
       context: ../..
-      dockerfile: src/Services/Call/CallService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Call/CallService.Api/CallService.Api.csproj
+        SERVICE_DLL: CallService.Api.dll
     container_name: urfu-call-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -473,10 +493,12 @@ services:
   discipline-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj
+        SERVICE_DLL: DisciplineService.Api.dll
     container_name: urfu-discipline-migrations
-    command: ["dotnet", "DisciplineService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
@@ -488,8 +510,10 @@ services:
   discipline-service:
     build:
       context: ../..
-      dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj
+        SERVICE_DLL: DisciplineService.Api.dll
     container_name: urfu-discipline-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -515,8 +539,10 @@ services:
   api-gateway:
     build:
       context: ../..
-      dockerfile: src/Gateway/ApiGateway/Dockerfile
-    platform: linux/amd64
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Gateway/ApiGateway/ApiGateway.csproj
+        SERVICE_DLL: ApiGateway.dll
     container_name: urfu-api-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
