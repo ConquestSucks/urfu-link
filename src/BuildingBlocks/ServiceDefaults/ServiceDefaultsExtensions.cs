@@ -18,6 +18,8 @@ public static class ServiceDefaultsExtensions
         IConfiguration configuration,
         string serviceName)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.AddProblemDetails();
         services.AddOpenApi();
         services.AddApiVersioning(options =>
