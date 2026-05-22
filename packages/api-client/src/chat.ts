@@ -109,6 +109,15 @@ export type ActiveThreadDto = {
   reason: ThreadSubscriptionReason;
 };
 
+export type ParticipantRole = "Owner" | "Member";
+
+export type ConversationParticipantDto = {
+  userId: string;
+  role: ParticipantRole;
+  displayName: string;
+  avatarUrl: string;
+};
+
 export type SearchFilters = {
   conversationId?: string;
   senderId?: string;
@@ -149,6 +158,12 @@ export function createChatApi(
 
     getConversation(id: string): Promise<ConversationPreview> {
       return request<ConversationPreview>(`${PREFIX}/conversations/${encodeURIComponent(id)}`);
+    },
+
+    getConversationParticipants(id: string): Promise<ConversationParticipantDto[]> {
+      return request<ConversationParticipantDto[]>(
+        `${PREFIX}/conversations/${encodeURIComponent(id)}/participants`,
+      );
     },
 
     getConversationMessages(id: string, cursor?: string, limit?: number, direction?: "older" | "newer"): Promise<Paginated<MessageDto>> {
