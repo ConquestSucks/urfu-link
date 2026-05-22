@@ -83,7 +83,14 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                             {(() => {
                                 // Приоритет: typing > online/status label > last seen > "Не в сети".
                                 if (typers.length > 0) {
-                                    return <TypingIndicator conversationId={chatId} showNames={false} />;
+                                    // В direct-чате имя печатающего совпадает с заголовком — не дублируем.
+                                    // В групповом (Discipline) показываем "Иван печатает...".
+                                    return (
+                                        <TypingIndicator
+                                            conversationId={chatId}
+                                            showNames={conversation.type !== "Direct"}
+                                        />
+                                    );
                                 }
                                 if (indicatorStatus === "online" && statusLabel) {
                                     return (

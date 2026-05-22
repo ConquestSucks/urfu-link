@@ -6,6 +6,7 @@ import { ChatInput } from "./chat-input/Input";
 import { MessagesList, type MessagesListHandle } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
 import { apiClient } from "@/shared/lib/api";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
@@ -86,6 +87,19 @@ export const ChatView = () => {
         const ok = listRef.current?.scrollToMessage(pendingScrollId);
         if (ok) setPendingScrollToMessageId(null);
     }, [pendingScrollId, setPendingScrollToMessageId]);
+
+    // Прогрев participants-store: нужен для @mentions autocomplete и для
+    // resolve userId -> displayName в TypingIndicator. Кэш в сторе TTL 5 минут,
+    // повторные load() для одного и того же chatId — no-op.
+    useEffect(() => {
+        if (!chatId) return;
+        useParticipantsStore
+            .getState()
+            .load(chatId)
+            .catch(() => {
+                /* fail-open: индикатор печати и mentions работают и без имён */
+            });
+    }, [chatId]);
 
     if (!chatId) return null;
 

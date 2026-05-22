@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { PresenceInfo, PresenceStatus } from "@urfu-link/api-client";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
+import { lookupParticipantName, useParticipantsStore } from "@/entities/conversation/model/participants-store";
 
 type TypingUser = {
     userId: string;
@@ -51,7 +52,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
         // Сервер шлёт UserTyping(conversationId, userId, isTyping) — см.
         // IPresenceClient.cs и PresenceBroadcaster.BroadcastTypingAsync.
-        // displayName на текущий момент не передаётся (см. follow-up issue).
+        // displayName сервер не передаёт намеренно: имя резолвится на клиенте
+        // через participants-store (он уже загружен для @mentions и
+        // sender-фильтра в этом же чате) — без доп. gRPC-хопов Chat→Presence→User.
         newConnection.on(
             "UserTyping",
             (conversationId: string, userId: string, isTyping: boolean) => {
@@ -64,7 +67,27 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 }
 
                 if (isTyping) {
-                    store.setTyping({ userId, conversationId });
+                    let displayName = lookupParticipantName(conversationId, userId);
+                    store.setTyping({ userId, conversationId, displayName });
+
+                    // Кэш мог быть холодным: типинг прилетел до того, как UI
+                    // успел запросить participants. Прогреваем кэш — потом
+                    // следующий тик селектора useConversationTypers подтянет имя.
+                    if (!displayName) {
+                        useParticipantsStore
+                            .getState()
+                            .load(conversationId)
+                            .then(() => {
+                                const resolved = lookupParticipantName(conversationId, userId);
+                                if (resolved) {
+                                    get().setTyping({ userId, conversationId, displayName: resolved });
+                                }
+                            })
+                            .catch(() => {
+                                /* fail-open: индикатор покажется без имени */
+                            });
+                    }
+
                     // Защита от потерянного StopTyping: чистим запись, если очередной
                     // StartTyping не подоспеет за TYPING_TIMEOUT_MS.
                     typingTimers[key] = setTimeout(() => {
