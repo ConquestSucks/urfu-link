@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useSearchStore } from "./search-store";
+import { SearchFilterValues, useSearchStore } from "./search-store";
 
 const DEBOUNCE_MS = 300;
 
@@ -13,7 +13,9 @@ export function useLocalSearch(conversationId: string) {
         isLocalLoading,
         localError,
         localNextCursor,
+        localFilters,
         setLocalQuery,
+        setLocalFilters,
         searchLocal,
         loadMoreLocal,
         clearLocal,
@@ -29,6 +31,11 @@ export function useLocalSearch(conversationId: string) {
             }, DEBOUNCE_MS);
         },
         [conversationId, searchLocal, setLocalQuery]
+    );
+
+    const onFiltersChange = useCallback(
+        (next: SearchFilterValues) => setLocalFilters(next),
+        [setLocalFilters],
     );
 
     const retry = useCallback(() => {
@@ -50,7 +57,9 @@ export function useLocalSearch(conversationId: string) {
         isLoading: isLocalLoading,
         error: localError,
         hasMore: !!localNextCursor,
+        filters: localFilters,
         onQueryChange,
+        onFiltersChange,
         loadMore: loadMoreLocal,
         retry,
         clear: clearLocal,
@@ -67,7 +76,9 @@ export function useGlobalSearch() {
         isGlobalLoading,
         globalError,
         globalNextCursor,
+        globalFilters,
         setGlobalQuery,
+        setGlobalFilters,
         searchGlobal,
         loadMoreGlobal,
     } = useSearchStore();
@@ -84,6 +95,11 @@ export function useGlobalSearch() {
         [searchGlobal, setGlobalQuery]
     );
 
+    const onFiltersChange = useCallback(
+        (next: SearchFilterValues) => setGlobalFilters(next),
+        [setGlobalFilters],
+    );
+
     const retry = useCallback(() => {
         if (globalQuery.length >= 2) {
             searchGlobal(globalQuery);
@@ -96,7 +112,9 @@ export function useGlobalSearch() {
         isLoading: isGlobalLoading,
         error: globalError,
         hasMore: !!globalNextCursor,
+        filters: globalFilters,
         onQueryChange,
+        onFiltersChange,
         loadMore: loadMoreGlobal,
         retry,
     };

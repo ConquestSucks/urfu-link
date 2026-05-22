@@ -9,6 +9,7 @@ import { Button, EmptyState } from "@/shared/ui";
 import { MagnifyingGlassIcon, WarningCircleIcon } from "@/shared/ui/phosphor";
 import { useGlobalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
+import { SearchFiltersBar } from "./SearchFiltersBar";
 import { useRouter } from "expo-router";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 
@@ -18,7 +19,8 @@ interface GlobalSearchPanelProps {
 }
 
 export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => {
-    const { query, results, isLoading, error, hasMore, loadMore, retry } = useGlobalSearch();
+    const { query, results, isLoading, error, hasMore, filters, onFiltersChange, loadMore, retry } =
+        useGlobalSearch();
     const router = useRouter();
     const setPendingScrollToMessageId = useChatStore((s) => s.setPendingScrollToMessageId);
 
@@ -33,55 +35,72 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
 
     if (query.length < 2) return null;
 
+    // Bar над выдачей — даём управление фильтрами hasAttachments / attachmentType / date.
+    // sender-picker для глобального поиска не показываем (нет конкретного списка
+    // участников — нужно было бы дёргать всех знакомых юзеров).
+    const filtersBar = <SearchFiltersBar value={filters} onChange={onFiltersChange} />;
+
     if (isLoading && results.length === 0) {
         return (
-            <View className="flex-1 items-center justify-center py-8">
-                <RNActivityIndicator color="#6B6FFF" />
+            <View className="flex-1">
+                {filtersBar}
+                <View className="flex-1 items-center justify-center py-8">
+                    <RNActivityIndicator color="#6B6FFF" />
+                </View>
             </View>
         );
     }
 
     if (error && results.length === 0) {
         return (
-            <EmptyState
-                size="full"
-                icon={WarningCircleIcon}
-                title="Не удалось загрузить результаты"
-                description={error}
-                action={<Button label="Повторить" onPress={retry} />}
-            />
+            <View className="flex-1">
+                {filtersBar}
+                <EmptyState
+                    size="full"
+                    icon={WarningCircleIcon}
+                    title="Не удалось загрузить результаты"
+                    description={error}
+                    action={<Button label="Повторить" onPress={retry} />}
+                />
+            </View>
         );
     }
 
     if (results.length === 0) {
         return (
-            <EmptyState
-                size="full"
-                icon={MagnifyingGlassIcon}
-                title="Ничего не найдено"
-                description="Попробуйте изменить запрос или поискать в другой вкладке"
-            />
+            <View className="flex-1">
+                {filtersBar}
+                <EmptyState
+                    size="full"
+                    icon={MagnifyingGlassIcon}
+                    title="Ничего не найдено"
+                    description="Попробуйте изменить запрос или фильтры"
+                />
+            </View>
         );
     }
 
     return (
-        <FlatList
-            className="flex-1"
-            data={results}
-            keyExtractor={(item) => item.messageId}
-            renderItem={({ item }) => (
-                <SearchResultItem item={item} onPress={handlePress} />
-            )}
-            onEndReached={hasMore ? loadMore : undefined}
-            onEndReachedThreshold={0.3}
-            keyboardShouldPersistTaps="handled"
-            ListFooterComponent={
-                isLoading && hasMore ? (
-                    <View className="py-3 items-center">
-                        <RNActivityIndicator color="#6B6FFF" />
-                    </View>
-                ) : null
-            }
-        />
+        <View className="flex-1">
+            {filtersBar}
+            <FlatList
+                className="flex-1"
+                data={results}
+                keyExtractor={(item) => item.messageId}
+                renderItem={({ item }) => (
+                    <SearchResultItem item={item} onPress={handlePress} />
+                )}
+                onEndReached={hasMore ? loadMore : undefined}
+                onEndReachedThreshold={0.3}
+                keyboardShouldPersistTaps="handled"
+                ListFooterComponent={
+                    isLoading && hasMore ? (
+                        <View className="py-3 items-center">
+                            <RNActivityIndicator color="#6B6FFF" />
+                        </View>
+                    ) : null
+                }
+            />
+        </View>
     );
 };

@@ -1,6 +1,10 @@
 import { create } from "zustand";
-import { SearchResultDto } from "@urfu-link/api-client";
+import { SearchFilters, SearchResultDto } from "@urfu-link/api-client";
 import { apiClient } from "@/shared/lib/api";
+
+// Поля, которыми UI рулит из SearchFiltersBar. conversationId исключён —
+// он задаётся самим режимом поиска (global/local), а не пользователем.
+export type SearchFilterValues = Omit<SearchFilters, "conversationId">;
 
 type SearchState = {
     // Global search (all conversations)
@@ -10,6 +14,7 @@ type SearchState = {
     globalError: string | null;
     globalNextCursor?: string;
     globalAbort: AbortController | null;
+    globalFilters: SearchFilterValues;
 
     // Local search (within a conversation)
     localQuery: string;
@@ -19,12 +24,15 @@ type SearchState = {
     localConversationId: string | null;
     localNextCursor?: string;
     localAbort: AbortController | null;
+    localFilters: SearchFilterValues;
 
     setGlobalQuery: (query: string) => void;
+    setGlobalFilters: (filters: SearchFilterValues) => void;
     searchGlobal: (query: string) => Promise<void>;
     loadMoreGlobal: () => Promise<void>;
 
     setLocalQuery: (query: string) => void;
+    setLocalFilters: (filters: SearchFilterValues) => void;
     searchLocal: (conversationId: string, query: string) => Promise<void>;
     loadMoreLocal: () => Promise<void>;
     clearLocal: () => void;
@@ -40,6 +48,18 @@ const messageFromError = (error: unknown): string =>
 
 const MIN_QUERY_LENGTH = 2;
 
+const EMPTY_FILTERS: SearchFilterValues = {};
+
+const filtersToApi = (filters: SearchFilterValues): SearchFilters | undefined => {
+    const hasAny =
+        filters.senderId ||
+        filters.from ||
+        filters.to ||
+        typeof filters.hasAttachments === "boolean" ||
+        filters.attachmentType;
+    return hasAny ? filters : undefined;
+};
+
 export const useSearchStore = create<SearchState>((set, get) => ({
     globalQuery: "",
     globalResults: [],
@@ -47,6 +67,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     globalError: null,
     globalNextCursor: undefined,
     globalAbort: null,
+    globalFilters: EMPTY_FILTERS,
 
     localQuery: "",
     localResults: [],
@@ -55,8 +76,21 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     localConversationId: null,
     localNextCursor: undefined,
     localAbort: null,
+    localFilters: EMPTY_FILTERS,
 
     setGlobalQuery: (query) => set({ globalQuery: query }),
+
+    setGlobalFilters: (filters) => {
+        set({ globalFilters: filters });
+        // Изменение фильтра — это запрос с другим срезом результатов: перезапускаем
+        // поиск, если query валидный, иначе просто чистим выдачу.
+        const { globalQuery } = get();
+        if (globalQuery.length >= MIN_QUERY_LENGTH) {
+            void get().searchGlobal(globalQuery);
+        } else {
+            set({ globalResults: [], globalNextCursor: undefined });
+        }
+    },
 
     searchGlobal: async (query) => {
         // Отменяем in-flight запрос предыдущего поиска.
@@ -75,7 +109,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
                 undefined,
                 undefined,
                 20,
-                undefined,
+                filtersToApi(get().globalFilters),
                 controller.signal,
             );
             // Если за время запроса нас отменили — не пишем результаты в state.
@@ -104,7 +138,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
                 undefined,
                 globalNextCursor,
                 20,
-                undefined,
+                filtersToApi(get().globalFilters),
                 controller.signal,
             );
             if (controller.signal.aborted) return;
@@ -122,6 +156,16 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     },
 
     setLocalQuery: (query) => set({ localQuery: query }),
+
+    setLocalFilters: (filters) => {
+        set({ localFilters: filters });
+        const { localQuery, localConversationId } = get();
+        if (localConversationId && localQuery.length >= MIN_QUERY_LENGTH) {
+            void get().searchLocal(localConversationId, localQuery);
+        } else {
+            set({ localResults: [], localNextCursor: undefined });
+        }
+    },
 
     searchLocal: async (conversationId, query) => {
         get().localAbort?.abort();
@@ -145,7 +189,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
                 conversationId,
                 undefined,
                 20,
-                undefined,
+                filtersToApi(get().localFilters),
                 controller.signal,
             );
             if (controller.signal.aborted) return;
@@ -175,7 +219,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
                 localConversationId,
                 localNextCursor,
                 20,
-                undefined,
+                filtersToApi(get().localFilters),
                 controller.signal,
             );
             if (controller.signal.aborted) return;
@@ -203,6 +247,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
             isLocalLoading: false,
             localError: null,
             localAbort: null,
+            localFilters: EMPTY_FILTERS,
         });
     },
 }));

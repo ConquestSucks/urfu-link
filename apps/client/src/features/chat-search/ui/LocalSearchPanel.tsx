@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import {
     View,
     TextInput,
@@ -12,6 +12,8 @@ import { EmptyState } from "@/shared/ui";
 import { SearchResultDto } from "@urfu-link/api-client";
 import { useLocalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
+import { SearchFiltersBar } from "./SearchFiltersBar";
+import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
 
 interface LocalSearchPanelProps {
     conversationId: string;
@@ -20,9 +22,33 @@ interface LocalSearchPanelProps {
 }
 
 export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: LocalSearchPanelProps) => {
-    const { query, results, isLoading, error, hasMore, onQueryChange, loadMore, retry, clear } =
-        useLocalSearch(conversationId);
+    const {
+        query,
+        results,
+        isLoading,
+        error,
+        hasMore,
+        filters,
+        onQueryChange,
+        onFiltersChange,
+        loadMore,
+        retry,
+        clear,
+    } = useLocalSearch(conversationId);
     const inputRef = useRef<TextInput>(null);
+    const participants = useParticipantsStore(
+        (s) => s.byConversationId[conversationId]?.items,
+    );
+
+    // Если участников ещё нет в кэше (например, юзер открыл поиск раньше,
+    // чем ChatView успел дёрнуть load) — догружаем для sender-фильтра.
+    useEffect(() => {
+        if (!participants) {
+            useParticipantsStore.getState().load(conversationId).catch(() => {
+                /* fail-open: sender-фильтр просто не покажется */
+            });
+        }
+    }, [conversationId, participants]);
 
     const handleClose = () => {
         clear();
@@ -53,6 +79,12 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                     <Text className="text-brand-400 text-sm font-medium">Отмена</Text>
                 </Pressable>
             </View>
+
+            <SearchFiltersBar
+                value={filters}
+                onChange={onFiltersChange}
+                participants={participants}
+            />
 
             {/* Results */}
             {query.length >= 2 && (
