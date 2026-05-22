@@ -52,6 +52,7 @@ public static class ModuleRegistration
 
         services.Configure<KeycloakAdminOptions>(configuration.GetSection(KeycloakAdminOptions.SectionName));
         services.AddHttpClient<ISessionManager, KeycloakSessionClient>();
+        services.AddHttpClient<IUserDirectory, KeycloakUserClient>();
 
         services.AddSingleton<IDeviceRegistry, RedisDeviceRegistry>();
         services.AddSessionRevocation(configuration);

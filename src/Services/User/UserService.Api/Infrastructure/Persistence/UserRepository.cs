@@ -19,6 +19,28 @@ public sealed class UserRepository(
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string?>> GetAvatarUrlsAsync(
+        IReadOnlyCollection<Guid> userIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+        if (userIds.Count == 0)
+            return new Dictionary<Guid, string?>();
+
+        // Один запрос вместо N — нужен для BatchGetUsers, где UserService подтягивает
+        // аватары к displayName'ам из Keycloak. UserProfile может не существовать
+        // (юзер логинился через Keycloak, но запись в БД ещё не создалась) — для таких
+        // id в результат не пишем, потребитель сам подставит null.
+        var rows = await dbContext.UserProfiles
+            .AsNoTracking()
+            .Where(u => userIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.Account.AvatarUrl })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows.ToDictionary(r => r.Id, r => r.AvatarUrl);
+    }
+
     public void Add(UserProfile user)
     {
         dbContext.UserProfiles.Add(user);

@@ -9,7 +9,9 @@ using DomainSettings = UserService.Api.Domain.ValueObjects.NotificationSettings;
 
 namespace UserService.Api.Services;
 
-public sealed class InternalApiService(IUserRepository userRepository) : InternalApi.InternalApiBase
+public sealed class InternalApiService(
+    IUserRepository userRepository,
+    IUserDirectory userDirectory) : InternalApi.InternalApiBase
 {
     public override Task<PingReply> Ping(PingRequest request, ServerCallContext context)
     {
@@ -63,19 +65,67 @@ public sealed class InternalApiService(IUserRepository userRepository) : Interna
         return new UpdateNotificationPreferencesReply { Preferences = MapPreferences(profile.Notifications) };
     }
 
-    public override Task<GetUserContactReply> GetUserContact(GetUserContactRequest request, ServerCallContext context)
+    public override async Task<GetUserContactReply> GetUserContact(GetUserContactRequest request, ServerCallContext context)
     {
         ArgumentNullException.ThrowIfNull(request);
-        _ = ParseGuid(request.UserId, nameof(request.UserId));
+        ArgumentNullException.ThrowIfNull(context);
 
-        // UserService does not own contact details (Keycloak is the source of truth).
-        // Until a Keycloak admin client lookup is wired in, gRPC clients should fall back to defaults.
-        return Task.FromResult(new GetUserContactReply
+        var userId = ParseGuid(request.UserId, nameof(request.UserId));
+        var entries = await userDirectory.GetUsersAsync(new[] { userId }, context.CancellationToken).ConfigureAwait(false);
+
+        if (!entries.TryGetValue(userId, out var entry))
         {
-            Email = string.Empty,
-            DisplayName = string.Empty,
+            return new GetUserContactReply
+            {
+                Email = string.Empty,
+                DisplayName = string.Empty,
+                Locale = DomainSettings.DefaultLocale,
+            };
+        }
+
+        return new GetUserContactReply
+        {
+            Email = entry.Email,
+            DisplayName = entry.DisplayName,
             Locale = DomainSettings.DefaultLocale,
-        });
+        };
+    }
+
+    public override async Task<BatchGetUsersReply> BatchGetUsers(BatchGetUsersRequest request, ServerCallContext context)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
+
+        var userIds = request.UserIds
+            .Select(raw => ParseGuid(raw, nameof(request.UserIds)))
+            .Distinct()
+            .ToArray();
+
+        var reply = new BatchGetUsersReply();
+        if (userIds.Length == 0)
+            return reply;
+
+        // Параллельно: контакты из Keycloak (источник истины по имени/email) и
+        // аватары из локальной БД UserService (там, где Account.AvatarUrl).
+        var directoryTask = userDirectory.GetUsersAsync(userIds, context.CancellationToken);
+        var avatarsTask = userRepository.GetAvatarUrlsAsync(userIds, context.CancellationToken);
+        var directory = await directoryTask.ConfigureAwait(false);
+        var avatars = await avatarsTask.ConfigureAwait(false);
+
+        foreach (var id in userIds)
+        {
+            directory.TryGetValue(id, out var entry);
+            avatars.TryGetValue(id, out var avatar);
+            reply.Users.Add(new UserSummary
+            {
+                UserId = id.ToString(),
+                DisplayName = entry?.DisplayName ?? string.Empty,
+                Email = entry?.Email ?? string.Empty,
+                AvatarUrl = avatar ?? string.Empty,
+            });
+        }
+
+        return reply;
     }
 
     private static Guid ParseGuid(string raw, string parameterName)

@@ -8,6 +8,7 @@ service InternalApi {
   rpc GetNotificationPreferences (GetNotificationPreferencesRequest) returns (GetNotificationPreferencesReply);
   rpc UpdateNotificationPreferences (UpdateNotificationPreferencesRequest) returns (UpdateNotificationPreferencesReply);
   rpc GetUserContact (GetUserContactRequest) returns (GetUserContactReply);
+  rpc BatchGetUsers (BatchGetUsersRequest) returns (BatchGetUsersReply);
 }
 
 message PingRequest {
@@ -71,4 +72,19 @@ message GetUserContactReply {
   string email = 1;
   string display_name = 2;
   string locale = 3;
+}
+
+message BatchGetUsersRequest {
+  repeated string user_ids = 1;
+}
+
+message UserSummary {
+  string user_id = 1;
+  string display_name = 2;
+  string avatar_url = 3;
+  string email = 4;
+}
+
+message BatchGetUsersReply {
+  repeated UserSummary users = 1;
 }
