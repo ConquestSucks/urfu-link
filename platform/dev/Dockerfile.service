@@ -43,6 +43,7 @@ COPY ["src/BuildingBlocks/SessionRevocation/SessionRevocation.csproj", "src/Buil
 COPY ["src/Services/Discipline/DisciplineService.Api.Contracts/DisciplineService.Api.Contracts.csproj", "src/Services/Discipline/DisciplineService.Api.Contracts/"]
 COPY ["src/Services/Media/MediaService.Api.Contracts/MediaService.Api.Contracts.csproj",                "src/Services/Media/MediaService.Api.Contracts/"]
 COPY ["src/Services/Presence/PresenceService.Api.Contracts/PresenceService.Api.Contracts.csproj",      "src/Services/Presence/PresenceService.Api.Contracts/"]
+COPY ["src/Services/User/UserService.Api.Contracts/UserService.Api.Contracts.csproj",                  "src/Services/User/UserService.Api.Contracts/"]
 
 # Service Api projects
 COPY ["src/Gateway/ApiGateway/ApiGateway.csproj",                                       "src/Gateway/ApiGateway/"]
