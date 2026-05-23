@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo } from "react";
 import { FlatList, Pressable, Text, TextInput, View } from "react-native";
 import { ArrowBendUpLeftIcon, XIcon } from "@/shared/ui/phosphor";
 import { EmptyState } from "@/shared/ui";
-import { useThreadStore } from "@/entities/conversation/model/thread-store";
+import { useThreadStore, useThreadMessages } from "@/entities/conversation/model/thread-store";
 import { useChatStore, mapMessageToProps } from "@/entities/conversation/model/chat-store";
 import { ChatMessage } from "@/entities/chat-message";
 import { useCurrentUserId } from "@/shared/store/auth-store";
@@ -15,7 +15,7 @@ interface ThreadPanelProps {
 }
 
 export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
-    const messages = useThreadStore((s) => s.messagesByThread[rootMessageId] ?? []);
+    const messages = useThreadMessages(rootMessageId);
     const root = useThreadStore((s) => s.rootsById[rootMessageId]);
     const isLoading = useThreadStore((s) => !!s.loadingByThread[rootMessageId]);
     const hasMore = useThreadStore((s) => !!s.hasMoreByThread[rootMessageId]);

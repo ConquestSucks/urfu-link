@@ -184,8 +184,15 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 export const useUserPresence = (userId: string) =>
     usePresenceStore((state) => state.presenceByUser[userId]);
 
-export const useConversationTypers = (conversationId: string) =>
-    usePresenceStore((state) => state.typingByConversation[conversationId] ?? []);
+// Стабильная пустая ссылка для отсутствующего conversationId — иначе каждый рендер
+// возвращает новый `[]`, и Zustand v5 ловит «getSnapshot should be cached» с
+// последующим infinite loop в useSyncExternalStore.
+const EMPTY_TYPERS: TypingUser[] = [];
+
+export const useConversationTypers = (conversationId: string): TypingUser[] =>
+    usePresenceStore(
+        (state) => state.typingByConversation[conversationId] ?? EMPTY_TYPERS,
+    );
 
 export const presenceStatusToLabel = (status: PresenceStatus): string => {
     switch (status) {

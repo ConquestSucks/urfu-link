@@ -107,6 +107,66 @@ public sealed class KeycloakUserClient(
         }
     }
 
+    public async Task<IReadOnlyList<UserDirectoryPageItem>> ListPageAsync(
+        int offset,
+        int limit,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(offset);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(limit);
+
+        var token = await GetAccessTokenAsync(cancellationToken).ConfigureAwait(false);
+
+        // briefRepresentation=true оставляет только базовые поля; sort по id
+        // в KC не поддерживается через REST, но порядок страниц стабилен —
+        // достаточно для пейджинга в reconciler-е.
+        var url = $"{_options.AdminUrl}/admin/realms/{_options.Realm}/users"
+            + $"?first={offset}&max={limit}&briefRepresentation=true";
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(url));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning(
+                "Keycloak users list failed at offset={Offset} limit={Limit}: {Status}",
+                offset, limit, response.StatusCode);
+            return Array.Empty<UserDirectoryPageItem>();
+        }
+
+        var page = await response.Content
+            .ReadFromJsonAsync<KeycloakUser[]>(JsonOptions, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (page is null || page.Length == 0)
+            return Array.Empty<UserDirectoryPageItem>();
+
+        var items = new List<UserDirectoryPageItem>(page.Length);
+        foreach (var dto in page)
+        {
+            if (!Guid.TryParse(dto.Id, out var id) || id == Guid.Empty)
+                continue;
+
+            // KC отдаёт createdTimestamp всегда, modifiedTimestamp — только при
+            // включённом фиче-флаге в реалме. Используем max(modified, created),
+            // чтобы idempotency-маркер всегда был ненулевым.
+            var modifiedMs = Math.Max(dto.ModifiedTimestamp ?? 0, dto.CreatedTimestamp ?? 0);
+
+            items.Add(new UserDirectoryPageItem(
+                UserId: id,
+                Username: dto.Username ?? string.Empty,
+                FirstName: dto.FirstName,
+                LastName: dto.LastName,
+                Email: dto.Email,
+                DisplayName: BuildDisplayName(dto),
+                ModifiedTimestampMs: modifiedMs));
+        }
+
+        return items;
+    }
+
     private static string BuildDisplayName(KeycloakUser dto)
     {
         var first = (dto.FirstName ?? string.Empty).Trim();
@@ -172,6 +232,12 @@ public sealed class KeycloakUserClient(
 
         [JsonPropertyName("lastName")]
         public string? LastName { get; set; }
+
+        [JsonPropertyName("createdTimestamp")]
+        public long? CreatedTimestamp { get; set; }
+
+        [JsonPropertyName("modifiedTimestamp")]
+        public long? ModifiedTimestamp { get; set; }
     }
 
     private sealed class TokenResponse

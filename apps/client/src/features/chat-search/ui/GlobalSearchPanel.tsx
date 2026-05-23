@@ -8,8 +8,11 @@ import { SearchResultDto } from "@urfu-link/api-client";
 import { Button, EmptyState } from "@/shared/ui";
 import { MagnifyingGlassIcon, WarningCircleIcon } from "@/shared/ui/phosphor";
 import { useGlobalSearch } from "../model/use-search";
+import { useSearchStore } from "../model/search-store";
 import { SearchResultItem } from "./SearchResultItem";
 import { SearchFiltersBar } from "./SearchFiltersBar";
+import { SearchScopeTabs } from "./SearchScopeTabs";
+import { UserSearchResults } from "./UserSearchResults";
 import { useRouter } from "expo-router";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 
@@ -21,6 +24,8 @@ interface GlobalSearchPanelProps {
 export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => {
     const { query, results, isLoading, error, hasMore, filters, onFiltersChange, loadMore, retry } =
         useGlobalSearch();
+    const globalScope = useSearchStore((s) => s.globalScope);
+    const setGlobalScope = useSearchStore((s) => s.setGlobalScope);
     const router = useRouter();
     const setPendingScrollToMessageId = useChatStore((s) => s.setPendingScrollToMessageId);
 
@@ -35,6 +40,20 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
 
     if (query.length < 2) return null;
 
+    const scopeTabs = <SearchScopeTabs value={globalScope} onChange={setGlobalScope} />;
+
+    // На "Люди" фильтры (даты/вложения) не применимы — UserSearchResults рендерит
+    // только результат поиска по людям. Табы остаются всегда, чтобы можно было
+    // переключиться обратно на сообщения.
+    if (globalScope === "users") {
+        return (
+            <View className="flex-1">
+                {scopeTabs}
+                <UserSearchResults />
+            </View>
+        );
+    }
+
     // Bar над выдачей — даём управление фильтрами hasAttachments / attachmentType / date.
     // sender-picker для глобального поиска не показываем (нет конкретного списка
     // участников — нужно было бы дёргать всех знакомых юзеров).
@@ -43,6 +62,7 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
     if (isLoading && results.length === 0) {
         return (
             <View className="flex-1">
+                {scopeTabs}
                 {filtersBar}
                 <View className="flex-1 items-center justify-center py-8">
                     <RNActivityIndicator color="#6B6FFF" />
@@ -54,6 +74,7 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
     if (error && results.length === 0) {
         return (
             <View className="flex-1">
+                {scopeTabs}
                 {filtersBar}
                 <EmptyState
                     size="full"
@@ -69,6 +90,7 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
     if (results.length === 0) {
         return (
             <View className="flex-1">
+                {scopeTabs}
                 {filtersBar}
                 <EmptyState
                     size="full"
@@ -82,6 +104,7 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
 
     return (
         <View className="flex-1">
+            {scopeTabs}
             {filtersBar}
             <FlatList
                 className="flex-1"

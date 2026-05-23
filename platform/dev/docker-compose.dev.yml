@@ -285,6 +285,11 @@ services:
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       Infrastructure__Redis__Configuration: redis:6379
+      # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      GrpcClients__UserService__Address: http://user-service:8081
+      GrpcClients__DisciplineService__Address: http://discipline-service:8081
+      GrpcClients__MediaService__Address: http://media-service:8081
+      GrpcClients__PresenceService__Address: http://presence-service:8081
     depends_on:
       mongo:
         condition: service_healthy
@@ -440,8 +445,9 @@ services:
       Notification__Smtp__From: noreply@urfu-link.local
       Notification__Smtp__FromDisplayName: UrFU Link
       Notification__Retention__RetentionDays: "90"
-      UserService__GrpcEndpoint: http://user-service:8080
-      PresenceService__GrpcEndpoint: http://presence-service:8080
+      # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      UserService__GrpcEndpoint: http://user-service:8081
+      PresenceService__GrpcEndpoint: http://presence-service:8081
     depends_on:
       notification-migrations:
         condition: service_completed_successfully

@@ -3,6 +3,7 @@ using Grpc.Core;
 using Urfu.Link.Services.User.Grpc;
 using UserService.Api.Domain;
 using UserService.Api.Domain.Interfaces;
+using UserService.Api.Infrastructure.Search;
 using DomainChannelToggle = UserService.Api.Domain.ValueObjects.ChannelToggle;
 using DomainQuietHours = UserService.Api.Domain.ValueObjects.QuietHours;
 using DomainSettings = UserService.Api.Domain.ValueObjects.NotificationSettings;
@@ -11,7 +12,9 @@ namespace UserService.Api.Services;
 
 public sealed class InternalApiService(
     IUserRepository userRepository,
-    IUserDirectory userDirectory) : InternalApi.InternalApiBase
+    IUserDirectory userDirectory,
+    IUserSearchRepository userSearchRepository,
+    UserSearchTextBuilder userSearchTextBuilder) : InternalApi.InternalApiBase
 {
     public override Task<PingReply> Ping(PingRequest request, ServerCallContext context)
     {
@@ -105,22 +108,94 @@ public sealed class InternalApiService(
         if (userIds.Length == 0)
             return reply;
 
-        // Параллельно: контакты из Keycloak (источник истины по имени/email) и
-        // аватары из локальной БД UserService (там, где Account.AvatarUrl).
-        var directoryTask = userDirectory.GetUsersAsync(userIds, context.CancellationToken);
-        var avatarsTask = userRepository.GetAvatarUrlsAsync(userIds, context.CancellationToken);
-        var directory = await directoryTask.ConfigureAwait(false);
-        var avatars = await avatarsTask.ConfigureAwait(false);
+        // Стратегия:
+        //   1) Локальная проекция user_search_projection — горячий путь, ~ms.
+        //      Наполняется UserSearchReconciler-ом и lazy-upsert-ом на логине.
+        //   2) Для id, отсутствующих в проекции — fallback на Keycloak Admin API
+        //      (источник истины). Результат немедленно UPSERT-им обратно в проекцию,
+        //      чтобы следующий BatchGetUsers по тому же id уже шёл из (1).
+        //   3) Аватары — всегда из локального user_profiles (там реальный AvatarUrl).
+        // userSearchRepository и userRepository шарят один scoped DbContext —
+        // запросы выполняем последовательно, иначе EF падает с "A second operation
+        // was started on this context instance".
+        var ct = context.CancellationToken;
+        var projection = await userSearchRepository.BatchGetSummariesAsync(userIds, ct).ConfigureAwait(false);
+        var avatars = await userRepository.GetAvatarUrlsAsync(userIds, ct).ConfigureAwait(false);
+
+        // Из проекции принимаем запись только если у неё есть непустое DisplayName.
+        // Пустой DisplayName в проекции — артефакт: либо lazy-upsert на логине без
+        // полноценных JWT-клеймов, либо ранний UPSERT, когда KC ещё не вернул данные.
+        // Такой id считаем "missing" и идём в KC заново.
+        var missing = userIds
+            .Where(id => !projection.TryGetValue(id, out var s)
+                || string.IsNullOrWhiteSpace(s.DisplayName))
+            .ToArray();
+        IReadOnlyDictionary<Guid, UserDirectoryEntry> directory =
+            new Dictionary<Guid, UserDirectoryEntry>();
+        if (missing.Length > 0)
+        {
+            directory = await userDirectory.GetUsersAsync(missing, ct).ConfigureAwait(false);
+
+            // Fire-and-forget UPSERT для прогрева проекции. Пишем только записи
+            // с непустым DisplayName, чтобы не кэшировать "мусор" и не блокировать
+            // последующие fallback'и на KC.
+            foreach (var (id, entry) in directory)
+            {
+                if (string.IsNullOrWhiteSpace(entry.DisplayName))
+                    continue;
+
+                var (searchText, translit) = userSearchTextBuilder.Build(
+                    username: entry.DisplayName,
+                    firstName: null,
+                    lastName: null,
+                    email: entry.Email);
+
+                _ = userSearchRepository.UpsertAsync(
+                    new UserSearchUpsert(
+                        UserId: id,
+                        Username: entry.DisplayName,
+                        FirstName: null,
+                        LastName: null,
+                        Email: string.IsNullOrWhiteSpace(entry.Email) ? null : entry.Email,
+                        DisplayName: entry.DisplayName,
+                        SearchText: searchText,
+                        SearchTextTranslit: translit,
+                        KeycloakModifiedMs: 0),
+                    CancellationToken.None);
+            }
+        }
 
         foreach (var id in userIds)
         {
-            directory.TryGetValue(id, out var entry);
+            string displayName = string.Empty;
+            string email = string.Empty;
+
+            // Приоритет: проекция (если есть непустое имя) → KC → fallback на short-id.
+            if (projection.TryGetValue(id, out var summary)
+                && !string.IsNullOrWhiteSpace(summary.DisplayName))
+            {
+                displayName = summary.DisplayName;
+                email = summary.Email;
+            }
+            else if (directory.TryGetValue(id, out var entry)
+                && !string.IsNullOrWhiteSpace(entry.DisplayName))
+            {
+                displayName = entry.DisplayName;
+                email = entry.Email;
+            }
+
+            if (string.IsNullOrWhiteSpace(displayName))
+            {
+                // Гарантируем non-empty: UI никогда не должен получать "".
+                displayName = $"User {id.ToString()[..8]}";
+            }
+
             avatars.TryGetValue(id, out var avatar);
             reply.Users.Add(new UserSummary
             {
                 UserId = id.ToString(),
-                DisplayName = entry?.DisplayName ?? string.Empty,
-                Email = entry?.Email ?? string.Empty,
+                DisplayName = displayName,
+                Email = email,
                 AvatarUrl = avatar ?? string.Empty,
             });
         }

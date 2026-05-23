@@ -56,6 +56,8 @@ type ChatState = {
     connect: () => Promise<void>;
     disconnect: () => Promise<void>;
 
+    // Фильтр для GET /conversations — бэк принимает "direct" или "discipline"
+    // (case-insensitive). "Direct" → личные, "Discipline" → дисциплинные группы.
     loadConversations: (type?: "Direct" | "Discipline") => Promise<void>;
     loadMessages: (chatId: string, type: "chat" | "subject", reset?: boolean) => Promise<void>;
     loadMore: (chatId: string, type: "chat" | "subject") => Promise<void>;

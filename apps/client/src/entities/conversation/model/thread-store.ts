@@ -189,3 +189,13 @@ export const useThreadStore = create<ThreadState>((set, get) => {
         },
     };
 });
+
+// Стабильная пустая ссылка для тредов без сообщений — иначе inline `?? []`
+// в selector-е возвращает новый массив каждый рендер, и Zustand v5 ловит
+// «getSnapshot should be cached» с последующим infinite loop.
+const EMPTY_THREAD_MESSAGES: MessageDto[] = [];
+
+export const useThreadMessages = (rootMessageId: string): MessageDto[] =>
+    useThreadStore(
+        (state) => state.messagesByThread[rootMessageId] ?? EMPTY_THREAD_MESSAGES,
+    );

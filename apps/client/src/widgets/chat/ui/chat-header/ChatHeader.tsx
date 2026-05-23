@@ -2,8 +2,10 @@ import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar, StatusIndicator } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useConversationParticipants } from "@/entities/conversation/model/participants-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ChatHeaderActions } from "./ChatHeaderActions";
 import { UserProfileModal } from "./UserProfileModal";
@@ -37,13 +39,34 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
         s.conversations.find((c) => c.id === chatId),
     );
 
-    const peerPresence = useUserPresence(chatId);
+    const participants = useConversationParticipants(chatId);
+    const currentUserId = useCurrentUserId();
+
+    // Для direct-чата peerUserId — тот, кто не равен currentUserId.
+    // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
+    // прогрев в ChatView через useParticipantsStore.load()).
+    const peer = useMemo(() => {
+        if (!conversation || conversation.type !== "Direct") return null;
+        return (
+            participants.find((p) => p.userId !== currentUserId) ??
+            participants[0] ??
+            null
+        );
+    }, [conversation, participants, currentUserId]);
+
+    // peerUserId для presence/typing подписки: в direct-чате используем id
+    // собеседника, для остального — chatId (presence per-user, typing per-room).
+    const presenceUserId = peer?.userId ?? chatId;
+    const peerPresence = useUserPresence(presenceUserId);
     const typers = useConversationTypers(chatId);
 
     if (!conversation) return null;
 
-    const chatName = conversation.title ?? "Личный чат";
-    const chatAvatarUrl = "";
+    const chatName =
+        conversation.title ??
+        peer?.displayName ??
+        (conversation.type === "Direct" ? "Личный чат" : "Чат");
+    const chatAvatarUrl = peer?.avatarUrl ?? "";
 
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence

@@ -22,7 +22,7 @@ export const Header = ({ title }: { title: string }) => {
             <SearchBar
                 value={globalQuery}
                 onChange={onQueryChange}
-                placeholder="Поиск по чатам и сообщениям..."
+                placeholder="Поиск по чатам, сообщениям и людям..."
             />
         </View>
     );

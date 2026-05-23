@@ -62,6 +62,18 @@ export const useParticipantsStore = create<ParticipantsState>((set, get) => ({
         }),
 }));
 
+// Стабильная пустая ссылка для чатов без кэшированных участников — иначе
+// inline `?? []` в selector-е возвращает новый массив каждый рендер, и
+// Zustand v5 ловит «getSnapshot should be cached» с infinite loop.
+const EMPTY_PARTICIPANTS: ConversationParticipantDto[] = [];
+
+export const useConversationParticipants = (
+    conversationId: string,
+): ConversationParticipantDto[] =>
+    useParticipantsStore(
+        (s) => s.byConversationId[conversationId]?.items ?? EMPTY_PARTICIPANTS,
+    );
+
 // Хелпер: вернуть displayName для userId в конкретном чате без запроса сети.
 // Используется в presence-store для обогащения UserTyping и в любых местах,
 // где fallback (короткий GUID) приемлем при пустом кэше.

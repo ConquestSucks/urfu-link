@@ -1,13 +1,20 @@
 import { create } from "zustand";
-import { SearchFilters, SearchResultDto } from "@urfu-link/api-client";
+import { SearchFilters, SearchResultDto, SearchUserDto } from "@urfu-link/api-client";
 import { apiClient } from "@/shared/lib/api";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
 
 // Поля, которыми UI рулит из SearchFiltersBar. conversationId исключён —
 // он задаётся самим режимом поиска (global/local), а не пользователем.
 export type SearchFilterValues = Omit<SearchFilters, "conversationId">;
 
+// Глобальный поиск имеет два scope: сообщения (messages) и пользователи (users).
+// Один SearchBar управляет обоими — scope переключается табами в GlobalSearchPanel.
+export type GlobalSearchScope = "messages" | "users";
+
 type SearchState = {
     // Global search (all conversations)
+    globalScope: GlobalSearchScope;
     globalQuery: string;
     globalResults: SearchResultDto[];
     isGlobalLoading: boolean;
@@ -15,6 +22,16 @@ type SearchState = {
     globalNextCursor?: string;
     globalAbort: AbortController | null;
     globalFilters: SearchFilterValues;
+
+    // Global user search (отдельная ветка state — независимые результаты и pagination)
+    userResults: SearchUserDto[];
+    isUsersLoading: boolean;
+    usersError: string | null;
+    usersNextOffset?: number;
+    usersAbort: AbortController | null;
+    // Идентификатор пользователя, для которого сейчас открывается direct-чат.
+    // Блокирует повторный tap по той же строке и показывает spinner справа.
+    pendingUserId: string | null;
 
     // Local search (within a conversation)
     localQuery: string;
@@ -26,10 +43,18 @@ type SearchState = {
     localAbort: AbortController | null;
     localFilters: SearchFilterValues;
 
+    setGlobalScope: (scope: GlobalSearchScope) => void;
     setGlobalQuery: (query: string) => void;
     setGlobalFilters: (filters: SearchFilterValues) => void;
     searchGlobal: (query: string) => Promise<void>;
     loadMoreGlobal: () => Promise<void>;
+
+    searchUsers: (query: string) => Promise<void>;
+    loadMoreUsers: () => Promise<void>;
+    // Возвращает conversationId direct-чата (либо ловит ошибку и возвращает null).
+    // Бэкенд идемпотентен по peerUserId — повторный вызов вернёт тот же чат.
+    openDirectWithUser: (userId: string) => Promise<string | null>;
+    clearGlobal: () => void;
 
     setLocalQuery: (query: string) => void;
     setLocalFilters: (filters: SearchFilterValues) => void;
@@ -47,6 +72,7 @@ const messageFromError = (error: unknown): string =>
     error instanceof Error ? error.message : "Не удалось выполнить поиск";
 
 const MIN_QUERY_LENGTH = 2;
+const USERS_PAGE_SIZE = 20;
 
 const EMPTY_FILTERS: SearchFilterValues = {};
 
@@ -61,6 +87,7 @@ const filtersToApi = (filters: SearchFilterValues): SearchFilters | undefined =>
 };
 
 export const useSearchStore = create<SearchState>((set, get) => ({
+    globalScope: "messages",
     globalQuery: "",
     globalResults: [],
     isGlobalLoading: false,
@@ -68,6 +95,13 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     globalNextCursor: undefined,
     globalAbort: null,
     globalFilters: EMPTY_FILTERS,
+
+    userResults: [],
+    isUsersLoading: false,
+    usersError: null,
+    usersNextOffset: undefined,
+    usersAbort: null,
+    pendingUserId: null,
 
     localQuery: "",
     localResults: [],
@@ -77,6 +111,24 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     localNextCursor: undefined,
     localAbort: null,
     localFilters: EMPTY_FILTERS,
+
+    setGlobalScope: (scope) => {
+        if (get().globalScope === scope) return;
+        set({ globalScope: scope });
+        // Смена scope — запускаем поиск в новом режиме, если query валидный.
+        // Отменяем in-flight запросы предыдущего scope, чтобы их результаты не
+        // прилетели поверх новых.
+        const { globalQuery } = get();
+        if (globalQuery.length >= MIN_QUERY_LENGTH) {
+            if (scope === "users") {
+                get().globalAbort?.abort();
+                void get().searchUsers(globalQuery);
+            } else {
+                get().usersAbort?.abort();
+                void get().searchGlobal(globalQuery);
+            }
+        }
+    },
 
     setGlobalQuery: (query) => set({ globalQuery: query }),
 
@@ -153,6 +205,122 @@ export const useSearchStore = create<SearchState>((set, get) => ({
             console.error("Load more global failed", error);
             set({ isGlobalLoading: false, globalError: messageFromError(error), globalAbort: null });
         }
+    },
+
+    searchUsers: async (query) => {
+        get().usersAbort?.abort();
+
+        if (query.length < MIN_QUERY_LENGTH) {
+            set({ userResults: [], usersNextOffset: undefined, usersError: null, usersAbort: null });
+            return;
+        }
+
+        const controller = new AbortController();
+        set({
+            isUsersLoading: true,
+            globalQuery: query,
+            usersError: null,
+            usersAbort: controller,
+        });
+        try {
+            const res = await apiClient.users.searchUsers(
+                query,
+                0,
+                USERS_PAGE_SIZE,
+                controller.signal,
+            );
+            if (controller.signal.aborted) return;
+            set({
+                userResults: res.items,
+                usersNextOffset: res.hasMore ? res.items.length : undefined,
+                isUsersLoading: false,
+                usersAbort: null,
+            });
+        } catch (error) {
+            if (isAbortError(error)) return;
+            console.error("User search failed", error);
+            set({ isUsersLoading: false, usersError: messageFromError(error), usersAbort: null });
+        }
+    },
+
+    loadMoreUsers: async () => {
+        const { globalQuery, usersNextOffset, isUsersLoading, userResults } = get();
+        if (isUsersLoading || usersNextOffset === undefined) return;
+        const controller = new AbortController();
+        set({ isUsersLoading: true, usersError: null, usersAbort: controller });
+        try {
+            const res = await apiClient.users.searchUsers(
+                globalQuery,
+                usersNextOffset,
+                USERS_PAGE_SIZE,
+                controller.signal,
+            );
+            if (controller.signal.aborted) return;
+            const combined = [...userResults, ...res.items];
+            set({
+                userResults: combined,
+                usersNextOffset: res.hasMore ? combined.length : undefined,
+                isUsersLoading: false,
+                usersAbort: null,
+            });
+        } catch (error) {
+            if (isAbortError(error)) return;
+            console.error("Load more users failed", error);
+            set({ isUsersLoading: false, usersError: messageFromError(error), usersAbort: null });
+        }
+    },
+
+    openDirectWithUser: async (userId) => {
+        // Если по этому id уже идёт запрос — не дубль. Если по другому — разрешаем
+        // (race-protection: бэк идемпотентен, оба запроса вернут один и тот же чат).
+        if (get().pendingUserId === userId) return null;
+        set({ pendingUserId: userId });
+        try {
+            const conversation = await apiClient.chat.openDirectConversation(userId);
+
+            // Локально регистрируем чат в chat-store сразу, не дожидаясь SignalR
+            // ConversationUpdated — иначе ChatHeader/Inbox не найдут conversation
+            // по id после router.push. Если SignalR-событие потом прилетит, оно
+            // просто перезапишет ту же запись (updateConversation идемпотентен).
+            useChatStore.getState().updateConversation(conversation);
+
+            // Прогреваем participants-кэш заранее: ChatHeader/Inbox берут оттуда
+            // displayName и avatarUrl собеседника для direct-чата.
+            useParticipantsStore.getState().load(conversation.id).catch(() => {
+                /* fail-open: имя проступит после первого участникам-fetch retry */
+            });
+
+            return conversation.id;
+        } catch (error) {
+            console.error("Open direct chat failed", error);
+            return null;
+        } finally {
+            // Сбрасываем pending только если он указывал на этого юзера — иначе
+            // мог уже стартовать запрос для другого user'а.
+            if (get().pendingUserId === userId) {
+                set({ pendingUserId: null });
+            }
+        }
+    },
+
+    clearGlobal: () => {
+        get().globalAbort?.abort();
+        get().usersAbort?.abort();
+        set({
+            globalScope: "messages",
+            globalQuery: "",
+            globalResults: [],
+            globalNextCursor: undefined,
+            isGlobalLoading: false,
+            globalError: null,
+            globalAbort: null,
+            userResults: [],
+            usersNextOffset: undefined,
+            isUsersLoading: false,
+            usersError: null,
+            usersAbort: null,
+            pendingUserId: null,
+        });
     },
 
     setLocalQuery: (query) => set({ localQuery: query }),

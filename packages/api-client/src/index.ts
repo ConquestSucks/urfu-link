@@ -17,6 +17,8 @@ export type {
   UpdatePrivacyDto,
   UpdateNotificationsDto,
   UpdateSoundVideoDto,
+  SearchUserDto,
+  SearchUsersResponse,
 } from "./users";
 
 export type {

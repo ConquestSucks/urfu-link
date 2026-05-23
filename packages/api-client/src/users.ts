@@ -67,6 +67,18 @@ export type UpdateSoundVideoDto = {
   webcamDeviceId?: string | null;
 };
 
+export type SearchUserDto = {
+  id: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+};
+
+export type SearchUsersResponse = {
+  items: SearchUserDto[];
+  hasMore: boolean;
+};
+
 import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
 export function createUsersApi(
@@ -135,6 +147,22 @@ export function createUsersApi(
 
     terminateAllDevices(): Promise<void> {
       return request<void>("/api/users/me/devices", { method: "DELETE" });
+    },
+
+    searchUsers(
+      query: string,
+      offset = 0,
+      limit = 20,
+      signal?: AbortSignal,
+    ): Promise<SearchUsersResponse> {
+      const params = new URLSearchParams();
+      params.append("q", query);
+      if (offset > 0) params.append("offset", String(offset));
+      if (limit !== 20) params.append("limit", String(limit));
+      return request<SearchUsersResponse>(
+        `/api/users/search?${params.toString()}`,
+        { signal },
+      );
     },
   };
 }

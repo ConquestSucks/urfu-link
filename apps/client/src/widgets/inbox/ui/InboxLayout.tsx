@@ -30,11 +30,10 @@ export const InboxLayout = () => {
 
     const isDetailView = segments.includes("[id]");
 
-    useEffect(() => {
-        if (!params.view) {
-            router.setParams({ view: "messages" });
-        }
-    }, [params.view]);
+    // params.view не нормализуем через router.setParams: expo-router падает на
+    // первом рендере с "Attempted to navigate before mounting the Root Layout"
+    // в момент HMR/cold-mount. useInboxRouting уже отдаёт "messages" по умолчанию,
+    // когда query-параметр отсутствует — этого достаточно.
 
     useEffect(() => {
         if (currentView === "notifications") {

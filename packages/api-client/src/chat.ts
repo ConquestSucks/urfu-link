@@ -1,20 +1,34 @@
 import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
-export type ConversationType = "Direct" | "Discipline";
+// Соответствует ChatService.Api.Domain.Enums.ConversationType (Direct=0, Group=1).
+// Бэкенд сериализует enum как строку (JsonStringEnumConverter в Program.cs).
+export type ConversationType = "Direct" | "Group";
+
+// Подтип группового чата: "Discipline" для чатов учебной дисциплины.
+// Соответствует ChatService.Api.Domain.Enums.GroupSubtype.
+export type GroupSubtype = "Discipline";
 
 export type ConversationPreview = {
   id: string;
   type: ConversationType;
   participants: string[];
-  createdAt: string;
-  lastMessageAt: string | null;
+  // Бэк отдаёт CreatedAtUtc / LastMessageAtUtc; для direct без сообщений
+  // LastMessageAtUtc заполняется временем создания.
+  createdAtUtc?: string;
+  lastMessageAtUtc?: string;
+  // Старые имена сохраняем как опциональные на случай fallback'а другого endpoint'а.
+  createdAt?: string;
+  lastMessageAt?: string | null;
   lastMessagePreview: {
     senderId: string;
     body: string;
-    sentAt: string;
+    sentAt?: string;
+    sentAtUtc?: string;
+    hasAttachments?: boolean;
   } | null;
   pinnedMessageIds?: string[];
   title?: string;
+  groupSubtype?: GroupSubtype | null;
 };
 
 export type MessageState = "Sent" | "Delivered" | "Read" | "Deleted";

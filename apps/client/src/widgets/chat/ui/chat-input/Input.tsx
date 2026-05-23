@@ -15,7 +15,7 @@ import { AttachmentsPreview } from "./AttachmentsPreview";
 import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
 import { useComposerStore } from "@/features/message-actions";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
-import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
+import { useParticipantsStore, useConversationParticipants } from "@/entities/conversation/model/participants-store";
 import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 
@@ -49,9 +49,7 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     const setReply = useComposerStore((s) => s.setReply);
     const editMessage = useChatStore((s) => s.editMessage);
     const currentUserId = useCurrentUserId();
-    const participants = useParticipantsStore(
-        (s) => s.byConversationId[conversationId]?.items ?? [],
-    );
+    const participants = useConversationParticipants(conversationId);
 
     // Токен под курсором: либо валидный mention, либо null.
     const mentionToken = useMemo(() => findMentionAtCursor(query, selection.start), [
@@ -85,6 +83,16 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     useEffect(() => {
         if (editing) setQuery(editing.body);
     }, [editing?.id]);
+
+    // Когда query становится пустым — на вебе onContentSizeChange textarea не
+    // схлопывается обратно к высоте одной строки. Принудительно сбрасываем
+    // через requestAnimationFrame, чтобы перетереть устаревшее значение,
+    // которое onContentSizeChange выставит после onChangeText.
+    useEffect(() => {
+        if (query.length !== 0) return;
+        const raf = requestAnimationFrame(() => setInputHeight(24));
+        return () => cancelAnimationFrame(raf);
+    }, [query]);
 
     const animate = useCallback(
         (show: boolean) => {
@@ -210,7 +218,6 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                         onChangeText={(text) => {
                             setQuery(text);
                             if (!editing) notifyTyping(text);
-                            if (text === "") setInputHeight(24);
                         }}
                         selection={pendingSelection ?? undefined}
                         onSelectionChange={(e) => {

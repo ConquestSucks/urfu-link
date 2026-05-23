@@ -7,6 +7,8 @@ using UserService.Api.Domain.Interfaces;
 using UserService.Api.Infrastructure.Devices;
 using UserService.Api.Infrastructure.Keycloak;
 using UserService.Api.Infrastructure.Persistence;
+using UserService.Api.Infrastructure.Search;
+using UserService.Api.Services;
 using Urfu.Link.BuildingBlocks.SessionRevocation;
 using UserService.Api.Infrastructure.Storage;
 
@@ -56,6 +58,20 @@ public static class ModuleRegistration
 
         services.AddSingleton<IDeviceRegistry, RedisDeviceRegistry>();
         services.AddSessionRevocation(configuration);
+
+        // User search infrastructure: транслитератор + builder — singleton (stateless),
+        // репозиторий — scoped (использует UserDbContext).
+        services.AddSingleton<Transliterator>();
+        services.AddSingleton<UserSearchTextBuilder>();
+        services.AddScoped<IUserSearchRepository, PgUserSearchRepository>();
+
+        services.Configure<UserSearchReconcilerOptions>(
+            configuration.GetSection(UserSearchReconcilerOptions.SectionName));
+        services.Configure<UserSearchLazyUpserterOptions>(
+            configuration.GetSection(UserSearchLazyUpserterOptions.SectionName));
+
+        services.AddSingleton<UserSearchLazyUpserter>();
+        services.AddHostedService<UserSearchReconciler>();
 
         return services;
     }
