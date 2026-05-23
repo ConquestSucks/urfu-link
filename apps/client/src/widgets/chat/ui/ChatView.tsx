@@ -6,6 +6,7 @@ import { ChatInput } from "./chat-input/Input";
 import { MessagesList, type MessagesListHandle } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
 import { apiClient } from "@/shared/lib/api";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
@@ -20,6 +21,7 @@ import { PinnedBar } from "./PinnedBar";
 import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
@@ -35,6 +37,7 @@ export const ChatView = () => {
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
     const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
+    const currentUserId = useCurrentUserId();
 
     const chatId = params.id as string;
     const type = currentTab === "chats" ? "chat" : "subject";
@@ -84,6 +87,19 @@ export const ChatView = () => {
         const ok = listRef.current?.scrollToMessage(pendingScrollId);
         if (ok) setPendingScrollToMessageId(null);
     }, [pendingScrollId, setPendingScrollToMessageId]);
+
+    // Прогрев participants-store: нужен для @mentions autocomplete и для
+    // resolve userId -> displayName в TypingIndicator. Кэш в сторе TTL 5 минут,
+    // повторные load() для одного и того же chatId — no-op.
+    useEffect(() => {
+        if (!chatId) return;
+        useParticipantsStore
+            .getState()
+            .load(chatId)
+            .catch(() => {
+                /* fail-open: индикатор печати и mentions работают и без имён */
+            });
+    }, [chatId]);
 
     if (!chatId) return null;
 
@@ -153,7 +169,7 @@ export const ChatView = () => {
 
             <MessageActionsMenu
                 message={actionsTarget}
-                isOwn={actionsTarget?.senderId === "me"}
+                isOwn={!!currentUserId && actionsTarget?.senderId === currentUserId}
                 isPinned={isActionsTargetPinned}
                 onClose={() => setActionsTarget(null)}
                 onForwardRequest={() => {

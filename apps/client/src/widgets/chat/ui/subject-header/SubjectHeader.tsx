@@ -1,7 +1,7 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar } from "@/shared/ui";
-import { useInboxStore } from "@/shared/store/useInboxStore";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -19,11 +19,15 @@ export const SubjectHeader = ({ subjectId }: {
 }) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
     const { isMobile } = useWindowSize();
-    const subjectMeta = useInboxStore((state) => state.getSubjectMessageById(subjectId));
-    if (!subjectMeta)
-        return null;
-    const onlineCount = subjectMeta.onlineCount || 13;
-    const totalCount = subjectMeta.totalCount || 30;
+    const conversation = useChatStore((s) =>
+        s.conversations.find((c) => c.id === subjectId),
+    );
+    if (!conversation) return null;
+    const subjectName = conversation.title ?? "Чат предмета";
+    const subjectAvatarUrl = "";
+    // TODO: вернуть онлайн-счётчики, когда ConversationPreview обогатится полями.
+    const onlineCount = 13;
+    const totalCount = 30;
     const membersData = MOCK_MEMBERS;
     return (<>
       <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2">
@@ -32,11 +36,11 @@ export const SubjectHeader = ({ subjectId }: {
               <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
             </Pressable>)}
          <View className="flex-row gap-3 items-center">
-          <Avatar size={38} src={subjectMeta.avatarUrl} name={subjectMeta.name}/>
+          <Avatar size={38} src={subjectAvatarUrl} name={subjectName}/>
 
           <View className="justify-center flex-1 gap-1.5">
             <Text numberOfLines={1} className="text-white leading-none text-base font-semibold">
-              {subjectMeta.name}
+              {subjectName}
             </Text>
             <Text numberOfLines={1} className="text-text-subtle leading-none text-xs font-medium">
               В сети {onlineCount} из {totalCount}

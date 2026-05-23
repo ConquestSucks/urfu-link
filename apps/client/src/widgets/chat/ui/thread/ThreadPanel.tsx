@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo } from "react";
 import { FlatList, Pressable, Text, TextInput, View } from "react-native";
-import { XIcon } from "@/shared/ui/phosphor";
-import { useThreadStore } from "@/entities/conversation/model/thread-store";
+import { ArrowBendUpLeftIcon, XIcon } from "@/shared/ui/phosphor";
+import { EmptyState } from "@/shared/ui";
+import { useThreadStore, useThreadMessages } from "@/entities/conversation/model/thread-store";
 import { useChatStore, mapMessageToProps } from "@/entities/conversation/model/chat-store";
 import { ChatMessage } from "@/entities/chat-message";
-import { useAuthStore } from "@/shared/store/auth-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { MessageDto } from "@urfu-link/api-client";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 
@@ -14,7 +15,7 @@ interface ThreadPanelProps {
 }
 
 export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
-    const messages = useThreadStore((s) => s.messagesByThread[rootMessageId] ?? []);
+    const messages = useThreadMessages(rootMessageId);
     const root = useThreadStore((s) => s.rootsById[rootMessageId]);
     const isLoading = useThreadStore((s) => !!s.loadingByThread[rootMessageId]);
     const hasMore = useThreadStore((s) => !!s.hasMoreByThread[rootMessageId]);
@@ -32,7 +33,7 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
         return undefined;
     });
 
-    const currentUserId = useAuthStore((s) => (s.accessToken ? "me" : null));
+    const currentUserId = useCurrentUserId();
     const [body, setBody] = React.useState("");
 
     useEffect(() => {
@@ -116,11 +117,11 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
                             <ActivityIndicator className="text-brand-600" />
                         </View>
                     ) : (
-                        <View className="py-8 items-center">
-                            <Text className="text-text-muted text-sm">
-                                Пока нет ответов
-                            </Text>
-                        </View>
+                        <EmptyState
+                            size="compact"
+                            icon={ArrowBendUpLeftIcon}
+                            title="Пока нет ответов"
+                        />
                     )
                 }
             />

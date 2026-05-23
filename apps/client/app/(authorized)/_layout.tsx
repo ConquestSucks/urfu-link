@@ -8,6 +8,7 @@ import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { usePresenceHub } from "@/shared/lib/usePresenceHub";
+import { useChatHub } from "@/shared/lib/useChatHub";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -16,7 +17,9 @@ export default function AuthLayout() {
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
-    // Connect to PresenceHub and maintain heartbeat for the whole session
+    // Подключаемся к ChatHub и PresenceHub на всё время авторизованной сессии.
+    // Хуки сами обрабатывают AppState (background/foreground) и cleanup при unmount.
+    useChatHub();
     usePresenceHub();
 
     const safeAreaEdges: Edge[] = isMobile

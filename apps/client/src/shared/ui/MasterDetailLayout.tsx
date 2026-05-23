@@ -61,7 +61,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     sidebarOverlay: {
-        ...StyleSheet.absoluteFillObject,
+        ...StyleSheet.absoluteFill,
         zIndex: 10,
     },
     outletHidden: {

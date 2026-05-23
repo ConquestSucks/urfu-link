@@ -1,16 +1,22 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar, StatusIndicator } from "@/shared/ui";
-import { useInboxStore } from "@/shared/store/useInboxStore";
+import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useConversationParticipants } from "@/entities/conversation/model/participants-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { ChatHeaderActions } from "./ChatHeaderActions";
 import { UserProfileModal } from "./UserProfileModal";
-import { useUserPresence, presenceStatusToLabel } from "@/entities/presence";
+import {
+    LastSeenLabel,
+    TypingIndicator,
+    presenceStatusToLabel,
+    useConversationTypers,
+    useUserPresence,
+} from "@/entities/presence";
 import type { UserStatus } from "@/shared/ui/StatusIndicator";
-import { TypingIndicator } from "@/entities/presence";
-import { useConversationTypers } from "@/entities/presence";
 
 const presenceStatusToIndicator = (status?: string): UserStatus => {
     switch (status) {
@@ -29,12 +35,38 @@ interface ChatHeaderProps {
 export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
-    const chatMeta = useInboxStore((state) => state.getChatById(chatId));
+    const conversation = useChatStore((s) =>
+        s.conversations.find((c) => c.id === chatId),
+    );
 
-    const peerPresence = useUserPresence(chatId);
+    const participants = useConversationParticipants(chatId);
+    const currentUserId = useCurrentUserId();
+
+    // Для direct-чата peerUserId — тот, кто не равен currentUserId.
+    // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
+    // прогрев в ChatView через useParticipantsStore.load()).
+    const peer = useMemo(() => {
+        if (!conversation || conversation.type !== "Direct") return null;
+        return (
+            participants.find((p) => p.userId !== currentUserId) ??
+            participants[0] ??
+            null
+        );
+    }, [conversation, participants, currentUserId]);
+
+    // peerUserId для presence/typing подписки: в direct-чате используем id
+    // собеседника, для остального — chatId (presence per-user, typing per-room).
+    const presenceUserId = peer?.userId ?? chatId;
+    const peerPresence = useUserPresence(presenceUserId);
     const typers = useConversationTypers(chatId);
 
-    if (!chatMeta) return null;
+    if (!conversation) return null;
+
+    const chatName =
+        conversation.title ??
+        peer?.displayName ??
+        (conversation.type === "Direct" ? "Личный чат" : "Чат");
+    const chatAvatarUrl = peer?.avatarUrl ?? "";
 
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
@@ -56,7 +88,7 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                     )}
                     <View className="flex-row gap-3 items-center">
                         <View className="relative z-1 p-0.5">
-                            <Avatar size={38} src={chatMeta.avatarUrl} name={chatMeta.name} />
+                            <Avatar size={38} src={chatAvatarUrl} name={chatName} />
                             <StatusIndicator
                                 status={indicatorStatus}
                                 size={12}
@@ -69,22 +101,47 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                                 numberOfLines={1}
                                 className="text-white leading-none text-base font-semibold"
                             >
-                                {chatMeta.name}
+                                {chatName}
                             </Text>
-                            {typers.length > 0 ? (
-                                <TypingIndicator conversationId={chatId} showNames={false} />
-                            ) : (
-                                <Text
-                                    numberOfLines={1}
-                                    className={`leading-none text-xs font-medium ${
-                                        indicatorStatus === "online"
-                                            ? "text-success-600"
-                                            : "text-text-muted"
-                                    }`}
-                                >
-                                    {statusLabel ?? "Не в сети"}
-                                </Text>
-                            )}
+                            {(() => {
+                                // Приоритет: typing > online/status label > last seen > "Не в сети".
+                                if (typers.length > 0) {
+                                    // В direct-чате имя печатающего совпадает с заголовком — не дублируем.
+                                    // В групповом (Discipline) показываем "Иван печатает...".
+                                    return (
+                                        <TypingIndicator
+                                            conversationId={chatId}
+                                            showNames={conversation.type !== "Direct"}
+                                        />
+                                    );
+                                }
+                                if (indicatorStatus === "online" && statusLabel) {
+                                    return (
+                                        <Text
+                                            numberOfLines={1}
+                                            className="leading-none text-xs font-medium text-success-600"
+                                        >
+                                            {statusLabel}
+                                        </Text>
+                                    );
+                                }
+                                if (peerPresence?.lastSeenAt) {
+                                    return (
+                                        <LastSeenLabel
+                                            lastSeenAt={peerPresence.lastSeenAt}
+                                            className="leading-none text-xs font-medium text-text-muted"
+                                        />
+                                    );
+                                }
+                                return (
+                                    <Text
+                                        numberOfLines={1}
+                                        className="leading-none text-xs font-medium text-text-muted"
+                                    >
+                                        {statusLabel ?? "Не в сети"}
+                                    </Text>
+                                );
+                            })()}
                         </View>
                     </View>
                 </View>
@@ -98,7 +155,12 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
             <UserProfileModal
                 isOpen={isProfileOpen}
                 onClose={() => setIsProfileOpen(false)}
-                user={{ name: chatMeta.name, avatarUrl: chatMeta.avatarUrl }}
+                user={{
+                    name: chatName,
+                    avatarUrl: chatAvatarUrl,
+                    status: peerPresence?.status,
+                    lastSeenAt: peerPresence?.lastSeenAt,
+                }}
             />
         </>
     );

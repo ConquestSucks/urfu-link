@@ -3,7 +3,8 @@ packages:
   - packages/*
 
 # pnpm 10+ blocks postinstall scripts of transitive deps by default (supply-chain
-# hardening). List packages here that legitimately need to run a build step.
-# esbuild fetches a platform-specific native binary in its postinstall.
-onlyBuiltDependencies:
-  - esbuild
+# hardening). esbuild — fetches a platform-specific native binary in its
+# postinstall; msgpackr-extract — нужен Metro/SignalR на mobile.
+allowBuilds:
+  esbuild: true
+  msgpackr-extract: true

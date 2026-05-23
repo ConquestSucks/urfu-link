@@ -5,13 +5,8 @@ using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Messages;
 
-public sealed class GetReadReceiptsRouteRequest
-{
-    public Guid Id { get; set; }
-}
-
 public sealed class GetReadReceiptsEndpoint(GetReadReceiptsQuery query)
-    : Endpoint<GetReadReceiptsRouteRequest, IReadOnlyList<ReadReceiptDto>>
+    : EndpointWithoutRequest<IReadOnlyList<ReadReceiptDto>>
 {
     public override void Configure()
     {
@@ -20,11 +15,11 @@ public sealed class GetReadReceiptsEndpoint(GetReadReceiptsQuery query)
         Summary(s => s.Summary = "Read receipts for a message. Authz: caller must be a participant of the conversation.");
     }
 
-    public override async Task HandleAsync(GetReadReceiptsRouteRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
-        var receipts = await query.ExecuteAsync(req.Id, caller, ct).ConfigureAwait(false);
+        var id = Route<Guid>("id");
+        var receipts = await query.ExecuteAsync(id, caller, ct).ConfigureAwait(false);
         await Send.OkAsync(receipts, ct).ConfigureAwait(false);
     }
 }

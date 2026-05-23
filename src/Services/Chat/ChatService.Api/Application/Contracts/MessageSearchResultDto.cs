@@ -21,5 +21,16 @@ public sealed record MessageSearchResultDto(
 /// caller's counterparty is surfaced as <see cref="PeerUserId"/>; group chats use
 /// <see cref="Title"/> once a title field is added to the aggregate. <see cref="Type"/> lets
 /// the client decide which one to render.
+///
+/// <see cref="AvatarUrl"/> and <see cref="SenderName"/> are optional UI niceties: when
+/// the search service can cheaply resolve them (e.g. from a participant snapshot or a
+/// UserService lookup), it sets them so the client can show a recognisable card without
+/// a follow-up round trip. They are nullable because the backend may not always have
+/// them — the client renders avatar initials and falls back to the title in that case.
 /// </summary>
-public sealed record ConversationPreviewDto(ConversationType Type, string? Title, Guid? PeerUserId);
+public sealed record ConversationPreviewDto(
+    ConversationType Type,
+    string? Title,
+    Guid? PeerUserId,
+    string? AvatarUrl = null,
+    string? SenderName = null);

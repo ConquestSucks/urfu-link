@@ -2,14 +2,16 @@ import { ChatMessage } from "@/entities/chat-message";
 import {
     mapMessageToProps,
     useChatStore,
+    type LocalMessageDto,
 } from "@/entities/conversation/model/chat-store";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
-import { FileIcon } from "@/shared/ui/phosphor";
+import { EmptyState } from "@/shared/ui";
+import { ChatCircleTextIcon } from "@/shared/ui/phosphor";
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef } from "react";
-import { FlatList, Text, View } from "react-native";
+import { FlatList, View } from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
 import type { MessageDto } from "@urfu-link/api-client";
-import { useAuthStore } from "@/shared/store/auth-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 
 interface MessagesListProps {
     chatId: string;
@@ -36,7 +38,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const hasMore = hasMoreByConversation[chatId] || false;
         const listRef = useRef<FlatList<MessageDto>>(null);
 
-        const currentUserId = useAuthStore((s) => (s.accessToken ? "me" : null));
+        const currentUserId = useCurrentUserId();
 
         useEffect(() => {
             loadMessages(chatId, type, true);
@@ -79,10 +81,14 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         const viewabilityConfig = React.useRef({ itemVisiblePercentThreshold: 50 }).current;
 
+        const addReaction = useChatStore((s) => s.addReaction);
+        const removeReaction = useChatStore((s) => s.removeReaction);
+
         const renderItem = useMemo(
             () =>
                 ({ item }: { item: MessageDto }) => {
                     const view = mapMessageToProps(item, currentUserId);
+                    const localStatus = (item as LocalMessageDto)._localStatus;
                     return (
                         <ChatMessage
                             id={view.id}
@@ -99,7 +105,20 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                             forwardedFrom={item.forwardedFrom ?? null}
                             isDeleted={item.state === "Deleted"}
                             threadReplyCount={item.threadReplyCount ?? 0}
+                            localStatus={localStatus}
                             onLongPress={() => onMessageLongPress?.(item)}
+                            onReactionPress={
+                                currentUserId
+                                    ? (emoji) => {
+                                          const reacters = item.reactions?.[emoji] ?? [];
+                                          if (reacters.includes(currentUserId)) {
+                                              removeReaction(item.id, emoji);
+                                          } else {
+                                              addReaction(item.id, emoji);
+                                          }
+                                      }
+                                    : undefined
+                            }
                             onThreadOpen={
                                 item.threadReplyCount && item.threadReplyCount > 0
                                     ? () => onThreadOpen?.(item.id)
@@ -108,7 +127,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         />
                     );
                 },
-            [currentUserId, shouldShowAvatars, onMessageLongPress, onThreadOpen],
+            [currentUserId, shouldShowAvatars, onMessageLongPress, onThreadOpen, addReaction, removeReaction],
         );
 
         if (isInitialLoading) {
@@ -122,6 +141,21 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     <ChatMessageSkeleton isOwn={false} showAvatar={shouldShowAvatars} />
                     <ChatMessageSkeleton isOwn={false} showAvatar={shouldShowAvatars} />
                     <ChatMessageSkeleton isOwn={true} />
+                </View>
+            );
+        }
+
+        // EmptyState вынесен за пределы FlatList: в inverted FlatList ListEmptyComponent
+        // рендерится перевёрнутым на 180°. Early-return даёт корректную ориентацию.
+        if (messages.length === 0) {
+            return (
+                <View className="flex-1 px-6 py-6 justify-end overflow-hidden">
+                    <EmptyState
+                        size="full"
+                        icon={ChatCircleTextIcon}
+                        title="Начните общение"
+                        description="Отправьте первое сообщение в этом чате"
+                    />
                 </View>
             );
         }
@@ -142,17 +176,19 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 renderItem={renderItem}
                 onEndReached={() => loadMore(chatId, type)}
                 onEndReachedThreshold={0.2}
-                onScrollToIndexFailed={() => {}}
-                ListEmptyComponent={
-                    <View className="flex-1 items-center justify-center py-20 px-6 min-h-[280px]">
-                        <View className="w-24 h-24 rounded-full bg-white/5 items-center justify-center mb-5">
-                            <FileIcon size={40} className="text-text-disabled" weight="regular" />
-                        </View>
-                        <Text className="text-text-muted text-base font-medium text-center">
-                            Начните общение
-                        </Text>
-                    </View>
-                }
+                onScrollToIndexFailed={(info) => {
+                    // Стандартный fallback для inverted FlatList: прокатываем к
+                    // приблизительной позиции, ждём рендер и повторяем точный scrollToIndex.
+                    const offset = info.averageItemLength * info.index;
+                    listRef.current?.scrollToOffset({ offset, animated: false });
+                    setTimeout(() => {
+                        listRef.current?.scrollToIndex({
+                            index: info.index,
+                            viewPosition: 0.5,
+                            animated: true,
+                        });
+                    }, 50);
+                }}
                 ListFooterComponent={() =>
                     isLoading && hasMore ? (
                         <View className="py-4">

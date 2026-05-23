@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { ModalOverlay } from "@/shared/ui";
 import {
     ArrowBendUpLeftIcon,
@@ -12,16 +12,7 @@ import {
     TrashIcon,
 } from "@/shared/ui/phosphor";
 import type { MessageDto } from "@urfu-link/api-client";
-
-const copyToClipboard = async (text: string) => {
-    if (Platform.OS === "web") {
-        try {
-            await navigator.clipboard.writeText(text);
-        } catch {
-            /* ignore */
-        }
-    }
-};
+import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useComposerStore } from "../model/composer-store";
 
@@ -102,7 +93,7 @@ export const MessageActionsMenu = ({
                 onForwardRequest();
                 return;
             case "copy":
-                if (message.body) await copyToClipboard(message.body);
+                if (message.body) await copyTextToClipboard(message.body);
                 break;
             case "pin":
                 await pinMessage(message.conversationId, message.id);

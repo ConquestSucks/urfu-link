@@ -15,10 +15,7 @@ const runtimeConfigSchema = z.object({
     apiUrl: z.string().url(),
     keycloakUrl: z.string().url(),
 });
-type AppExpoConfig = ExpoConfig & {
-    newArchEnabled?: boolean;
-};
-export default ({ config }: ConfigContext): AppExpoConfig => {
+export default ({ config }: ConfigContext): ExpoConfig => {
     const appEnvResult = appEnvSchema.safeParse(process.env.APP_ENV);
     const appEnv = appEnvResult.success ? appEnvResult.data : "dev";
     const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URLS[appEnv];
@@ -51,8 +48,6 @@ export default ({ config }: ConfigContext): AppExpoConfig => {
         scheme: "urfulink",
         orientation: "portrait",
         userInterfaceStyle: "automatic",
-        jsEngine: "hermes",
-        newArchEnabled: true,
         platforms: ["ios", "android", "web"],
         runtimeVersion: {
             policy: "appVersion"
@@ -60,7 +55,12 @@ export default ({ config }: ConfigContext): AppExpoConfig => {
         experiments: {
             typedRoutes: true
         },
-        plugins: ["expo-router", "expo-web-browser", "expo-image-picker", "expo-font", "expo-image"],
+        plugins: [
+            ...(config.plugins ?? []),
+            "expo-web-browser",
+            "expo-image-picker",
+            "expo-font",
+        ],
         extra: {
             appEnv,
             apiUrl,

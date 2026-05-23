@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { PresenceInfo, PresenceStatus } from "@urfu-link/api-client";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
+import { lookupParticipantName, useParticipantsStore } from "@/entities/conversation/model/participants-store";
 
 type TypingUser = {
     userId: string;
@@ -49,18 +50,55 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
             get().setUserPresence(info);
         });
 
-        newConnection.on("UserTyping", (userId: string, conversationId: string, displayName?: string) => {
-            const store = get();
-            store.setTyping({ userId, conversationId, displayName });
+        // Сервер шлёт UserTyping(conversationId, userId, isTyping) — см.
+        // IPresenceClient.cs и PresenceBroadcaster.BroadcastTypingAsync.
+        // displayName сервер не передаёт намеренно: имя резолвится на клиенте
+        // через participants-store (он уже загружен для @mentions и
+        // sender-фильтра в этом же чате) — без доп. gRPC-хопов Chat→Presence→User.
+        newConnection.on(
+            "UserTyping",
+            (conversationId: string, userId: string, isTyping: boolean) => {
+                const store = get();
+                const key = `${conversationId}:${userId}`;
 
-            // Auto-clear after timeout
-            const key = `${conversationId}:${userId}`;
-            if (typingTimers[key]) clearTimeout(typingTimers[key]);
-            typingTimers[key] = setTimeout(() => {
-                store.clearTyping(userId, conversationId);
-                delete typingTimers[key];
-            }, TYPING_TIMEOUT_MS);
-        });
+                if (typingTimers[key]) {
+                    clearTimeout(typingTimers[key]);
+                    delete typingTimers[key];
+                }
+
+                if (isTyping) {
+                    let displayName = lookupParticipantName(conversationId, userId);
+                    store.setTyping({ userId, conversationId, displayName });
+
+                    // Кэш мог быть холодным: типинг прилетел до того, как UI
+                    // успел запросить participants. Прогреваем кэш — потом
+                    // следующий тик селектора useConversationTypers подтянет имя.
+                    if (!displayName) {
+                        useParticipantsStore
+                            .getState()
+                            .load(conversationId)
+                            .then(() => {
+                                const resolved = lookupParticipantName(conversationId, userId);
+                                if (resolved) {
+                                    get().setTyping({ userId, conversationId, displayName: resolved });
+                                }
+                            })
+                            .catch(() => {
+                                /* fail-open: индикатор покажется без имени */
+                            });
+                    }
+
+                    // Защита от потерянного StopTyping: чистим запись, если очередной
+                    // StartTyping не подоспеет за TYPING_TIMEOUT_MS.
+                    typingTimers[key] = setTimeout(() => {
+                        store.clearTyping(userId, conversationId);
+                        delete typingTimers[key];
+                    }, TYPING_TIMEOUT_MS);
+                } else {
+                    store.clearTyping(userId, conversationId);
+                }
+            },
+        );
 
         try {
             await newConnection.start();
@@ -146,8 +184,15 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 export const useUserPresence = (userId: string) =>
     usePresenceStore((state) => state.presenceByUser[userId]);
 
-export const useConversationTypers = (conversationId: string) =>
-    usePresenceStore((state) => state.typingByConversation[conversationId] ?? []);
+// Стабильная пустая ссылка для отсутствующего conversationId — иначе каждый рендер
+// возвращает новый `[]`, и Zustand v5 ловит «getSnapshot should be cached» с
+// последующим infinite loop в useSyncExternalStore.
+const EMPTY_TYPERS: TypingUser[] = [];
+
+export const useConversationTypers = (conversationId: string): TypingUser[] =>
+    usePresenceStore(
+        (state) => state.typingByConversation[conversationId] ?? EMPTY_TYPERS,
+    );
 
 export const presenceStatusToLabel = (status: PresenceStatus): string => {
     switch (status) {

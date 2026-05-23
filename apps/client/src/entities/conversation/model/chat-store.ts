@@ -8,6 +8,15 @@ import {
 import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
 import { apiClient } from "@/shared/lib/api";
+import { useAuthStore } from "@/shared/store/auth-store";
+
+/** Локальный (только клиентский) статус сообщения, не приходящий с сервера. */
+export type LocalMessageStatus = "sending" | "sent" | "failed";
+
+/** MessageDto + локальная разметка статуса для optimistic UI. */
+export type LocalMessageDto = MessageDto & {
+    _localStatus?: LocalMessageStatus;
+};
 
 export type ChatMessagePropsMapped = {
     id: string;
@@ -47,6 +56,8 @@ type ChatState = {
     connect: () => Promise<void>;
     disconnect: () => Promise<void>;
 
+    // Фильтр для GET /conversations — бэк принимает "direct" или "discipline"
+    // (case-insensitive). "Direct" → личные, "Discipline" → дисциплинные группы.
     loadConversations: (type?: "Direct" | "Discipline") => Promise<void>;
     loadMessages: (chatId: string, type: "chat" | "subject", reset?: boolean) => Promise<void>;
     loadMore: (chatId: string, type: "chat" | "subject") => Promise<void>;
@@ -229,6 +240,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
             },
         );
 
+        newConnection.onclose((err) => {
+            if (err) {
+                console.warn("ChatHub connection closed with error", err);
+            }
+            set({ isConnected: false });
+        });
+
+        newConnection.onreconnected(() => {
+            // После потери соединения часть сообщений могла пройти мимо. Сбрасываем
+            // курсоры и hasMore, чтобы следующий loadMessages(reset=true) подтянул
+            // свежий снэпшот.
+            set({ cursors: {}, hasMoreByConversation: {}, isConnected: true });
+        });
+
+        newConnection.onreconnecting((err) => {
+            console.warn("ChatHub reconnecting", err);
+            set({ isConnected: false });
+        });
+
         try {
             await newConnection.start();
             set({ connection: newConnection, isConnected: true });
@@ -297,16 +327,85 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     sendMessage: async (chatId, text, attachments = [], replyToMessageId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
-            const clientMessageId = crypto.randomUUID();
-            await connection.invoke(
-                "SendMessage",
-                chatId,
-                text,
-                attachments,
+        if (connection?.state !== HubConnectionState.Connected) {
+            throw new Error("ChatHub is not connected");
+        }
+        const currentUserId = useAuthStore.getState().userId;
+        if (!currentUserId) {
+            throw new Error("Not authenticated");
+        }
+
+        const clientMessageId =
+            typeof crypto !== "undefined" && "randomUUID" in crypto
+                ? crypto.randomUUID()
+                : `cmid-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+        // Поднимаем reply preview из локального состояния — для optimistic-карточки
+        // достаточно messageId/senderId/preview-текста, сервер вернёт авторитетную версию.
+        const replyTo = (() => {
+            if (!replyToMessageId) return null;
+            const list = get().messagesByConversation[chatId] ?? [];
+            const target = list.find((m) => m.id === replyToMessageId);
+            if (!target) return null;
+            return {
+                messageId: target.id,
+                senderId: target.senderId,
+                preview: target.body,
+            };
+        })();
+
+        const nowIso = new Date().toISOString();
+        const optimistic: LocalMessageDto = {
+            id: `optimistic:${clientMessageId}`,
+            conversationId: chatId,
+            senderId: currentUserId,
+            body: text,
+            attachments: [],
+            state: "Sent",
+            createdAt: nowIso,
+            deliveredAt: null,
+            readAt: null,
+            clientMessageId,
+            editedAtUtc: null,
+            replyTo,
+            reactions: {},
+            mentions: [],
+            forwardedFrom: null,
+            _localStatus: "sending",
+        };
+
+        get().addMessage(optimistic);
+
+        try {
+            // ChatHub.SendMessage принимает один record SendMessageHubInput, а не
+            // позиционные аргументы — JSON-биндинг иначе не совпадает с C# record'ом
+            // и invoke падает на сервере.
+            const real = await connection.invoke<MessageDto>("SendMessage", {
+                conversationId: chatId,
+                body: text,
+                attachmentAssetIds: attachments,
                 clientMessageId,
-                replyToMessageId ?? null,
-            );
+                replyToMessageId: replyToMessageId ?? null,
+            });
+            // Sender не получает MessageReceived (recipients = participants кроме отправителя),
+            // поэтому подменяем оптимистичный экземпляр на серверный сами.
+            get().addMessage({ ...real, _localStatus: "sent" } as LocalMessageDto);
+        } catch (error) {
+            console.error("Failed to send message", error);
+            set((state) => {
+                const list = state.messagesByConversation[chatId] ?? [];
+                return {
+                    messagesByConversation: {
+                        ...state.messagesByConversation,
+                        [chatId]: list.map((m) =>
+                            (m as LocalMessageDto).clientMessageId === clientMessageId
+                                ? ({ ...m, _localStatus: "failed" } as LocalMessageDto)
+                                : m,
+                        ),
+                    },
+                };
+            });
+            throw error;
         }
     },
 
@@ -395,6 +494,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const conversationId = message.conversationId;
             const existing = state.messagesByConversation[conversationId] || [];
 
+            const incomingCmid = (message as LocalMessageDto).clientMessageId;
+            // Если приходит реальный (не optimistic) экземпляр с тем же clientMessageId —
+            // заменяем оптимистичный плейсхолдер на него.
+            if (incomingCmid && !message.id.startsWith("optimistic:")) {
+                const optimisticIdx = existing.findIndex(
+                    (m) =>
+                        (m as LocalMessageDto).clientMessageId === incomingCmid &&
+                        m.id.startsWith("optimistic:"),
+                );
+                if (optimisticIdx !== -1) {
+                    const next = [...existing];
+                    next[optimisticIdx] = message;
+                    return {
+                        messagesByConversation: {
+                            ...state.messagesByConversation,
+                            [conversationId]: next,
+                        },
+                    };
+                }
+            }
+
+            // Дедуп по реальному id (повторный MessageReceived).
             if (existing.some((m) => m.id === message.id)) {
                 return state;
             }
@@ -483,17 +604,30 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const next = [...state.conversations];
             next[idx] = updated;
 
+            // Если pinned-сообщения уже в буфере — обновляем их инкрементально,
+            // НЕ перересортировывая весь список (иначе сообщение "телепортируется"
+            // при unpin, потому что reactions/state поменялся и порядок поедет).
             const list = state.messagesByConversation[conversationId];
             let nextMessages = state.messagesByConversation;
-            if (list) {
-                const byId = new Map(list.map((m) => [m.id, m]));
-                pinned.forEach((p) => byId.set(p.id, p));
-                nextMessages = {
-                    ...state.messagesByConversation,
-                    [conversationId]: Array.from(byId.values()).sort(
-                        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-                    ),
-                };
+            if (list && pinned.length > 0) {
+                const pinnedById = new Map(pinned.map((p) => [p.id, p]));
+                let touched = false;
+                const merged = list.map((m) => {
+                    const fresh = pinnedById.get(m.id);
+                    if (!fresh) return m;
+                    touched = true;
+                    return fresh;
+                });
+                if (touched) {
+                    nextMessages = {
+                        ...state.messagesByConversation,
+                        [conversationId]: merged,
+                    };
+                }
+                // Pinned messages, отсутствующие в текущем буфере, мы НЕ вставляем
+                // в середину массива по createdAt — это сбивало бы pagination и
+                // мог бы вызвать дубль при lazy-load. PinnedBar показывает их
+                // независимо, поднимая полный pinned-snapshot через отдельный API.
             }
 
             return { conversations: next, messagesByConversation: nextMessages };
@@ -518,7 +652,7 @@ export const mapMessageToProps = (
         seen: dto.readAt !== null,
         attachments: dto.attachments.map((a) => ({
             name: a.fileName,
-            url: `/api/v1/media/${a.mediaAssetId}/download-url`,
+            url: `/api/media/${a.mediaAssetId}/download-url`,
         })),
     };
 };

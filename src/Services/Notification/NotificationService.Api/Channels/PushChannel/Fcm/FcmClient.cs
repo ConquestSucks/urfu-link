@@ -34,7 +34,14 @@ public sealed class FcmClient : IFcmClient, IDisposable
                     $"FCM service-account JSON not found at '{settings.ServiceAccountPath}'.");
             }
 
-            var credential = GoogleCredential.FromFile(settings.ServiceAccountPath);
+            // Service-account JSON → ServiceAccountCredential → GoogleCredential.
+            // Старый GoogleCredential.FromFile помечен [Obsolete] начиная с
+            // Google.Apis.Auth 1.71 (security advisory). CredentialFactory — новый
+            // рекомендованный путь: явный тип учётки + последующая обёртка
+            // через ToGoogleCredential() для FirebaseApp.
+            var serviceAccount = CredentialFactory.FromFile<ServiceAccountCredential>(
+                settings.ServiceAccountPath);
+            var credential = serviceAccount.ToGoogleCredential();
             _app = FirebaseApp.Create(
                 new AppOptions { Credential = credential, ProjectId = settings.ProjectId },
                 $"notification-service-{Guid.NewGuid():N}");

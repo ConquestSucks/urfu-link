@@ -17,6 +17,8 @@ export type {
   UpdatePrivacyDto,
   UpdateNotificationsDto,
   UpdateSoundVideoDto,
+  SearchUserDto,
+  SearchUsersResponse,
 } from "./users";
 
 export type {
@@ -37,6 +39,8 @@ export type {
   ReadReceiptDto,
   ThreadSubscriptionReason,
   ActiveThreadDto,
+  ParticipantRole,
+  ConversationParticipantDto,
 } from "./chat";
 
 export type {

@@ -3,6 +3,7 @@ using Asp.Versioning;
 using FluentValidation;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.BuildingBlocks.Auth;
@@ -18,6 +19,20 @@ public static class ServiceDefaultsExtensions
         IConfiguration configuration,
         string serviceName)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
+        // HTTP/1.1 для REST/SignalR и HTTP/2 (h2c) для gRPC нельзя совместить на одном
+        // cleartext-порту: ALPN-переговоры доступны только под TLS. Раскладываем:
+        //   :8080 — REST/SignalR (HTTP/1.1);
+        //   :8081 — H2C для внутреннего gRPC-трафика между сервисами.
+        // KestrelServerOptions.Listen* перекрывает ASPNETCORE_URLS из base-image,
+        // поэтому привязываем оба порта явно.
+        services.Configure<KestrelServerOptions>(options =>
+        {
+            options.ListenAnyIP(8080, listen => listen.Protocols = HttpProtocols.Http1);
+            options.ListenAnyIP(8081, listen => listen.Protocols = HttpProtocols.Http2);
+        });
+
         services.AddProblemDetails();
         services.AddOpenApi();
         services.AddApiVersioning(options =>

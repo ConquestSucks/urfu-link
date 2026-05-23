@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { View, Pressable, Text, TextInput, Keyboard, Animated, Dimensions } from "react-native";
 import {
     PaperPlaneRightIcon,
@@ -15,6 +15,9 @@ import { AttachmentsPreview } from "./AttachmentsPreview";
 import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
 import { useComposerStore } from "@/features/message-actions";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useParticipantsStore, useConversationParticipants } from "@/entities/conversation/model/participants-store";
+import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
+import { useCurrentUserId } from "@/shared/store/auth-store";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MAX_INPUT_HEIGHT = SCREEN_HEIGHT * 0.35;
@@ -30,6 +33,12 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     const { onTextChange: notifyTyping, onSend: notifyStopTyping } = useTypingIndicator(conversationId);
     const [isEmojiVisible, setIsEmojiVisible] = useState(false);
     const [inputHeight, setInputHeight] = useState(24);
+    // Курсор: позиция точки вставки в тексте. Нужен для детекта @-токена.
+    const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
+    // Программно проставляемая selection после вставки @mention. RN сбрасывает
+    // её обратно в "контролируемый" режим до следующего пользовательского ввода.
+    const [pendingSelection, setPendingSelection] = useState<{ start: number; end: number } | null>(null);
+    const inputRef = useRef<TextInput>(null);
 
     const heightAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(320)).current;
@@ -39,10 +48,51 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     const resetComposer = useComposerStore((s) => s.reset);
     const setReply = useComposerStore((s) => s.setReply);
     const editMessage = useChatStore((s) => s.editMessage);
+    const currentUserId = useCurrentUserId();
+    const participants = useConversationParticipants(conversationId);
+
+    // Токен под курсором: либо валидный mention, либо null.
+    const mentionToken = useMemo(() => findMentionAtCursor(query, selection.start), [
+        query, selection.start,
+    ]);
+
+    // Фильтр participants по подстроке displayName. Сами себя не предлагаем.
+    const mentionSuggestions = useMemo(() => {
+        if (!mentionToken) return [];
+        const q = mentionToken.query.toLowerCase();
+        return participants
+            .filter((p) => p.userId !== currentUserId)
+            .filter((p) => !q || (p.displayName || "").toLowerCase().includes(q))
+            .slice(0, 8);
+    }, [mentionToken, participants, currentUserId]);
+
+    const handleSelectMention = useCallback(
+        (item: { displayName: string }) => {
+            if (!mentionToken) return;
+            const insertion = `@${item.displayName.replace(/\s+/g, " ").trim()} `;
+            const next = query.slice(0, mentionToken.start) + insertion + query.slice(mentionToken.end);
+            const cursor = mentionToken.start + insertion.length;
+            setQuery(next);
+            setPendingSelection({ start: cursor, end: cursor });
+            // notifyTyping не дёргаем — это всё ещё ввод, useTypingIndicator
+            // получит событие на следующем onChangeText.
+        },
+        [mentionToken, query],
+    );
 
     useEffect(() => {
         if (editing) setQuery(editing.body);
     }, [editing?.id]);
+
+    // Когда query становится пустым — на вебе onContentSizeChange textarea не
+    // схлопывается обратно к высоте одной строки. Принудительно сбрасываем
+    // через requestAnimationFrame, чтобы перетереть устаревшее значение,
+    // которое onContentSizeChange выставит после onChangeText.
+    useEffect(() => {
+        if (query.length !== 0) return;
+        const raf = requestAnimationFrame(() => setInputHeight(24));
+        return () => cancelAnimationFrame(raf);
+    }, [query]);
 
     const animate = useCallback(
         (show: boolean) => {
@@ -120,6 +170,7 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
 
     return (
         <View className="border-t border-white/5 bg-app-card p-4">
+            <MentionSuggestions items={mentionSuggestions} onSelect={handleSelectMention} />
             {composerHint && (
                 <View className="flex-row items-start gap-2 mb-2 pl-2 border-l-2 border-brand-400">
                     {composerHint.icon === "edit" ? (
@@ -159,6 +210,7 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
 
                 <View className="flex-1 flex-row items-end bg-white/5 rounded-2xl px-4">
                     <TextInput
+                        ref={inputRef}
                         className="text-white flex-1 text-[15px]"
                         placeholder={editing ? "Изменение сообщения" : "Сообщение"}
                         placeholderTextColor="#8B8FA8"
@@ -166,7 +218,15 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                         onChangeText={(text) => {
                             setQuery(text);
                             if (!editing) notifyTyping(text);
-                            if (text === "") setInputHeight(24);
+                        }}
+                        selection={pendingSelection ?? undefined}
+                        onSelectionChange={(e) => {
+                            const next = e.nativeEvent.selection;
+                            setSelection(next);
+                            // Программная установка selection одноразовая — снимаем
+                            // фиксацию после первого срабатывания, иначе RN не даст
+                            // пользователю перемещать курсор.
+                            if (pendingSelection) setPendingSelection(null);
                         }}
                         onFocus={() => isEmojiVisible && animate(false)}
                         multiline

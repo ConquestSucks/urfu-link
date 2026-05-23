@@ -5,6 +5,9 @@ export interface Attachment {
     url: string;
 }
 
+/** Локальный статус для optimistic UI: undefined для серверных, остальные — клиентские. */
+export type LocalDeliveryStatus = "sending" | "sent" | "failed";
+
 export interface ChatMessageProps {
     id: string;
     text: string;
@@ -20,6 +23,8 @@ export interface ChatMessageProps {
     forwardedFrom?: ForwardedFromDto | null;
     isDeleted?: boolean;
     threadReplyCount?: number;
+    localStatus?: LocalDeliveryStatus;
     onLongPress?: () => void;
     onThreadOpen?: () => void;
+    onReactionPress?: (emoji: string) => void;
 }

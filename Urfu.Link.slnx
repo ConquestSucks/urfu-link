@@ -36,6 +36,7 @@
   </Folder>
   <Folder Name="/src/Services/User/">
     <Project Path="src/Services/User/UserService.Api/UserService.Api.csproj" />
+    <Project Path="src/Services/User/UserService.Api.Contracts/UserService.Api.Contracts.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/unit/">

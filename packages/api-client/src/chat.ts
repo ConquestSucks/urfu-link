@@ -1,20 +1,34 @@
 import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
-export type ConversationType = "Direct" | "Discipline";
+// Соответствует ChatService.Api.Domain.Enums.ConversationType (Direct=0, Group=1).
+// Бэкенд сериализует enum как строку (JsonStringEnumConverter в Program.cs).
+export type ConversationType = "Direct" | "Group";
+
+// Подтип группового чата: "Discipline" для чатов учебной дисциплины.
+// Соответствует ChatService.Api.Domain.Enums.GroupSubtype.
+export type GroupSubtype = "Discipline";
 
 export type ConversationPreview = {
   id: string;
   type: ConversationType;
   participants: string[];
-  createdAt: string;
-  lastMessageAt: string | null;
+  // Бэк отдаёт CreatedAtUtc / LastMessageAtUtc; для direct без сообщений
+  // LastMessageAtUtc заполняется временем создания.
+  createdAtUtc?: string;
+  lastMessageAtUtc?: string;
+  // Старые имена сохраняем как опциональные на случай fallback'а другого endpoint'а.
+  createdAt?: string;
+  lastMessageAt?: string | null;
   lastMessagePreview: {
     senderId: string;
     body: string;
-    sentAt: string;
+    sentAt?: string;
+    sentAtUtc?: string;
+    hasAttachments?: boolean;
   } | null;
   pinnedMessageIds?: string[];
   title?: string;
+  groupSubtype?: GroupSubtype | null;
 };
 
 export type MessageState = "Sent" | "Delivered" | "Read" | "Deleted";
@@ -78,6 +92,8 @@ export type ConversationPreviewSnippet = {
   type: ConversationType;
   title?: string;
   peerUserId?: string;
+  avatarUrl?: string;
+  senderName?: string;
 };
 
 export type SearchResultDto = {
@@ -105,6 +121,15 @@ export type ActiveThreadDto = {
   replyCount: number;
   lastActivityAtUtc: string;
   reason: ThreadSubscriptionReason;
+};
+
+export type ParticipantRole = "Owner" | "Member";
+
+export type ConversationParticipantDto = {
+  userId: string;
+  role: ParticipantRole;
+  displayName: string;
+  avatarUrl: string;
 };
 
 export type SearchFilters = {
@@ -149,6 +174,12 @@ export function createChatApi(
       return request<ConversationPreview>(`${PREFIX}/conversations/${encodeURIComponent(id)}`);
     },
 
+    getConversationParticipants(id: string): Promise<ConversationParticipantDto[]> {
+      return request<ConversationParticipantDto[]>(
+        `${PREFIX}/conversations/${encodeURIComponent(id)}/participants`,
+      );
+    },
+
     getConversationMessages(id: string, cursor?: string, limit?: number, direction?: "older" | "newer"): Promise<Paginated<MessageDto>> {
       const params = new URLSearchParams();
       if (cursor) params.append("cursor", cursor);
@@ -157,7 +188,14 @@ export function createChatApi(
       return request<Paginated<MessageDto>>(`${PREFIX}/conversations/${encodeURIComponent(id)}/messages?${params.toString()}`);
     },
 
-    searchMessages(query: string, conversationId?: string, cursor?: string, limit?: number, filters?: SearchFilters): Promise<Paginated<SearchResultDto>> {
+    searchMessages(
+      query: string,
+      conversationId?: string,
+      cursor?: string,
+      limit?: number,
+      filters?: SearchFilters,
+      signal?: AbortSignal,
+    ): Promise<Paginated<SearchResultDto>> {
       const params = new URLSearchParams();
       params.append("q", query);
       if (conversationId) params.append("conversationId", conversationId);
@@ -168,7 +206,7 @@ export function createChatApi(
       if (filters?.to) params.append("to", filters.to);
       if (typeof filters?.hasAttachments === "boolean") params.append("hasAttachments", String(filters.hasAttachments));
       if (filters?.attachmentType) params.append("attachmentType", filters.attachmentType);
-      return request<Paginated<SearchResultDto>>(`${PREFIX}/search?${params.toString()}`);
+      return request<Paginated<SearchResultDto>>(`${PREFIX}/search?${params.toString()}`, { signal });
     },
 
     editMessage(messageId: string, body: string): Promise<MessageDto> {
