@@ -117,6 +117,68 @@ describe("chat store direct draft sending", () => {
         });
     });
 
+    it("keeps a direct draft marked as draft while the first message is pending", async () => {
+        let resolveInvoke!: (value: unknown) => void;
+        let pendingClientMessageId = "";
+        const invoke = jest.fn(
+            (_method: string, payload: { clientMessageId: string }) => {
+                pendingClientMessageId = payload.clientMessageId;
+                return new Promise((resolve) => {
+                    resolveInvoke = resolve;
+                });
+            },
+        );
+
+        useChatStore.setState({
+            connection: { state: "Connected", invoke } as never,
+            isConnected: true,
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        const sendPromise = useChatStore.getState().sendMessage("direct-1", "hello");
+        await Promise.resolve();
+        await Promise.resolve();
+
+        const pendingConversation = useChatStore.getState().conversations[0];
+        expect(pendingConversation.lastMessagePreview).toEqual(
+            expect.objectContaining({ body: "hello" }),
+        );
+        expect((pendingConversation as { _localStatus?: string })._localStatus).toBe("draft");
+
+        expect(resolveInvoke).toBeDefined();
+        resolveInvoke({
+            id: "message-1",
+            conversationId: "direct-1",
+            senderId: "user-1",
+            body: "hello",
+            attachments: [],
+            state: "Sent",
+            createdAtUtc: "2026-05-24T10:00:00.000Z",
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            clientMessageId: pendingClientMessageId,
+            editedAtUtc: null,
+            replyTo: null,
+            reactionsSummary: {},
+            mentions: [],
+            forwardedFrom: null,
+        });
+        await sendPromise;
+
+        expect(
+            (useChatStore.getState().conversations[0] as { _localStatus?: string })._localStatus,
+        ).toBeUndefined();
+    });
+
     it("passes peerUserId when sending the first message to a direct draft", async () => {
         const invoke = jest.fn(async (_method: string, payload: { clientMessageId: string }) => ({
             id: "message-1",

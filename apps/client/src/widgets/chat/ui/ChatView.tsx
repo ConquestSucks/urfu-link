@@ -8,10 +8,10 @@ import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
 import {
-    isDirectDraftConversation,
     isDirectDraftId,
     restoreDirectDraftConversation,
 } from "@/entities/conversation/model/direct-draft-cache";
+import { isDirectDraftConversation } from "@/entities/conversation/model/direct-draft-status";
 import { apiClient } from "@/shared/lib/api";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
