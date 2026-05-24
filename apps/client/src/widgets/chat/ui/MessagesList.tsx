@@ -16,7 +16,16 @@ import React, {
     useRef,
     useState,
 } from "react";
-import { Animated, FlatList, StyleSheet, Text, View } from "react-native";
+import {
+    Animated,
+    FlatList,
+    Platform,
+    StyleSheet,
+    Text,
+    View,
+    type NativeScrollEvent,
+    type NativeSyntheticEvent,
+} from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
 import type { MessageDto } from "@urfu-link/api-client";
 import { useCurrentUserId } from "@/shared/store/auth-store";
@@ -41,6 +50,8 @@ const HIGHLIGHT_HOLD_MS = 1500;
 const HIGHLIGHT_FADE_OUT_MS = 520;
 const HIGHLIGHT_TOTAL_MS = HIGHLIGHT_FADE_IN_MS + HIGHLIGHT_HOLD_MS + HIGHLIGHT_FADE_OUT_MS;
 const MAX_SCROLL_LOAD_ATTEMPTS = 30;
+const SCROLL_DIRECTION_EPSILON = 8;
+const NEWER_EDGE_OFFSET = 64;
 
 const waitForListUpdate = () => new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -99,6 +110,9 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const highlightOpacity = useRef(new Animated.Value(0)).current;
         const highlightAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
         const highlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+        const suppressEndReachedAfterScrollRef = useRef(false);
+        const userDraggingAfterProgrammaticScrollRef = useRef(false);
+        const lastScrollOffsetRef = useRef<number | null>(null);
 
         const currentUserId = useCurrentUserId();
         const readContextRef = useRef({ chatId, currentUserId, markRead });
@@ -122,6 +136,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         }, []);
 
         const highlightMessage = useCallback((messageId: string) => {
+            const useNativeAnimationDriver = Platform.OS !== "web";
             highlightAnimationRef.current?.stop();
             if (highlightClearTimerRef.current) {
                 clearTimeout(highlightClearTimerRef.current);
@@ -134,13 +149,13 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 Animated.timing(highlightOpacity, {
                     toValue: 1,
                     duration: HIGHLIGHT_FADE_IN_MS,
-                    useNativeDriver: true,
+                    useNativeDriver: useNativeAnimationDriver,
                 }),
                 Animated.delay(HIGHLIGHT_HOLD_MS),
                 Animated.timing(highlightOpacity, {
                     toValue: 0,
                     duration: HIGHLIGHT_FADE_OUT_MS,
-                    useNativeDriver: true,
+                    useNativeDriver: useNativeAnimationDriver,
                 }),
             ]);
 
@@ -156,6 +171,9 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             (messageId: string, sourceMessages: MessageDto[]) => {
                 const idx = sourceMessages.findIndex((m) => m.id === messageId);
                 if (idx === -1) return false;
+                suppressEndReachedAfterScrollRef.current = true;
+                userDraggingAfterProgrammaticScrollRef.current = false;
+                lastScrollOffsetRef.current = null;
                 listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
                 highlightMessage(messageId);
                 return true;
@@ -239,6 +257,38 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const viewabilityConfig = React.useRef({ itemVisiblePercentThreshold: 50 }).current;
         const addReaction = useChatStore((s) => s.addReaction);
         const removeReaction = useChatStore((s) => s.removeReaction);
+
+        const handleScrollBeginDrag = useCallback(() => {
+            if (!suppressEndReachedAfterScrollRef.current) return;
+            userDraggingAfterProgrammaticScrollRef.current = true;
+            lastScrollOffsetRef.current = null;
+        }, []);
+
+        const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            const previousOffset = lastScrollOffsetRef.current;
+            lastScrollOffsetRef.current = offsetY;
+
+            if (
+                !suppressEndReachedAfterScrollRef.current ||
+                !userDraggingAfterProgrammaticScrollRef.current ||
+                previousOffset === null
+            ) {
+                return;
+            }
+
+            const movedTowardOlderMessages = offsetY > previousOffset + SCROLL_DIRECTION_EPSILON;
+            const returnedToNewestEdge = offsetY <= NEWER_EDGE_OFFSET;
+            if (movedTowardOlderMessages || returnedToNewestEdge) {
+                suppressEndReachedAfterScrollRef.current = false;
+                userDraggingAfterProgrammaticScrollRef.current = false;
+            }
+        }, []);
+
+        const handleEndReached = useCallback(() => {
+            if (suppressEndReachedAfterScrollRef.current) return;
+            loadMore(chatId, type);
+        }, [chatId, loadMore, type]);
 
         const renderItem = useMemo(
             () =>
@@ -385,7 +435,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     onViewableItemsChanged={handleViewableItemsChanged}
                     viewabilityConfig={viewabilityConfig}
                     renderItem={renderItem}
-                    onEndReached={() => loadMore(chatId, type)}
+                    onScroll={handleScroll}
+                    onScrollBeginDrag={handleScrollBeginDrag}
+                    scrollEventThrottle={16}
+                    onEndReached={handleEndReached}
                     onEndReachedThreshold={0.2}
                     ListHeaderComponent={() => (
                         <TypingIndicator

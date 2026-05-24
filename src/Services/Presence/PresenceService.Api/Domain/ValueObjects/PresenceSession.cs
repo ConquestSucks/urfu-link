@@ -9,4 +9,5 @@ public sealed record PresenceSession(
     PresenceStatus Status,
     string? CustomActivity,
     DateTimeOffset ConnectedAt,
-    DateTimeOffset LastHeartbeatAt);
+    DateTimeOffset LastHeartbeatAt,
+    string? ConnectionId = null);

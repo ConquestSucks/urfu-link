@@ -26,7 +26,7 @@
       "channel": "production",
       "env": {
         "APP_ENV": "prod",
-        "EXPO_PUBLIC_API_URL": "https://api.ghjc.ru"
+        "EXPO_PUBLIC_API_URL": "https://api.urfu-link.ghjc.ru"
       }
     }
   },

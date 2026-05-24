@@ -45,7 +45,10 @@ public sealed class PresenceHub(
         Context.Items[PlatformItemKey] = platform;
 
         var session = new PresenceSession(userId, deviceId, platform, PresenceStatus.Online,
-            CustomActivity: null, ConnectedAt: now, LastHeartbeatAt: now);
+            CustomActivity: null,
+            ConnectedAt: now,
+            LastHeartbeatAt: now,
+            ConnectionId: Context.ConnectionId);
         var wasFirst = await sessions.AddSessionAsync(session, ct).ConfigureAwait(false);
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupForUser(userId), ct).ConfigureAwait(false);
@@ -66,7 +69,9 @@ public sealed class PresenceHub(
             && Context.Items.TryGetValue(PlatformItemKey, out var platformObj) && platformObj is Platform platform)
         {
             var ct = CancellationToken.None;
-            var (removed, wasLast) = await sessions.RemoveSessionAsync(userId, deviceId, ct).ConfigureAwait(false);
+            var (removed, wasLast) = await sessions
+                .RemoveSessionForConnectionAsync(userId, deviceId, Context.ConnectionId, ct)
+                .ConfigureAwait(false);
 
             if (removed && wasLast)
             {

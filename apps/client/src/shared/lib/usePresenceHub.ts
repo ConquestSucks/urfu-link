@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
-import { AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus, Platform } from "react-native";
 import { usePresenceStore } from "@/entities/presence";
 import { notifyPresenceDisconnect } from "@/shared/lib/signalr";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
+const shouldDisconnectForAppState = (nextState: AppStateStatus) =>
+    Platform.OS !== "web" && (nextState === "background" || nextState === "inactive");
 
 /**
  * Подключается к PresenceHub и поддерживает heartbeat раз в 15 секунд.
@@ -77,7 +79,7 @@ export function usePresenceHub() {
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
                 connectAndStartHeartbeat();
-            } else if (nextState === "background" || nextState === "inactive") {
+            } else if (shouldDisconnectForAppState(nextState)) {
                 disconnectAndStopHeartbeat();
             }
         });

@@ -20,6 +20,18 @@ public interface IPresenceSessionStore
     /// </summary>
     Task<(bool Removed, bool WasLast)> RemoveSessionAsync(Guid userId, string deviceId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Removes a session only when the currently stored connection still belongs
+    /// to the disconnecting hub connection. This protects a quick reconnect with
+    /// the same device id from being deleted by the stale connection's
+    /// <c>OnDisconnectedAsync</c>.
+    /// </summary>
+    Task<(bool Removed, bool WasLast)> RemoveSessionForConnectionAsync(
+        Guid userId,
+        string deviceId,
+        string connectionId,
+        CancellationToken cancellationToken);
+
     Task RefreshHeartbeatAsync(Guid userId, string deviceId, DateTimeOffset utcNow, CancellationToken cancellationToken);
 
     Task UpdateSessionStatusAsync(
