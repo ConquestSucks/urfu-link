@@ -23,6 +23,9 @@ const connection = {
     onreconnected: jest.fn((handler: (...args: unknown[]) => void) => {
         handlers.reconnected = handler;
     }),
+    onclose: jest.fn((handler: (...args: unknown[]) => void) => {
+        handlers.close = handler;
+    }),
     start: jest.fn(async () => {
         connection.state = "Connected";
     }),
@@ -35,6 +38,7 @@ const connection = {
 jest.mock("@microsoft/signalr", () => ({
     HubConnectionState: {
         Connected: "Connected",
+        Connecting: "Connecting",
         Disconnected: "Disconnected",
     },
 }));
@@ -104,6 +108,45 @@ describe("presence store subscriptions", () => {
         });
 
         expect(connection.invoke).toHaveBeenCalledWith("SubscribeToUsers", [peerUserId]);
+    });
+
+    it("coalesces duplicate connect calls while the first hub start is pending", async () => {
+        let finishStart!: () => void;
+        const slowConnection = {
+            ...connection,
+            state: "Connecting",
+            on: jest.fn(),
+            onreconnecting: jest.fn(),
+            onreconnected: jest.fn(),
+            onclose: jest.fn(),
+            start: jest.fn(
+                () => new Promise<void>((resolve) => {
+                    finishStart = () => {
+                        slowConnection.state = "Connected";
+                        resolve();
+                    };
+                }),
+            ),
+            stop: jest.fn(async () => {
+                slowConnection.state = "Disconnected";
+            }),
+            invoke: jest.fn(async () => undefined),
+        };
+        (createHubConnection as jest.Mock).mockReturnValue(slowConnection);
+
+        const first = usePresenceStore.getState().connect();
+        const second = usePresenceStore.getState().connect();
+
+        expect(createHubConnection).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            finishStart();
+            await first;
+            await second;
+        });
+
+        expect(usePresenceStore.getState().connection).toBe(slowConnection);
+        expect(usePresenceStore.getState().isConnected).toBe(true);
     });
 
     it("ignores non-uuid presence ids without calling the api or hub", async () => {
@@ -207,6 +250,27 @@ describe("presence store subscriptions", () => {
 
         expect(usePresenceStore.getState().watchedUserIds).toEqual([]);
         expect(connection.invoke).toHaveBeenCalledWith("UnsubscribeFromUsers", [peerUserId]);
+    });
+
+    it("does not warn when subscribe is canceled by a closing hub connection", async () => {
+        const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        await act(async () => {
+            await usePresenceStore.getState().connect();
+        });
+        connection.invoke.mockClear();
+        connection.invoke.mockRejectedValueOnce(
+            new Error("Invocation canceled due to the underlying connection being closed."),
+        );
+
+        await act(async () => {
+            await usePresenceStore.getState().watchUserPresence(peerUserId);
+        });
+
+        expect(connection.invoke).toHaveBeenCalledWith("SubscribeToUsers", [peerUserId]);
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        warnSpy.mockRestore();
     });
 
     it("does not warn when unsubscribe is canceled by a closing hub connection", async () => {

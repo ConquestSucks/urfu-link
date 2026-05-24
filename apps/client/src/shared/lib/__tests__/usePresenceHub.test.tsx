@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react-native";
-import { AppState, type AppStateStatus } from "react-native";
+import { AppState, Platform, type AppStateStatus } from "react-native";
 
 import { notifyPresenceDisconnect } from "@/shared/lib/signalr";
 import { usePresenceHub } from "../usePresenceHub";
@@ -30,10 +30,17 @@ describe("usePresenceHub", () => {
         if (event === "beforeunload") beforeUnloadHandler = handler;
     });
     const removeWindowEventListener = jest.fn();
+    const setPlatformOS = (os: typeof Platform.OS) => {
+        Object.defineProperty(Platform, "OS", {
+            configurable: true,
+            get: () => os,
+        });
+    };
 
     beforeEach(() => {
         jest.useFakeTimers();
         jest.clearAllMocks();
+        setPlatformOS("ios");
         appStateHandler = null;
         pagehideHandler = null;
         beforeUnloadHandler = null;
@@ -69,6 +76,22 @@ describe("usePresenceHub", () => {
         });
 
         expect(mockDisconnect).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps web presence connected when the tab is merely hidden", async () => {
+        setPlatformOS("web");
+        renderHook(() => usePresenceHub());
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+        mockDisconnect.mockClear();
+
+        await act(async () => {
+            appStateHandler?.("background");
+        });
+
+        expect(mockDisconnect).not.toHaveBeenCalled();
     });
 
     it("reconnects and resumes heartbeat when the app returns to foreground", async () => {

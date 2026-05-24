@@ -96,7 +96,7 @@ builder.Services
         name: "yarp-destinations",
         factory: sp => sp.GetRequiredService<YarpDestinationsHealthCheck>(),
         failureStatus: HealthStatus.Unhealthy,
-        tags: ["ready"]));
+        tags: ["downstream"]));
 
 var app = builder.Build();
 
@@ -126,8 +126,8 @@ app.Use((context, next) =>
     return next();
 });
 
-// Defence in depth for SignalR hub routes: gateway does not validate the JWT (downstream does), but
-// it requires the access_token query parameter to be present so anonymous traffic is rejected here.
+// Defence in depth for SignalR hub routes: downstream services validate the JWT, while the gateway
+// rejects hub traffic that carries no token or edge identity assertion at all.
 app.UseMiddleware<HubAccessTokenPresenceMiddleware>();
 
 app.UseAuthentication();
@@ -158,7 +158,11 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions
 {
-    Predicate = check => check.Tags.Contains("ready"),
+    Predicate = _ => false,
+});
+app.MapHealthChecks("/health/downstreams", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("downstream"),
     ResultStatusCodes = readinessStatusCodes,
 });
 

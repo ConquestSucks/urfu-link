@@ -141,6 +141,9 @@ spec:
               path "kv/data/urfu-link/prod/chat-service" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/discipline-service" {
+                capabilities = ["create", "update", "read"]
+              }
               path "kv/data/urfu-link/prod/presence-service" {
                 capabilities = ["create", "update", "read"]
               }
@@ -200,6 +203,9 @@ spec:
               }
               path "kv/data/urfu-link/prod/user-service" {
                 capabilities = ["read", "update"]
+              }
+              path "kv/data/urfu-link/prod/chat-service" {
+                capabilities = ["create", "update", "read"]
               }
               path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]

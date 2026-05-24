@@ -23,9 +23,16 @@ public class RedisPresenceSessionStoreTests : IAsyncLifetime
     private IPresenceSessionStore Resolve() =>
         _factory.Services.GetRequiredService<IPresenceSessionStore>();
 
-    private static PresenceSession Session(Guid userId, string deviceId, Platform platform = Platform.Web)
+    private static PresenceSession Session(
+        Guid userId,
+        string deviceId,
+        Platform platform = Platform.Web,
+        string? connectionId = null)
         => new(userId, deviceId, platform, PresenceStatus.Online,
-            CustomActivity: null, ConnectedAt: DateTimeOffset.UtcNow, LastHeartbeatAt: DateTimeOffset.UtcNow);
+            CustomActivity: null,
+            ConnectedAt: DateTimeOffset.UtcNow,
+            LastHeartbeatAt: DateTimeOffset.UtcNow,
+            ConnectionId: connectionId);
 
     [Fact]
     public async Task AddSession_FirstSession_ReturnsTrue()
@@ -87,6 +94,36 @@ public class RedisPresenceSessionStoreTests : IAsyncLifetime
 
         removed.Should().BeTrue();
         wasLast.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task RemoveSessionForConnection_StaleConnection_DoesNotRemoveReplacementSession()
+    {
+        var sut = Resolve();
+        var userId = Guid.NewGuid();
+        await sut.AddSessionAsync(Session(userId, "d1", connectionId: "old-connection"), CancellationToken.None);
+        await sut.AddSessionAsync(Session(userId, "d1", connectionId: "new-connection"), CancellationToken.None);
+
+        var stale = await sut.RemoveSessionForConnectionAsync(
+            userId,
+            "d1",
+            "old-connection",
+            CancellationToken.None);
+
+        stale.Removed.Should().BeFalse();
+        stale.WasLast.Should().BeFalse();
+        var sessions = await sut.GetSessionsAsync(userId, CancellationToken.None);
+        sessions.Should().ContainSingle();
+        sessions.Single().ConnectionId.Should().Be("new-connection");
+
+        var current = await sut.RemoveSessionForConnectionAsync(
+            userId,
+            "d1",
+            "new-connection",
+            CancellationToken.None);
+
+        current.Removed.Should().BeTrue();
+        current.WasLast.Should().BeTrue();
     }
 
     [Fact]

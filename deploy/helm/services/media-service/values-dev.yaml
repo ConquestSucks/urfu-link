@@ -14,6 +14,10 @@ service:
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: http://+:8080
+  Storage__Endpoint: http://minio.urfu-platform.svc.cluster.local:9000
+  Storage__PublicEndpoint: http://storage.dev.127.0.0.1.nip.io
+  Storage__PrivateBucket: media-private
+  Storage__PublicBucket: media-public
 
 secrets:
   enabled: true

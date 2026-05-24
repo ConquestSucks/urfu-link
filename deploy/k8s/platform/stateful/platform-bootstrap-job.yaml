@@ -129,6 +129,9 @@ spec:
 
                 USER_DB_PASSWORD="$(secret_value "$GENERATED_JSON" user_db_password 2>/dev/null || true)"
                 MEDIA_DB_PASSWORD="$(secret_value "$GENERATED_JSON" media_db_password 2>/dev/null || true)"
+                DISCIPLINE_DB_PASSWORD="$(secret_value "$GENERATED_JSON" discipline_db_password 2>/dev/null || true)"
+                PRESENCE_DB_PASSWORD="$(secret_value "$GENERATED_JSON" presence_db_password 2>/dev/null || true)"
+                NOTIFICATION_DB_PASSWORD="$(secret_value "$GENERATED_JSON" notification_db_password 2>/dev/null || true)"
                 KEYCLOAK_DB_PASSWORD="$(secret_value "$GENERATED_JSON" keycloak_db_password 2>/dev/null || true)"
                 KEYCLOAK_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" keycloak_admin_password 2>/dev/null || true)"
                 API_GATEWAY_CLIENT_SECRET="$(secret_value "$GENERATED_JSON" api_gateway_client_secret 2>/dev/null || true)"
@@ -136,6 +139,9 @@ spec:
 
                 [ -n "$USER_DB_PASSWORD" ] || USER_DB_PASSWORD="$(rand 32)"
                 [ -n "$MEDIA_DB_PASSWORD" ] || MEDIA_DB_PASSWORD="$(rand 32)"
+                [ -n "$DISCIPLINE_DB_PASSWORD" ] || DISCIPLINE_DB_PASSWORD="$(rand 32)"
+                [ -n "$PRESENCE_DB_PASSWORD" ] || PRESENCE_DB_PASSWORD="$(rand 32)"
+                [ -n "$NOTIFICATION_DB_PASSWORD" ] || NOTIFICATION_DB_PASSWORD="$(rand 32)"
                 [ -n "$KEYCLOAK_DB_PASSWORD" ] || KEYCLOAK_DB_PASSWORD="$(rand 32)"
                 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ] || KEYCLOAK_ADMIN_PASSWORD="$(rand 32)"
                 [ -n "$API_GATEWAY_CLIENT_SECRET" ] || API_GATEWAY_CLIENT_SECRET="$(rand 40)"
@@ -144,9 +150,12 @@ spec:
                 GRAFANA_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" grafana_admin_password 2>/dev/null || true)"
                 [ -n "$GRAFANA_ADMIN_PASSWORD" ] || GRAFANA_ADMIN_PASSWORD="$(rand 32)"
 
-                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
+                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","discipline_db_password":"%s","presence_db_password":"%s","notification_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
                   "$(b64 "$USER_DB_PASSWORD")" \
                   "$(b64 "$MEDIA_DB_PASSWORD")" \
+                  "$(b64 "$DISCIPLINE_DB_PASSWORD")" \
+                  "$(b64 "$PRESENCE_DB_PASSWORD")" \
+                  "$(b64 "$NOTIFICATION_DB_PASSWORD")" \
                   "$(b64 "$KEYCLOAK_DB_PASSWORD")" \
                   "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
                   "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
@@ -156,9 +165,12 @@ spec:
                 if [ "$GENERATED_EXISTS" = "true" ]; then
                   patch_secret_json platform-bootstrap-generated "$GENERATED_PATCH"
                 else
-                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
+                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","discipline_db_password":"%s","presence_db_password":"%s","notification_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
                     "$(b64 "$USER_DB_PASSWORD")" \
                     "$(b64 "$MEDIA_DB_PASSWORD")" \
+                    "$(b64 "$DISCIPLINE_DB_PASSWORD")" \
+                    "$(b64 "$PRESENCE_DB_PASSWORD")" \
+                    "$(b64 "$NOTIFICATION_DB_PASSWORD")" \
                     "$(b64 "$KEYCLOAK_DB_PASSWORD")" \
                     "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
                     "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
@@ -235,6 +247,9 @@ spec:
 
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'user') THEN CREATE ROLE \"user\" LOGIN PASSWORD '$USER_DB_PASSWORD'; ELSE ALTER ROLE \"user\" WITH LOGIN PASSWORD '$USER_DB_PASSWORD'; END IF; END \$\$;"
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'media') THEN CREATE ROLE \"media\" LOGIN PASSWORD '$MEDIA_DB_PASSWORD'; ELSE ALTER ROLE \"media\" WITH LOGIN PASSWORD '$MEDIA_DB_PASSWORD'; END IF; END \$\$;"
+                pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'discipline') THEN CREATE ROLE discipline LOGIN PASSWORD '$DISCIPLINE_DB_PASSWORD'; ELSE ALTER ROLE discipline WITH LOGIN PASSWORD '$DISCIPLINE_DB_PASSWORD'; END IF; END \$\$;"
+                pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'presence') THEN CREATE ROLE presence LOGIN PASSWORD '$PRESENCE_DB_PASSWORD'; ELSE ALTER ROLE presence WITH LOGIN PASSWORD '$PRESENCE_DB_PASSWORD'; END IF; END \$\$;"
+                pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'notification') THEN CREATE ROLE notification LOGIN PASSWORD '$NOTIFICATION_DB_PASSWORD'; ELSE ALTER ROLE notification WITH LOGIN PASSWORD '$NOTIFICATION_DB_PASSWORD'; END IF; END \$\$;"
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'keycloak') THEN CREATE ROLE keycloak LOGIN PASSWORD '$KEYCLOAK_DB_PASSWORD'; ELSE ALTER ROLE keycloak WITH LOGIN PASSWORD '$KEYCLOAK_DB_PASSWORD'; END IF; END \$\$;"
                 pg_exec "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pomerium') THEN CREATE ROLE pomerium LOGIN PASSWORD '$POMERIUM_DB_PASSWORD'; ELSE ALTER ROLE pomerium WITH LOGIN PASSWORD '$POMERIUM_DB_PASSWORD'; END IF; END \$\$;"
 
@@ -252,6 +267,30 @@ spec:
                   -d postgres \
                   -c "SELECT 1 FROM pg_database WHERE datname = 'media_db'" | grep -q 1; then
                   pg_exec "CREATE DATABASE media_db OWNER \"media\""
+                fi
+
+                if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -At \
+                  -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
+                  -U "$POSTGRES_USER" \
+                  -d postgres \
+                  -c "SELECT 1 FROM pg_database WHERE datname = 'discipline_db'" | grep -q 1; then
+                  pg_exec "CREATE DATABASE discipline_db OWNER discipline"
+                fi
+
+                if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -At \
+                  -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
+                  -U "$POSTGRES_USER" \
+                  -d postgres \
+                  -c "SELECT 1 FROM pg_database WHERE datname = 'presence_db'" | grep -q 1; then
+                  pg_exec "CREATE DATABASE presence_db OWNER presence"
+                fi
+
+                if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -At \
+                  -h urfu-postgres-rw.urfu-platform.svc.cluster.local \
+                  -U "$POSTGRES_USER" \
+                  -d postgres \
+                  -c "SELECT 1 FROM pg_database WHERE datname = 'notification_db'" | grep -q 1; then
+                  pg_exec "CREATE DATABASE notification_db OWNER notification"
                 fi
 
                 if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -At \
@@ -329,9 +368,10 @@ spec:
                 USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s"}}' "$USER_DB_PASSWORD")"
               fi
               MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
+              DISCIPLINE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=discipline_db;Username=discipline;Password=%s"}}' "$DISCIPLINE_DB_PASSWORD")"
               CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
-              PRESENCE_PAYLOAD='{"data":{"primary_connection":"urfu-redis.urfu-platform.svc.cluster.local:6379"}}'
-              NOTIFICATION_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
+              PRESENCE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s"}}' "$PRESENCE_DB_PASSWORD")"
+              NOTIFICATION_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s","kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}' "$NOTIFICATION_DB_PASSWORD")"
               CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
               GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
               KAFKA_PAYLOAD='{"data":{"bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
@@ -345,6 +385,7 @@ spec:
               vault_put urfu-link/prod/pomerium-db "$POMERIUM_DB_PAYLOAD"
               vault_put urfu-link/prod/user-service "$USER_PAYLOAD"
               vault_put urfu-link/prod/media-service "$MEDIA_PAYLOAD"
+              vault_put urfu-link/prod/discipline-service "$DISCIPLINE_PAYLOAD"
               vault_put urfu-link/prod/chat-service "$CHAT_PAYLOAD"
               vault_put urfu-link/prod/presence-service "$PRESENCE_PAYLOAD"
               vault_put urfu-link/prod/notification-service "$NOTIFICATION_PAYLOAD"

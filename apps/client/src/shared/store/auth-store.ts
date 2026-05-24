@@ -8,6 +8,7 @@ type AuthState = {
     expiresAt: number | null; // Unix ms
     userId: string | null;
     setTokens: (accessToken: string, refreshToken: string, expiresAt: number) => void;
+    setUserId: (userId: string | null) => void;
     clearTokens: () => void;
     isTokenValid: () => boolean;
 };
@@ -45,6 +46,7 @@ export const useAuthStore = create<AuthState>()(
                     expiresAt,
                     userId: extractUserId(accessToken),
                 }),
+            setUserId: (userId) => set({ userId }),
             clearTokens: () =>
                 set({
                     accessToken: null,

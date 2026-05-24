@@ -3,7 +3,7 @@ fullnameOverride: api-gateway
 image:
   repository: ghcr.io/conquestsucks/urfu-link/api-gateway
   pullPolicy: IfNotPresent
-  tag: sha-e8011a9
+  tag: sha-6ab3489
 
 imagePullSecrets:
   - name: ghcr-pull-secret
@@ -40,6 +40,7 @@ serviceMonitor:
 networkPolicy:
   allowedIngressNamespaces:
     - urfu-platform
+    - ingress-nginx
 
 resources:
   requests:

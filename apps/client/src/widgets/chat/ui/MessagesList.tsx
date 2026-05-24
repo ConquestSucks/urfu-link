@@ -16,7 +16,16 @@ import React, {
     useRef,
     useState,
 } from "react";
-import { Animated, FlatList, StyleSheet, Text, View } from "react-native";
+import {
+    Animated,
+    FlatList,
+    Platform,
+    StyleSheet,
+    Text,
+    View,
+    type NativeScrollEvent,
+    type NativeSyntheticEvent,
+} from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
 import type { MessageDto } from "@urfu-link/api-client";
 import { useCurrentUserId } from "@/shared/store/auth-store";
@@ -41,10 +50,61 @@ const HIGHLIGHT_HOLD_MS = 1500;
 const HIGHLIGHT_FADE_OUT_MS = 520;
 const HIGHLIGHT_TOTAL_MS = HIGHLIGHT_FADE_IN_MS + HIGHLIGHT_HOLD_MS + HIGHLIGHT_FADE_OUT_MS;
 const MAX_SCROLL_LOAD_ATTEMPTS = 30;
+const SCROLL_DIRECTION_EPSILON = 8;
+const NEWER_EDGE_OFFSET = 64;
+
+type MessageListMessageItem = {
+    type: "message";
+    id: string;
+    message: MessageDto;
+};
+
+type MessageListDateItem = {
+    type: "date";
+    id: string;
+    dayKey: string;
+    createdAt: string;
+};
+
+type MessageListItem = MessageListMessageItem | MessageListDateItem;
+
+const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] => {
+    const items: MessageListItem[] = [];
+
+    messages.forEach((message, index) => {
+        items.push({
+            type: "message",
+            id: message.id,
+            message,
+        });
+
+        const currentDay = getMessageDayKey(message.createdAt);
+        const nextDay = getMessageDayKey(messages[index + 1]?.createdAt);
+        if (currentDay === "" || currentDay === nextDay) return;
+
+        items.push({
+            type: "date",
+            id: `date-${currentDay}-${index}`,
+            dayKey: currentDay,
+            createdAt: message.createdAt,
+        });
+    });
+
+    return items;
+};
+
+const getMessageListItemKey = (item: MessageListItem) => item.id;
 
 const waitForListUpdate = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 const styles = StyleSheet.create({
+    dateSeparator: {
+        marginTop: 24,
+        marginBottom: 4,
+    },
+    firstDateSeparator: {
+        marginTop: 0,
+    },
     highlightOutline: {
         position: "absolute",
         top: 0,
@@ -66,6 +126,9 @@ const styles = StyleSheet.create({
         borderRadius: 999,
         backgroundColor: "#51A2FF",
         pointerEvents: "none",
+    },
+    messageAfterMessage: {
+        marginTop: 24,
     },
 });
 
@@ -94,12 +157,15 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const isLoading = messagesLoadingByConversation[chatId] || false;
         const isLoaded = messagesLoadedByConversation[chatId] || false;
         const hasMore = hasMoreByConversation[chatId] || false;
-        const listRef = useRef<FlatList<MessageDto>>(null);
+        const listItems = useMemo(() => buildMessageListItems(messages), [messages]);
+        const listRef = useRef<FlatList<MessageListItem>>(null);
         const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-        const [visibleDateLabel, setVisibleDateLabel] = useState("");
         const highlightOpacity = useRef(new Animated.Value(0)).current;
         const highlightAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
         const highlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+        const suppressEndReachedAfterScrollRef = useRef(false);
+        const userDraggingAfterProgrammaticScrollRef = useRef(false);
+        const lastScrollOffsetRef = useRef<number | null>(null);
 
         const currentUserId = useCurrentUserId();
         const readContextRef = useRef({ chatId, currentUserId, markRead });
@@ -114,10 +180,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         }, [chatId, type, skipInitialLoad, loadMessages]);
 
         useEffect(() => {
-            setVisibleDateLabel(messages[0] ? formatMessageDateLabel(messages[0].createdAt) : "");
-        }, [messages]);
-
-        useEffect(() => {
             return () => {
                 highlightAnimationRef.current?.stop();
                 if (highlightClearTimerRef.current) {
@@ -127,6 +189,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         }, []);
 
         const highlightMessage = useCallback((messageId: string) => {
+            const useNativeAnimationDriver = Platform.OS !== "web";
             highlightAnimationRef.current?.stop();
             if (highlightClearTimerRef.current) {
                 clearTimeout(highlightClearTimerRef.current);
@@ -139,13 +202,13 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 Animated.timing(highlightOpacity, {
                     toValue: 1,
                     duration: HIGHLIGHT_FADE_IN_MS,
-                    useNativeDriver: true,
+                    useNativeDriver: useNativeAnimationDriver,
                 }),
                 Animated.delay(HIGHLIGHT_HOLD_MS),
                 Animated.timing(highlightOpacity, {
                     toValue: 0,
                     duration: HIGHLIGHT_FADE_OUT_MS,
-                    useNativeDriver: true,
+                    useNativeDriver: useNativeAnimationDriver,
                 }),
             ]);
 
@@ -159,8 +222,13 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         const scrollLoadedMessageIntoView = useCallback(
             (messageId: string, sourceMessages: MessageDto[]) => {
-                const idx = sourceMessages.findIndex((m) => m.id === messageId);
+                const idx = buildMessageListItems(sourceMessages).findIndex(
+                    (item) => item.type === "message" && item.message.id === messageId,
+                );
                 if (idx === -1) return false;
+                suppressEndReachedAfterScrollRef.current = true;
+                userDraggingAfterProgrammaticScrollRef.current = false;
+                lastScrollOffsetRef.current = null;
                 listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
                 highlightMessage(messageId);
                 return true;
@@ -220,18 +288,8 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             ({
                 viewableItems,
             }: {
-                viewableItems: Array<{ item: MessageDto; index: number | null }>;
+                viewableItems: Array<{ item: MessageListItem; index: number | null }>;
             }) => {
-                const topVisible = viewableItems.reduce<
-                    { item: MessageDto; index: number | null } | null
-                >((current, next) => {
-                    if (!current) return next;
-                    return (next.index ?? -1) > (current.index ?? -1) ? next : current;
-                }, null);
-                if (topVisible?.item.createdAt) {
-                    setVisibleDateLabel(formatMessageDateLabel(topVisible.item.createdAt));
-                }
-
                 const {
                     chatId: activeChatId,
                     currentUserId: activeCurrentUserId,
@@ -240,13 +298,16 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 if (!activeCurrentUserId) return;
 
                 const unreadItems = viewableItems.filter(
-                    (v) => v.item.senderId !== activeCurrentUserId && v.item.readAt === null,
+                    (v): v is { item: MessageListMessageItem; index: number | null } =>
+                        v.item.type === "message" &&
+                        v.item.message.senderId !== activeCurrentUserId &&
+                        v.item.message.readAt === null,
                 );
                 if (unreadItems.length > 0) {
                     const newestUnread = unreadItems.reduce((prev, curr) =>
                         (curr.index ?? 0) < (prev.index ?? 0) ? curr : prev,
                     );
-                    activeMarkRead(activeChatId, newestUnread.item.id);
+                    activeMarkRead(activeChatId, newestUnread.item.message.id);
                 }
             },
         ).current;
@@ -255,28 +316,72 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const addReaction = useChatStore((s) => s.addReaction);
         const removeReaction = useChatStore((s) => s.removeReaction);
 
+        const handleScrollBeginDrag = useCallback(() => {
+            if (!suppressEndReachedAfterScrollRef.current) return;
+            userDraggingAfterProgrammaticScrollRef.current = true;
+            lastScrollOffsetRef.current = null;
+        }, []);
+
+        const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            const offsetY = event.nativeEvent.contentOffset.y;
+            const previousOffset = lastScrollOffsetRef.current;
+            lastScrollOffsetRef.current = offsetY;
+
+            if (
+                !suppressEndReachedAfterScrollRef.current ||
+                !userDraggingAfterProgrammaticScrollRef.current ||
+                previousOffset === null
+            ) {
+                return;
+            }
+
+            const movedTowardOlderMessages = offsetY > previousOffset + SCROLL_DIRECTION_EPSILON;
+            const returnedToNewestEdge = offsetY <= NEWER_EDGE_OFFSET;
+            if (movedTowardOlderMessages || returnedToNewestEdge) {
+                suppressEndReachedAfterScrollRef.current = false;
+                userDraggingAfterProgrammaticScrollRef.current = false;
+            }
+        }, []);
+
+        const handleEndReached = useCallback(() => {
+            if (suppressEndReachedAfterScrollRef.current) return;
+            loadMore(chatId, type);
+        }, [chatId, loadMore, type]);
+
         const renderItem = useMemo(
             () =>
-                ({ item, index }: { item: MessageDto; index: number }) => {
-                    const view = mapMessageToProps(item, currentUserId);
-                    const localStatus = (item as LocalMessageDto)._localStatus;
+                ({ item, index }: { item: MessageListItem; index: number }) => {
+                    if (item.type === "date") {
+                        const isFirstVisualItem = index === listItems.length - 1;
+
+                        return (
+                            <View
+                                testID={`message-date-separator-${item.dayKey}`}
+                                className="items-center py-1"
+                                style={[
+                                    styles.dateSeparator,
+                                    isFirstVisualItem ? styles.firstDateSeparator : null,
+                                ]}
+                            >
+                                <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
+                                    <Text className="text-[12px] font-semibold text-text-subtle">
+                                        {formatMessageDateLabel(item.createdAt)}
+                                    </Text>
+                                </View>
+                            </View>
+                        );
+                    }
+
+                    const message = item.message;
+                    const view = mapMessageToProps(message, currentUserId);
+                    const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
-                    const next = messages[index + 1];
-                    const currentDay = getMessageDayKey(item.createdAt);
-                    const nextDay = getMessageDayKey(next?.createdAt);
-                    const showDateSeparator = currentDay !== "" && currentDay !== nextDay;
+                    const itemAbove = listItems[index + 1];
+                    const messageSpacing =
+                        itemAbove?.type === "message" ? styles.messageAfterMessage : null;
 
                     return (
-                        <View>
-                            {showDateSeparator && (
-                                <View className="items-center py-1">
-                                    <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
-                                        <Text className="text-[12px] font-semibold text-text-subtle">
-                                            {formatMessageDateLabel(item.createdAt)}
-                                        </Text>
-                                    </View>
-                                </View>
-                            )}
+                        <View style={messageSpacing}>
                             <View
                                 testID={`message-row-${view.id}`}
                                 className="-mx-2 rounded-2xl px-2 py-1 overflow-hidden"
@@ -307,38 +412,40 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     avatarUrl={view.avatarUrl}
                                     showAvatar={shouldShowAvatars}
                                     attachments={view.attachments}
-                                    replyTo={item.replyTo ?? null}
-                                    reactions={item.reactions}
-                                    editedAtUtc={item.editedAtUtc}
-                                    forwardedFrom={item.forwardedFrom ?? null}
-                                    isDeleted={item.state === "Deleted"}
+                                    replyTo={message.replyTo ?? null}
+                                    reactions={message.reactions}
+                                    editedAtUtc={message.editedAtUtc}
+                                    forwardedFrom={message.forwardedFrom ?? null}
+                                    isDeleted={message.state === "Deleted"}
                                     isHighlighted={isHighlighted}
-                                    threadReplyCount={item.threadReplyCount ?? 0}
+                                    threadReplyCount={message.threadReplyCount ?? 0}
                                     localStatus={localStatus}
-                                    onLongPress={() => onMessageLongPress?.(item)}
-                                    onContextMenu={(anchor) => onMessageContextMenu?.(item, anchor)}
+                                    onLongPress={() => onMessageLongPress?.(message)}
+                                    onContextMenu={(anchor) =>
+                                        onMessageContextMenu?.(message, anchor)
+                                    }
                                     onReplyPress={
-                                        item.replyTo?.messageId
+                                        message.replyTo?.messageId
                                             ? () => {
-                                                  void scrollToMessage(item.replyTo!.messageId);
+                                                  void scrollToMessage(message.replyTo!.messageId);
                                               }
                                             : undefined
                                     }
                                     onReactionPress={
                                         currentUserId
                                             ? (emoji) => {
-                                                  const reacters = item.reactions?.[emoji] ?? [];
+                                                  const reacters = message.reactions?.[emoji] ?? [];
                                                   if (reacters.includes(currentUserId)) {
-                                                      removeReaction(item.id, emoji);
+                                                      removeReaction(message.id, emoji);
                                                   } else {
-                                                      addReaction(item.id, emoji);
+                                                      addReaction(message.id, emoji);
                                                   }
                                               }
                                             : undefined
                                     }
                                     onThreadOpen={
-                                        item.threadReplyCount && item.threadReplyCount > 0
-                                            ? () => onThreadOpen?.(item.id)
+                                        message.threadReplyCount && message.threadReplyCount > 0
+                                            ? () => onThreadOpen?.(message.id)
                                             : undefined
                                     }
                                 />
@@ -349,7 +456,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             [
                 currentUserId,
                 highlightedMessageId,
-                messages,
+                listItems,
                 shouldShowAvatars,
                 onMessageLongPress,
                 onMessageContextMenu,
@@ -391,16 +498,18 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     ref={listRef}
                     className="flex-1 px-6 py-6"
                     inverted={true}
-                    data={messages}
-                    keyExtractor={(item) => item.id}
+                    data={listItems}
+                    keyExtractor={getMessageListItemKey}
                     contentContainerStyle={{
-                        gap: 24,
                         flexGrow: 1,
                     }}
                     onViewableItemsChanged={handleViewableItemsChanged}
                     viewabilityConfig={viewabilityConfig}
                     renderItem={renderItem}
-                    onEndReached={() => loadMore(chatId, type)}
+                    onScroll={handleScroll}
+                    onScrollBeginDrag={handleScrollBeginDrag}
+                    scrollEventThrottle={16}
+                    onEndReached={handleEndReached}
                     onEndReachedThreshold={0.2}
                     ListHeaderComponent={() => (
                         <TypingIndicator
@@ -429,18 +538,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         ) : null
                     }
                 />
-                {visibleDateLabel ? (
-                    <View
-                        className="absolute top-3 left-0 right-0 items-center"
-                        style={{ pointerEvents: "none" }}
-                    >
-                        <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
-                            <Text className="text-[12px] font-semibold text-text-subtle">
-                                {visibleDateLabel}
-                            </Text>
-                        </View>
-                    </View>
-                ) : null}
             </View>
         );
     },

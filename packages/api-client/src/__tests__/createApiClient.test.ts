@@ -19,13 +19,20 @@ function mockFetchWith(responseInit: Partial<Response>) {
 
 describe("createApiClient", () => {
   let originalLocation: Location;
+  let assignLocation: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     originalLocation = window.location;
+    assignLocation = vi.fn((url: string | URL) => {
+      window.location.href = url.toString();
+    });
     Object.defineProperty(window, "location", {
       configurable: true,
       writable: true,
-      value: { href: "https://urfu-link.ghjc.ru/chats?view=messages" },
+      value: {
+        href: "https://urfu-link.ghjc.ru/chats?view=messages",
+        assign: assignLocation,
+      },
     });
   });
 
@@ -57,7 +64,7 @@ describe("createApiClient", () => {
   });
 
   describe("handleUnauthorized — opaqueredirect (Pomerium → Keycloak redirect)", () => {
-    it("redirects to /.pomerium/sign_in on opaqueredirect response", async () => {
+    it("reloads the current route on opaqueredirect response", async () => {
       mockFetchWith({ type: "opaqueredirect", status: 0, ok: false });
 
       const client = createApiClient({ baseUrl: "" });
@@ -67,12 +74,10 @@ describe("createApiClient", () => {
         // expected: response.ok is false → throws
       }
 
-      expect(window.location.href).toBe(
-        "/.pomerium/sign_in?pomerium_redirect_uri=https%3A%2F%2Furfu-link.ghjc.ru%2Fchats%3Fview%3Dmessages"
-      );
+      expect(assignLocation).toHaveBeenCalledWith("https://urfu-link.ghjc.ru/chats?view=messages");
     });
 
-    it("redirects to /.pomerium/sign_in on 401 without X-Session-Revoked", async () => {
+    it("reloads the current route on 401 without X-Session-Revoked", async () => {
       mockFetchWith({ status: 401, ok: false });
 
       const client = createApiClient({ baseUrl: "" });
@@ -82,9 +87,7 @@ describe("createApiClient", () => {
         // expected
       }
 
-      expect(window.location.href).toBe(
-        "/.pomerium/sign_in?pomerium_redirect_uri=https%3A%2F%2Furfu-link.ghjc.ru%2Fchats%3Fview%3Dmessages"
-      );
+      expect(assignLocation).toHaveBeenCalledWith("https://urfu-link.ghjc.ru/chats?view=messages");
     });
 
     it("redirects to /.pomerium/sign_out on 401 with X-Session-Revoked: true", async () => {

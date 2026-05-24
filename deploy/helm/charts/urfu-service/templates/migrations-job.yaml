@@ -30,7 +30,8 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "urfu-service.serviceAccountName" . }}
+      serviceAccountName: {{ include "urfu-service.migrationsServiceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.migrations.serviceAccount.automountServiceAccountToken }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:

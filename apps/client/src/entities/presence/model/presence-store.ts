@@ -49,6 +49,12 @@ const isConnectionClosingError = (error: unknown) =>
     error instanceof Error &&
     error.message.toLowerCase().includes("underlying connection being closed");
 
+const warnUnlessConnectionClosingError = (message: string, error: unknown) => {
+    if (!isConnectionClosingError(error)) {
+        console.warn(message, error);
+    }
+};
+
 const formatGuid = (hex: string) =>
     `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`.toLowerCase();
 
@@ -76,6 +82,9 @@ const normalizePlatforms = (platforms: Array<Platform | number | string>): Platf
     platforms
         .map(normalizePlatform)
         .filter((platform): platform is Platform => platform !== null);
+
+const isActiveConnection = (connection: HubConnection | null) =>
+    connection !== null && connection.state !== HubConnectionState.Disconnected;
 
 export const toPresenceTypingConversationId = (conversationId: string) => {
     if (GUID_RE.test(conversationId)) {
@@ -106,17 +115,23 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     connect: async () => {
         const { connection, isConnected } = get();
-        if (isConnected || connection?.state === HubConnectionState.Connected) {
+        if (isConnected || isActiveConnection(connection)) {
             return;
         }
 
         const newConnection = createHubConnection("/hubs/presence");
         const subscribeWatchedUsers = async () => {
             const watched = get().watchedUserIds.filter(isUuid);
-            if (watched.length === 0) return;
+            if (
+                watched.length === 0 ||
+                newConnection.state !== HubConnectionState.Connected ||
+                get().connection !== newConnection
+            ) {
+                return;
+            }
 
-            await newConnection.invoke("SubscribeToUsers", watched).catch((e) =>
-                console.warn("Presence subscribe failed", e),
+            await newConnection.invoke("SubscribeToUsers", watched).catch((error) =>
+                warnUnlessConnectionClosingError("Presence subscribe failed", error),
             );
         };
 
@@ -177,22 +192,48 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         );
 
         newConnection.onreconnecting((err) => {
+            if (get().connection !== newConnection) {
+                return;
+            }
+
             console.warn("PresenceHub reconnecting", err);
             set({ isConnected: false });
         });
 
         newConnection.onreconnected(() => {
+            if (get().connection !== newConnection) {
+                return;
+            }
+
             set({ isConnected: true });
             void subscribeWatchedUsers();
         });
 
+        newConnection.onclose((err) => {
+            if (get().connection !== newConnection) {
+                return;
+            }
+
+            if (err) {
+                console.warn("PresenceHub closed", err);
+            }
+            set({ connection: null, isConnected: false });
+        });
+
         try {
+            set({ connection: newConnection, isConnected: false });
             await newConnection.start();
+            if (get().connection !== newConnection) {
+                await newConnection.stop().catch(() => undefined);
+                return;
+            }
             set({ connection: newConnection, isConnected: true });
             await subscribeWatchedUsers();
         } catch (e) {
             console.error("Failed to connect to PresenceHub", e);
-            set({ isConnected: false });
+            if (get().connection === newConnection) {
+                set({ connection: null, isConnected: false });
+            }
         }
     },
 
@@ -222,7 +263,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         const { connection } = get();
         if (shouldSubscribe && connection?.state === HubConnectionState.Connected) {
             await connection.invoke("SubscribeToUsers", [userId]).catch((error) =>
-                console.warn("Presence subscribe failed", error),
+                warnUnlessConnectionClosingError("Presence subscribe failed", error),
             );
         }
     },
@@ -249,11 +290,9 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
         const { connection } = get();
         if (shouldUnsubscribe && connection?.state === HubConnectionState.Connected) {
-            connection.invoke("UnsubscribeFromUsers", [userId]).catch((error) => {
-                if (!isConnectionClosingError(error)) {
-                    console.warn("Presence unsubscribe failed", error);
-                }
-            });
+            connection.invoke("UnsubscribeFromUsers", [userId]).catch((error) =>
+                warnUnlessConnectionClosingError("Presence unsubscribe failed", error),
+            );
         }
     },
 
@@ -302,7 +341,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         const { connection } = get();
         if (connection?.state === HubConnectionState.Connected) {
             connection.invoke("Heartbeat").catch((e) =>
-                console.warn("Heartbeat failed", e)
+                warnUnlessConnectionClosingError("Heartbeat failed", e)
             );
         }
     },
@@ -311,7 +350,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         const { connection } = get();
         if (connection?.state === HubConnectionState.Connected) {
             connection.invoke("StartTyping", conversationId).catch((e) =>
-                console.warn("StartTyping failed", e)
+                warnUnlessConnectionClosingError("StartTyping failed", e)
             );
         }
     },
@@ -320,7 +359,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         const { connection } = get();
         if (connection?.state === HubConnectionState.Connected) {
             connection.invoke("StopTyping", conversationId).catch((e) =>
-                console.warn("StopTyping failed", e)
+                warnUnlessConnectionClosingError("StopTyping failed", e)
             );
         }
     },

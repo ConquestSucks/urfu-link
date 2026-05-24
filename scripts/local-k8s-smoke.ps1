@@ -13,6 +13,7 @@ $services = @(
     "user-service",
     "media-service",
     "chat-service",
+    "discipline-service",
     "presence-service",
     "notification-service",
     "call-service",

@@ -1,4 +1,5 @@
 using FastEndpoints;
+using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
@@ -19,7 +20,18 @@ public sealed class GetConversationEndpoint(GetConversationQuery query)
     {
         var caller = User.GetUserId();
         var id = Route<string>("id")!;
-        var dto = await query.ExecuteAsync(id, caller, ct).ConfigureAwait(false);
-        await Send.OkAsync(dto, ct).ConfigureAwait(false);
+        try
+        {
+            var dto = await query.ExecuteAsync(id, caller, ct).ConfigureAwait(false);
+            await Send.OkAsync(dto, ct).ConfigureAwait(false);
+        }
+        catch (ConversationNotFoundException)
+        {
+            await Send.NotFoundAsync(ct).ConfigureAwait(false);
+        }
+        catch (ChatAccessDeniedException)
+        {
+            await Send.ForbiddenAsync(ct).ConfigureAwait(false);
+        }
     }
 }
