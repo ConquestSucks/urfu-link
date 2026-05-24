@@ -49,7 +49,7 @@ public class PinningTests : IAsyncLifetime
     [Fact]
     public async Task PinMessage_AtCap_ThrowsLimit()
     {
-        var (sender, _, conv, _) = await SeedSentMessageAsync();
+        var (sender, peer, conv, _) = await SeedSentMessageAsync();
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var convRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
@@ -60,7 +60,7 @@ public class PinningTests : IAsyncLifetime
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var sixthMsg = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "sixth", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "sixth", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
             default);
 
         var pin = scope.ServiceProvider.GetRequiredService<PinMessageService>();
@@ -130,7 +130,7 @@ public class PinningTests : IAsyncLifetime
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var dto = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "to pin", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "to pin", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
             default);
 
         var msg = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()

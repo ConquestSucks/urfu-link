@@ -1,5 +1,7 @@
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ChatService.IntegrationTests.Infrastructure;
 
@@ -21,6 +23,8 @@ public static class TestChatHubClient
                 opts.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
                 opts.Transports = HttpTransportType.LongPolling;
             })
+            .AddJsonProtocol(options =>
+                options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
             .Build();
 
         await connection.StartAsync();

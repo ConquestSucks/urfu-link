@@ -41,6 +41,7 @@ public class ChatHubIdempotencyTests : IAsyncLifetime
             Body = "hi",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = clientMessageId,
+            PeerUserId = bob,
         });
         var second = await aliceConn.InvokeAsync<MessageDto>("SendMessage", new
         {

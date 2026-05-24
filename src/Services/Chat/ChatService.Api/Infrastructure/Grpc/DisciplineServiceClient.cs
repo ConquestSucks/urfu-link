@@ -10,7 +10,9 @@ namespace Urfu.Link.Services.Chat.Infrastructure.Grpc;
 /// generated <see cref="DisciplineGrpc.InternalApi.InternalApiClient"/> so domain code stays
 /// free of protobuf types.
 /// </summary>
-internal sealed class DisciplineServiceClient(DisciplineGrpc.InternalApi.InternalApiClient grpcClient)
+internal sealed class DisciplineServiceClient(
+    DisciplineGrpc.InternalApi.InternalApiClient grpcClient,
+    IGrpcBearerTokenProvider tokenProvider)
     : IDisciplineServiceClient
 {
     public async Task<IReadOnlyList<UserDisciplineSnapshot>> ListUserDisciplinesAsync(
@@ -22,8 +24,9 @@ internal sealed class DisciplineServiceClient(DisciplineGrpc.InternalApi.Interna
             UserId = userId.ToString("D", CultureInfo.InvariantCulture),
         };
 
+        var headers = await tokenProvider.GetAuthorizationMetadataAsync(cancellationToken).ConfigureAwait(false);
         var reply = await grpcClient
-            .ListUserDisciplinesAsync(request, cancellationToken: cancellationToken)
+            .ListUserDisciplinesAsync(request, headers, cancellationToken: cancellationToken)
             .ResponseAsync
             .ConfigureAwait(false);
 
@@ -45,8 +48,9 @@ internal sealed class DisciplineServiceClient(DisciplineGrpc.InternalApi.Interna
             DisciplineId = disciplineId.ToString("D", CultureInfo.InvariantCulture),
         };
 
+        var headers = await tokenProvider.GetAuthorizationMetadataAsync(cancellationToken).ConfigureAwait(false);
         var reply = await grpcClient
-            .ListMembersAsync(request, cancellationToken: cancellationToken)
+            .ListMembersAsync(request, headers, cancellationToken: cancellationToken)
             .ResponseAsync
             .ConfigureAwait(false);
 

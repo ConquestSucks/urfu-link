@@ -5,7 +5,9 @@ using Urfu.Link.Services.Chat.Domain.Enums;
 
 namespace Urfu.Link.Services.Chat.Infrastructure.Grpc;
 
-internal sealed class MediaServiceClient(InternalApi.InternalApiClient grpcClient) : IMediaServiceClient
+internal sealed class MediaServiceClient(
+    InternalApi.InternalApiClient grpcClient,
+    IGrpcBearerTokenProvider tokenProvider) : IMediaServiceClient
 {
     public async Task<IReadOnlyList<MediaAssetMetadata>> BatchGetMetadataAsync(
         IReadOnlyList<Guid> assetIds,
@@ -20,7 +22,11 @@ internal sealed class MediaServiceClient(InternalApi.InternalApiClient grpcClien
         var request = new BatchGetMetadataRequest();
         request.AssetIds.AddRange(assetIds.Select(a => a.ToString("D", CultureInfo.InvariantCulture)));
 
-        var reply = await grpcClient.BatchGetMetadataAsync(request, cancellationToken: cancellationToken);
+        var headers = await tokenProvider.GetAuthorizationMetadataAsync(cancellationToken).ConfigureAwait(false);
+        var reply = await grpcClient.BatchGetMetadataAsync(
+            request,
+            headers,
+            cancellationToken: cancellationToken);
 
         return reply.Items
             .Select(item => new MediaAssetMetadata(
@@ -56,6 +62,10 @@ internal sealed class MediaServiceClient(InternalApi.InternalApiClient grpcClien
         };
         request.UserIds.AddRange(userIds.Select(u => u.ToString("D", CultureInfo.InvariantCulture)));
 
-        await grpcClient.GrantAssetAccessAsync(request, cancellationToken: cancellationToken);
+        var headers = await tokenProvider.GetAuthorizationMetadataAsync(cancellationToken).ConfigureAwait(false);
+        await grpcClient.GrantAssetAccessAsync(
+            request,
+            headers,
+            cancellationToken: cancellationToken);
     }
 }

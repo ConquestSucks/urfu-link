@@ -46,6 +46,7 @@ public class ChatHubThreadsTests : IAsyncLifetime
             Body = "root",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         var reply = await bobConn.InvokeAsync<MessageDto>("ReplyInThread", new

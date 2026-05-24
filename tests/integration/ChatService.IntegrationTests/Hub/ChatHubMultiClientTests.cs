@@ -39,6 +39,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
             Body = "hi bob",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         var received = await bobReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -66,6 +67,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
             Body = "hi",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await bobConn.InvokeAsync<Guid?>("MarkRead", conv.Id, msg.Id);
@@ -97,6 +99,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
             Body = "hi",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await bobConn.InvokeAsync<IReadOnlyList<Guid>>("MarkDelivered", conv.Id, new[] { msg.Id });
@@ -108,7 +111,7 @@ public class ChatHubMultiClientTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task OpenDirectConversation_PushesConversationUpdatedToBothParticipants()
+    public async Task FirstMessage_PushesConversationUpdatedToBothParticipants()
     {
         var alice = Guid.NewGuid();
         var bob = Guid.NewGuid();
@@ -122,10 +125,19 @@ public class ChatHubMultiClientTests : IAsyncLifetime
         bobConn.On<ConversationDto>("ConversationUpdated", c => bobUpdated.TrySetResult(c));
 
         var conv = await aliceConn.InvokeAsync<ConversationDto>("OpenDirectConversation", bob);
+        await aliceConn.InvokeAsync<MessageDto>("SendMessage", new
+        {
+            ConversationId = conv.Id,
+            Body = "hi",
+            AttachmentAssetIds = Array.Empty<Guid>(),
+            ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
+        });
 
         var aliceFromHub = await aliceUpdated.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var bobFromHub = await bobUpdated.Task.WaitAsync(TimeSpan.FromSeconds(5));
         aliceFromHub.Id.Should().Be(conv.Id);
         bobFromHub.Id.Should().Be(conv.Id);
+        bobFromHub.LastMessagePreview!.Body.Should().Be("hi");
     }
 }

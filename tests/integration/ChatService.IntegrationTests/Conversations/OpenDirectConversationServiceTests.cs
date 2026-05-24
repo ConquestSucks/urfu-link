@@ -2,7 +2,6 @@ using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.Services.Chat.Application.Conversations;
-using Urfu.Link.Services.Chat.Domain.Events;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 
 namespace ChatService.IntegrationTests.Conversations;
@@ -22,7 +21,7 @@ public class OpenDirectConversationServiceTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task OpenAsync_PersistsConversationAndPublishesCreatedEvent()
+    public async Task OpenAsync_ReturnsDraftWithoutPersistingOrPublishing()
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
@@ -33,21 +32,16 @@ public class OpenDirectConversationServiceTests : IAsyncLifetime
         var conversation = await service.OpenAsync(userA, userB, default);
 
         conversation.Participants.Should().BeEquivalentTo(new[] { userA, userB });
+        conversation.LastMessagePreview.Should().BeNull();
 
         var loaded = await scope.ServiceProvider.GetRequiredService<IConversationRepository>()
             .GetByIdAsync(conversation.Id, default);
-        loaded.Should().NotBeNull();
-
-        var published = _factory.OutboxWriter.Published
-            .Select(p => p.Payload)
-            .OfType<ChatConversationCreatedEvent>()
-            .Where(e => e.ConversationId == conversation.Id)
-            .ToList();
-        published.Should().ContainSingle();
+        loaded.Should().BeNull();
+        _factory.OutboxWriter.Published.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task OpenAsync_RepeatedCalls_AreIdempotent_AndDoNotDoublePublish()
+    public async Task OpenAsync_RepeatedCalls_ReturnSameDraftId_WithoutPublishing()
     {
         var userA = Guid.NewGuid();
         var userB = Guid.NewGuid();
@@ -59,11 +53,6 @@ public class OpenDirectConversationServiceTests : IAsyncLifetime
         var second = await service.OpenAsync(userB, userA, default);
 
         second.Id.Should().Be(first.Id);
-
-        var published = _factory.OutboxWriter.Published
-            .OfType<ChatService.IntegrationTests.Infrastructure.PublishedEvent>()
-            .Where(p => p.Payload is ChatConversationCreatedEvent ev && ev.ConversationId == first.Id)
-            .ToList();
-        published.Should().HaveCount(1);
+        _factory.OutboxWriter.Published.Should().BeEmpty();
     }
 }

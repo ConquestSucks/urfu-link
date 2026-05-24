@@ -37,10 +37,12 @@ public class ForwardMessagesServiceTests : IAsyncLifetime
         var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
         var source = await open.OpenAsync(caller, sourcePeer, default);
         var target = await open.OpenAsync(caller, targetPeer, default);
+        var convRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        await convRepo.TryCreateAsync(target, default);
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var sourceDto = await send.SendAsync(
-            new SendMessageRequest(source.Id, sourcePeer, "to forward", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(source.Id, sourcePeer, "to forward", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: caller),
             default);
         _factory.OutboxWriter.Clear();
 
@@ -83,7 +85,7 @@ public class ForwardMessagesServiceTests : IAsyncLifetime
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var sourceDto = await send.SendAsync(
-            new SendMessageRequest(source.Id, caller, "secret source", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(source.Id, caller, "secret source", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: sourcePeer),
             default);
 
         var forward = scope.ServiceProvider.GetRequiredService<ForwardMessagesService>();
@@ -107,13 +109,15 @@ public class ForwardMessagesServiceTests : IAsyncLifetime
         var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
         var source = await open.OpenAsync(caller, sourcePeer, default);
         var target = await open.OpenAsync(caller, targetPeer, default);
+        var convRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        await convRepo.TryCreateAsync(target, default);
 
         var assetId = Guid.NewGuid();
         _factory.MediaServiceClient.RegisterAsset(assetId, ownerId: caller);
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var sourceDto = await send.SendAsync(
-            new SendMessageRequest(source.Id, caller, "see attached", new[] { assetId }, $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(source.Id, caller, "see attached", new[] { assetId }, $"c-{Guid.NewGuid():N}", PeerUserId: sourcePeer),
             default);
 
         // The send already grants access to sourcePeer; the forward should also grant access
@@ -140,10 +144,12 @@ public class ForwardMessagesServiceTests : IAsyncLifetime
         var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
         var foreignConv = await open.OpenAsync(stranger, foreignPeer, default);
         var target = await open.OpenAsync(caller, targetPeer, default);
+        var convRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        await convRepo.TryCreateAsync(target, default);
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var foreignMsg = await send.SendAsync(
-            new SendMessageRequest(foreignConv.Id, stranger, "private", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(foreignConv.Id, stranger, "private", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: foreignPeer),
             default);
 
         var forward = scope.ServiceProvider.GetRequiredService<ForwardMessagesService>();

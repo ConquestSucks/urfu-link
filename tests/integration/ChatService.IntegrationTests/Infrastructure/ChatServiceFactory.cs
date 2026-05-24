@@ -1,6 +1,8 @@
+using DotNet.Testcontainers.Images;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -30,10 +32,12 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
 {
     private readonly MongoDbContainer _mongo = new MongoDbBuilder()
         .WithImage("mongo:8.0.5")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7.4.2-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     public FakeOutboxWriter OutboxWriter { get; } = new();
@@ -126,6 +130,11 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
             // Drop all background workers (Kafka consumer, outbox publisher, MongoIndexInitializer
             // — indexes are created up-front in InitializeAsync).
             services.RemoveAll<IHostedService>();
+
+            // A single in-process TestServer does not need the production Redis SignalR
+            // backplane. Keep real Redis for app state, but use in-memory hub fan-out.
+            services.RemoveAll<HubLifetimeManager<ChatHub>>();
+            services.AddSingleton<HubLifetimeManager<ChatHub>, DefaultHubLifetimeManager<ChatHub>>();
 
             IdempotencyStore.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(ValueTask.FromResult(true));

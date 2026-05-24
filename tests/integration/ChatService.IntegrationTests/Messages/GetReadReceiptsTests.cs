@@ -79,7 +79,7 @@ public class GetReadReceiptsTests : IAsyncLifetime
         for (var i = 0; i < 3; i++)
         {
             var dto = await send.SendAsync(
-                new SendMessageRequest(conv.Id, sender, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(conv.Id, sender, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
                 default);
             ids.Add(dto.Id);
         }
@@ -108,7 +108,7 @@ public class GetReadReceiptsTests : IAsyncLifetime
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var dto = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "to read", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "to read", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
             default);
 
         var msg = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()

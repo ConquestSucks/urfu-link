@@ -43,8 +43,8 @@ public sealed class SendMessageService(
 
         ValidatePayloadShape(request);
 
-        var conversation = await conversations.GetByIdAsync(request.ConversationId, cancellationToken).ConfigureAwait(false)
-            ?? throw ConversationNotFoundException.For(request.ConversationId);
+        var (conversation, shouldCreateConversation) = await ResolveConversationAsync(request, cancellationToken)
+            .ConfigureAwait(false);
 
         if (!conversation.IsParticipant(request.SenderId) && !request.CallerIsAdmin)
         {
@@ -73,6 +73,14 @@ public sealed class SendMessageService(
                 // The conversation lastMessage update may have failed in the prior attempt — replay
                 // it now so the conversation projection eventually catches up. Idempotent at the
                 // Mongo write level (Set $set with the same payload).
+                if (shouldCreateConversation)
+                {
+                    conversation = await EnsureConversationCreatedAsync(
+                        conversation,
+                        prior.CreatedAtUtc,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
                 await ReprojectLastMessageAsync(conversation, prior, cancellationToken).ConfigureAwait(false);
                 return MessageDto.FromDomain(prior);
             }
@@ -114,14 +122,29 @@ public sealed class SendMessageService(
             var prior = await messages.FindByClientMessageIdAsync(request.SenderId, request.ClientMessageId, cancellationToken).ConfigureAwait(false);
             if (prior is not null)
             {
+                if (shouldCreateConversation)
+                {
+                    conversation = await EnsureConversationCreatedAsync(
+                        conversation,
+                        prior.CreatedAtUtc,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
                 await ReprojectLastMessageAsync(conversation, prior, cancellationToken).ConfigureAwait(false);
                 return MessageDto.FromDomain(prior);
             }
             throw;
         }
 
-        var preview = new MessagePreview(request.SenderId, request.Body, now, message.HasAttachments);
+        if (shouldCreateConversation)
+        {
+            conversation = await EnsureConversationCreatedAsync(conversation, now, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var preview = BuildMessagePreview(message);
         await conversations.UpdateLastMessageAsync(conversation.Id, preview, now, cancellationToken).ConfigureAwait(false);
+        conversation.RegisterMessage(preview, now);
 
         await GrantAttachmentAccessAsync(attachments, conversation, request.SenderId, cancellationToken).ConfigureAwait(false);
 
@@ -151,6 +174,10 @@ public sealed class SendMessageService(
         }
 
         var dto = MessageDto.FromDomain(message);
+        await broadcaster.NotifyConversationUpdatedAsync(
+            conversation.Participants,
+            ConversationDto.FromDomain(conversation).WithLastMessageMetadata(message),
+            cancellationToken).ConfigureAwait(false);
         await broadcaster.NotifyMessageReceivedAsync(recipients, dto, cancellationToken).ConfigureAwait(false);
 
         // Auto-clear the sender's typing indicator on PresenceService — sending a message
@@ -161,6 +188,54 @@ public sealed class SendMessageService(
             .ConfigureAwait(false);
 
         return dto;
+    }
+
+    private async Task<(Conversation Conversation, bool ShouldCreateConversation)> ResolveConversationAsync(
+        SendMessageRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existing = await conversations.GetByIdAsync(request.ConversationId, cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return (existing, false);
+        }
+
+        if (request.PeerUserId is not { } peerUserId)
+        {
+            throw ConversationNotFoundException.For(request.ConversationId);
+        }
+
+        var draft = Conversation.OpenDirect(request.SenderId, peerUserId, clock.GetUtcNow());
+        if (!string.Equals(draft.Id, request.ConversationId, StringComparison.Ordinal))
+        {
+            throw ConversationNotFoundException.For(request.ConversationId);
+        }
+
+        return (draft, true);
+    }
+
+    private async Task<Conversation> EnsureConversationCreatedAsync(
+        Conversation conversation,
+        DateTimeOffset occurredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var created = await conversations.TryCreateAsync(conversation, cancellationToken).ConfigureAwait(false);
+        if (!created)
+        {
+            return await conversations.GetByIdAsync(conversation.Id, cancellationToken).ConfigureAwait(false)
+                ?? throw ConversationNotFoundException.For(conversation.Id);
+        }
+
+        await dispatcher.PublishAsync(
+            new ChatConversationCreatedEvent(
+                conversation.Id,
+                conversation.Type,
+                conversation.Participants,
+                occurredAtUtc),
+            cancellationToken).ConfigureAwait(false);
+
+        return conversation;
     }
 
     private static void ValidatePayloadShape(SendMessageRequest request)
@@ -275,10 +350,17 @@ public sealed class SendMessageService(
             return;
         }
 
-        var preview = new MessagePreview(message.SenderId, message.Body, message.CreatedAtUtc, message.HasAttachments);
+        var preview = BuildMessagePreview(message);
         await conversations.UpdateLastMessageAsync(conversation.Id, preview, message.CreatedAtUtc, cancellationToken)
             .ConfigureAwait(false);
     }
+
+    private static MessagePreview BuildMessagePreview(Message message) => new(
+        message.SenderId,
+        message.Body,
+        message.CreatedAtUtc,
+        message.HasAttachments,
+        message.Attachments.Select(a => a.FileName).ToList());
 
     private static string BuildPreviewText(string body, bool hasAttachments)
     {

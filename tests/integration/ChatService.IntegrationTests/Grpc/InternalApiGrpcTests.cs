@@ -3,6 +3,7 @@ using FluentAssertions;
 using global::Grpc.Net.Client;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.Services.Chat.Application.Conversations;
+using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Grpc;
 
 namespace ChatService.IntegrationTests.Grpc;
@@ -52,12 +53,7 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
     {
         var alice = Guid.NewGuid();
         var bob = Guid.NewGuid();
-        string convId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            convId = (await open.OpenAsync(alice, bob, default)).Id;
-        }
+        var convId = await SeedDirectConversationAsync(alice, bob);
 
         var client = new InternalApi.InternalApiClient(_channel);
         var reply = await client.GetConversationParticipantsAsync(
@@ -71,12 +67,7 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
     {
         var alice = Guid.NewGuid();
         var bob = Guid.NewGuid();
-        string convId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            convId = (await open.OpenAsync(alice, bob, default)).Id;
-        }
+        var convId = await SeedDirectConversationAsync(alice, bob);
 
         var client = new InternalApi.InternalApiClient(_channel);
 
@@ -129,12 +120,7 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
     {
         var alice = Guid.NewGuid();
         var bob = Guid.NewGuid();
-        string convId;
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            convId = (await open.OpenAsync(alice, bob, default)).Id;
-        }
+        var convId = await SeedDirectConversationAsync(alice, bob);
 
         var client = new InternalApi.InternalApiClient(_channel);
         var reply = await client.GetConversationAsync(new GetConversationRequest { ConversationId = convId });
@@ -142,5 +128,23 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
         reply.Exists.Should().BeTrue();
         reply.Type.Should().Be(ConversationKind.Direct);
         reply.Participants.Should().BeEquivalentTo(new[] { alice.ToString("D"), bob.ToString("D") });
+    }
+
+    private async Task<string> SeedDirectConversationAsync(Guid caller, Guid peer)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+        var draft = await open.OpenAsync(caller, peer, default);
+        var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
+        await send.SendAsync(
+            new SendMessageRequest(
+                draft.Id,
+                caller,
+                "seed",
+                Array.Empty<Guid>(),
+                $"grpc-{Guid.NewGuid():N}",
+                PeerUserId: peer),
+            default);
+        return draft.Id;
     }
 }

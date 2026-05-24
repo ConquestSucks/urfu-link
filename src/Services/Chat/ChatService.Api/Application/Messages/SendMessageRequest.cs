@@ -7,4 +7,5 @@ public sealed record SendMessageRequest(
     IReadOnlyList<Guid> AttachmentAssetIds,
     string ClientMessageId,
     Guid? ReplyToMessageId = null,
-    bool CallerIsAdmin = false);
+    bool CallerIsAdmin = false,
+    Guid? PeerUserId = null);

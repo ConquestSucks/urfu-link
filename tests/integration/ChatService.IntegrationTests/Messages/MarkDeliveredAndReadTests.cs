@@ -2,7 +2,6 @@ using ChatService.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using Urfu.Link.Services.Chat.Application;
-using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
@@ -138,8 +137,9 @@ public class MarkDeliveredAndReadTests : IAsyncLifetime
         var sender = Guid.NewGuid();
         var recipient = Guid.NewGuid();
         await using var scope = _factory.Services.CreateAsyncScope();
-        var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-        var conv = await open.OpenAsync(sender, recipient, default);
+        var conv = Conversation.OpenDirect(sender, recipient, DateTimeOffset.UtcNow);
+        var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        await repo.TryCreateAsync(conv, default);
         return (sender, recipient, conv);
     }
 }

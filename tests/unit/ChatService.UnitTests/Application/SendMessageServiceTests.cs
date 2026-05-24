@@ -179,6 +179,71 @@ public class SendMessageServiceTests
     }
 
     [Fact]
+    public async Task SendAsync_FirstDirectMessage_CreatesConversationAndBroadcastsPreview()
+    {
+        var draft = Conversation.OpenDirect(Sender, Peer, DateTimeOffset.UtcNow.AddMinutes(-1));
+        _conversations.GetByIdAsync(draft.Id, Arg.Any<CancellationToken>()).Returns((Conversation?)null);
+        _conversations.TryCreateAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(true);
+        _idempotency.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(ValueTask.FromResult(true));
+        _media.BatchGetMetadataAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Array.Empty<MediaAssetMetadata>());
+
+        var dto = await Build().SendAsync(
+            new SendMessageRequest(
+                draft.Id,
+                Sender,
+                "hello",
+                Array.Empty<Guid>(),
+                "c-first",
+                PeerUserId: Peer),
+            default);
+
+        dto.Body.Should().Be("hello");
+
+        await _conversations.Received(1).TryCreateAsync(
+            Arg.Is<Conversation>(c => c.Id == draft.Id
+                && c.Participants.Contains(Sender)
+                && c.Participants.Contains(Peer)),
+            Arg.Any<CancellationToken>());
+        await _conversations.Received(1).UpdateLastMessageAsync(
+            draft.Id,
+            Arg.Is<MessagePreview>(p => p.SenderId == Sender && p.Body == "hello"),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+        await _broadcaster.Received(1).NotifyConversationUpdatedAsync(
+            Arg.Is<IReadOnlyList<Guid>>(ids => ids.Contains(Sender) && ids.Contains(Peer)),
+            Arg.Is<Urfu.Link.Services.Chat.Application.Contracts.ConversationDto>(
+                c => c.Id == draft.Id && c.LastMessagePreview!.Body == "hello"),
+            Arg.Any<CancellationToken>());
+
+        _outbox.Captured.OfType<ChatConversationCreatedEvent>()
+            .Should().ContainSingle()
+            .Which.ConversationId.Should().Be(draft.Id);
+    }
+
+    [Fact]
+    public async Task SendAsync_MissingDirectConversationWithMismatchedPeer_ThrowsNotFoundWithoutCreating()
+    {
+        _conversations.GetByIdAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((Conversation?)null);
+
+        var act = () => Build().SendAsync(
+            new SendMessageRequest(
+                "not-the-direct-id",
+                Sender,
+                "x",
+                Array.Empty<Guid>(),
+                "c1",
+                PeerUserId: Peer),
+            default);
+
+        await act.Should().ThrowAsync<ConversationNotFoundException>();
+        await _conversations.DidNotReceive().TryCreateAsync(
+            Arg.Any<Conversation>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task SendAsync_HappyPath_PersistsAndPublishesSentEvent()
     {
         var conv = SeedConversation();
@@ -298,6 +363,12 @@ public class SendMessageServiceTests
             Arg.Is<IReadOnlyList<Guid>>(u => u.Count == 1 && u[0] == Peer),
             conv.Id,
             Sender,
+            Arg.Any<CancellationToken>());
+        await _conversations.Received(1).UpdateLastMessageAsync(
+            conv.Id,
+            Arg.Is<MessagePreview>(p => p.HasAttachments
+                && p.AttachmentFileNames.SequenceEqual(new[] { "photo.png" })),
+            Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
     }
 

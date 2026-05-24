@@ -17,7 +17,7 @@ public sealed class OpenDirectConversationEndpoint(OpenDirectConversationService
     {
         Post("conversations/direct");
         Group<ChatGroup>();
-        Summary(s => s.Summary = "Idempotently open a direct conversation with another user.");
+        Summary(s => s.Summary = "Return an existing direct conversation or an unsaved draft for composing.");
     }
 
     public override async Task HandleAsync(OpenDirectConversationRequest req, CancellationToken ct)

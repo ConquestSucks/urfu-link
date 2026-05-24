@@ -40,6 +40,11 @@ public static class ModuleRegistration
             KafkaTopicNames.ChatEvents,
             "chat.message.sent.v1"));
 
+        services.AddOptions<InternalGrpcAuthOptions>()
+            .Bind(configuration.GetSection(InternalGrpcAuthOptions.SectionName));
+        services.AddHttpClient(KeycloakClientCredentialsGrpcBearerTokenProvider.HttpClientName);
+        services.AddSingleton<IGrpcBearerTokenProvider, KeycloakClientCredentialsGrpcBearerTokenProvider>();
+
         services.AddOptions<ChatMongoOptions>()
             .Bind(configuration.GetSection(ChatMongoOptions.SectionName))
             .PostConfigure(opts =>
@@ -221,6 +226,7 @@ public static class ModuleRegistration
         services.AddScoped<UnpinMessageService>();
         services.AddScoped<GetUserConversationsQuery>();
         services.AddScoped<GetConversationQuery>();
+        services.AddScoped<GetPinnedMessagesQuery>();
         services.AddScoped<GetConversationParticipantsQuery>();
         services.AddScoped<GetConversationMessagesQuery>();
         services.AddScoped<GetReadReceiptsQuery>();
