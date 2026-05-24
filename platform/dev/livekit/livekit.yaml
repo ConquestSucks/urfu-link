@@ -1,8 +1,8 @@
 port: 7880
 rtc:
   tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50100
+  port_range_start: 60100
+  port_range_end: 60150
 keys:
   devkey: devsecret0123456789abcdef0123456789
 log_level: info

@@ -67,41 +67,26 @@ export type UpdateSoundVideoDto = {
   webcamDeviceId?: string | null;
 };
 
-type AuthHeaders = () => Record<string, string>;
-type HandleUnauthorized = (response: Response) => void;
+export type SearchUserDto = {
+  id: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+};
+
+export type SearchUsersResponse = {
+  items: SearchUserDto[];
+  hasMore: boolean;
+};
+
+import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
 export function createUsersApi(
   baseUrl: string,
   authHeaders: AuthHeaders,
   handleUnauthorized: HandleUnauthorized
 ) {
-  async function request<T>(
-    path: string,
-    init?: RequestInit
-  ): Promise<T> {
-    const response = await fetch(`${baseUrl}${path}`, {
-      ...init,
-      headers: {
-        ...(init?.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
-        ...authHeaders(),
-        ...init?.headers,
-      },
-      credentials: "same-origin",
-      redirect: "manual",
-    });
-
-    handleUnauthorized(response);
-
-    if (!response.ok) {
-      throw new Error(`${response.status} ${response.statusText}`);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return response.json() as Promise<T>;
-  }
+  const request = createRequest(baseUrl, authHeaders, handleUnauthorized);
 
   return {
     getMe(): Promise<UserProfile> {
@@ -162,6 +147,22 @@ export function createUsersApi(
 
     terminateAllDevices(): Promise<void> {
       return request<void>("/api/users/me/devices", { method: "DELETE" });
+    },
+
+    searchUsers(
+      query: string,
+      offset = 0,
+      limit = 20,
+      signal?: AbortSignal,
+    ): Promise<SearchUsersResponse> {
+      const params = new URLSearchParams();
+      params.append("q", query);
+      if (offset > 0) params.append("offset", String(offset));
+      if (limit !== 20) params.append("limit", String(limit));
+      return request<SearchUsersResponse>(
+        `/api/users/search?${params.toString()}`,
+        { signal },
+      );
     },
   };
 }

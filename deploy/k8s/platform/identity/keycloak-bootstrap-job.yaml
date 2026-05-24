@@ -145,6 +145,28 @@ spec:
                 fi
               }
 
+              ensure_realm_role() {
+                local ROLE_NAME="$1"
+                local DESCRIPTION="${2:-}"
+
+                echo "Ensuring realm role '${ROLE_NAME}' exists..."
+                ROLE_STATUS="$(curl --silent --output /dev/null --write-out "%{http_code}" \
+                  -H "Authorization: Bearer ${KC_TOKEN}" \
+                  "${KEYCLOAK_URL}/admin/realms/urfu-link/roles/${ROLE_NAME}")"
+                if [ "$ROLE_STATUS" = "404" ]; then
+                  curl --fail --silent --show-error \
+                    -X POST \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/roles" \
+                    -d "$(jq -n --arg name "$ROLE_NAME" --arg description "$DESCRIPTION" \
+                      '{name: $name, description: $description}')" >/dev/null
+                  echo "Realm role '${ROLE_NAME}' created."
+                else
+                  echo "Realm role '${ROLE_NAME}' already exists."
+                fi
+              }
+
               # ensure_client <clientId> <redirectUrisJson> <webOriginsJson> [isPublic] [displayName] [baseUrl] [serviceAccountsEnabled]
               # Sets CLIENT_SECRET and CLIENT_UUID as output
               ensure_client() {
@@ -305,6 +327,8 @@ spec:
               wait_for_keycloak
               get_admin_token
               ensure_realm
+              ensure_realm_role "service:discipline-read" \
+                "Allows internal gRPC reads on DisciplineService.InternalApi."
 
               # --- Linkerd Viz ---
               ensure_client "linkerd-viz" '["https://linkerd.ghjc.ru/oauth2/callback"]' '["https://linkerd.ghjc.ru"]' "false" "Linkerd Dashboard" "https://linkerd.ghjc.ru"
@@ -354,6 +378,27 @@ spec:
                 "${KEYCLOAK_URL}/admin/realms/urfu-link/users/${SA_USER_ID}/role-mappings/clients/${RM_CLIENT_ID}" \
                 -d "[${VIEW_USERS_ROLE}]"
               echo "Granted view-users to user-service-admin service account"
+
+              # --- Chat Service Internal (machine-to-machine, internal gRPC) ---
+              ensure_client "chat-service-internal" '[]' '[]' "false" "Chat Service Internal" "" "true"
+              CHAT_SERVICE_INTERNAL_SECRET="$CLIENT_SECRET"
+              CHAT_SERVICE_INTERNAL_UUID="$CLIENT_UUID"
+              ensure_audience_mapper "$CHAT_SERVICE_INTERNAL_UUID" "urfu-link-api"
+              ensure_groups_mapper "$CHAT_SERVICE_INTERNAL_UUID"
+
+              CHAT_SA_ID="$(curl --silent --fail \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CHAT_SERVICE_INTERNAL_UUID}/service-account-user" | jq -r '.id')"
+              DISCIPLINE_READ_ROLE="$(curl --silent --fail \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/roles/service:discipline-read")"
+              curl --fail --silent --show-error \
+                -X POST \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                -H "Content-Type: application/json" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/users/${CHAT_SA_ID}/role-mappings/realm" \
+                -d "[${DISCIPLINE_READ_ROLE}]" >/dev/null
+              echo "Granted service:discipline-read to chat-service-internal service account"
 
               # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*","http://app.dev.127.0.0.1.nip.io/*"]' '["https://urfu-link.ghjc.ru","http://app.dev.127.0.0.1.nip.io"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
@@ -441,6 +486,15 @@ spec:
               vault_put urfu-link/prod/user-service \
                 "$(printf '{"data":{"primary_connection":"%s","keycloak_client_secret":"%s"}}' \
                   "$USER_SVC_CONN" "$USER_SERVICE_ADMIN_SECRET")"
+
+              # Merge chat-service-internal client secret into chat-service Vault path,
+              # preserving the primary_connection written by platform-bootstrap-job.
+              echo "Merging chat-service-internal secret into chat-service Vault path..."
+              EXISTING_CHAT_SVC="$(vault_read urfu-link/prod/chat-service || true)"
+              CHAT_SVC_CONN="$(echo "$EXISTING_CHAT_SVC" | jq -r '.data.data.primary_connection // empty' 2>/dev/null || true)"
+              vault_put urfu-link/prod/chat-service \
+                "$(printf '{"data":{"primary_connection":"%s","internal_auth_client_secret":"%s"}}' \
+                  "$CHAT_SVC_CONN" "$CHAT_SERVICE_INTERNAL_SECRET")"
 
               # --- Update Vault OIDC config with real client secret ---
               echo "Updating Vault OIDC auth config..."

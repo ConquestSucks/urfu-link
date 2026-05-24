@@ -1,0 +1,7 @@
+Скоро дедлайн: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

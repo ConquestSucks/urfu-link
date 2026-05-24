@@ -21,14 +21,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\..\..\BuildingBlocks\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\SessionRevocation\SessionRevocation.csproj" />
+    <ProjectReference Include="..\UserService.Api.Contracts\UserService.Api.Contracts.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

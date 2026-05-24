@@ -24,7 +24,7 @@ export const Menu = forwardRef<MenuRef, MenuProps>(({ model }, ref) => {
     }));
     return (<Modal visible={isVisible} transparent={true} animationType="fade" onRequestClose={() => setIsVisible(false)}>
       <Pressable className="flex-1 cursor-default" onPress={() => setIsVisible(false)}>
-        <Pressable className="absolute top-16 right-[33px] bg-app-panel rounded-2xl overflow-hidden border border-white/10 py-2" onPress={(e) => e.stopPropagation()}>
+        <Pressable className="absolute top-16 right-[33px] cursor-default bg-app-panel rounded-2xl overflow-hidden border border-white/10 py-2" onPress={(e) => e.stopPropagation()}>
           {model.map((item, index) => {
             if (item.separator) {
                 return (<View key={index} className="h-[1px] bg-white/5 my-1 mx-2"/>);

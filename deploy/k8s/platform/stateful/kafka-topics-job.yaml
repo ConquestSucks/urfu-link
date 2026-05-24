@@ -28,4 +28,5 @@ spec:
               /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.notification.events.v1 --partitions 3 --replication-factor 1 &&
               /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.call.events.v1 --partitions 3 --replication-factor 1 &&
               /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.presence.events.v1 --partitions 3 --replication-factor 1 &&
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server urfu-kafka.urfu-platform.svc.cluster.local:9092 --create --if-not-exists --topic urfu.system.events.v1 --partitions 3 --replication-factor 1 &&
               echo "All topics created successfully."

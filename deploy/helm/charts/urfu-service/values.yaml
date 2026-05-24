@@ -38,6 +38,9 @@ securityContext:
 service:
   type: ClusterIP
   port: 8080
+  grpc:
+    enabled: false
+    port: 8081
 
 revisionHistoryLimit: 3
 
@@ -95,6 +98,15 @@ probes:
   readinessPath: /health/ready
   startupPath: /health/live
   startupEnabled: true
+
+# EF Core migrations applied via Helm pre-install/pre-upgrade Job.
+# Disabled by default; opt-in for services that own a relational schema.
+migrations:
+  enabled: false
+  command: []
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 600
+  resources: {}
 
 nodeSelector: {}
 

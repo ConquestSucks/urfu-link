@@ -1,7 +1,7 @@
 import { AnimatedView } from "@/shared/lib/nativewind-interop";
 import { router, usePathname } from "expo-router";
 import React, { useEffect } from "react";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
 import { MOBILE_TABS } from "../config/tabs";
@@ -63,7 +63,12 @@ export const MobileBottomTabs = () => {
     }));
 
     return (
-        <AnimatedView style={containerStyle} pointerEvents={hideTabs ? "none" : "auto"}>
+        <AnimatedView
+            style={[
+                containerStyle,
+                hideTabs ? styles.pointerEventsNone : styles.pointerEventsAuto,
+            ]}
+        >
             <AnimatedView style={rowStyle}>
                 <View
                     className="flex-row bg-app-bg border-t border-effects-white05 pb-[2px]"
@@ -75,3 +80,12 @@ export const MobileBottomTabs = () => {
         </AnimatedView>
     );
 };
+
+const styles = StyleSheet.create({
+    pointerEventsAuto: {
+        pointerEvents: "auto",
+    },
+    pointerEventsNone: {
+        pointerEvents: "none",
+    },
+});

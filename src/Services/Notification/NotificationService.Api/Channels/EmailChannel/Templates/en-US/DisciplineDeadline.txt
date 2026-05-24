@@ -1,0 +1,7 @@
+Deadline approaching: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

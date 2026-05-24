@@ -10,6 +10,10 @@ imagePullSecrets:
 
 replicaCount: 1
 
+service:
+  grpc:
+    enabled: true
+
 env:
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_URLS: http://+:8080
@@ -22,6 +26,8 @@ env:
   Auth__NameClaim: email
   Auth__RoleClaim: groups
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
+  UserService__GrpcEndpoint: http://user-service:8081
+  PresenceService__GrpcEndpoint: http://presence-service:8081
 
 secrets:
   enabled: true
@@ -44,3 +50,10 @@ resources:
   limits:
     cpu: 250m
     memory: 256Mi
+
+# Helm pre-upgrade Job (helm.sh/hook-weight: -5) runs `--migrate` against the
+# same image and secrets before any new app pod starts. A non-zero exit aborts
+# the rollout so the new pods never face an un-migrated schema.
+migrations:
+  enabled: true
+  command: ["dotnet", "NotificationService.Api.dll", "--migrate"]

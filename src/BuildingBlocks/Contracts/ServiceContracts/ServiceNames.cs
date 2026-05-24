@@ -9,4 +9,5 @@ public static class ServiceNames
     public const string Presence = "presence-service";
     public const string Notification = "notification-service";
     public const string Call = "call-service";
+    public const string Discipline = "discipline-service";
 }

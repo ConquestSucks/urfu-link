@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createApiClient } from "../index";
 
-function mockFetchWith(responseInit: Partial<Response>) {
-  const response = {
+function makeMockResponse(responseInit: Partial<Response>) {
+  return {
     status: 200,
     ok: true,
     type: "basic",
@@ -11,8 +11,10 @@ function mockFetchWith(responseInit: Partial<Response>) {
     text: () => Promise.resolve(""),
     ...responseInit,
   } as Response;
+}
 
-  return vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
+function mockFetchWith(responseInit: Partial<Response>) {
+  return vi.spyOn(globalThis, "fetch").mockResolvedValue(makeMockResponse(responseInit));
 }
 
 describe("createApiClient", () => {
@@ -115,6 +117,115 @@ describe("createApiClient", () => {
 
       expect(onUnauthorized).toHaveBeenCalled();
       expect(window.location.href).toBe("https://urfu-link.ghjc.ru/chats?view=messages");
+    });
+  });
+
+  describe("presence", () => {
+    it("unwraps batch presence responses from the service envelope", async () => {
+      const info = { userId: "u1", status: "Online", platforms: ["Web"], lastSeenAt: null };
+      mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({ items: [info] }),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      const result = await client.presence.getBatchUserPresence(["u1"]);
+
+      expect(result).toEqual([info]);
+    });
+  });
+
+  describe("chat", () => {
+    it("fetches pinned messages for a conversation", async () => {
+      const pinned = [{ id: "message-1", conversationId: "conversation-1", body: "pinned" }];
+      const fetchSpy = mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve(pinned),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      const result = await client.chat.getPinnedMessages("conversation-1");
+
+      expect(result).toEqual(pinned);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/chat/conversations/conversation-1/pinned",
+        expect.objectContaining({ method: "GET" }),
+      );
+    });
+  });
+
+  describe("media", () => {
+    it("does not send JSON content type for bodyless download-url requests", async () => {
+      const fetchSpy = mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({
+          url: "http://localhost:9000/media-private/file.json",
+        }),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      await client.media.getAssetDownloadUrl("asset-1");
+
+      const [, init] = fetchSpy.mock.calls[0];
+      const headers = new Headers((init as RequestInit).headers as HeadersInit);
+      expect(headers.get("Content-Type")).toBeNull();
+    });
+
+    it("normalizes the backend download URL response shape", async () => {
+      mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({
+          url: "http://localhost:9000/media-private/file.json?X-Amz-Signature=abc",
+          expiresAtUtc: "2026-05-24T10:00:00.000Z",
+        }),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      const result = await client.media.getAssetDownloadUrl("asset-1");
+
+      expect(result).toEqual({
+        downloadUrl: "http://localhost:9000/media-private/file.json?X-Amz-Signature=abc",
+        expiresAtUtc: "2026-05-24T10:00:00.000Z",
+      });
+    });
+
+    it("sends idempotency keys for upload mutations", async () => {
+      const uploadInit = {
+        assetId: "asset-1",
+        presignedPutUrl: "https://storage.example/upload",
+        expiresAt: "2026-05-24T10:00:00.000Z",
+        bucket: "media-private",
+        objectKey: "owner/asset/.claude.json",
+      };
+      const fetchSpy = vi.spyOn(globalThis, "fetch")
+        .mockResolvedValueOnce(makeMockResponse({
+          json: () => Promise.resolve(uploadInit),
+        }))
+        .mockResolvedValueOnce(makeMockResponse({ status: 204, ok: true }))
+        .mockResolvedValueOnce(makeMockResponse({ status: 204, ok: true }));
+
+      const client = createApiClient({ baseUrl: "" });
+
+      await client.media.initUpload({
+        fileName: ".claude.json",
+        size: 21984,
+        mimeType: "application/json",
+        visibility: "Private",
+      });
+      await client.media.completeUpload({ assetId: uploadInit.assetId });
+      await client.media.deleteAsset(uploadInit.assetId);
+
+      const keys = fetchSpy.mock.calls.map(([, init]) =>
+        new Headers((init as RequestInit).headers as HeadersInit).get("Idempotency-Key"),
+      );
+
+      expect(keys).toHaveLength(3);
+      expect(keys.every(Boolean)).toBe(true);
+      expect(new Set(keys).size).toBe(3);
     });
   });
 });

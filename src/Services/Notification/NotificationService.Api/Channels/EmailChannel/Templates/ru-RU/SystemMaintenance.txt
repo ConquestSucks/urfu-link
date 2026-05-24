@@ -1,0 +1,7 @@
+Плановые работы: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

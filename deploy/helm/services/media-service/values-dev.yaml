@@ -7,6 +7,10 @@ image:
 
 replicaCount: 1
 
+service:
+  grpc:
+    enabled: true
+
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: http://+:8080
@@ -32,4 +36,8 @@ resources:
   limits:
     cpu: 200m
     memory: 256Mi
+
+migrations:
+  enabled: true
+  command: ["dotnet", "MediaService.Api.dll", "--migrate"]
 

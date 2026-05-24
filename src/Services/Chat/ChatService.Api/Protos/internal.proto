@@ -5,6 +5,17 @@ package chat.internal.v1;
 
 service InternalApi {
   rpc Ping (PingRequest) returns (PingReply);
+
+  // Returns the user IDs participating in a conversation. Used by NotificationService and
+  // MediaService for fan-out and access checks.
+  rpc GetConversationParticipants (GetConversationParticipantsRequest)
+      returns (GetConversationParticipantsReply);
+
+  // Cheap predicate check used by other services to gate access to per-conversation resources.
+  rpc IsParticipant (IsParticipantRequest) returns (IsParticipantReply);
+
+  // Returns conversation metadata (type + participants) without messages.
+  rpc GetConversation (GetConversationRequest) returns (GetConversationReply);
 }
 
 message PingRequest {
@@ -15,4 +26,36 @@ message PingReply {
   string message = 1;
   string service = 2;
   string utc = 3;
+}
+
+message GetConversationParticipantsRequest {
+  string conversation_id = 1;
+}
+
+message GetConversationParticipantsReply {
+  repeated string user_ids = 1; // Guid (D format)
+}
+
+message IsParticipantRequest {
+  string conversation_id = 1;
+  string user_id = 2; // Guid
+}
+
+message IsParticipantReply {
+  bool participates = 1;
+  bool conversation_exists = 2;
+}
+
+enum ConversationKind {
+  CONVERSATION_KIND_DIRECT = 0;
+}
+
+message GetConversationRequest {
+  string conversation_id = 1;
+}
+
+message GetConversationReply {
+  bool exists = 1;
+  ConversationKind type = 2;
+  repeated string participants = 3;
 }

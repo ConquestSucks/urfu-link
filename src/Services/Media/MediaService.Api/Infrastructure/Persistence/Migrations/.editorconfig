@@ -1,0 +1,6 @@
+# EF Core generated migrations: suppress analyzer rules that don't apply to
+# auto-generated code we don't hand-tune.
+[*.cs]
+dotnet_diagnostic.CA1861.severity = none
+dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.CA1822.severity = none

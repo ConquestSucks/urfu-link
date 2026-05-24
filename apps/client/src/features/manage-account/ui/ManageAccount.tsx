@@ -1,7 +1,7 @@
 import { useCurrentUser, useDeleteAvatar, useUploadAvatar } from "@/entities/user";
-import { Avatar, Button, Input, LabeledCard } from "@/shared/ui";
+import { Avatar, Button, Input, LabeledCard, Skeleton } from "@/shared/ui";
 import * as ImagePicker from "expo-image-picker";
-import { ActivityIndicator, Platform, ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 
 async function pickFile(): Promise<File | null> {
   if (Platform.OS === "web") {
@@ -42,9 +42,29 @@ export const ManageAccount = () => {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
-      </View>
+      <ScrollView contentContainerClassName="gap-4">
+        <LabeledCard label="Ð¤Ð¾Ñ‚Ð¾ Ð¿Ñ€Ð¾Ñ„Ð¸Ð»Ñ">
+          <View className="flex-row gap-4">
+            <Skeleton
+              testID="account-avatar-skeleton"
+              style={{ width: 80, height: 80 }}
+              className="!rounded-2xl shrink-0"
+            />
+            <View className="flex-row gap-2 items-center">
+              <Skeleton className="h-10 w-24 rounded-xl" />
+              <Skeleton className="h-10 w-20 rounded-xl bg-white/5" />
+            </View>
+          </View>
+        </LabeledCard>
+
+        <LabeledCard label="Ð˜Ð¼Ñ">
+          <Skeleton testID="account-input-skeleton" className="h-12 w-full rounded-xl bg-white/5" />
+        </LabeledCard>
+
+        <LabeledCard label="Email">
+          <Skeleton testID="account-input-skeleton" className="h-12 w-full rounded-xl bg-white/5" />
+        </LabeledCard>
+      </ScrollView>
     );
   }
 

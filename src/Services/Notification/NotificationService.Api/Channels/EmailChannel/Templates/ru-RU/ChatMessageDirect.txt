@@ -1,0 +1,7 @@
+Новое сообщение: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

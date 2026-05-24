@@ -18,6 +18,20 @@ using UserService.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Migration mode: invoked by the Helm pre-upgrade Job (or the docker-compose
+// `user-migrations` sidecar in dev). When triggered, applies pending EF
+// migrations and exits — no web host is started, no HostedServices run.
+if (await MigrationCliRunner.TryRunMigrationsAsync<UserDbContext>(
+    args,
+    "UserService",
+    services => services.AddDbContext<UserDbContext>(options =>
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("Primary"),
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")))))
+{
+    return;
+}
+
 builder.Services.AddGrpc();
 builder.Services.AddFastEndpoints();
 builder.Services.SwaggerDocument(o =>
@@ -49,14 +63,26 @@ builder.Services.AddUserModule(builder.Configuration);
 
 var app = builder.Build();
 
-await using (var scope = app.Services.CreateAsyncScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<UserDbContext>();
-    if (db.Database.IsRelational())
-        await db.Database.MigrateAsync();
-}
-
+// Schema is owned by the Helm pre-upgrade migrations Job (or the dev sidecar)
+// and applied via `dotnet UserService.Api.dll --migrate` exactly once per
+// release. Auto-migrating in startup raced replicas on the schema upgrade
+// at boot — moved out deliberately.
 app.MapServiceDefaults();
+
+// Lazy upsert проекции для поиска: при первом authenticated-запросе
+// пользователь автоматически попадает в users.user_search_projection,
+// чтобы стать находимым в /users/search без ожидания reconcile-цикла.
+// Внутри fire-and-forget с TTL-кешем — оверхеда на горячем пути почти нет.
+app.Use(async (context, next) =>
+{
+    if (context.User?.Identity?.IsAuthenticated == true)
+    {
+        var lazyUpserter = context.RequestServices.GetRequiredService<UserSearchLazyUpserter>();
+        await lazyUpserter.EnsureAsync(context.User, context.RequestAborted).ConfigureAwait(false);
+    }
+    await next().ConfigureAwait(false);
+});
+
 app.UseFastEndpoints(c =>
 {
     c.Endpoints.RoutePrefix = "api/v1";

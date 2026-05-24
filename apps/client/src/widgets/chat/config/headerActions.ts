@@ -1,6 +1,8 @@
-import { BellSlashIcon, MagnifyingGlassIcon, ProhibitIcon, PushPinIcon, TrashIcon, UserCircleIcon, } from "@/shared/ui/phosphor";
+import { BellSlashIcon, PushPinIcon, UserCircleIcon } from "@/shared/ui/phosphor";
+
 export const getChatHeaderActions = (callbacks: {
     onOpenProfile: () => void;
+    onOpenPinned?: () => void;
 }) => [
     {
         icon: UserCircleIcon,
@@ -9,16 +11,10 @@ export const getChatHeaderActions = (callbacks: {
         command: callbacks.onOpenProfile,
     },
     {
-        icon: MagnifyingGlassIcon,
-        iconClassName: "text-success-500",
-        label: "Поиск по сообщениям",
-        command: () => console.log("Ищем..."),
-    },
-    {
         icon: PushPinIcon,
         iconClassName: "text-warning-500",
         label: "Закрепленные",
-        command: () => console.log("Закрепленные..."),
+        command: callbacks.onOpenPinned,
     },
     { separator: true },
     {
@@ -27,23 +23,11 @@ export const getChatHeaderActions = (callbacks: {
         label: "Отключить уведомления",
         command: () => console.log("Уведомления..."),
     },
-    {
-        icon: TrashIcon,
-        iconClassName: "text-warning-600",
-        label: "Очистить историю",
-        command: () => console.log("Чистим..."),
-    },
-    { separator: true },
-    {
-        icon: ProhibitIcon,
-        iconClassName: "text-danger-300",
-        label: "Заблокировать",
-        command: () => console.log("Блокируем..."),
-        danger: true,
-    },
 ];
+
 export const getSubjectHeaderActions = (callbacks: {
     onOpenMembers: () => void;
+    onOpenPinned?: () => void;
 }) => [
     {
         icon: UserCircleIcon,
@@ -52,16 +36,10 @@ export const getSubjectHeaderActions = (callbacks: {
         command: callbacks.onOpenMembers,
     },
     {
-        icon: MagnifyingGlassIcon,
-        iconClassName: "text-success-500",
-        label: "Поиск по сообщениям",
-        command: () => console.log("Ищем..."),
-    },
-    {
         icon: PushPinIcon,
         iconClassName: "text-warning-500",
         label: "Закрепленные",
-        command: () => console.log("Закрепленные..."),
+        command: callbacks.onOpenPinned,
     },
     { separator: true },
     {

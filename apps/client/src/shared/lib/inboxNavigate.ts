@@ -1,6 +1,6 @@
-import type { Href, Router } from "expo-router";
+import type { Href, ImperativeRouter } from "expo-router";
 
-export function navigateInboxPath(router: Router, isWeb: boolean, path: Href): void {
+export function navigateInboxPath(router: ImperativeRouter, isWeb: boolean, path: Href): void {
     if (isWeb)
         router.replace(path);
     else

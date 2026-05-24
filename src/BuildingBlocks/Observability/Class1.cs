@@ -41,6 +41,11 @@ public static class ObservabilityExtensions
                 tracing
                     .AddAspNetCoreInstrumentation(options => options.RecordException = true)
                     .AddHttpClientInstrumentation()
+                    // Confluent.Kafka emits Producer/Consumer activities under the
+                    // "Confluent.Kafka" ActivitySource since v2.10. Subscribing here
+                    // is what makes async cross-service traces (e.g. chat → kafka →
+                    // notification) link into a single trace_id.
+                    .AddSource("Confluent.Kafka")
                     .AddOtlpExporter(exporter => exporter.Endpoint = otlpUri);
             })
             .WithMetrics(metrics =>

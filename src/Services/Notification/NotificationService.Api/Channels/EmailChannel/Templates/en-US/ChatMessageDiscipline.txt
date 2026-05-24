@@ -1,0 +1,7 @@
+Discipline chat message: {{title}}
+
+{{body}}
+
+Open: {{deepLink}}
+
+— UrFU Link

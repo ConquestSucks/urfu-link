@@ -93,6 +93,8 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.presence.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.notification.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.call.events.v1 --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.discipline.events.v1 --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.system.events.v1 --partitions 3 --replication-factor 1
         echo "Kafka topics created."
     restart: "no"
 
@@ -141,6 +143,9 @@ services:
         mc alias set minio http://minio:9000 minio minio123
         mc mb minio/user-avatars --ignore-existing
         mc anonymous set public minio/user-avatars
+        mc mb minio/media-private --ignore-existing
+        mc mb minio/media-public --ignore-existing
+        mc anonymous set download minio/media-public
         echo "MinIO buckets ready."
     restart: "no"
 
@@ -198,7 +203,7 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-50100:50000-50100/udp"
+      - "60100-60150:60100-60150/udp"
 
   coturn:
     image: coturn/coturn:4.8.0-r0
@@ -214,18 +219,49 @@ services:
 
   # ── .NET Services ──────────────────────────────────────────────────────────
 
+  # ── Migration sidecars ─────────────────────────────────────────────────────
+  # One-shot containers that mirror the production Helm pre-upgrade Job: run
+  # `dotnet *.Api.dll --migrate` once, then exit. Main app pods depend on
+  # `service_completed_successfully` so the schema is applied before anything
+  # else opens a connection. This intentionally matches the prod flow — devs
+  # should never see "auto-migrate on startup" behaviour locally either.
+
+  user-migrations:
+    build:
+      context: ../..
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/User/UserService.Api/UserService.Api.csproj
+        SERVICE_DLL: UserService.Api.dll
+    container_name: urfu-user-migrations
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   user-service:
     build:
       context: ../..
-      dockerfile: src/Services/User/UserService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/User/UserService.Api/UserService.Api.csproj
+        SERVICE_DLL: UserService.Api.dll
     container_name: urfu-user-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
       Keycloak__ClientSecret: user-service-admin-dev-secret
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       Storage__PublicEndpoint: http://localhost:9000
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      user-migrations:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -241,12 +277,24 @@ services:
   chat-service:
     build:
       context: ../..
-      dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Chat/ChatService.Api/ChatService.Api.csproj
+        SERVICE_DLL: ChatService.Api.dll
     container_name: urfu-chat-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Infrastructure__Redis__Configuration: redis:6379
+      # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      GrpcClients__InternalAuth__TokenEndpoint: http://keycloak:8080/realms/urfu-link/protocol/openid-connect/token
+      GrpcClients__InternalAuth__ClientId: chat-service-internal
+      GrpcClients__InternalAuth__ClientSecret: chat-service-internal-dev-secret
+      GrpcClients__UserService__Address: http://user-service:8081
+      GrpcClients__DisciplineService__Address: http://discipline-service:8081
+      GrpcClients__MediaService__Address: http://media-service:8081
+      GrpcClients__PresenceService__Address: http://presence-service:8081
     depends_on:
       mongo:
         condition: service_healthy
@@ -260,16 +308,46 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  media-migrations:
+    build:
+      context: ../..
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Media/MediaService.Api/MediaService.Api.csproj
+        SERVICE_DLL: MediaService.Api.dll
+    container_name: urfu-media-migrations
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   media-service:
     build:
       context: ../..
-      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Media/MediaService.Api/MediaService.Api.csproj
+        SERVICE_DLL: MediaService.Api.dll
     container_name: urfu-media-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
+      Storage__Endpoint: http://minio:9000
+      Storage__PublicEndpoint: http://localhost:9000
+      Storage__AccessKey: minio
+      Storage__SecretKey: minio123
+      Storage__PrivateBucket: media-private
+      Storage__PublicBucket: media-public
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      media-migrations:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -278,22 +356,52 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
       keycloak:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  presence-migrations:
+    build:
+      context: ../..
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj
+        SERVICE_DLL: PresenceService.Api.dll
+    container_name: urfu-presence-migrations
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   presence-service:
     build:
       context: ../..
-      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj
+        SERVICE_DLL: PresenceService.Api.dll
     container_name: urfu-presence-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
+      Kafka__ConsumerTopic: urfu.user.events.v1
+      Kafka__ConsumerGroup: presence-privacy-projection-v1
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
+      Infrastructure__Redis__Configuration: redis:6379
     depends_on:
+      presence-migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
@@ -304,16 +412,52 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  notification-migrations:
+    build:
+      context: ../..
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj
+        SERVICE_DLL: NotificationService.Api.dll
+    container_name: urfu-notification-migrations
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   notification-service:
     build:
       context: ../..
-      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj
+        SERVICE_DLL: NotificationService.Api.dll
     container_name: urfu-notification-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
+      Infrastructure__Redis__Configuration: redis:6379
+      Notification__Push__Provider: fake
+      Notification__Smtp__Host: mailhog
+      Notification__Smtp__Port: 1025
+      Notification__Smtp__EnableStartTls: "false"
+      Notification__Smtp__From: noreply@urfu-link.local
+      Notification__Smtp__FromDisplayName: UrFU Link
+      Notification__Retention__RetentionDays: "90"
+      # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      UserService__GrpcEndpoint: http://user-service:8081
+      PresenceService__GrpcEndpoint: http://presence-service:8081
     depends_on:
+      notification-migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
       kafka:
@@ -322,12 +466,25 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: urfu-mailhog
+    ports:
+      - "8025:8025"
+      - "1025:1025"
     restart: unless-stopped
 
   call-service:
     build:
       context: ../..
-      dockerfile: src/Services/Call/CallService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Call/CallService.Api/CallService.Api.csproj
+        SERVICE_DLL: CallService.Api.dll
     container_name: urfu-call-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -344,18 +501,70 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  discipline-migrations:
+    build:
+      context: ../..
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj
+        SERVICE_DLL: DisciplineService.Api.dll
+    container_name: urfu-discipline-migrations
+    command: ["--migrate"]
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  discipline-service:
+    build:
+      context: ../..
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj
+        SERVICE_DLL: DisciplineService.Api.dll
+    container_name: urfu-discipline-service
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Kafka__BootstrapServers: kafka:29092
+      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
+      Infrastructure__Redis__Configuration: redis:6379
+    depends_on:
+      discipline-migrations:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
   api-gateway:
     build:
       context: ../..
-      dockerfile: src/Gateway/ApiGateway/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Gateway/ApiGateway/ApiGateway.csproj
+        SERVICE_DLL: ApiGateway.dll
     container_name: urfu-api-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Cors__AllowedOrigins__0: http://localhost:3000
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Infrastructure__Redis__Configuration: redis:6379
     ports:
       - "5080:8080"
     depends_on:
+      redis:
+        condition: service_healthy
       keycloak:
         condition: service_healthy
       user-service:
@@ -369,6 +578,8 @@ services:
       notification-service:
         condition: service_started
       call-service:
+        condition: service_started
+      discipline-service:
         condition: service_started
     restart: unless-stopped
 

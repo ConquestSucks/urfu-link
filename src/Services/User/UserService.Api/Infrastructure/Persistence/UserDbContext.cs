@@ -6,6 +6,7 @@ namespace UserService.Api.Infrastructure.Persistence;
 public sealed class UserDbContext(DbContextOptions<UserDbContext> options) : DbContext(options)
 {
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<UserSearchProjection> UserSearchProjections => Set<UserSearchProjection>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

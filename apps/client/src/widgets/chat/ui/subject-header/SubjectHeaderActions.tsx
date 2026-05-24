@@ -5,13 +5,18 @@ import { Pressable, View } from "react-native";
 import { getSubjectHeaderActions } from "../../config/headerActions";
 interface SubjectHeaderActionsProps {
     onOpenMembers: () => void;
+    onOpenPinned: () => void;
 }
-export const SubjectHeaderActions = ({ onOpenMembers, }: SubjectHeaderActionsProps) => {
+export const SubjectHeaderActions = ({ onOpenMembers, onOpenPinned }: SubjectHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getSubjectHeaderActions({
         onOpenMembers: () => {
             menuRef.current?.close();
             onOpenMembers();
+        },
+        onOpenPinned: () => {
+            menuRef.current?.close();
+            onOpenPinned();
         },
     });
     return (<View className="flex-row gap-1 items-center">

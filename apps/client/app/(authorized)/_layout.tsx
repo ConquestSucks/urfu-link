@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { usePresenceHub } from "@/shared/lib/usePresenceHub";
+import { useChatHub } from "@/shared/lib/useChatHub";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -14,6 +16,11 @@ export default function AuthLayout() {
         (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+    // Подключаемся к ChatHub и PresenceHub на всё время авторизованной сессии.
+    // Хуки сами обрабатывают AppState (background/foreground) и cleanup при unmount.
+    useChatHub();
+    usePresenceHub();
 
     const safeAreaEdges: Edge[] = isMobile
         ? ["top", "left", "right", "bottom"]
@@ -41,7 +48,6 @@ export default function AuthLayout() {
 
             {isMobile && (
                 <View
-                    pointerEvents="box-none"
                     style={{
                         position: "absolute",
                         left: 0,
@@ -49,6 +55,7 @@ export default function AuthLayout() {
                         bottom: 0,
                         zIndex: isThreadDetail ? 0 : 3,
                         elevation: isThreadDetail ? 0 : 3,
+                        pointerEvents: "box-none",
                     }}
                 >
                     <MobileBottomTabs />

@@ -1,0 +1,7 @@
+Вас упомянули: {{title}}
+
+{{body}}
+
+Открыть: {{deepLink}}
+
+— UrFU Link

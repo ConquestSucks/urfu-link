@@ -17,9 +17,50 @@ export type {
   UpdatePrivacyDto,
   UpdateNotificationsDto,
   UpdateSoundVideoDto,
+  SearchUserDto,
+  SearchUsersResponse,
 } from "./users";
 
+export type {
+  ConversationType,
+  ConversationPreview,
+  ConversationPreviewSnippet,
+  MessageState,
+  AttachmentType,
+  ChatAttachment,
+  ReplyToDto,
+  ForwardedFromDto,
+  ReactionsSummary,
+  DeleteMode,
+  MessageDto,
+  Paginated,
+  SearchResultDto,
+  SearchFilters,
+  ReadReceiptDto,
+  ThreadSubscriptionReason,
+  ActiveThreadDto,
+  ParticipantRole,
+  ConversationParticipantDto,
+} from "./chat";
+
+export type {
+  Visibility,
+  InitUploadRequest,
+  InitUploadResponse,
+  CompleteUploadRequest,
+  AssetMetadata,
+} from "./media";
+
+export type {
+  PresenceStatus,
+  Platform,
+  PresenceInfo,
+} from "./presence";
+
 import { createUsersApi } from "./users";
+import { createChatApi } from "./chat";
+import { createMediaApi } from "./media";
+import { createPresenceApi } from "./presence";
 
 type ApiClientConfig = {
   baseUrl: string;
@@ -55,6 +96,9 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
 
   return {
     users: createUsersApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    chat: createChatApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    media: createMediaApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    presence: createPresenceApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
 
     async health(): Promise<BackendHealth> {
       try {
