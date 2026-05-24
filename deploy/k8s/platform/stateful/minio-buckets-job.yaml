@@ -31,16 +31,18 @@ spec:
                 sleep 5
               done
 
-              cat >/tmp/media-cors.json <<'EOF'
-              [
-                {
-                  "AllowedOrigins": ["https://urfu-link.ghjc.ru"],
-                  "AllowedMethods": ["GET", "HEAD", "PUT"],
-                  "AllowedHeaders": ["*"],
-                  "ExposeHeaders": ["ETag"],
-                  "MaxAgeSeconds": 3000
-                }
-              ]
+              cat >/tmp/media-cors.xml <<'EOF'
+              <CORSConfiguration>
+                <CORSRule>
+                  <AllowedOrigin>https://urfu-link.ghjc.ru</AllowedOrigin>
+                  <AllowedMethod>GET</AllowedMethod>
+                  <AllowedMethod>HEAD</AllowedMethod>
+                  <AllowedMethod>PUT</AllowedMethod>
+                  <AllowedHeader>*</AllowedHeader>
+                  <ExposeHeader>ETag</ExposeHeader>
+                  <MaxAgeSeconds>3000</MaxAgeSeconds>
+                </CORSRule>
+              </CORSConfiguration>
               EOF
 
               mc mb -p minio/media-private || true
@@ -48,8 +50,8 @@ spec:
               mc mb -p minio/user-avatars || true
               mc anonymous set download minio/media-public
               mc anonymous set download minio/user-avatars
-              mc cors set minio/media-private /tmp/media-cors.json
-              mc cors set minio/media-public /tmp/media-cors.json
+              mc cors set minio/media-private /tmp/media-cors.xml
+              mc cors set minio/media-public /tmp/media-cors.xml
           volumeMounts:
             - name: bootstrap-secret
               mountPath: /bootstrap
