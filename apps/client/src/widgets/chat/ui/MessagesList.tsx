@@ -93,6 +93,14 @@ const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] => {
     return items;
 };
 
+const getDateStickyHeaderIndices = (items: MessageListItem[], stickyOffset = 0) =>
+    items.reduce<number[]>((indices, item, index) => {
+        if (item.type === "date") {
+            indices.push(index + stickyOffset);
+        }
+        return indices;
+    }, []);
+
 const getMessageListItemKey = (item: MessageListItem) => item.id;
 
 const waitForListUpdate = () => new Promise((resolve) => setTimeout(resolve, 50));
@@ -101,6 +109,7 @@ const styles = StyleSheet.create({
     dateSeparator: {
         marginTop: 24,
         marginBottom: 4,
+        zIndex: 2,
     },
     firstDateSeparator: {
         marginTop: 0,
@@ -158,6 +167,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const isLoaded = messagesLoadedByConversation[chatId] || false;
         const hasMore = hasMoreByConversation[chatId] || false;
         const listItems = useMemo(() => buildMessageListItems(messages), [messages]);
+        const stickyHeaderIndices = useMemo(
+            () => getDateStickyHeaderIndices(listItems, 1),
+            [listItems],
+        );
         const listRef = useRef<FlatList<MessageListItem>>(null);
         const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
         const highlightOpacity = useRef(new Animated.Value(0)).current;
@@ -503,6 +516,8 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     contentContainerStyle={{
                         flexGrow: 1,
                     }}
+                    stickyHeaderIndices={stickyHeaderIndices}
+                    invertStickyHeaders
                     onViewableItemsChanged={handleViewableItemsChanged}
                     viewabilityConfig={viewabilityConfig}
                     renderItem={renderItem}
