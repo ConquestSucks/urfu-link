@@ -21,6 +21,7 @@ namespace UserService.Api.Migrations
                 .HasAnnotation("ProductVersion", "10.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "citext");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("UserService.Api.Domain.UserProfile", b =>
@@ -51,6 +52,61 @@ namespace UserService.Api.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("user_profiles", "users");
+                });
+
+            modelBuilder.Entity("UserService.Api.Domain.UserSearchProjection", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at_utc");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("citext")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("citext")
+                        .HasColumnName("email");
+
+                    b.Property<string>("FirstName")
+                        .HasColumnType("citext")
+                        .HasColumnName("first_name");
+
+                    b.Property<long>("KeycloakModifiedMs")
+                        .HasColumnType("bigint")
+                        .HasColumnName("keycloak_modified_ms");
+
+                    b.Property<string>("LastName")
+                        .HasColumnType("citext")
+                        .HasColumnName("last_name");
+
+                    b.Property<string>("SearchText")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("search_text");
+
+                    b.Property<string>("SearchTextTranslit")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("search_text_translit");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasColumnType("citext")
+                        .HasColumnName("username");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("user_search_projection", "users");
                 });
 
             modelBuilder.Entity("UserService.Api.Domain.UserProfile", b =>

@@ -94,6 +94,7 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.notification.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.call.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.discipline.events.v1 --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.system.events.v1 --partitions 3 --replication-factor 1
         echo "Kafka topics created."
     restart: "no"
 
@@ -202,7 +203,7 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "50000-50100:50000-50100/udp"
+      - "60100-60150:60100-60150/udp"
 
   coturn:
     image: coturn/coturn:4.8.0-r0
@@ -228,12 +229,15 @@ services:
   user-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/User/UserService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/User/UserService.Api/UserService.Api.csproj
+        SERVICE_DLL: UserService.Api.dll
     container_name: urfu-user-migrations
-    command: ["dotnet", "UserService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -242,10 +246,14 @@ services:
   user-service:
     build:
       context: ../..
-      dockerfile: src/Services/User/UserService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/User/UserService.Api/UserService.Api.csproj
+        SERVICE_DLL: UserService.Api.dll
     container_name: urfu-user-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
       Keycloak__ClientSecret: user-service-admin-dev-secret
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
@@ -269,13 +277,24 @@ services:
   chat-service:
     build:
       context: ../..
-      dockerfile: src/Services/Chat/ChatService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Chat/ChatService.Api/ChatService.Api.csproj
+        SERVICE_DLL: ChatService.Api.dll
     container_name: urfu-chat-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       Infrastructure__Redis__Configuration: redis:6379
+      # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      GrpcClients__InternalAuth__TokenEndpoint: http://keycloak:8080/realms/urfu-link/protocol/openid-connect/token
+      GrpcClients__InternalAuth__ClientId: chat-service-internal
+      GrpcClients__InternalAuth__ClientSecret: chat-service-internal-dev-secret
+      GrpcClients__UserService__Address: http://user-service:8081
+      GrpcClients__DisciplineService__Address: http://discipline-service:8081
+      GrpcClients__MediaService__Address: http://media-service:8081
+      GrpcClients__PresenceService__Address: http://presence-service:8081
     depends_on:
       mongo:
         condition: service_healthy
@@ -292,12 +311,15 @@ services:
   media-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Media/MediaService.Api/MediaService.Api.csproj
+        SERVICE_DLL: MediaService.Api.dll
     container_name: urfu-media-migrations
-    command: ["dotnet", "MediaService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -306,13 +328,16 @@ services:
   media-service:
     build:
       context: ../..
-      dockerfile: src/Services/Media/MediaService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Media/MediaService.Api/MediaService.Api.csproj
+        SERVICE_DLL: MediaService.Api.dll
     container_name: urfu-media-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
       Storage__Endpoint: http://minio:9000
       Storage__PublicEndpoint: http://localhost:9000
       Storage__AccessKey: minio
@@ -342,12 +367,15 @@ services:
   presence-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj
+        SERVICE_DLL: PresenceService.Api.dll
     container_name: urfu-presence-migrations
-    command: ["dotnet", "PresenceService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -356,7 +384,10 @@ services:
   presence-service:
     build:
       context: ../..
-      dockerfile: src/Services/Presence/PresenceService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj
+        SERVICE_DLL: PresenceService.Api.dll
     container_name: urfu-presence-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -364,7 +395,7 @@ services:
       Kafka__ConsumerTopic: urfu.user.events.v1
       Kafka__ConsumerGroup: presence-privacy-projection-v1
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       presence-migrations:
@@ -384,12 +415,15 @@ services:
   notification-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj
+        SERVICE_DLL: NotificationService.Api.dll
     container_name: urfu-notification-migrations
-    command: ["dotnet", "NotificationService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -398,13 +432,16 @@ services:
   notification-service:
     build:
       context: ../..
-      dockerfile: src/Services/Notification/NotificationService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj
+        SERVICE_DLL: NotificationService.Api.dll
     container_name: urfu-notification-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
       Notification__Push__Provider: fake
       Notification__Smtp__Host: mailhog
@@ -413,8 +450,9 @@ services:
       Notification__Smtp__From: noreply@urfu-link.local
       Notification__Smtp__FromDisplayName: UrFU Link
       Notification__Retention__RetentionDays: "90"
-      UserService__GrpcEndpoint: http://user-service:8080
-      PresenceService__GrpcEndpoint: http://presence-service:8080
+      # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      UserService__GrpcEndpoint: http://user-service:8081
+      PresenceService__GrpcEndpoint: http://presence-service:8081
     depends_on:
       notification-migrations:
         condition: service_completed_successfully
@@ -443,7 +481,10 @@ services:
   call-service:
     build:
       context: ../..
-      dockerfile: src/Services/Call/CallService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Call/CallService.Api/CallService.Api.csproj
+        SERVICE_DLL: CallService.Api.dll
     container_name: urfu-call-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
@@ -463,12 +504,15 @@ services:
   discipline-migrations:
     build:
       context: ../..
-      dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj
+        SERVICE_DLL: DisciplineService.Api.dll
     container_name: urfu-discipline-migrations
-    command: ["dotnet", "DisciplineService.Api.dll", "--migrate"]
+    command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -477,13 +521,16 @@ services:
   discipline-service:
     build:
       context: ../..
-      dockerfile: src/Services/Discipline/DisciplineService.Api/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj
+        SERVICE_DLL: DisciplineService.Api.dll
     container_name: urfu-discipline-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       discipline-migrations:
@@ -503,7 +550,10 @@ services:
   api-gateway:
     build:
       context: ../..
-      dockerfile: src/Gateway/ApiGateway/Dockerfile
+      dockerfile: platform/dev/Dockerfile.service
+      args:
+        SERVICE_PROJECT: src/Gateway/ApiGateway/ApiGateway.csproj
+        SERVICE_DLL: ApiGateway.dll
     container_name: urfu-api-gateway
     environment:
       ASPNETCORE_ENVIRONMENT: Production

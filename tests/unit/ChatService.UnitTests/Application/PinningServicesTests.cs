@@ -180,6 +180,63 @@ public class PinningServicesTests
         _outbox.Captured.OfType<ChatMessageUnpinnedEvent>().Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task GetPinnedAsync_NonParticipant_Throws()
+    {
+        var (conv, _) = Seed();
+        var query = new GetPinnedMessagesQuery(_conversations, _messages);
+
+        var act = () => query.ExecuteAsync(conv.Id, Stranger, default);
+
+        await act.Should().ThrowAsync<ChatAccessDeniedException>();
+    }
+
+    [Fact]
+    public async Task GetPinnedAsync_EmptyPinnedList_ReturnsEmptyWithoutMessageLookup()
+    {
+        var (conv, _) = Seed();
+        var query = new GetPinnedMessagesQuery(_conversations, _messages);
+
+        var pinned = await query.ExecuteAsync(conv.Id, Caller, default);
+
+        pinned.Should().BeEmpty();
+        await _messages.DidNotReceive().GetByIdsAsync(
+            Arg.Any<string>(), Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetPinnedAsync_ReturnsMessagesInConversationPinnedOrder()
+    {
+        var conv = Conversation.Hydrate(
+            $"direct-{Guid.NewGuid():N}",
+            ConversationType.Direct,
+            new[] { Caller, Peer },
+            _clock.GetUtcNow(),
+            _clock.GetUtcNow(),
+            null);
+        var first = Message.Send(
+            Guid.NewGuid(), conv.Id, Caller, "first", Array.Empty<Attachment>(), "c1", _clock.GetUtcNow());
+        var second = Message.Send(
+            Guid.NewGuid(), conv.Id, Peer, "second", Array.Empty<Attachment>(), "c2", _clock.GetUtcNow());
+        var withPinned = Conversation.Hydrate(
+            conv.Id,
+            ConversationType.Direct,
+            conv.Participants,
+            conv.CreatedAtUtc,
+            conv.LastMessageAtUtc,
+            conv.LastMessagePreview,
+            new[] { second.Id, first.Id });
+
+        _conversations.GetByIdAsync(withPinned.Id, Arg.Any<CancellationToken>()).Returns(withPinned);
+        _messages.GetByIdsAsync(withPinned.Id, withPinned.PinnedMessageIds, Arg.Any<CancellationToken>())
+            .Returns(new[] { first, second });
+        var query = new GetPinnedMessagesQuery(_conversations, _messages);
+
+        var pinned = await query.ExecuteAsync(withPinned.Id, Caller, default);
+
+        pinned.Select(m => m.Id).Should().Equal(second.Id, first.Id);
+    }
+
     private sealed class RecordingOutboxWriter : IOutboxWriter
     {
         public List<IIntegrationEvent> Captured { get; } = new();

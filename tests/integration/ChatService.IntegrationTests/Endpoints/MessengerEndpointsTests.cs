@@ -39,7 +39,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
             new { body = "edited" });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var dto = await response.Content.ReadFromJsonAsync<MessageDto>();
+        var dto = await response.Content.ReadFromChatJsonAsync<MessageDto>();
         dto!.Body.Should().Be("edited");
         dto.EditedAtUtc.Should().NotBeNull();
     }
@@ -70,7 +70,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
         var response = await client.DeleteAsync($"/api/v1/chat/messages/{msg.Id:D}?mode=for-everyone");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var dto = await response.Content.ReadFromJsonAsync<MessageDto>();
+        var dto = await response.Content.ReadFromChatJsonAsync<MessageDto>();
         dto!.State.Should().Be(MessageState.Deleted);
         dto.DeleteMode.Should().Be(DeleteMode.ForEveryone);
     }
@@ -138,7 +138,26 @@ public class MessengerEndpointsTests : IAsyncLifetime
             new { messageId = msg.Id });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var pinned = await response.Content.ReadFromJsonAsync<List<MessageDto>>();
+        var pinned = await response.Content.ReadFromChatJsonAsync<List<MessageDto>>();
+        pinned.Should().ContainSingle(m => m.Id == msg.Id);
+    }
+
+    [Fact]
+    public async Task Get_Pinned_ReturnsPinnedList()
+    {
+        var (caller, _, conv, msg) = await SeedSentMessageAsync();
+        await using (var pinScope = _factory.Services.CreateAsyncScope())
+        {
+            var pin = pinScope.ServiceProvider.GetRequiredService<PinMessageService>();
+            await pin.PinAsync(new PinMessageRequest(conv.Id, caller, false, msg.Id), default);
+        }
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/v1/chat/conversations/{conv.Id}/pinned");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var pinned = await response.Content.ReadFromChatJsonAsync<List<MessageDto>>();
         pinned.Should().ContainSingle(m => m.Id == msg.Id);
     }
 
@@ -157,7 +176,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
         var response = await client.DeleteAsync($"/api/v1/chat/conversations/{conv.Id}/pinned/{msg.Id:D}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var pinned = await response.Content.ReadFromJsonAsync<List<MessageDto>>();
+        var pinned = await response.Content.ReadFromChatJsonAsync<List<MessageDto>>();
         pinned.Should().BeEmpty();
     }
 
@@ -179,7 +198,10 @@ public class MessengerEndpointsTests : IAsyncLifetime
 
             var send = seed.ServiceProvider.GetRequiredService<SendMessageService>();
             var dto = await send.SendAsync(
-                new SendMessageRequest(sourceConv.Id, caller, "to forward", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(sourceConv.Id, caller, "to forward", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: sourcePeer),
+                default);
+            await send.SendAsync(
+                new SendMessageRequest(targetConv.Id, caller, "target seed", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: targetPeer),
                 default);
             sourceMsgId = dto.Id;
         }
@@ -192,7 +214,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
             new { messageIds = new[] { sourceMsgId } });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var forwarded = await response.Content.ReadFromJsonAsync<List<MessageDto>>();
+        var forwarded = await response.Content.ReadFromChatJsonAsync<List<MessageDto>>();
         forwarded.Should().ContainSingle();
         forwarded![0].ForwardedFrom.Should().NotBeNull();
         forwarded[0].SenderId.Should().Be(caller);
@@ -210,7 +232,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var receipts = await client.GetFromJsonAsync<List<ReadReceiptDto>>(
+        var receipts = await client.GetFromChatJsonAsync<List<ReadReceiptDto>>(
             $"/api/v1/chat/messages/{msg.Id:D}/read-receipts");
 
         receipts.Should().ContainSingle(r => r.UserId == peer);
@@ -227,7 +249,7 @@ public class MessengerEndpointsTests : IAsyncLifetime
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var dto = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "hello", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "hello", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
             default);
 
         var msg = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()

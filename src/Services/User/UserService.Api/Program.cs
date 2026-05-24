@@ -25,7 +25,9 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<UserDbContext>(
     args,
     "UserService",
     services => services.AddDbContext<UserDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("Primary"),
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")))))
 {
     return;
 }
@@ -66,6 +68,21 @@ var app = builder.Build();
 // release. Auto-migrating in startup raced replicas on the schema upgrade
 // at boot — moved out deliberately.
 app.MapServiceDefaults();
+
+// Lazy upsert проекции для поиска: при первом authenticated-запросе
+// пользователь автоматически попадает в users.user_search_projection,
+// чтобы стать находимым в /users/search без ожидания reconcile-цикла.
+// Внутри fire-and-forget с TTL-кешем — оверхеда на горячем пути почти нет.
+app.Use(async (context, next) =>
+{
+    if (context.User?.Identity?.IsAuthenticated == true)
+    {
+        var lazyUpserter = context.RequestServices.GetRequiredService<UserSearchLazyUpserter>();
+        await lazyUpserter.EnsureAsync(context.User, context.RequestAborted).ConfigureAwait(false);
+    }
+    await next().ConfigureAwait(false);
+});
+
 app.UseFastEndpoints(c =>
 {
     c.Endpoints.RoutePrefix = "api/v1";

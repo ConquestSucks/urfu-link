@@ -1,5 +1,5 @@
 import { useCurrentUser } from "@/entities/user";
-import { Avatar, Button, StatusIndicator } from "@/shared/ui";
+import { Avatar, Button, Skeleton, StatusIndicator } from "@/shared/ui";
 import { AtIcon, CaretRightIcon, EnvelopeSimpleIcon } from "@/shared/ui/phosphor";
 import React from "react";
 import { Text, View, ScrollView } from "react-native";
@@ -8,7 +8,7 @@ import { SETTINGS_ITEMS } from "@/shared/config";
 import { Href, router } from "expo-router";
 
 export const ProfileMobile = () => {
-    const { data: profile } = useCurrentUser();
+    const { data: profile, isLoading } = useCurrentUser();
 
     const userName = profile?.identity.name ?? "";
     const userDescription = profile?.account.aboutMe ?? "";
@@ -20,15 +20,36 @@ export const ProfileMobile = () => {
         <View className="flex-1 bg-app-bg">
             <View className="items-center pt-8 pb-6">
                 <View className="relative">
-                    <Avatar src={avatarUrl} size={100} name={userName} className="rounded-full" />
-                    <StatusIndicator
-                        status="online"
-                        size={24}
-                        className="border-4 border-app-bg bottom-1 right-1"
-                    />
+                    {isLoading ? (
+                        <Skeleton
+                            testID="profile-mobile-avatar-skeleton"
+                            style={{ width: 100, height: 100 }}
+                            className="rounded-full"
+                        />
+                    ) : (
+                        <Avatar src={avatarUrl} size={100} name={userName} className="rounded-full" />
+                    )}
+                    {isLoading ? (
+                        <Skeleton className="absolute bottom-1 right-1 h-6 w-6 rounded-full border-4 border-app-bg" />
+                    ) : (
+                        <StatusIndicator
+                            status="online"
+                            size={24}
+                            className="border-4 border-app-bg bottom-1 right-1"
+                        />
+                    )}
                 </View>
-                <Text className="text-white text-2xl font-bold mt-4">{userName}</Text>
-                <Text className="text-text-placeholder text-sm mt-1">{userDescription}</Text>
+                {isLoading ? (
+                    <>
+                        <Skeleton testID="profile-mobile-name-skeleton" className="h-6 w-44 rounded mt-4" />
+                        <Skeleton className="h-3.5 w-32 rounded mt-2 bg-white/5" />
+                    </>
+                ) : (
+                    <>
+                        <Text className="text-white text-2xl font-bold mt-4">{userName}</Text>
+                        <Text className="text-text-placeholder text-sm mt-1">{userDescription}</Text>
+                    </>
+                )}
             </View>
 
             <View className="gap-3">
@@ -39,7 +60,11 @@ export const ProfileMobile = () => {
                         </View>
                         <View>
                             <Text className="text-text-placeholder text-xs">Имя пользователя</Text>
-                            <Text className="text-white text-sm font-medium">{userHandle}</Text>
+                            {isLoading ? (
+                                <Skeleton className="h-4 w-24 rounded mt-1" />
+                            ) : (
+                                <Text className="text-white text-sm font-medium">{userHandle}</Text>
+                            )}
                         </View>
                     </View>
 
@@ -49,7 +74,11 @@ export const ProfileMobile = () => {
                         </View>
                         <View>
                             <Text className="text-text-placeholder text-xs">Почта</Text>
-                            <Text className="text-white text-sm font-medium">{email}</Text>
+                            {isLoading ? (
+                                <Skeleton className="h-4 w-40 rounded mt-1" />
+                            ) : (
+                                <Text className="text-white text-sm font-medium">{email}</Text>
+                            )}
                         </View>
                     </View>
                 </View>

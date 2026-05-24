@@ -38,6 +38,26 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
     }
 
     [Fact]
+    public async Task GetProfileShouldReturnIdentityFromJwtClaims()
+    {
+        var userId = Guid.NewGuid();
+        var client = CreateAuthenticatedClient();
+        client.DefaultRequestHeaders.Add("X-Test-UserId", userId.ToString());
+        client.DefaultRequestHeaders.Add("X-Test-Name", "Nikita Baranov");
+        client.DefaultRequestHeaders.Add("X-Test-Email", "n.baranov@urfu.me");
+        client.DefaultRequestHeaders.Add("X-Test-Username", "n.baranov");
+
+        var response = await client.GetAsync(new Uri("/api/v1/me", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var profile = await response.Content.ReadFromJsonAsync<UserProfileResponse>();
+        Assert.NotNull(profile);
+        Assert.Equal("Nikita Baranov", profile.Identity.Name);
+        Assert.Equal("n.baranov@urfu.me", profile.Identity.Email);
+        Assert.Equal("n.baranov", profile.Identity.Username);
+    }
+
+    [Fact]
     public async Task GetProfileWithoutAuthShouldReturn401()
     {
         var client = factory.CreateClient();

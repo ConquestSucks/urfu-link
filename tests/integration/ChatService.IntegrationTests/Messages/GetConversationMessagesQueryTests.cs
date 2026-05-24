@@ -70,7 +70,7 @@ public class GetConversationMessagesQueryTests : IAsyncLifetime
             await using var sendScope = _factory.Services.CreateAsyncScope();
             var send = sendScope.ServiceProvider.GetRequiredService<SendMessageService>();
             await send.SendAsync(
-                new SendMessageRequest(convId, sender, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(convId, sender, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: recipient),
                 default);
             await Task.Delay(5);
         }

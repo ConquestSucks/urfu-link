@@ -21,7 +21,8 @@ public sealed record SendMessageHubInput(
     string Body,
     IReadOnlyList<Guid> AttachmentAssetIds,
     string ClientMessageId,
-    Guid? ReplyToMessageId = null);
+    Guid? ReplyToMessageId = null,
+    Guid? PeerUserId = null);
 
 public sealed record EditMessageHubInput(Guid MessageId, string NewBody);
 
@@ -153,7 +154,8 @@ public sealed class ChatHub(
                 assetIds,
                 input.ClientMessageId,
                 input.ReplyToMessageId,
-                principal.IsAdmin()),
+                principal.IsAdmin(),
+                input.PeerUserId),
             Context.ConnectionAborted);
     }
 

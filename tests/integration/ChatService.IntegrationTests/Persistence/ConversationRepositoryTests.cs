@@ -75,7 +75,7 @@ public class ConversationRepositoryTests : IClassFixture<MongoFixture>, IAsyncLi
         await _repo.TryCreateAsync(conversation, default);
 
         var sentAt = DateTimeOffset.UtcNow.AddMinutes(1);
-        var preview = new MessagePreview(conversation.Participants[0], "ping", sentAt, HasAttachments: false);
+        var preview = new MessagePreview(conversation.Participants[0], "ping", sentAt, hasAttachments: false);
         await _repo.UpdateLastMessageAsync(conversation.Id, preview, sentAt, default);
 
         var loaded = await _repo.GetByIdAsync(conversation.Id, default);

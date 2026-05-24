@@ -14,4 +14,6 @@ export type InboxChatProps = {
     lastMessageFromSelf?: boolean;
     /** Прочитано собеседником (синие галочки); иначе серые */
     lastMessageRead?: boolean;
+    /** В превью сейчас показывается typing-состояние, а не последнее сообщение */
+    isTyping?: boolean;
 };

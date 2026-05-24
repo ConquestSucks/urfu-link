@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Images;
 using DisciplineService.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -19,6 +20,7 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     public FakeOutboxWriter OutboxWriter { get; } = new();

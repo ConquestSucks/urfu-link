@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -18,7 +19,7 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.7" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.2" />
@@ -51,7 +52,13 @@
     <PackageVersion Include="Testcontainers.Redis" Version="4.4.0" />
     <PackageVersion Include="Testcontainers.MongoDb" Version="4.4.0" />
 
-    <PackageVersion Include="MongoDB.Driver" Version="3.5.0" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.8.0" />
+    <!-- Snappier is a transitive dep of MongoDB.Driver. The driver declares 1.0.0 (NU1903,
+         GHSA-pggp-6c3x-2xmx); we pin to the patched 1.3.x line via transitive pinning. -->
+    <PackageVersion Include="Snappier" Version="1.3.1" />
+    <!-- MongoDB.Driver currently brings SharpCompress transitively; pin the patched line
+         centrally so restore stays clean under NuGetAudit + TreatWarningsAsErrors. -->
+    <PackageVersion Include="SharpCompress" Version="0.48.1" />
 
     <PackageVersion Include="FirebaseAdmin" Version="3.5.0" />
     <PackageVersion Include="dotAPNS" Version="4.6.0" />

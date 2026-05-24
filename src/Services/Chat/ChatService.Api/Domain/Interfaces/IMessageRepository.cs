@@ -64,6 +64,15 @@ public interface IMessageRepository
         CursorDirection direction,
         CancellationToken cancellationToken);
 
+    Task<IReadOnlyDictionary<string, Message>> GetLatestByConversationIdsAsync(
+        IReadOnlyCollection<string> conversationIds,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<string, int>> GetUnreadCountsByConversationIdsAsync(
+        IReadOnlyCollection<string> conversationIds,
+        Guid userId,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Atomically transitions matching messages from Sent to Delivered. Returns the IDs that
     /// were actually transitioned (already-delivered messages are ignored).

@@ -7,10 +7,11 @@
     <Project Path="src/BuildingBlocks/Observability/Observability.csproj" />
     <Project Path="src/BuildingBlocks/Outbox/Outbox.csproj" />
     <Project Path="src/BuildingBlocks/ServiceDefaults/ServiceDefaults.csproj" />
+    <Project Path="src/BuildingBlocks/SessionRevocation/SessionRevocation.csproj" />
   </Folder>
   <Folder Name="/src/Gateway/">
     <Project Path="src/Gateway/ApiGateway/ApiGateway.csproj" />
-    <Project Path="src/Gateway/ApiGateway.Tests/ApiGateway.Tests.csproj" />
+    <Project Path="tests/integration/ApiGateway.IntegrationTests/ApiGateway.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/src/Services/" />
   <Folder Name="/src/Services/Call/">
@@ -36,15 +37,18 @@
   </Folder>
   <Folder Name="/src/Services/User/">
     <Project Path="src/Services/User/UserService.Api/UserService.Api.csproj" />
+    <Project Path="src/Services/User/UserService.Api.Contracts/UserService.Api.Contracts.csproj" />
   </Folder>
   <Folder Name="/tests/" />
   <Folder Name="/tests/unit/">
+    <Project Path="tests/unit/ApiGateway.UnitTests/ApiGateway.UnitTests.csproj" />
     <Project Path="tests/unit/BuildingBlocks.UnitTests/BuildingBlocks.UnitTests.csproj" />
     <Project Path="tests/unit/ChatService.UnitTests/ChatService.UnitTests.csproj" />
     <Project Path="tests/unit/DisciplineService.UnitTests/DisciplineService.UnitTests.csproj" />
     <Project Path="tests/unit/MediaService.UnitTests/MediaService.UnitTests.csproj" />
     <Project Path="tests/unit/NotificationService.UnitTests/NotificationService.UnitTests.csproj" />
     <Project Path="tests/unit/PresenceService.UnitTests/PresenceService.UnitTests.csproj" />
+    <Project Path="tests/unit/SessionRevocation.Tests/SessionRevocation.Tests.csproj" />
     <Project Path="tests/unit/UserService.UnitTests/UserService.UnitTests.csproj" />
   </Folder>
   <Folder Name="/tests/contract/">

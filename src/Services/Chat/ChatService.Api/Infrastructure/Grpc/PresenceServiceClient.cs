@@ -11,13 +11,13 @@ namespace Urfu.Link.Services.Chat.Infrastructure.Grpc;
 /// <c>SetTyping</c> rpc on PresenceService so domain code never sees protobuf types.
 /// </summary>
 /// <remarks>
-/// Conversation ids in chat are deterministic strings (SHA1 for direct, <c>discipline:GUID</c>
-/// for groups). PresenceService stores typing per-conversation by GUID, so for direct chats
-/// we hash the deterministic string into a stable GUID before sending. Discipline
-/// conversation ids embed the GUID directly — extract it.
+/// Conversation ids in chat are deterministic strings (SHA1 hex for direct,
+/// <c>discipline:GUID</c> for groups). PresenceService stores typing per-conversation
+/// by GUID, so we map those strings to a stable GUID that the client can derive too.
 /// </remarks>
 internal sealed class PresenceServiceClient(
     PresenceGrpc.InternalApi.InternalApiClient grpcClient,
+    IGrpcBearerTokenProvider tokenProvider,
     ILogger<PresenceServiceClient> logger) : IPresenceServiceClient
 {
     private const string DisciplinePrefix = "discipline:";
@@ -40,8 +40,9 @@ internal sealed class PresenceServiceClient(
 
         try
         {
+            var headers = await tokenProvider.GetAuthorizationMetadataAsync(cancellationToken).ConfigureAwait(false);
             await grpcClient
-                .SetTypingAsync(request, cancellationToken: cancellationToken)
+                .SetTypingAsync(request, headers, cancellationToken: cancellationToken)
                 .ResponseAsync
                 .ConfigureAwait(false);
         }
@@ -73,15 +74,31 @@ internal sealed class PresenceServiceClient(
             }
         }
 
-        // Direct conversation id — derive a stable Guid via SHA1 truncation. SHA1 is used
-        // here as a non-cryptographic deterministic hash (same justification as
-        // Conversation.OpenDirect): the same string maps to the same Guid every time so
-        // PresenceService keys remain stable. Collisions would only matter for identifier
-        // reuse, not security.
+        if (Guid.TryParse(conversationId, out var guid))
+        {
+            return guid;
+        }
+
+        // Direct conversation ids are already SHA1 hex strings. Use the first 16 bytes
+        // as a UUID-shaped key so PresenceHub events can be matched back to the chat id
+        // by clients without async hashing in render-time selectors.
+        if (conversationId.Length >= 32
+            && conversationId[..32].All(IsHexDigit)
+            && Guid.TryParseExact(conversationId[..32], "N", out var directId))
+        {
+            return directId;
+        }
+
+        // Fallback for any future non-hex ids: derive a stable Guid via SHA1 truncation.
 #pragma warning disable CA5350
         Span<byte> hash = stackalloc byte[20];
         System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(conversationId), hash);
 #pragma warning restore CA5350
         return new Guid(hash[..16]);
     }
+
+    private static bool IsHexDigit(char value)
+        => value is >= '0' and <= '9'
+            or >= 'a' and <= 'f'
+            or >= 'A' and <= 'F';
 }

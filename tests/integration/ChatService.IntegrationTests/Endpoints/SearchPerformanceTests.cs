@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Messages;
+using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence.Documents;
@@ -105,9 +106,11 @@ public class SearchPerformanceTests : IAsyncLifetime
         await using (var seedScope = _factory.Services.CreateAsyncScope())
         {
             var open = seedScope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+            var conversations = seedScope.ServiceProvider.GetRequiredService<IConversationRepository>();
             for (var i = 0; i < ConversationsCount; i++)
             {
                 var conv = await open.OpenAsync(caller, Guid.NewGuid(), default);
+                await conversations.TryCreateAsync(conv, default);
                 conversationIds.Add(conv.Id);
             }
         }

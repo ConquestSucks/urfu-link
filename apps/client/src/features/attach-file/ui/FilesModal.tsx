@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, ScrollView, Modal } from "react-native";
 import { CaretLeftIcon, XIcon, FileIcon } from "@/shared/ui/phosphor";
+import { EmptyState } from "@/shared/ui";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import * as DocumentPicker from "expo-document-picker";
 
@@ -29,14 +30,14 @@ export const FilesModal = ({ visible, onClose, attachments, onRemove }: FilesMod
                                     <CaretLeftIcon size={20} className="text-white" />
                                 </Pressable>
                                 <Text className="text-white text-lg font-bold">
-                                    Прикрепленные файлы ({attachments.length})
+                                    Прикрепленные файлы{attachments.length > 0 ? ` (${attachments.length})` : ""}
                                 </Text>
                             </View>
                         )}
                         {!isMobile && (
                             <View className="flex-row items-center justify-between gap-3 flex-1">
                                 <Text className="text-white text-lg font-bold">
-                                    Прикрепленные файлы ({attachments.length})
+                                    Прикрепленные файлы{attachments.length > 0 ? ` (${attachments.length})` : ""}
                                 </Text>
                                 <Pressable onPress={onClose} className="active:opacity-60 p-1">
                                     <XIcon size={20} className="text-white" />
@@ -46,31 +47,39 @@ export const FilesModal = ({ visible, onClose, attachments, onRemove }: FilesMod
                     </View>
 
                     <ScrollView className="flex-1 p-4">
-                        {attachments.map((file, index) => (
-                            <View
-                                key={`${file.uri}-${index}`}
-                                className="flex-row items-center bg-white/5 p-4 rounded-xl mb-3"
-                            >
-                                <FileIcon size={24} className="text-brand-400 mr-3" />
-                                <View className="flex-1">
-                                    <Text
-                                        className="text-white text-sm font-medium mb-1"
-                                        numberOfLines={1}
-                                    >
-                                        {file.name}
-                                    </Text>
-                                    <Text className="text-text-subtle text-xs">
-                                        {file.size ? (file.size / 1024 / 1024).toFixed(2) : 0} MB
-                                    </Text>
-                                </View>
-                                <Pressable
-                                    onPress={() => onRemove(index)}
-                                    className="p-2 bg-white/5 rounded-full active:bg-white/10"
+                        {attachments.length === 0 ? (
+                            <EmptyState
+                                size="compact"
+                                icon={FileIcon}
+                                title="Файлы не прикреплены"
+                            />
+                        ) : (
+                            attachments.map((file, index) => (
+                                <View
+                                    key={`${file.uri}-${index}`}
+                                    className="flex-row items-center bg-white/5 p-4 rounded-xl mb-3"
                                 >
-                                    <XIcon size={16} className="text-text-muted hover:text-white" />
-                                </Pressable>
-                            </View>
-                        ))}
+                                    <FileIcon size={24} className="text-brand-400 mr-3" />
+                                    <View className="flex-1">
+                                        <Text
+                                            className="text-white text-sm font-medium mb-1"
+                                            numberOfLines={1}
+                                        >
+                                            {file.name}
+                                        </Text>
+                                        <Text className="text-text-subtle text-xs">
+                                            {file.size ? (file.size / 1024 / 1024).toFixed(2) : 0} MB
+                                        </Text>
+                                    </View>
+                                    <Pressable
+                                        onPress={() => onRemove(index)}
+                                        className="p-2 bg-white/5 rounded-full active:bg-white/10"
+                                    >
+                                        <XIcon size={16} className="text-text-muted hover:text-white" />
+                                    </Pressable>
+                                </View>
+                            ))
+                        )}
                     </ScrollView>
                 </View>
             </View>

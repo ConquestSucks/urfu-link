@@ -21,6 +21,13 @@ builder.Services
         options.HandshakeTimeout = TimeSpan.FromSeconds(15);
         options.MaximumReceiveMessageSize = 64 * 1024;
     })
+    .AddJsonProtocol(options =>
+    {
+        // Соответствует FastEndpoints-сериализатору: enum'ы отдаём строками,
+        // чтобы клиент мог типизировать ConversationType как union "Direct" | "Group".
+        options.PayloadSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter());
+    })
     .AddStackExchangeRedis(
         builder.Configuration["Infrastructure:Redis:Configuration"]
             ?? throw new InvalidOperationException("Infrastructure:Redis:Configuration is missing"),
@@ -62,7 +69,14 @@ builder.Services.AddChatModule(builder.Configuration);
 var app = builder.Build();
 
 app.MapServiceDefaults();
-app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
+app.UseFastEndpoints(c =>
+{
+    c.Endpoints.RoutePrefix = "api/v1";
+    // Enum'ы сериализуем как строки ("Direct"/"Group" вместо 0/1) — клиент типизирует
+    // ConversationType / ParticipantRole / AttachmentType строковыми union-ами.
+    c.Serializer.Options.Converters.Add(
+        new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 app.MapGrpcService<InternalApiService>().RequireAuthorization();
 app.MapHub<ChatHub>("/hubs/chat");
 

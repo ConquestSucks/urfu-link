@@ -3,6 +3,7 @@ using Urfu.Link.Services.Presence.Application.Aggregation;
 using Urfu.Link.Services.Presence.Domain.Enums;
 using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Grpc;
+using Urfu.Link.Services.Presence.Realtime;
 using DomainEnums = Urfu.Link.Services.Presence.Domain.Enums;
 
 namespace Urfu.Link.Services.Presence.Services;
@@ -11,7 +12,8 @@ public sealed class InternalApiService(
     IPresenceSessionStore sessions,
     ITypingStore typing,
     ILastSeenRepository lastSeen,
-    PresenceAggregator aggregator) : InternalApi.InternalApiBase
+    PresenceAggregator aggregator,
+    PresenceBroadcaster broadcaster) : InternalApi.InternalApiBase
 {
     public override Task<PingReply> Ping(PingRequest request, ServerCallContext context)
     {
@@ -77,11 +79,17 @@ public sealed class InternalApiService(
         var user = ParseUserId(request.UserId);
 
         // The store reports `changed = true` when it actually mutated state (created a
-        // fresh entry on Start, or removed an existing one on Stop). Callers can use
-        // this to avoid emitting redundant typing broadcasts for keep-alive refreshes.
+        // fresh entry on Start, or removed an existing one on Stop). Only fan out to
+        // subscribers on real transitions — keep-alive refreshes stay silent.
         var changed = request.IsTyping
             ? await typing.StartTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false)
             : await typing.StopTypingAsync(conv, user, context.CancellationToken).ConfigureAwait(false);
+
+        if (changed)
+        {
+            await broadcaster.BroadcastTypingAsync(conv, user, request.IsTyping, context.CancellationToken)
+                .ConfigureAwait(false);
+        }
 
         return new SetTypingReply { Changed = changed };
     }

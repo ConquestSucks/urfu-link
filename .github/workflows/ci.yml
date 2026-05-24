@@ -117,37 +117,51 @@ jobs:
         id: build-matrix
         shell: bash
         run: |
-          declare -A SERVICE_MAP
-          SERVICE_MAP[api-gateway]="src/Gateway/ApiGateway/Dockerfile"
-          SERVICE_MAP[media-service]="src/Services/Media/MediaService.Api/Dockerfile"
-          SERVICE_MAP[user-service]="src/Services/User/UserService.Api/Dockerfile"
-          SERVICE_MAP[chat-service]="src/Services/Chat/ChatService.Api/Dockerfile"
-          SERVICE_MAP[presence-service]="src/Services/Presence/PresenceService.Api/Dockerfile"
-          SERVICE_MAP[notification-service]="src/Services/Notification/NotificationService.Api/Dockerfile"
-          SERVICE_MAP[call-service]="src/Services/Call/CallService.Api/Dockerfile"
+          # service → (project_path, dll_name) для build-args единого Dockerfile.
+          declare -A PROJECT_MAP
+          PROJECT_MAP[api-gateway]="src/Gateway/ApiGateway/ApiGateway.csproj"
+          PROJECT_MAP[media-service]="src/Services/Media/MediaService.Api/MediaService.Api.csproj"
+          PROJECT_MAP[user-service]="src/Services/User/UserService.Api/UserService.Api.csproj"
+          PROJECT_MAP[chat-service]="src/Services/Chat/ChatService.Api/ChatService.Api.csproj"
+          PROJECT_MAP[presence-service]="src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj"
+          PROJECT_MAP[notification-service]="src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj"
+          PROJECT_MAP[call-service]="src/Services/Call/CallService.Api/CallService.Api.csproj"
+
+          declare -A DLL_MAP
+          DLL_MAP[api-gateway]="ApiGateway.dll"
+          DLL_MAP[media-service]="MediaService.Api.dll"
+          DLL_MAP[user-service]="UserService.Api.dll"
+          DLL_MAP[chat-service]="ChatService.Api.dll"
+          DLL_MAP[presence-service]="PresenceService.Api.dll"
+          DLL_MAP[notification-service]="NotificationService.Api.dll"
+          DLL_MAP[call-service]="CallService.Api.dll"
 
           ALL_SERVICES=(api-gateway media-service user-service chat-service presence-service notification-service call-service)
 
           FORCE_ALL="${{ inputs.force_all }}"
           SHARED_CHANGED="${{ steps.filter.outputs.shared }}"
+          DOCKERFILE="platform/dev/Dockerfile.service"
+
+          add_service() {
+            local svc="$1"
+            local proj="${PROJECT_MAP[$svc]}"
+            local dll="${DLL_MAP[$svc]}"
+            includes=$(echo "$includes" | jq \
+              --arg s "$svc" \
+              --arg d "$DOCKERFILE" \
+              --arg p "$proj" \
+              --arg n "$dll" \
+              '. + [{"service":$s,"dockerfile":$d,"context":".","service_project":$p,"service_dll":$n}]')
+          }
 
           includes="[]"
 
           if [[ "$FORCE_ALL" == "true" || "$SHARED_CHANGED" == "true" ]]; then
-            includes=$(jq -n '[
-              {"service":"api-gateway","dockerfile":"src/Gateway/ApiGateway/Dockerfile","context":"."},
-              {"service":"media-service","dockerfile":"src/Services/Media/MediaService.Api/Dockerfile","context":"."},
-              {"service":"user-service","dockerfile":"src/Services/User/UserService.Api/Dockerfile","context":"."},
-              {"service":"chat-service","dockerfile":"src/Services/Chat/ChatService.Api/Dockerfile","context":"."},
-              {"service":"presence-service","dockerfile":"src/Services/Presence/PresenceService.Api/Dockerfile","context":"."},
-              {"service":"notification-service","dockerfile":"src/Services/Notification/NotificationService.Api/Dockerfile","context":"."},
-              {"service":"call-service","dockerfile":"src/Services/Call/CallService.Api/Dockerfile","context":"."}
-            ]')
-          else
-            includes="[]"
             for svc in "${ALL_SERVICES[@]}"; do
-              changed="${{ steps.filter.outputs.changes }}"
-              # Check individual service filter output
+              add_service "$svc"
+            done
+          else
+            for svc in "${ALL_SERVICES[@]}"; do
               svc_changed=""
               case "$svc" in
                 api-gateway) svc_changed="${{ steps.filter.outputs.api-gateway }}" ;;
@@ -160,8 +174,7 @@ jobs:
               esac
 
               if [[ "$svc_changed" == "true" ]]; then
-                dockerfile="${SERVICE_MAP[$svc]}"
-                includes=$(echo "$includes" | jq --arg s "$svc" --arg d "$dockerfile" '. + [{"service":$s,"dockerfile":$d,"context":"."}]')
+                add_service "$svc"
               fi
             done
           fi
@@ -216,11 +229,14 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          build-args: |
+            SERVICE_PROJECT=${{ matrix.service_project }}
+            SERVICE_DLL=${{ matrix.service_dll }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
       - name: Scan image
         uses: aquasecurity/trivy-action@v0.36.0

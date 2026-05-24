@@ -3,15 +3,23 @@ import { DotsThreeVerticalIcon, MagnifyingGlassIcon, PhoneIcon } from "@/shared/
 import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getChatHeaderActions } from "../../config/headerActions";
+
 interface ChatHeaderActionsProps {
     onOpenProfile: () => void;
+    onOpenPinned: () => void;
+    onSearchPress: () => void;
 }
-export const ChatHeaderActions = ({ onOpenProfile }: ChatHeaderActionsProps) => {
+
+export const ChatHeaderActions = ({ onOpenProfile, onOpenPinned, onSearchPress }: ChatHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getChatHeaderActions({
         onOpenProfile: () => {
             menuRef.current?.close();
             onOpenProfile();
+        },
+        onOpenPinned: () => {
+            menuRef.current?.close();
+            onOpenPinned();
         },
     });
     return (
@@ -19,11 +27,11 @@ export const ChatHeaderActions = ({ onOpenProfile }: ChatHeaderActionsProps) => 
             <Pressable className="p-2 rounded-xl active:bg-white/10">
                 <PhoneIcon size={24} className="text-text-muted" weight="regular" />
             </Pressable>
-            <Pressable className="p-2 rounded-xl active:bg-white/10">
+            <Pressable className="p-2 rounded-xl active:bg-white/10" onPress={onSearchPress}>
                 <MagnifyingGlassIcon size={24} className="text-text-muted" weight="regular" />
             </Pressable>
             <Pressable
-                className="p-2 rounded-xl active:bg-white/10 "
+                className="p-2 rounded-xl active:bg-white/10"
                 onPress={() => menuRef.current?.toggle()}
             >
                 <DotsThreeVerticalIcon size={24} className="text-text-muted" weight="bold" />

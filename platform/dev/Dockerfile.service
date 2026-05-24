@@ -1,0 +1,87 @@
+# syntax=docker/dockerfile:1.7
+#
+# Универсальный Dockerfile для всех .NET-сервисов и миграционных сидекаров.
+# Параметризован через build-args SERVICE_PROJECT и SERVICE_DLL.
+#
+# Ключевые приёмы:
+#   * --platform=$BUILDPLATFORM на build-стадии — SDK работает в нативной
+#     архитектуре хоста (arm64 на Apple Silicon → без эмуляции через Rosetta).
+#     BUILDPLATFORM и TARGETARCH автоматически предоставляются BuildKit,
+#     отдельно их объявлять глобально не нужно.
+#   * -a $TARGETARCH передаётся в restore/publish — артефакты собираются под
+#     целевую runtime-архитектуру (всё ещё может быть amd64 если нужен прод-target).
+#   * COPY csproj → RUN restore → COPY src → RUN publish: NuGet-restore попадает
+#     в отдельный кэш-слой и переиспользуется пока csproj-ы и Directory.Packages.props
+#     не менялись.
+
+# ── Restore-стадия: только csproj-ы и пакеты ────────────────────────────────
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0.201 AS restore
+WORKDIR /src
+
+# Системный protoc взамен встроенного в Grpc.Tools 2.80.0:
+# для linux_arm64 встроенный protoc падает с SIGSEGV в Docker на Apple Silicon
+# (известная регрессия пакета). Системный protobuf-compiler из Debian стабилен.
+# grpc_csharp_plugin остаётся из Grpc.Tools — он переопределяется отдельно
+# через gRPC_PluginFullPath, если потребуется.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+ENV Protobuf_ProtocFullPath=/usr/bin/protoc
+
+COPY ["Directory.Build.props", "Directory.Packages.props", "NuGet.Config", "./"]
+
+# BuildingBlocks
+COPY ["src/BuildingBlocks/Auth/Auth.csproj",                         "src/BuildingBlocks/Auth/"]
+COPY ["src/BuildingBlocks/Contracts/Contracts.csproj",               "src/BuildingBlocks/Contracts/"]
+COPY ["src/BuildingBlocks/Idempotency/Idempotency.csproj",           "src/BuildingBlocks/Idempotency/"]
+COPY ["src/BuildingBlocks/Observability/Observability.csproj",       "src/BuildingBlocks/Observability/"]
+COPY ["src/BuildingBlocks/Outbox/Outbox.csproj",                     "src/BuildingBlocks/Outbox/"]
+COPY ["src/BuildingBlocks/ServiceDefaults/ServiceDefaults.csproj",   "src/BuildingBlocks/ServiceDefaults/"]
+COPY ["src/BuildingBlocks/SessionRevocation/SessionRevocation.csproj", "src/BuildingBlocks/SessionRevocation/"]
+
+# Service contracts (transitive references between services)
+COPY ["src/Services/Discipline/DisciplineService.Api.Contracts/DisciplineService.Api.Contracts.csproj", "src/Services/Discipline/DisciplineService.Api.Contracts/"]
+COPY ["src/Services/Media/MediaService.Api.Contracts/MediaService.Api.Contracts.csproj",                "src/Services/Media/MediaService.Api.Contracts/"]
+COPY ["src/Services/Presence/PresenceService.Api.Contracts/PresenceService.Api.Contracts.csproj",      "src/Services/Presence/PresenceService.Api.Contracts/"]
+COPY ["src/Services/User/UserService.Api.Contracts/UserService.Api.Contracts.csproj",                  "src/Services/User/UserService.Api.Contracts/"]
+
+# Service Api projects
+COPY ["src/Gateway/ApiGateway/ApiGateway.csproj",                                       "src/Gateway/ApiGateway/"]
+COPY ["src/Services/Call/CallService.Api/CallService.Api.csproj",                       "src/Services/Call/CallService.Api/"]
+COPY ["src/Services/Chat/ChatService.Api/ChatService.Api.csproj",                       "src/Services/Chat/ChatService.Api/"]
+COPY ["src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj",     "src/Services/Discipline/DisciplineService.Api/"]
+COPY ["src/Services/Media/MediaService.Api/MediaService.Api.csproj",                    "src/Services/Media/MediaService.Api/"]
+COPY ["src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj", "src/Services/Notification/NotificationService.Api/"]
+COPY ["src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj",           "src/Services/Presence/PresenceService.Api/"]
+COPY ["src/Services/User/UserService.Api/UserService.Api.csproj",                       "src/Services/User/UserService.Api/"]
+
+ARG SERVICE_PROJECT
+ARG TARGETARCH
+RUN dotnet restore "$SERVICE_PROJECT" -a "$TARGETARCH"
+
+# ── Build-стадия: компиляция и publish ──────────────────────────────────────
+FROM restore AS build
+COPY src/ src/
+
+ARG SERVICE_PROJECT
+ARG TARGETARCH
+RUN dotnet publish "$SERVICE_PROJECT" \
+    -c Release \
+    -a "$TARGETARCH" \
+    --no-restore \
+    -o /app/publish \
+    /p:UseAppHost=false
+
+# ── Runtime-стадия ──────────────────────────────────────────────────────────
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.4 AS final
+WORKDIR /app
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+
+COPY --from=build /app/publish .
+
+ARG SERVICE_DLL
+ENV SERVICE_DLL=${SERVICE_DLL}
+
+USER $APP_UID
+ENTRYPOINT ["sh", "-c", "exec dotnet $SERVICE_DLL \"$@\"", "--"]

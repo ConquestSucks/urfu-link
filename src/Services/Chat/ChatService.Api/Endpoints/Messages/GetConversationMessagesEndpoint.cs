@@ -7,19 +7,8 @@ using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Messages;
 
-public sealed class GetConversationMessagesRequest
-{
-    public string Id { get; set; } = string.Empty;
-
-    [QueryParam] public string? Cursor { get; set; }
-
-    [QueryParam] public int? Limit { get; set; }
-
-    [QueryParam] public string? Direction { get; set; }
-}
-
 public sealed class GetConversationMessagesEndpoint(GetConversationMessagesQuery query)
-    : Endpoint<GetConversationMessagesRequest, CursorPage<MessageDto>>
+    : EndpointWithoutRequest<CursorPage<MessageDto>>
 {
     public override void Configure()
     {
@@ -28,22 +17,25 @@ public sealed class GetConversationMessagesEndpoint(GetConversationMessagesQuery
         Summary(s => s.Summary = "Cursor-paginated message history for a conversation.");
     }
 
-    public override async Task HandleAsync(GetConversationMessagesRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
-        var direction = string.Equals(req.Direction, "newer", StringComparison.OrdinalIgnoreCase)
+        var id = Route<string>("id")!;
+        var cursor = Query<string?>("cursor", isRequired: false);
+        var limit = Query<int?>("limit", isRequired: false);
+        var directionRaw = Query<string?>("direction", isRequired: false);
+        var direction = string.Equals(directionRaw, "newer", StringComparison.OrdinalIgnoreCase)
             ? CursorDirection.Newer
             : CursorDirection.Older;
 
         try
         {
-            var page = await query.ExecuteAsync(req.Id, caller, req.Cursor, req.Limit, direction, ct).ConfigureAwait(false);
+            var page = await query.ExecuteAsync(id, caller, cursor, limit, direction, ct).ConfigureAwait(false);
             await Send.OkAsync(page, ct).ConfigureAwait(false);
         }
         catch (InvalidChatCursorException)
         {
-            AddError(r => r.Cursor!, "Invalid cursor.");
+            AddError("cursor", "Invalid cursor.");
             await Send.ErrorsAsync(StatusCodes.Status400BadRequest, ct).ConfigureAwait(false);
         }
     }

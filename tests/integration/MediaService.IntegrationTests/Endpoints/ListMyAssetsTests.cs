@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Infrastructure.Persistence;
@@ -35,7 +34,7 @@ public class ListMyAssetsTests : IAsyncLifetime
         var response = await client.GetAsync("/api/v1/media/my");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<ListMyAssetsResponse>();
+        var body = await MediaJson.ReadAsync<ListMyAssetsResponse>(response.Content);
         body!.Items.Should().HaveCount(2);
         body.Items.Should().OnlyContain(i => i.OwnerId == ownerId);
         body.NextCursor.Should().BeNull();
@@ -51,7 +50,7 @@ public class ListMyAssetsTests : IAsyncLifetime
         var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
         var response = await client.GetAsync("/api/v1/media/my");
 
-        var body = await response.Content.ReadFromJsonAsync<ListMyAssetsResponse>();
+        var body = await MediaJson.ReadAsync<ListMyAssetsResponse>(response.Content);
         body!.Items.Should().HaveCount(1);
     }
 
@@ -67,13 +66,13 @@ public class ListMyAssetsTests : IAsyncLifetime
 
         var client = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
         var firstPage = await client.GetAsync("/api/v1/media/my?limit=2");
-        var first = await firstPage.Content.ReadFromJsonAsync<ListMyAssetsResponse>();
+        var first = await MediaJson.ReadAsync<ListMyAssetsResponse>(firstPage.Content);
         first!.Items.Should().HaveCount(2);
         first.NextCursor.Should().NotBeNull();
 
         var secondClient = TestAssetBuilder.AuthorizedClient(_factory, ownerId);
         var secondPage = await secondClient.GetAsync($"/api/v1/media/my?limit=2&cursor={first.NextCursor}");
-        var second = await secondPage.Content.ReadFromJsonAsync<ListMyAssetsResponse>();
+        var second = await MediaJson.ReadAsync<ListMyAssetsResponse>(secondPage.Content);
         second!.Items.Should().HaveCount(2);
 
         var seen = first.Items.Concat(second.Items).Select(i => i.AssetId).ToList();
@@ -111,7 +110,7 @@ public class ListMyAssetsTests : IAsyncLifetime
                 ? $"/api/v1/media/my?limit=1&cursor={cursor}"
                 : "/api/v1/media/my?limit=1";
             var resp = await client.GetAsync(url);
-            var body = await resp.Content.ReadFromJsonAsync<ListMyAssetsResponse>();
+            var body = await MediaJson.ReadAsync<ListMyAssetsResponse>(resp.Content);
             seen.AddRange(body!.Items.Select(i => i.AssetId));
             cursor = body.NextCursor;
             if (cursor is null) break;

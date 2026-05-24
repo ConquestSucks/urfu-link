@@ -100,6 +100,6 @@ public sealed class PinMessageService(
 
         var pinnedMessages = await messages.GetByIdsAsync(
             conversation.Id, conversation.PinnedMessageIds, cancellationToken).ConfigureAwait(false);
-        return pinnedMessages.Select(MessageDto.FromDomain).ToList();
+        return GetPinnedMessagesQuery.OrderPinnedMessages(conversation, pinnedMessages);
     }
 }

@@ -33,6 +33,8 @@ public sealed class ChatHubTypingTests(ChatServiceFactory factory) : IAsyncLifet
         await using var bobConn = await TestChatHubClient.ConnectAsync(_factory, bob);
 
         var conv = await aliceConn.InvokeAsync<ConversationDto>("OpenDirectConversation", bob);
+        await MaterializeDirectAsync(aliceConn, conv.Id, bob);
+        _factory.PresenceServiceClient.Reset();
 
         await aliceConn.InvokeAsync("StartTyping", conv.Id);
 
@@ -51,6 +53,8 @@ public sealed class ChatHubTypingTests(ChatServiceFactory factory) : IAsyncLifet
         await using var bobConn = await TestChatHubClient.ConnectAsync(_factory, bob);
 
         var conv = await aliceConn.InvokeAsync<ConversationDto>("OpenDirectConversation", bob);
+        await MaterializeDirectAsync(aliceConn, conv.Id, bob);
+        _factory.PresenceServiceClient.Reset();
 
         await aliceConn.InvokeAsync("StopTyping", conv.Id);
 
@@ -70,6 +74,8 @@ public sealed class ChatHubTypingTests(ChatServiceFactory factory) : IAsyncLifet
         await using var strangerConn = await TestChatHubClient.ConnectAsync(_factory, stranger);
 
         var conv = await aliceConn.InvokeAsync<ConversationDto>("OpenDirectConversation", bob);
+        await MaterializeDirectAsync(aliceConn, conv.Id, bob);
+        _factory.PresenceServiceClient.Reset();
 
         var act = async () => await strangerConn.InvokeAsync("StartTyping", conv.Id);
 
@@ -90,6 +96,7 @@ public sealed class ChatHubTypingTests(ChatServiceFactory factory) : IAsyncLifet
         await using var bobConn = await TestChatHubClient.ConnectAsync(_factory, bob);
 
         var conv = await aliceConn.InvokeAsync<ConversationDto>("OpenDirectConversation", bob);
+        await MaterializeDirectAsync(aliceConn, conv.Id, bob);
 
         // Alice starts typing, then sends — the explicit StopTyping should not be needed.
         await aliceConn.InvokeAsync("StartTyping", conv.Id);
@@ -107,4 +114,14 @@ public sealed class ChatHubTypingTests(ChatServiceFactory factory) : IAsyncLifet
             .ContainSingle(r => r.UserId == alice && r.ConversationId == conv.Id && !r.IsTyping,
                 "SendMessageService must auto-stop the sender's typing indicator after a successful send.");
     }
+
+    private static Task<MessageDto> MaterializeDirectAsync(HubConnection connection, string conversationId, Guid peerUserId)
+        => connection.InvokeAsync<MessageDto>("SendMessage", new
+        {
+            ConversationId = conversationId,
+            Body = "seed",
+            AttachmentAssetIds = Array.Empty<Guid>(),
+            ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = peerUserId,
+        });
 }

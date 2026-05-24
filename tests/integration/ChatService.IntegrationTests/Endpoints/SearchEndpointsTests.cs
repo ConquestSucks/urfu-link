@@ -39,9 +39,10 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            convA = (await open.OpenAsync(caller, peerA, default)).Id;
-            convB = (await open.OpenAsync(caller, peerB, default)).Id;
-            convStranger = (await open.OpenAsync(stranger, Guid.NewGuid(), default)).Id;
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            convA = await OpenAndPersistDirectAsync(open, conversations, caller, peerA);
+            convB = await OpenAndPersistDirectAsync(open, conversations, caller, peerB);
+            convStranger = await OpenAndPersistDirectAsync(open, conversations, stranger, Guid.NewGuid());
         }
 
         await SendAsync(convA, caller, "квантовая запутанность интересна");
@@ -51,11 +52,37 @@ public class SearchEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<MessageSearchResultDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<MessageSearchResultDto>>(
             "/api/v1/chat/search?q=квантовая&limit=50");
 
         page!.Items.Should().HaveCount(2);
         page.Items.Select(i => i.ConversationId).Should().BeEquivalentTo(new[] { convA, convB });
+    }
+
+    [Fact]
+    public async Task Get_Search_MatchesWordPrefix()
+    {
+        var caller = Guid.NewGuid();
+        var peer = Guid.NewGuid();
+        string conv;
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            conv = await OpenAndPersistDirectAsync(open, conversations, caller, peer);
+        }
+
+        await SendAsync(conv, peer, "привет, увидимся после пары");
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
+
+        using var client = _factory.CreateClient();
+        var page = await client.GetFromChatJsonAsync<CursorPage<MessageSearchResultDto>>(
+            "/api/v1/chat/search?q=при&limit=20");
+
+        page!.Items.Should().ContainSingle();
+        page.Items[0].Body.Should().Contain("привет");
+        page.Items[0].HighlightedSnippet.Should().Contain("при");
     }
 
     [Fact]
@@ -66,7 +93,8 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            strangerConv = (await open.OpenAsync(Guid.NewGuid(), Guid.NewGuid(), default)).Id;
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            strangerConv = await OpenAndPersistDirectAsync(open, conversations, Guid.NewGuid(), Guid.NewGuid());
         }
 
         await SendAsync(strangerConv, Guid.NewGuid(), "тайное сообщение");
@@ -77,7 +105,7 @@ public class SearchEndpointsTests : IAsyncLifetime
         var response = await client.GetAsync($"/api/v1/chat/search?q=тайное&conversationId={strangerConv}");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var page = await response.Content.ReadFromJsonAsync<CursorPage<MessageSearchResultDto>>();
+        var page = await response.Content.ReadFromChatJsonAsync<CursorPage<MessageSearchResultDto>>();
         page!.Items.Should().BeEmpty();
     }
 
@@ -131,7 +159,8 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            conv = (await open.OpenAsync(caller, peer, default)).Id;
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            conv = await OpenAndPersistDirectAsync(open, conversations, caller, peer);
         }
 
         await SendAsync(conv, caller, "общий термин раз");
@@ -140,7 +169,7 @@ public class SearchEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<MessageSearchResultDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<MessageSearchResultDto>>(
             $"/api/v1/chat/search?q=общий&senderId={caller}");
 
         page!.Items.Should().ContainSingle();
@@ -156,7 +185,8 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            conv = (await open.OpenAsync(caller, peer, default)).Id;
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            conv = await OpenAndPersistDirectAsync(open, conversations, caller, peer);
         }
 
         for (var i = 0; i < 6; i++)
@@ -167,12 +197,12 @@ public class SearchEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var first = await client.GetFromJsonAsync<CursorPage<MessageSearchResultDto>>(
+        var first = await client.GetFromChatJsonAsync<CursorPage<MessageSearchResultDto>>(
             "/api/v1/chat/search?q=тест&limit=3");
         first!.Items.Should().HaveCount(3);
         first.NextCursor.Should().NotBeNullOrEmpty();
 
-        var second = await client.GetFromJsonAsync<CursorPage<MessageSearchResultDto>>(
+        var second = await client.GetFromChatJsonAsync<CursorPage<MessageSearchResultDto>>(
             $"/api/v1/chat/search?q=тест&limit=3&cursor={Uri.EscapeDataString(first.NextCursor!)}");
         second!.Items.Should().HaveCount(3);
 
@@ -192,7 +222,9 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            var conv = await OpenAndPersistDirectAsync(open, conversations, caller, Guid.NewGuid());
+            await SendAsync(conv, caller, "scope seed");
         }
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
@@ -209,7 +241,8 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            conv = (await open.OpenAsync(caller, peer, default)).Id;
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            conv = await OpenAndPersistDirectAsync(open, conversations, caller, peer);
         }
 
         var prefix = new string('x', 50);
@@ -219,7 +252,7 @@ public class SearchEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<MessageSearchResultDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<MessageSearchResultDto>>(
             "/api/v1/chat/search?q=оплата");
 
         page!.Items.Should().ContainSingle();
@@ -234,7 +267,9 @@ public class SearchEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            await open.OpenAsync(caller, peer, default);
+            var conversations = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            var conv = await OpenAndPersistDirectAsync(open, conversations, caller, peer);
+            await SendAsync(conv, caller, "rate limit scope seed");
         }
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
@@ -266,5 +301,16 @@ public class SearchEndpointsTests : IAsyncLifetime
             Guid.NewGuid().ToString(),
             DateTimeOffset.UtcNow);
         await repo.InsertAsync(msg, default);
+    }
+
+    private static async Task<string> OpenAndPersistDirectAsync(
+        OpenDirectConversationService open,
+        IConversationRepository conversations,
+        Guid caller,
+        Guid peer)
+    {
+        var conv = await open.OpenAsync(caller, peer, default);
+        await conversations.TryCreateAsync(conv, default);
+        return conv.Id;
     }
 }

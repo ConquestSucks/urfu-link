@@ -8,6 +8,8 @@ import {
 } from "@/shared/ui/phosphor";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
+import { LastSeenLabel, presenceStatusToLabel } from "@/entities/presence";
+import type { PresenceStatus } from "@urfu-link/api-client";
 
 interface UserProfileModalProps {
     isOpen: boolean;
@@ -17,6 +19,8 @@ interface UserProfileModalProps {
         avatarUrl?: string;
         email?: string;
         phone?: string;
+        status?: PresenceStatus;
+        lastSeenAt?: string | null;
     };
 }
 
@@ -42,13 +46,28 @@ export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProp
                 <View className="items-center gap-4">
                     <View className="relative">
                         <Avatar size={100} src={user.avatarUrl} name={user.name} />
-                        <View className="absolute bottom-1 right-1 w-5 h-5 bg-success-500 border-[3px] border-app-card rounded-full" />
+                        {user.status === "Online" && (
+                            <View className="absolute bottom-1 right-1 w-5 h-5 bg-success-500 border-[3px] border-app-card rounded-full" />
+                        )}
                     </View>
                     <View className="items-center gap-1">
                         <Text className="text-2xl text-white font-bold text-center">
                             {user.name}
                         </Text>
-                        <Text className="text-sm text-success-500 font-medium">В сети</Text>
+                        {user.status === "Online" ? (
+                            <Text className="text-sm text-success-500 font-medium">
+                                {presenceStatusToLabel(user.status)}
+                            </Text>
+                        ) : user.lastSeenAt ? (
+                            <LastSeenLabel
+                                lastSeenAt={user.lastSeenAt}
+                                className="text-sm text-text-muted font-medium"
+                            />
+                        ) : (
+                            <Text className="text-sm text-text-muted font-medium">
+                                {user.status ? presenceStatusToLabel(user.status) : "Не в сети"}
+                            </Text>
+                        )}
                     </View>
                 </View>
                 <View className="flex-row justify-center gap-4 w-full">
@@ -75,17 +94,17 @@ export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProp
     );
 };
 const ActionBtn = ({ icon: Icon, label }: { icon: any; label: string }) => (
-    <Pressable className="w-20 items-center gap-2 group active:opacity-70 transition-opacity">
-        <View className="w-12 h-12 rounded-full bg-white/5 border border-white/10 items-center justify-center transition-colors">
+    <View className="w-20 items-center gap-2">
+        <View className="w-12 h-12 rounded-full bg-white/5 border border-white/10 items-center justify-center">
             <Icon size={20} className="text-text-muted" />
         </View>
         <Text className="text-[11px] text-text-muted font-medium text-center" numberOfLines={1}>
             {label}
         </Text>
-    </Pressable>
+    </View>
 );
 const InfoRow = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
-    <Pressable className="flex-row items-center gap-4 p-4 active:bg-white/5 transition-colors">
+    <View className="flex-row items-center gap-4 p-4">
         <Icon size={20} className="text-text-placeholder" />
         <View>
             <Text className="text-[11px] text-text-placeholder uppercase tracking-wider mb-0.5">
@@ -93,5 +112,5 @@ const InfoRow = ({ icon: Icon, label, value }: { icon: any; label: string; value
             </Text>
             <Text className="text-sm text-white">{value}</Text>
         </View>
-    </Pressable>
+    </View>
 );

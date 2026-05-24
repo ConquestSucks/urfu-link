@@ -22,7 +22,9 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<PresenceDbContext>(
     args,
     "PresenceService",
     services => services.AddDbContext<PresenceDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("Primary"),
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")))))
 {
     return;
 }

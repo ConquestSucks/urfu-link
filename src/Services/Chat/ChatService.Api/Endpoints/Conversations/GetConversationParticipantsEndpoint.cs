@@ -4,13 +4,8 @@ using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Conversations;
 
-public sealed class GetConversationParticipantsRequest
-{
-    public string Id { get; set; } = string.Empty;
-}
-
 public sealed class GetConversationParticipantsEndpoint(GetConversationParticipantsQuery query)
-    : Endpoint<GetConversationParticipantsRequest, IReadOnlyList<ConversationParticipantDto>>
+    : EndpointWithoutRequest<IReadOnlyList<ConversationParticipantDto>>
 {
     public override void Configure()
     {
@@ -21,13 +16,13 @@ public sealed class GetConversationParticipantsEndpoint(GetConversationParticipa
             "Caller must be a participant or an admin.");
     }
 
-    public override async Task HandleAsync(GetConversationParticipantsRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
         var isAdmin = User.IsAdmin();
+        var id = Route<string>("id")!;
         var participants = await query
-            .ExecuteAsync(req.Id, caller, isAdmin, ct)
+            .ExecuteAsync(id, caller, isAdmin, ct)
             .ConfigureAwait(false);
         await Send.OkAsync(participants, ct).ConfigureAwait(false);
     }

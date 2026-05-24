@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Images;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -22,10 +23,12 @@ public sealed class NotificationServiceFactory : WebApplicationFactory<Program>,
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:17.9-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7.4.2-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     /// <summary>

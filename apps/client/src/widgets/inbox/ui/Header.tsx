@@ -3,9 +3,13 @@ import { Text, View } from "react-native";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ViewToggle } from "@/entities/view";
 import { SearchBar } from "@/shared/ui";
+import { useSearchStore } from "@/features/chat-search";
+import { useGlobalSearch } from "@/features/chat-search";
 
 export const Header = ({ title }: { title: string }) => {
     const { currentView, createViewHref } = useInboxRouting();
+    const globalQuery = useSearchStore((s) => s.globalQuery);
+    const { onQueryChange } = useGlobalSearch();
 
     return (
         <View className="px-6">
@@ -15,7 +19,11 @@ export const Header = ({ title }: { title: string }) => {
                 </Text>
                 <ViewToggle currentView={currentView} createHref={createViewHref} />
             </View>
-            <SearchBar />
+            <SearchBar
+                value={globalQuery}
+                onChange={onQueryChange}
+                placeholder="Поиск по чатам, сообщениям и людям..."
+            />
         </View>
     );
 };

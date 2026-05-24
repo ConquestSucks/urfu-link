@@ -9,7 +9,7 @@ public interface IPresignedUrlGenerator
 {
     PresignedUrl ForUpload(string bucket, string objectKey, string contentType, TimeSpan ttl);
 
-    PresignedUrl ForDownload(string bucket, string objectKey, TimeSpan ttl);
+    PresignedUrl ForDownload(string bucket, string objectKey, string fileName, TimeSpan ttl);
 }
 
 public sealed record PresignedUrl(string Url, DateTimeOffset ExpiresAtUtc);

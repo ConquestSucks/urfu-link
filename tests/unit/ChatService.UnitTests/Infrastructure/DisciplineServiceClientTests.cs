@@ -9,6 +9,22 @@ namespace Urfu.Link.Services.Chat.UnitTests.Infrastructure;
 public class DisciplineServiceClientTests
 {
     [Fact]
+    public async Task ListUserDisciplinesAsync_AddsAuthorizationMetadata_WhenBearerTokenIsAvailable()
+    {
+        var reply = new DisciplineGrpc.ListUserDisciplinesReply();
+        var grpcClient = new StubInternalApiClient(reply);
+        var sut = new DisciplineServiceClient(
+            grpcClient,
+            new StubGrpcBearerTokenProvider("service-token"));
+
+        await sut.ListUserDisciplinesAsync(Guid.NewGuid(), default);
+
+        grpcClient.LastHeaders.Should().NotBeNull();
+        grpcClient.LastHeaders!.Should()
+            .ContainSingle(h => h.Key == "authorization" && h.Value == "Bearer service-token");
+    }
+
+    [Fact]
     public async Task ListUserDisciplinesAsync_MapsTeacherRoleToParticipantRoleTeacher()
     {
         var disciplineId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -26,7 +42,7 @@ public class DisciplineServiceClientTests
             },
         };
         var grpcClient = new StubInternalApiClient(reply);
-        var sut = new DisciplineServiceClient(grpcClient);
+        var sut = new DisciplineServiceClient(grpcClient, new StubGrpcBearerTokenProvider(null));
 
         var result = await sut.ListUserDisciplinesAsync(Guid.NewGuid(), default);
 
@@ -53,7 +69,7 @@ public class DisciplineServiceClientTests
                 },
             },
         };
-        var sut = new DisciplineServiceClient(new StubInternalApiClient(reply));
+        var sut = new DisciplineServiceClient(new StubInternalApiClient(reply), new StubGrpcBearerTokenProvider(null));
 
         var result = await sut.ListUserDisciplinesAsync(Guid.NewGuid(), default);
 
@@ -76,7 +92,7 @@ public class DisciplineServiceClientTests
                 },
             },
         };
-        var sut = new DisciplineServiceClient(new StubInternalApiClient(reply));
+        var sut = new DisciplineServiceClient(new StubInternalApiClient(reply), new StubGrpcBearerTokenProvider(null));
 
         var result = await sut.ListUserDisciplinesAsync(Guid.NewGuid(), default);
 
@@ -87,7 +103,8 @@ public class DisciplineServiceClientTests
     public async Task ListUserDisciplinesAsync_EmptyReply_ReturnsEmptyList()
     {
         var sut = new DisciplineServiceClient(
-            new StubInternalApiClient(new DisciplineGrpc.ListUserDisciplinesReply()));
+            new StubInternalApiClient(new DisciplineGrpc.ListUserDisciplinesReply()),
+            new StubGrpcBearerTokenProvider(null));
 
         var result = await sut.ListUserDisciplinesAsync(Guid.NewGuid(), default);
 
@@ -101,16 +118,37 @@ public class DisciplineServiceClientTests
     private sealed class StubInternalApiClient(DisciplineGrpc.ListUserDisciplinesReply reply)
         : DisciplineGrpc.InternalApi.InternalApiClient
     {
+        public Metadata? LastHeaders { get; private set; }
+
         public override AsyncUnaryCall<DisciplineGrpc.ListUserDisciplinesReply> ListUserDisciplinesAsync(
             DisciplineGrpc.ListUserDisciplinesRequest request,
             Metadata? headers = null,
             DateTime? deadline = null,
             CancellationToken cancellationToken = default)
-            => new(
-                Task.FromResult(reply),
-                Task.FromResult(new Metadata()),
-                () => Status.DefaultSuccess,
-                () => new Metadata(),
-                () => { });
+        {
+            LastHeaders = headers;
+            return new AsyncUnaryCall<DisciplineGrpc.ListUserDisciplinesReply>(
+                    Task.FromResult(reply),
+                    Task.FromResult(new Metadata()),
+                    () => Status.DefaultSuccess,
+                    () => new Metadata(),
+                    () => { });
+        }
+    }
+
+    private sealed class StubGrpcBearerTokenProvider(string? token) : IGrpcBearerTokenProvider
+    {
+        public ValueTask<Metadata?> GetAuthorizationMetadataAsync(CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return ValueTask.FromResult<Metadata?>(null);
+            }
+
+            return ValueTask.FromResult<Metadata?>(new Metadata
+            {
+                { "authorization", $"Bearer {token}" },
+            });
+        }
     }
 }

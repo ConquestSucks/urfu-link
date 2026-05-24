@@ -22,7 +22,9 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<NotificationDbContext>(
     args,
     "NotificationService",
     services => services.AddDbContext<NotificationDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("Primary"),
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")))))
 {
     return;
 }

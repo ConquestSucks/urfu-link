@@ -40,6 +40,11 @@ public static class ModuleRegistration
             KafkaTopicNames.ChatEvents,
             "chat.message.sent.v1"));
 
+        services.AddOptions<InternalGrpcAuthOptions>()
+            .Bind(configuration.GetSection(InternalGrpcAuthOptions.SectionName));
+        services.AddHttpClient(KeycloakClientCredentialsGrpcBearerTokenProvider.HttpClientName);
+        services.AddSingleton<IGrpcBearerTokenProvider, KeycloakClientCredentialsGrpcBearerTokenProvider>();
+
         services.AddOptions<ChatMongoOptions>()
             .Bind(configuration.GetSection(ChatMongoOptions.SectionName))
             .PostConfigure(opts =>
@@ -131,6 +136,42 @@ public static class ModuleRegistration
         });
         services.AddSingleton<IDisciplineServiceClient, DisciplineServiceClient>();
 
+        services.AddOptions<UserServiceClientOptions>()
+            .Bind(configuration.GetSection(UserServiceClientOptions.SectionName));
+        var userServiceAddress = configuration[$"{UserServiceClientOptions.SectionName}:Address"];
+        if (!string.IsNullOrWhiteSpace(userServiceAddress))
+        {
+            services.AddSingleton(sp =>
+            {
+                var opts = sp.GetRequiredService<IOptions<UserServiceClientOptions>>().Value;
+                var retryPolicy = new RetryPolicy
+                {
+                    MaxAttempts = 3,
+                    InitialBackoff = TimeSpan.FromMilliseconds(100),
+                    MaxBackoff = TimeSpan.FromSeconds(2),
+                    BackoffMultiplier = 2,
+                    RetryableStatusCodes = { StatusCode.Unavailable, StatusCode.DeadlineExceeded },
+                };
+                var channel = GrpcChannel.ForAddress(opts.Address, new GrpcChannelOptions
+                {
+                    ServiceConfig = new ServiceConfig
+                    {
+                        MethodConfigs =
+                        {
+                            new MethodConfig { Names = { MethodName.Default }, RetryPolicy = retryPolicy },
+                        },
+                    },
+                });
+                return new Urfu.Link.Services.User.Grpc.InternalApi.InternalApiClient(channel);
+            });
+            services.AddSingleton<Urfu.Link.Services.Chat.Application.Users.IUserServiceClient, UserServiceClient>();
+        }
+        else
+        {
+            // Stub для тестов и on-prem без UserService.
+            services.AddSingleton<Urfu.Link.Services.Chat.Application.Users.IUserServiceClient, NoopUserServiceClient>();
+        }
+
         services.AddOptions<PresenceServiceClientOptions>()
             .Bind(configuration.GetSection(PresenceServiceClientOptions.SectionName));
         var presenceAddress = configuration[$"{PresenceServiceClientOptions.SectionName}:Address"];
@@ -185,6 +226,7 @@ public static class ModuleRegistration
         services.AddScoped<UnpinMessageService>();
         services.AddScoped<GetUserConversationsQuery>();
         services.AddScoped<GetConversationQuery>();
+        services.AddScoped<GetPinnedMessagesQuery>();
         services.AddScoped<GetConversationParticipantsQuery>();
         services.AddScoped<GetConversationMessagesQuery>();
         services.AddScoped<GetReadReceiptsQuery>();

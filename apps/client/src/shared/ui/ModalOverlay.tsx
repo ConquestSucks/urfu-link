@@ -31,11 +31,14 @@ export const ModalOverlay = ({
 }: ModalOverlayProps) => (
   <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
     <Pressable
-      className={`flex-1 bg-black/60 justify-center items-center${backdropClassName ? ` ${backdropClassName}` : ""}`}
+      className={`flex-1 cursor-default bg-black/60 justify-center items-center${backdropClassName ? ` ${backdropClassName}` : ""}`}
       onPress={onClose}
     >
       {/* Inner Pressable stops touch events from reaching the backdrop */}
-      <Pressable onPress={(e) => e.stopPropagation()} className={contentClassName}>
+      <Pressable
+        onPress={(e) => e.stopPropagation()}
+        className={`cursor-default${contentClassName ? ` ${contentClassName}` : ""}`}
+      >
         {children}
       </Pressable>
     </Pressable>

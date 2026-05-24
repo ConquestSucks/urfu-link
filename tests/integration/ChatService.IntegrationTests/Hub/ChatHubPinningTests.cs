@@ -40,6 +40,7 @@ public class ChatHubPinningTests : IAsyncLifetime
             Body = "important",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await aliceConn.InvokeAsync<IReadOnlyList<MessageDto>>("PinMessage", conv.Id, sent.Id);
@@ -65,6 +66,7 @@ public class ChatHubPinningTests : IAsyncLifetime
             Body = "x",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
         await aliceConn.InvokeAsync<IReadOnlyList<MessageDto>>("PinMessage", conv.Id, sent.Id);
 

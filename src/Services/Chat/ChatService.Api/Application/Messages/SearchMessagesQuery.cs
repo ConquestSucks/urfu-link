@@ -1,5 +1,6 @@
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Cursors;
+using Urfu.Link.Services.Chat.Application.Users;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
@@ -24,7 +25,8 @@ public sealed record SearchMessagesParameters(
 
 public sealed class SearchMessagesQuery(
     IConversationRepository conversations,
-    IMessageRepository messages)
+    IMessageRepository messages,
+    IUserServiceClient users)
 {
     private const int DefaultLimit = 20;
     private const int MaxLimit = 100;
@@ -79,16 +81,18 @@ public sealed class SearchMessagesQuery(
         var hasMore = hits.Count > limit;
         var pageHits = hasMore ? hits.Take(limit).ToList() : hits.ToList();
 
-        // Single batch lookup for conversation previews — no N+1.
+        // Single batch lookup for conversation previews and author info — no N+1.
         List<string> distinctConvIds = pageHits.Select(h => h.Message.ConversationId).Distinct().ToList();
-        var conversationLookup = await BuildPreviewLookupAsync(distinctConvIds, callerUserId, cancellationToken).ConfigureAwait(false);
+        var conversationLookup = await BuildConversationLookupAsync(distinctConvIds, cancellationToken).ConfigureAwait(false);
+        var userLookup = await BuildUserLookupAsync(pageHits, conversationLookup.Values, callerUserId, cancellationToken)
+            .ConfigureAwait(false);
 
         var items = pageHits.Select(h => new MessageSearchResultDto(
             MessageId: h.Message.Id,
             ConversationId: h.Message.ConversationId,
-            ConversationPreview: conversationLookup.TryGetValue(h.Message.ConversationId, out var preview)
-                ? preview
-                : new ConversationPreviewDto(ConversationType.Direct, null, null),
+            ConversationPreview: conversationLookup.TryGetValue(h.Message.ConversationId, out var conversation)
+                ? BuildPreview(conversation, callerUserId, h.Message.SenderId, userLookup)
+                : BuildFallbackPreview(h.Message.SenderId, userLookup),
             SenderId: h.Message.SenderId,
             Body: h.Message.Body,
             Score: h.Score,
@@ -106,32 +110,95 @@ public sealed class SearchMessagesQuery(
         return new CursorPage<MessageSearchResultDto>(items, nextCursor);
     }
 
-    private async Task<Dictionary<string, ConversationPreviewDto>> BuildPreviewLookupAsync(
+    private async Task<Dictionary<string, Conversation>> BuildConversationLookupAsync(
         List<string> conversationIds,
-        Guid callerUserId,
         CancellationToken cancellationToken)
     {
         if (conversationIds.Count == 0)
         {
-            return new Dictionary<string, ConversationPreviewDto>(StringComparer.Ordinal);
+            return new Dictionary<string, Conversation>(StringComparer.Ordinal);
         }
 
         var docs = await conversations.GetByIdsAsync(conversationIds, cancellationToken).ConfigureAwait(false);
-        return docs.ToDictionary(c => c.Id, c => BuildPreview(c, callerUserId), StringComparer.Ordinal);
+        return docs.ToDictionary(c => c.Id, StringComparer.Ordinal);
     }
 
-    private static ConversationPreviewDto BuildPreview(Conversation conversation, Guid callerUserId)
+    private async Task<IReadOnlyDictionary<Guid, UserSummary>> BuildUserLookupAsync(
+        IReadOnlyCollection<MessageSearchHit> hits,
+        IEnumerable<Conversation> resultConversations,
+        Guid callerUserId,
+        CancellationToken cancellationToken)
     {
+        var ids = hits.Select(h => h.Message.SenderId)
+            .Concat(resultConversations
+                .Where(c => c.Type == ConversationType.Direct)
+                .Select(c => FindDirectPeer(c, callerUserId))
+                .Where(id => id.HasValue)
+                .Select(id => id!.Value))
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToArray();
+
+        return await users.BatchGetUsersAsync(ids, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static ConversationPreviewDto BuildPreview(
+        Conversation conversation,
+        Guid callerUserId,
+        Guid senderId,
+        IReadOnlyDictionary<Guid, UserSummary> userLookup)
+    {
+        var senderName = DisplayNameFor(userLookup, senderId);
+        var senderAvatarUrl = AvatarUrlFor(userLookup, senderId);
+
         if (conversation.Type == ConversationType.Direct)
         {
             // Direct: surface the counterparty so the client can render a name/avatar.
-            var peer = conversation.Participants.FirstOrDefault(p => p != callerUserId);
-            return new ConversationPreviewDto(ConversationType.Direct, null, peer == Guid.Empty ? null : peer);
+            var peer = FindDirectPeer(conversation, callerUserId);
+            var title = peer is { } peerId ? DisplayNameFor(userLookup, peerId) : null;
+            return new ConversationPreviewDto(
+                ConversationType.Direct,
+                title,
+                peer,
+                senderAvatarUrl,
+                senderName);
         }
 
         // Group/discipline conversations don't have a Title field on the aggregate yet — null
         // is the correct value until that work lands. Type alone tells the client this is a
         // group hit, which is enough to render a placeholder.
-        return new ConversationPreviewDto(conversation.Type, null, null);
+        return new ConversationPreviewDto(conversation.Type, null, null, senderAvatarUrl, senderName);
+    }
+
+    private static ConversationPreviewDto BuildFallbackPreview(
+        Guid senderId,
+        IReadOnlyDictionary<Guid, UserSummary> userLookup)
+    {
+        return new ConversationPreviewDto(
+            ConversationType.Direct,
+            DisplayNameFor(userLookup, senderId),
+            null,
+            AvatarUrlFor(userLookup, senderId),
+            DisplayNameFor(userLookup, senderId));
+    }
+
+    private static Guid? FindDirectPeer(Conversation conversation, Guid callerUserId)
+    {
+        var peer = conversation.Participants.FirstOrDefault(p => p != callerUserId);
+        return peer == Guid.Empty ? null : peer;
+    }
+
+    private static string? DisplayNameFor(IReadOnlyDictionary<Guid, UserSummary> userLookup, Guid userId)
+    {
+        return userLookup.TryGetValue(userId, out var summary) && !string.IsNullOrWhiteSpace(summary.DisplayName)
+            ? summary.DisplayName
+            : null;
+    }
+
+    private static string? AvatarUrlFor(IReadOnlyDictionary<Guid, UserSummary> userLookup, Guid userId)
+    {
+        return userLookup.TryGetValue(userId, out var summary) && !string.IsNullOrWhiteSpace(summary.AvatarUrl)
+            ? summary.AvatarUrl
+            : null;
     }
 }

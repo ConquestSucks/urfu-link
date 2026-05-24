@@ -8,17 +8,12 @@ using Microsoft.Extensions.Options;
 
 namespace MediaService.Api.Endpoints;
 
-public sealed class GetDownloadUrlRequest
-{
-    public Guid AssetId { get; set; }
-}
-
 public sealed class GetDownloadUrlEndpoint(
     IMediaAssetRepository assetRepository,
     IPresignedUrlGenerator urlGenerator,
     AccessPolicy accessPolicy,
     IOptions<StorageOptions> storageOptions)
-    : Endpoint<GetDownloadUrlRequest, DownloadUrlResponse>
+    : EndpointWithoutRequest<DownloadUrlResponse>
 {
     public override void Configure()
     {
@@ -27,11 +22,11 @@ public sealed class GetDownloadUrlEndpoint(
         Summary(s => s.Summary = "Issue a short-lived presigned GET URL if the user has access.");
     }
 
-    public override async Task HandleAsync(GetDownloadUrlRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
+        var assetId = Route<Guid>("assetId");
 
-        var asset = await assetRepository.GetByIdAsync(req.AssetId, ct).ConfigureAwait(false);
+        var asset = await assetRepository.GetByIdAsync(assetId, ct).ConfigureAwait(false);
         if (asset is null || !asset.IsAccessible)
         {
             await Send.NotFoundAsync(ct).ConfigureAwait(false);
@@ -45,7 +40,11 @@ public sealed class GetDownloadUrlEndpoint(
             return;
         }
 
-        var presigned = urlGenerator.ForDownload(asset.Bucket, asset.ObjectKey, storageOptions.Value.DownloadUrlTtl);
+        var presigned = urlGenerator.ForDownload(
+            asset.Bucket,
+            asset.ObjectKey,
+            asset.OriginalFileName,
+            storageOptions.Value.DownloadUrlTtl);
         await HttpContext.Response.SendAsync(
             new DownloadUrlResponse(presigned.Url, presigned.ExpiresAtUtc),
             cancellation: ct).ConfigureAwait(false);

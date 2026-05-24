@@ -107,6 +107,42 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
     }
 
     [Fact]
+    public async Task GetLatestByConversationIdsAsync_ReturnsNewestMainFlowMessagePerConversation()
+    {
+        var sender = Guid.NewGuid();
+        var firstConversationId = $"conv-latest-a-{Guid.NewGuid():N}";
+        var secondConversationId = $"conv-latest-b-{Guid.NewGuid():N}";
+        var baseTime = DateTimeOffset.UtcNow.AddMinutes(-5);
+        var firstOld = Message.Send(Guid.NewGuid(), firstConversationId, sender, "old", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}", baseTime);
+        var firstNew = Message.Send(Guid.NewGuid(), firstConversationId, sender, "new", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}", baseTime.AddSeconds(1));
+        var second = Message.Send(Guid.NewGuid(), secondConversationId, sender, "second", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}", baseTime.AddSeconds(2));
+        var threadReply = Message.SendAsThreadReply(
+            Guid.NewGuid(),
+            firstConversationId,
+            sender,
+            "thread reply",
+            Array.Empty<Attachment>(),
+            $"c-{Guid.NewGuid():N}",
+            baseTime.AddSeconds(3),
+            firstNew.Id);
+
+        await _repo.InsertAsync(firstOld, default);
+        await _repo.InsertAsync(firstNew, default);
+        await _repo.InsertAsync(second, default);
+        await _repo.InsertAsync(threadReply, default);
+
+        var latest = await _repo.GetLatestByConversationIdsAsync(
+            new[] { firstConversationId, secondConversationId, $"missing-{Guid.NewGuid():N}" },
+            default);
+
+        latest.Should().ContainKey(firstConversationId)
+            .WhoseValue.Id.Should().Be(firstNew.Id);
+        latest.Should().ContainKey(secondConversationId)
+            .WhoseValue.Id.Should().Be(second.Id);
+        latest.Should().HaveCount(2);
+    }
+
+    [Fact]
     public async Task MarkDeliveredAsync_OnlyTransitionsSentMessages_AndReturnsAffectedIds()
     {
         var sender = Guid.NewGuid();

@@ -17,7 +17,8 @@ public sealed record ConversationDto(
     GroupSubtype? GroupSubtype = null,
     bool IsAnnouncementOnly = false,
     DateTimeOffset? ArchivedAtUtc = null,
-    IReadOnlyDictionary<Guid, ParticipantRole>? ParticipantRoles = null)
+    IReadOnlyDictionary<Guid, ParticipantRole>? ParticipantRoles = null,
+    int? UnreadCount = null)
 {
     public static ConversationDto FromDomain(Conversation conversation)
     {
@@ -29,7 +30,7 @@ public sealed record ConversationDto(
             conversation.CreatedAtUtc,
             conversation.LastMessageAtUtc,
             conversation.LastMessagePreview is { } p
-                ? new MessagePreviewDto(p.SenderId, p.Body, p.SentAtUtc, p.HasAttachments)
+                ? new MessagePreviewDto(p.SenderId, p.Body, p.SentAtUtc, p.HasAttachments, p.AttachmentFileNames)
                 : null,
             PinnedMessageIds: conversation.PinnedMessageIds.Count == 0
                 ? Array.Empty<Guid>()
@@ -44,10 +45,34 @@ public sealed record ConversationDto(
                 ? null
                 : conversation.ParticipantRoles.ToDictionary(kv => kv.Key, kv => kv.Value));
     }
+
+    public ConversationDto WithUnreadCount(int unreadCount)
+        => this with { UnreadCount = unreadCount };
+
+    public ConversationDto WithLastMessageMetadata(Message? message)
+    {
+        if (LastMessagePreview is null || message is null || !string.Equals(message.ConversationId, Id, StringComparison.Ordinal))
+        {
+            return this;
+        }
+
+        return this with
+        {
+            LastMessagePreview = LastMessagePreview with
+            {
+                MessageId = message.Id,
+                ReadAtUtc = message.ReadAtUtc,
+                AttachmentFileNames = message.Attachments.Select(a => a.FileName).ToList(),
+            },
+        };
+    }
 }
 
 public sealed record MessagePreviewDto(
     Guid SenderId,
     string Body,
     DateTimeOffset SentAtUtc,
-    bool HasAttachments);
+    bool HasAttachments,
+    IReadOnlyList<string> AttachmentFileNames,
+    Guid? MessageId = null,
+    DateTimeOffset? ReadAtUtc = null);

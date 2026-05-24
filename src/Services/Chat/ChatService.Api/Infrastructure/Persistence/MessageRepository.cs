@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
@@ -135,6 +136,124 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             .ConfigureAwait(false);
 
         return docs.Select(d => d.ToDomain()).ToList();
+    }
+
+    public async Task<IReadOnlyDictionary<string, Message>> GetLatestByConversationIdsAsync(
+        IReadOnlyCollection<string> conversationIds,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(conversationIds);
+        if (conversationIds.Count == 0)
+        {
+            return new Dictionary<string, Message>(StringComparer.Ordinal);
+        }
+
+        var ids = conversationIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<string, Message>(StringComparer.Ordinal);
+        }
+
+        PipelineDefinition<MessageDocument, BsonDocument> pipeline = new[]
+        {
+            new BsonDocument("$match", new BsonDocument
+            {
+                { "conversationId", new BsonDocument("$in", new BsonArray(ids)) },
+                { "threadRootId", BsonNull.Value },
+            }),
+            new BsonDocument("$sort", new BsonDocument
+            {
+                { "conversationId", 1 },
+                { "createdAtUtc", -1 },
+                { "_id", -1 },
+            }),
+            new BsonDocument("$group", new BsonDocument
+            {
+                { "_id", "$conversationId" },
+                { "doc", new BsonDocument("$first", "$$ROOT") },
+            }),
+            new BsonDocument("$replaceRoot", new BsonDocument("newRoot", "$doc")),
+        };
+
+        var raw = await context.Messages
+            .Aggregate(pipeline, cancellationToken: cancellationToken)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return raw
+            .Select(doc => BsonSerializer.Deserialize<MessageDocument>(doc))
+            .Select(d => d.ToDomain())
+            .ToDictionary(m => m.ConversationId, StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyDictionary<string, int>> GetUnreadCountsByConversationIdsAsync(
+        IReadOnlyCollection<string> conversationIds,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(conversationIds);
+        if (conversationIds.Count == 0)
+        {
+            return new Dictionary<string, int>(StringComparer.Ordinal);
+        }
+
+        var ids = conversationIds
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (ids.Count == 0)
+        {
+            return new Dictionary<string, int>(StringComparer.Ordinal);
+        }
+
+        var userBinary = new BsonBinaryData(userId, GuidRepresentation.Standard);
+
+        PipelineDefinition<MessageDocument, BsonDocument> pipeline = new[]
+        {
+            new BsonDocument("$match", new BsonDocument
+            {
+                { "conversationId", new BsonDocument("$in", new BsonArray(ids)) },
+                { "threadRootId", BsonNull.Value },
+                { "senderId", new BsonDocument("$ne", userBinary) },
+                { "state", new BsonDocument("$ne", MessageState.Deleted.ToString()) },
+                { "hiddenFor", new BsonDocument("$ne", userBinary) },
+                {
+                    "$nor",
+                    new BsonArray
+                    {
+                        new BsonDocument(
+                            "readBy",
+                            new BsonDocument("$elemMatch", new BsonDocument("userId", userBinary))),
+                    }
+                },
+                {
+                    "$or",
+                    new BsonArray
+                    {
+                        new BsonDocument("readBy.0", new BsonDocument("$exists", true)),
+                        new BsonDocument("readAtUtc", BsonNull.Value),
+                    }
+                },
+            }),
+            new BsonDocument("$group", new BsonDocument
+            {
+                { "_id", "$conversationId" },
+                { "count", new BsonDocument("$sum", 1) },
+            }),
+        };
+
+        var raw = await context.Messages
+            .Aggregate(pipeline, cancellationToken: cancellationToken)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return raw.ToDictionary(
+            doc => doc["_id"].AsString,
+            doc => doc["count"].ToInt32(),
+            StringComparer.Ordinal);
     }
 
     public async Task<IReadOnlyList<Guid>> MarkDeliveredAsync(
@@ -546,16 +665,112 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             return Array.Empty<MessageSearchHit>();
         }
 
-        // Mongo requires $text in the pipeline's first $match stage; all non-score filters share
-        // that stage so the text index can drive selection. Score-based cursor matching has to
-        // come after $addFields below, since $meta:textScore is only addressable as a regular
-        // field once it has been projected.
+        var textHits = await ExecuteSearchPipelineAsync(
+            BuildTextSearchStages(criteria, allowedConversationIds, cursor, limit),
+            cancellationToken).ConfigureAwait(false);
+
+        var prefixTerms = ExtractSearchTerms(criteria.Query);
+        if (textHits.Count >= limit || prefixTerms.Count == 0)
+        {
+            return textHits;
+        }
+
+        var prefixHits = await ExecuteSearchPipelineAsync(
+            BuildPrefixSearchStages(criteria, allowedConversationIds, prefixTerms, cursor, limit + textHits.Count),
+            cancellationToken).ConfigureAwait(false);
+
+        return textHits
+            .Concat(prefixHits)
+            .GroupBy(hit => hit.Message.Id)
+            .Select(group => group
+                .OrderByDescending(hit => hit.Score)
+                .ThenByDescending(hit => hit.Message.CreatedAtUtc)
+                .ThenByDescending(hit => hit.Message.Id)
+                .First())
+            .OrderByDescending(hit => hit.Score)
+            .ThenByDescending(hit => hit.Message.CreatedAtUtc)
+            .ThenByDescending(hit => hit.Message.Id)
+            .Take(limit)
+            .ToList();
+    }
+
+    private const double PrefixSearchScore = 0.25;
+
+    private async Task<IReadOnlyList<MessageSearchHit>> ExecuteSearchPipelineAsync(
+        List<BsonDocument> stages,
+        CancellationToken cancellationToken)
+    {
+        PipelineDefinition<MessageDocument, BsonDocument> pipeline = stages;
+
+        var raw = await context.Messages
+            .Aggregate(pipeline, cancellationToken: cancellationToken)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var hits = new List<MessageSearchHit>(raw.Count);
+        foreach (var doc in raw)
+        {
+            var score = doc.GetValue("_score", BsonDouble.Create(0.0)).ToDouble();
+            doc.Remove("_score");
+            var msgDoc = BsonSerializer.Deserialize<MessageDocument>(doc);
+            hits.Add(new MessageSearchHit(msgDoc.ToDomain(), score));
+        }
+
+        return hits;
+    }
+
+    private static List<BsonDocument> BuildTextSearchStages(
+        MessageSearchCriteria criteria,
+        IReadOnlyList<string> allowedConversationIds,
+        MessageSearchCursor? cursor,
+        int limit)
+    {
         var matchStage = new BsonDocument
         {
             { "$text", new BsonDocument("$search", criteria.Query) },
-            { "conversationId", new BsonDocument("$in", new BsonArray(allowedConversationIds)) },
-            { "threadRootId", BsonNull.Value },
         };
+        AddCommonSearchFilters(matchStage, criteria, allowedConversationIds);
+
+        var stages = new List<BsonDocument>
+        {
+            new("$match", matchStage),
+            new("$addFields", new BsonDocument("_score", new BsonDocument("$meta", "textScore"))),
+        };
+
+        AddCursorStages(stages, cursor);
+        AddSortAndLimitStages(stages, limit);
+        return stages;
+    }
+
+    private static List<BsonDocument> BuildPrefixSearchStages(
+        MessageSearchCriteria criteria,
+        IReadOnlyList<string> allowedConversationIds,
+        IReadOnlyList<string> prefixTerms,
+        MessageSearchCursor? cursor,
+        int limit)
+    {
+        var matchStage = new BsonDocument();
+        AddCommonSearchFilters(matchStage, criteria, allowedConversationIds);
+        AddPrefixBodyFilters(matchStage, prefixTerms);
+
+        var stages = new List<BsonDocument>
+        {
+            new("$match", matchStage),
+            new("$addFields", new BsonDocument("_score", PrefixSearchScore)),
+        };
+
+        AddCursorStages(stages, cursor);
+        AddSortAndLimitStages(stages, limit);
+        return stages;
+    }
+
+    private static void AddCommonSearchFilters(
+        BsonDocument matchStage,
+        MessageSearchCriteria criteria,
+        IReadOnlyList<string> allowedConversationIds)
+    {
+        matchStage.Add("conversationId", new BsonDocument("$in", new BsonArray(allowedConversationIds)));
+        matchStage.Add("threadRootId", BsonNull.Value);
 
         if (criteria.SenderId is { } senderId)
         {
@@ -594,35 +809,56 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             // AttachmentDocument.Type is serialized as a string via BsonRepresentation.String.
             matchStage.Add("attachments.type", type.ToString());
         }
+    }
 
-        var stages = new List<BsonDocument>
-        {
-            new("$match", matchStage),
-            new("$addFields", new BsonDocument("_score", new BsonDocument("$meta", "textScore"))),
-        };
-
-        if (cursor is { } c)
-        {
-            // Keyset predicate for descending sort on (_score, createdAtUtc, _id): documents come
-            // after the cursor position iff one of the three lexicographic comparisons holds.
-            var cursorTs = c.CreatedAtUtc.UtcDateTime;
-            stages.Add(new("$match", new BsonDocument("$or", new BsonArray
+    private static void AddPrefixBodyFilters(BsonDocument matchStage, IReadOnlyList<string> prefixTerms)
+    {
+        var clauses = prefixTerms
+            .Select(term => new BsonDocument("body", new BsonDocument
             {
-                new BsonDocument("_score", new BsonDocument("$lt", c.Score)),
-                new BsonDocument
-                {
-                    { "_score", c.Score },
-                    { "createdAtUtc", new BsonDocument("$lt", cursorTs) },
-                },
-                new BsonDocument
-                {
-                    { "_score", c.Score },
-                    { "createdAtUtc", cursorTs },
-                    { "_id", new BsonDocument("$lt", new BsonBinaryData(c.MessageId, GuidRepresentation.Standard)) },
-                },
-            })));
+                { "$regex", BuildWordPrefixPattern(term) },
+                { "$options", "i" },
+            }))
+            .ToList();
+
+        if (clauses.Count == 1)
+        {
+            matchStage.Add("body", clauses[0]["body"]);
+            return;
         }
 
+        matchStage.Add("$and", new BsonArray(clauses));
+    }
+
+    private static void AddCursorStages(List<BsonDocument> stages, MessageSearchCursor? cursor)
+    {
+        if (cursor is not { } c)
+        {
+            return;
+        }
+
+        // Keyset predicate for descending sort on (_score, createdAtUtc, _id): documents come
+        // after the cursor position iff one of the three lexicographic comparisons holds.
+        var cursorTs = c.CreatedAtUtc.UtcDateTime;
+        stages.Add(new("$match", new BsonDocument("$or", new BsonArray
+        {
+            new BsonDocument("_score", new BsonDocument("$lt", c.Score)),
+            new BsonDocument
+            {
+                { "_score", c.Score },
+                { "createdAtUtc", new BsonDocument("$lt", cursorTs) },
+            },
+            new BsonDocument
+            {
+                { "_score", c.Score },
+                { "createdAtUtc", cursorTs },
+                { "_id", new BsonDocument("$lt", new BsonBinaryData(c.MessageId, GuidRepresentation.Standard)) },
+            },
+        })));
+    }
+
+    private static void AddSortAndLimitStages(List<BsonDocument> stages, int limit)
+    {
         stages.Add(new("$sort", new BsonDocument
         {
             { "_score", -1 },
@@ -630,22 +866,20 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
             { "_id", -1 },
         }));
         stages.Add(new("$limit", limit));
+    }
 
-        PipelineDefinition<MessageDocument, BsonDocument> pipeline = stages;
+    private static List<string> ExtractSearchTerms(string query)
+    {
+        return Regex.Matches(query, @"[\p{L}\p{N}]+")
+            .Select(match => match.Value)
+            .Where(term => term.Length >= 2)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(5)
+            .ToList();
+    }
 
-        var raw = await context.Messages
-            .Aggregate(pipeline, cancellationToken: cancellationToken)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var hits = new List<MessageSearchHit>(raw.Count);
-        foreach (var doc in raw)
-        {
-            var score = doc.GetValue("_score", BsonDouble.Create(0.0)).ToDouble();
-            doc.Remove("_score");
-            var msgDoc = BsonSerializer.Deserialize<MessageDocument>(doc);
-            hits.Add(new MessageSearchHit(msgDoc.ToDomain(), score));
-        }
-        return hits;
+    private static string BuildWordPrefixPattern(string term)
+    {
+        return $@"(^|[^\p{{L}}\p{{N}}_]){Regex.Escape(term)}";
     }
 }

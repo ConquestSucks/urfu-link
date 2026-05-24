@@ -1,6 +1,6 @@
 import { useCurrentUser, useUpdateNotifications } from "@/entities/user";
-import { SwitchCard } from "@/shared/ui";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { Skeleton, SwitchCard, SwitchCardSkeleton } from "@/shared/ui";
+import { ScrollView, Text, View } from "react-native";
 import { NOTIFICATIONS_SETTINGS, type NotificationField } from "../config/settings";
 
 export const ManageNotifications = () => {
@@ -9,9 +9,18 @@ export const ManageNotifications = () => {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
-      </View>
+      <ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
+        {Object.values(NOTIFICATIONS_SETTINGS).map((section, sectionIndex) => (
+          <View key={sectionIndex} className="gap-3">
+            <Skeleton className="h-3 w-28 rounded" />
+            <View className="gap-3">
+              {section.items.map((item) => (
+                <SwitchCardSkeleton key={item.key} />
+              ))}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
     );
   }
 

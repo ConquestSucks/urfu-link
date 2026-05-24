@@ -40,6 +40,7 @@ public class ChatHubReactionsTests : IAsyncLifetime
             Body = "hi",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await bobConn.InvokeAsync("AddReaction", sent.Id, "👍");
@@ -66,6 +67,7 @@ public class ChatHubReactionsTests : IAsyncLifetime
             Body = "hi",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await bobConn.InvokeAsync("AddReaction", sent.Id, "👍");

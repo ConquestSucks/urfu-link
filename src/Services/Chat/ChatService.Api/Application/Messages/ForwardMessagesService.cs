@@ -117,7 +117,7 @@ public sealed class ForwardMessagesService(
             produced.Add(MessageDto.FromDomain(newMessage));
 
             lastPreview = (
-                new MessagePreview(request.CallerUserId, newMessage.Body, sentAt, newMessage.HasAttachments),
+                BuildMessagePreview(newMessage),
                 sentAt);
 
             // Grant access on each forwarded attachment to the new conversation participants.
@@ -177,4 +177,11 @@ public sealed class ForwardMessagesService(
         var cutoff = char.IsHighSurrogate(body[maxPreview - 1]) ? maxPreview - 1 : maxPreview;
         return body[..cutoff];
     }
+
+    private static MessagePreview BuildMessagePreview(Message message) => new(
+        message.SenderId,
+        message.Body,
+        message.CreatedAtUtc,
+        message.HasAttachments,
+        message.Attachments.Select(a => a.FileName).ToList());
 }

@@ -30,12 +30,26 @@ public sealed class TestAuthHandler(
             ? sessionIdHeader.ToString()
             : DefaultSessionId;
 
-        var claims = new[]
+        var username = Request.Headers.TryGetValue("X-Test-Username", out var usernameHeader)
+            ? usernameHeader.ToString()
+            : "test-user";
+
+        var claims = new List<Claim>
         {
-            new Claim("sub", userId),
-            new Claim("sid", sessionId),
-            new Claim("preferred_username", "test-user"),
+            new("sub", userId),
+            new("sid", sessionId),
+            new("preferred_username", username),
         };
+
+        if (Request.Headers.TryGetValue("X-Test-Name", out var nameHeader))
+        {
+            claims.Add(new Claim("name", nameHeader.ToString()));
+        }
+
+        if (Request.Headers.TryGetValue("X-Test-Email", out var emailHeader))
+        {
+            claims.Add(new Claim("email", emailHeader.ToString()));
+        }
 
         var identity = new ClaimsIdentity(claims, SchemeName);
         var principal = new ClaimsPrincipal(identity);

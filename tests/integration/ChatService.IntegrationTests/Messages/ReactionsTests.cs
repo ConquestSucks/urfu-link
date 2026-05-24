@@ -113,7 +113,7 @@ public class ReactionsTests : IAsyncLifetime
 
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var dto = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "to react", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "to react", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
             default);
 
         var msg = await scope.ServiceProvider.GetRequiredService<IMessageRepository>()

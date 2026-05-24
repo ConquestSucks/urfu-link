@@ -19,7 +19,9 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<DisciplineDbContext>(
     args,
     "DisciplineService",
     services => services.AddDbContext<DisciplineDbContext>(options =>
-        options.UseNpgsql(builder.Configuration.GetConnectionString("Primary")))))
+        options.UseNpgsql(
+            builder.Configuration.GetConnectionString("Primary"),
+            npg => npg.MigrationsHistoryTable("__EFMigrationsHistory", "public")))))
 {
     return;
 }

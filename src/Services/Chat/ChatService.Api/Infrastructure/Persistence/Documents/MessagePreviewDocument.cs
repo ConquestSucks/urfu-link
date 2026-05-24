@@ -17,8 +17,16 @@ internal sealed class MessagePreviewDocument
     [BsonElement("hasAttachments")]
     public bool HasAttachments { get; set; }
 
+    [BsonElement("attachmentFileNames")]
+    public List<string> AttachmentFileNames { get; set; } = new();
+
     public MessagePreview ToDomain()
-        => new(SenderId, Body, new DateTimeOffset(DateTime.SpecifyKind(SentAtUtc, DateTimeKind.Utc)), HasAttachments);
+        => new(
+            SenderId,
+            Body,
+            new DateTimeOffset(DateTime.SpecifyKind(SentAtUtc, DateTimeKind.Utc)),
+            HasAttachments,
+            AttachmentFileNames);
 
     public static MessagePreviewDocument FromDomain(MessagePreview preview) => new()
     {
@@ -26,5 +34,6 @@ internal sealed class MessagePreviewDocument
         Body = preview.Body,
         SentAtUtc = preview.SentAtUtc.UtcDateTime,
         HasAttachments = preview.HasAttachments,
+        AttachmentFileNames = preview.AttachmentFileNames.ToList(),
     };
 }

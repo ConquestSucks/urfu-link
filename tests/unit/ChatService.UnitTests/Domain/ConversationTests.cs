@@ -67,7 +67,7 @@ public class ConversationTests
     {
         var conversation = Conversation.OpenDirect(UserA, UserB, Now);
         var sentAt = Now.AddMinutes(5);
-        var preview = new MessagePreview(UserA, "hello", sentAt, HasAttachments: false);
+        var preview = new MessagePreview(UserA, "hello", sentAt, hasAttachments: false);
 
         conversation.RegisterMessage(preview, sentAt);
 

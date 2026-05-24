@@ -38,8 +38,17 @@ public class ChatHubForwardTests : IAsyncLifetime
             Body = "from source",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = caller,
         });
         var targetConv = await callerConn.InvokeAsync<ConversationDto>("OpenDirectConversation", targetPeer);
+        await callerConn.InvokeAsync<MessageDto>("SendMessage", new
+        {
+            ConversationId = targetConv.Id,
+            Body = "target seed",
+            AttachmentAssetIds = Array.Empty<Guid>(),
+            ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = targetPeer,
+        });
 
         var targetReceived = new TaskCompletionSource<MessageDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         targetConn.On<MessageDto>("MessageReceived", msg => targetReceived.TrySetResult(msg));

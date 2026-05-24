@@ -1,5 +1,4 @@
 using FastEndpoints;
-using FluentValidation;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Cursors;
 using Urfu.Link.Services.Chat.Application.Messages;
@@ -8,48 +7,8 @@ using Urfu.Link.Services.Chat.Infrastructure.Auth;
 
 namespace Urfu.Link.Services.Chat.Endpoints.Messages;
 
-public sealed class SearchMessagesRequest
-{
-    [QueryParam] public string? Q { get; set; }
-
-    [QueryParam] public string? ConversationId { get; set; }
-
-    [QueryParam] public Guid? SenderId { get; set; }
-
-    [QueryParam] public DateTimeOffset? From { get; set; }
-
-    [QueryParam] public DateTimeOffset? To { get; set; }
-
-    [QueryParam] public bool? HasAttachments { get; set; }
-
-    [QueryParam] public AttachmentType? AttachmentType { get; set; }
-
-    [QueryParam] public string? Cursor { get; set; }
-
-    [QueryParam] public int? Limit { get; set; }
-}
-
-public sealed class SearchMessagesValidator : Validator<SearchMessagesRequest>
-{
-    public SearchMessagesValidator()
-    {
-        RuleFor(x => x.Q)
-            .NotEmpty().WithMessage("Query is required.")
-            .MinimumLength(2).WithMessage("Query must be at least 2 characters.");
-        RuleFor(x => x.Limit!.Value)
-            .InclusiveBetween(1, 100).WithMessage("Limit must be between 1 and 100.")
-            .When(x => x.Limit.HasValue);
-        // hasAttachments=false and attachmentType=X are mutually exclusive — silently
-        // returning empty would hide a client bug.
-        RuleFor(x => x.AttachmentType)
-            .Null()
-            .When(x => x.HasAttachments == false)
-            .WithMessage("attachmentType cannot be combined with hasAttachments=false.");
-    }
-}
-
 public sealed class SearchMessagesEndpoint(SearchMessagesQuery query)
-    : Endpoint<SearchMessagesRequest, CursorPage<MessageSearchResultDto>>
+    : EndpointWithoutRequest<CursorPage<MessageSearchResultDto>>
 {
     public override void Configure()
     {
@@ -59,31 +18,65 @@ public sealed class SearchMessagesEndpoint(SearchMessagesQuery query)
         Summary(s => s.Summary = "Full-text search across the caller's chat history.");
     }
 
-    public override async Task HandleAsync(SearchMessagesRequest req, CancellationToken ct)
+    public override async Task HandleAsync(CancellationToken ct)
     {
-        ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
+
+        var q = Query<string?>("q", isRequired: false);
+        var conversationId = Query<string?>("conversationId", isRequired: false);
+        var senderId = Query<Guid?>("senderId", isRequired: false);
+        var from = Query<DateTimeOffset?>("from", isRequired: false);
+        var to = Query<DateTimeOffset?>("to", isRequired: false);
+        var hasAttachments = Query<bool?>("hasAttachments", isRequired: false);
+        var attachmentType = Query<AttachmentType?>("attachmentType", isRequired: false);
+        var cursor = Query<string?>("cursor", isRequired: false);
+        var limit = Query<int?>("limit", isRequired: false);
+
+        // Ручная валидация: при EndpointWithoutRequest FluentValidation не применяется,
+        // поэтому проверки переносим сюда. Логика идентична прежнему SearchMessagesValidator.
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            AddError("q", "Query is required.");
+        }
+        else if (q.Length < 2)
+        {
+            AddError("q", "Query must be at least 2 characters.");
+        }
+
+        if (limit.HasValue && (limit.Value < 1 || limit.Value > 100))
+        {
+            AddError("limit", "Limit must be between 1 and 100.");
+        }
+
+        // hasAttachments=false и attachmentType=X — взаимоисключающие;
+        // молчаливый пустой ответ скрыл бы баг клиента.
+        if (hasAttachments == false && attachmentType.HasValue)
+        {
+            AddError("attachmentType", "attachmentType cannot be combined with hasAttachments=false.");
+        }
+
+        ThrowIfAnyErrors(StatusCodes.Status400BadRequest);
 
         try
         {
             var page = await query.ExecuteAsync(
                 new SearchMessagesParameters(
-                    req.Q!,
-                    req.ConversationId,
-                    req.SenderId,
-                    req.From,
-                    req.To,
-                    req.HasAttachments,
-                    req.AttachmentType,
-                    req.Cursor,
-                    req.Limit),
+                    q!,
+                    conversationId,
+                    senderId,
+                    from,
+                    to,
+                    hasAttachments,
+                    attachmentType,
+                    cursor,
+                    limit),
                 caller,
                 ct).ConfigureAwait(false);
             await Send.OkAsync(page, ct).ConfigureAwait(false);
         }
         catch (InvalidChatCursorException)
         {
-            AddError(r => r.Cursor!, "Invalid cursor.");
+            AddError("cursor", "Invalid cursor.");
             await Send.ErrorsAsync(StatusCodes.Status400BadRequest, ct).ConfigureAwait(false);
         }
     }

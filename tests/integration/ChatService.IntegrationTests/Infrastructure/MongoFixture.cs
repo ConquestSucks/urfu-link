@@ -1,3 +1,4 @@
+using DotNet.Testcontainers.Images;
 using Microsoft.Extensions.Options;
 using Testcontainers.MongoDb;
 using Urfu.Link.Services.Chat.Infrastructure.Persistence;
@@ -12,6 +13,7 @@ public sealed class MongoFixture : IAsyncLifetime
 {
     private readonly MongoDbContainer _container = new MongoDbBuilder()
         .WithImage("mongo:8.0.5")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     public string ConnectionString => _container.GetConnectionString();

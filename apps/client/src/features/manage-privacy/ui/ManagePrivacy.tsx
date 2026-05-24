@@ -1,6 +1,6 @@
 import { useCurrentUser, useUpdatePrivacy } from "@/entities/user";
-import { SwitchCard } from "@/shared/ui";
-import { ActivityIndicator, View, ScrollView } from "react-native";
+import { SwitchCard, SwitchCardSkeleton } from "@/shared/ui";
+import { View, ScrollView } from "react-native";
 import { PRIVACY_SETTINGS, type PrivacyField } from "../config/settings";
 
 export const ManagePrivacy = () => {
@@ -9,8 +9,12 @@ export const ManagePrivacy = () => {
 
   if (isLoading) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator />
+      <View className="flex-1">
+        <ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
+          {PRIVACY_SETTINGS.map((item) => (
+            <SwitchCardSkeleton key={item.key} />
+          ))}
+        </ScrollView>
       </View>
     );
   }

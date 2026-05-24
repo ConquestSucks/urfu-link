@@ -38,8 +38,14 @@ public class ChatEndpointsTests : IAsyncLifetime
             new { peerUserId = peer });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var dto = await response.Content.ReadFromJsonAsync<ConversationDto>();
+        var dto = await response.Content.ReadFromChatJsonAsync<ConversationDto>();
         dto!.Participants.Should().BeEquivalentTo(new[] { caller, peer });
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var stored = await scope.ServiceProvider
+            .GetRequiredService<Urfu.Link.Services.Chat.Domain.Interfaces.IConversationRepository>()
+            .GetByIdAsync(dto.Id, default);
+        stored.Should().BeNull();
     }
 
     [Fact]
@@ -49,15 +55,39 @@ public class ChatEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            await open.OpenAsync(caller, Guid.NewGuid(), default);
-            await open.OpenAsync(caller, Guid.NewGuid(), default);
-            await open.OpenAsync(Guid.NewGuid(), Guid.NewGuid(), default); // noise
+            var send = seed.ServiceProvider.GetRequiredService<SendMessageService>();
+            var first = await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var second = await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var noise = await open.OpenAsync(Guid.NewGuid(), Guid.NewGuid(), default);
+
+            await send.SendAsync(new SendMessageRequest(
+                first.Id,
+                caller,
+                "seed-1",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: first.Participants.Single(p => p != caller)), default);
+            await send.SendAsync(new SendMessageRequest(
+                second.Id,
+                caller,
+                "seed-2",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: second.Participants.Single(p => p != caller)), default);
+            var noiseSender = noise.Participants[0];
+            await send.SendAsync(new SendMessageRequest(
+                noise.Id,
+                noiseSender,
+                "noise",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: noise.Participants.Single(p => p != noiseSender)), default);
         }
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<ConversationDto>>("/api/v1/chat/conversations?limit=50");
+        var page = await client.GetFromChatJsonAsync<CursorPage<ConversationDto>>("/api/v1/chat/conversations?limit=50");
 
         page!.Items.Should().HaveCount(2);
         page.Items.Should().OnlyContain(c => c.Participants.Contains(caller));
@@ -72,6 +102,15 @@ public class ChatEndpointsTests : IAsyncLifetime
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
             var conv = await open.OpenAsync(Guid.NewGuid(), Guid.NewGuid(), default);
+            var sender = conv.Participants[0];
+            var send = seed.ServiceProvider.GetRequiredService<SendMessageService>();
+            await send.SendAsync(new SendMessageRequest(
+                conv.Id,
+                sender,
+                "private",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: conv.Participants.Single(p => p != sender)), default);
             convId = conv.Id;
         }
 
@@ -105,7 +144,15 @@ public class ChatEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var direct = await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var send = seed.ServiceProvider.GetRequiredService<SendMessageService>();
+            await send.SendAsync(new SendMessageRequest(
+                direct.Id,
+                caller,
+                "direct",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: direct.Participants.Single(p => p != caller)), default);
 
             var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
             await disc.HandleDisciplineCreatedAsync(
@@ -116,7 +163,7 @@ public class ChatEndpointsTests : IAsyncLifetime
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<ConversationDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<ConversationDto>>(
             "/api/v1/chat/conversations?type=discipline&limit=50");
 
         page!.Items.Should().ContainSingle()
@@ -130,7 +177,15 @@ public class ChatEndpointsTests : IAsyncLifetime
         await using (var seed = _factory.Services.CreateAsyncScope())
         {
             var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-            await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var direct = await open.OpenAsync(caller, Guid.NewGuid(), default);
+            var send = seed.ServiceProvider.GetRequiredService<SendMessageService>();
+            await send.SendAsync(new SendMessageRequest(
+                direct.Id,
+                caller,
+                "direct",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: direct.Participants.Single(p => p != caller)), default);
 
             var disc = seed.ServiceProvider.GetRequiredService<DisciplineConversationService>();
             await disc.HandleDisciplineCreatedAsync(
@@ -141,7 +196,7 @@ public class ChatEndpointsTests : IAsyncLifetime
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<ConversationDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<ConversationDto>>(
             "/api/v1/chat/conversations?type=direct&limit=50");
 
         page!.Items.Should().ContainSingle()
@@ -185,7 +240,7 @@ public class ChatEndpointsTests : IAsyncLifetime
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(teacherId);
         using var client = _factory.CreateClient();
-        var participants = await client.GetFromJsonAsync<List<ConversationParticipantDto>>(
+        var participants = await client.GetFromChatJsonAsync<List<ConversationParticipantDto>>(
             $"/api/v1/chat/conversations/{conversationId}/participants");
 
         participants.Should().NotBeNull();
@@ -241,7 +296,7 @@ public class ChatEndpointsTests : IAsyncLifetime
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin(Guid.NewGuid());
         using var client = _factory.CreateClient();
-        var participants = await client.GetFromJsonAsync<List<ConversationParticipantDto>>(
+        var participants = await client.GetFromChatJsonAsync<List<ConversationParticipantDto>>(
             $"/api/v1/chat/conversations/{conversationId}/participants");
 
         participants.Should().ContainSingle().Which.UserId.Should().Be(teacherId);
@@ -265,7 +320,7 @@ public class ChatEndpointsTests : IAsyncLifetime
             await using var sendScope = _factory.Services.CreateAsyncScope();
             var send = sendScope.ServiceProvider.GetRequiredService<SendMessageService>();
             await send.SendAsync(
-                new SendMessageRequest(convId, caller, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+                new SendMessageRequest(convId, caller, $"m{i}", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
                 default);
             await Task.Delay(5);
         }
@@ -273,7 +328,7 @@ public class ChatEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
 
         using var client = _factory.CreateClient();
-        var page = await client.GetFromJsonAsync<CursorPage<MessageDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<MessageDto>>(
             $"/api/v1/chat/conversations/{convId}/messages?limit=10&direction=older");
 
         page!.Items.Select(m => m.Body).Should().Equal("m2", "m1", "m0");

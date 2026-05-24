@@ -1,6 +1,8 @@
+using DotNet.Testcontainers.Images;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,6 +15,7 @@ using Testcontainers.Redis;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
+using Urfu.Link.Services.Presence.Realtime;
 
 namespace PresenceService.IntegrationTests.Infrastructure;
 
@@ -27,10 +30,12 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     private readonly RedisContainer _redis = new RedisBuilder()
         .WithImage("redis:7.4.2-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     public FakeOutboxWriter OutboxWriter { get; } = new();
@@ -97,6 +102,11 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IHostedService>();
+
+            // Integration tests run a single in-process TestServer. Keep real Redis
+            // for presence state, but avoid the production SignalR scale-out manager.
+            services.RemoveAll<HubLifetimeManager<PresenceHub>>();
+            services.AddSingleton<HubLifetimeManager<PresenceHub>, DefaultHubLifetimeManager<PresenceHub>>();
 
             IdempotencyStore.TryRegisterAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
                 .Returns(ValueTask.FromResult(true));

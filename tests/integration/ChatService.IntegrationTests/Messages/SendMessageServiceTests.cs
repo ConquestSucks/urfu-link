@@ -33,7 +33,7 @@ public class SendMessageServiceTests : IAsyncLifetime
         await using var scope = _factory.Services.CreateAsyncScope();
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
         var dto = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "hello", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            new SendMessageRequest(conv.Id, sender, "hello", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
             default);
 
         dto.Body.Should().Be("hello");
@@ -57,6 +57,37 @@ public class SendMessageServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SendAsync_FirstDirectMessage_MaterializesDraftConversation()
+    {
+        var sender = Guid.NewGuid();
+        var peer = Guid.NewGuid();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+        var draft = await open.OpenAsync(sender, peer, default);
+
+        var before = await scope.ServiceProvider.GetRequiredService<IConversationRepository>()
+            .GetByIdAsync(draft.Id, default);
+        before.Should().BeNull();
+
+        var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
+        var dto = await send.SendAsync(
+            new SendMessageRequest(draft.Id, sender, "first", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}", PeerUserId: peer),
+            default);
+
+        var loaded = await scope.ServiceProvider.GetRequiredService<IConversationRepository>()
+            .GetByIdAsync(draft.Id, default);
+        loaded.Should().NotBeNull();
+        loaded!.LastMessagePreview!.Body.Should().Be("first");
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatConversationCreatedEvent>()
+            .Should().ContainSingle(e => e.ConversationId == draft.Id);
+        dto.ConversationId.Should().Be(draft.Id);
+    }
+
+    [Fact]
     public async Task SendAsync_DuplicateClientMessageId_ReturnsPriorMessageWithoutDoublePublish()
     {
         var (sender, _, conv) = await OpenConversationAsync();
@@ -66,7 +97,7 @@ public class SendMessageServiceTests : IAsyncLifetime
         var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
 
         var first = await send.SendAsync(
-            new SendMessageRequest(conv.Id, sender, "hi", Array.Empty<Guid>(), clientMsgId),
+            new SendMessageRequest(conv.Id, sender, "hi", Array.Empty<Guid>(), clientMsgId, PeerUserId: conv.Participants.Single(p => p != sender)),
             default);
 
         // The fake idempotency store returns true on every call (treats every key as fresh).
@@ -142,8 +173,9 @@ public class SendMessageServiceTests : IAsyncLifetime
         var sender = Guid.NewGuid();
         var peer = Guid.NewGuid();
         await using var scope = _factory.Services.CreateAsyncScope();
-        var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
-        var conv = await open.OpenAsync(sender, peer, default);
+        var conv = Conversation.OpenDirect(sender, peer, DateTimeOffset.UtcNow);
+        var repo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        await repo.TryCreateAsync(conv, default);
         return (sender, peer, conv);
     }
 }

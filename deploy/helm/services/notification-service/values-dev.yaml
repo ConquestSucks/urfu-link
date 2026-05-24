@@ -7,9 +7,15 @@ image:
 
 replicaCount: 1
 
+service:
+  grpc:
+    enabled: true
+
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: http://+:8080
+  UserService__GrpcEndpoint: http://user-service:8081
+  PresenceService__GrpcEndpoint: http://presence-service:8081
 
 secrets:
   enabled: true

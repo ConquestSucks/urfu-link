@@ -4,6 +4,7 @@ using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Application.Aggregation;
 using Urfu.Link.Services.Presence.Application.Dispatchers;
+using Urfu.Link.Services.Presence.Application.Sessions;
 using Urfu.Link.Services.Presence.Domain;
 using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
@@ -55,6 +56,7 @@ public static class ModuleRegistration
 
         services.AddSingleton<PresenceAggregator>();
         services.AddScoped<PresenceEventDispatcher>();
+        services.AddScoped<DisconnectPresenceSessionService>();
         services.AddSingleton<PresenceBroadcaster>();
 
         services.AddHostedService<PresenceSweeperWorker>();

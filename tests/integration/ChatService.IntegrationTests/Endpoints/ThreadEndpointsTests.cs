@@ -37,7 +37,13 @@ public class ThreadEndpointsTests : IAsyncLifetime
 
             var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
             var sent = await send.SendAsync(
-                new SendMessageRequest(convId, alice, "root", Array.Empty<Guid>(), $"c-root-{Guid.NewGuid():N}", null),
+                new SendMessageRequest(
+                    convId,
+                    alice,
+                    "root",
+                    Array.Empty<Guid>(),
+                    $"c-root-{Guid.NewGuid():N}",
+                    PeerUserId: bob),
                 default);
             rootId = sent.Id;
         }
@@ -61,7 +67,7 @@ public class ThreadEndpointsTests : IAsyncLifetime
             });
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var dto = await response.Content.ReadFromJsonAsync<MessageDto>();
+        var dto = await response.Content.ReadFromChatJsonAsync<MessageDto>();
         dto!.ThreadRootId.Should().Be(rootId);
         dto.Body.Should().Be("in thread");
     }
@@ -82,7 +88,7 @@ public class ThreadEndpointsTests : IAsyncLifetime
                 clientMessageId = $"c-{Guid.NewGuid():N}",
             });
 
-        var page = await client.GetFromJsonAsync<CursorPage<MessageDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<MessageDto>>(
             $"/api/v1/chat/messages/{rootId}/thread?limit=10");
 
         page!.Items.Should().ContainSingle().Which.Body.Should().Be("first");
@@ -121,7 +127,7 @@ public class ThreadEndpointsTests : IAsyncLifetime
                 clientMessageId = $"c-{Guid.NewGuid():N}",
             });
 
-        var page = await client.GetFromJsonAsync<CursorPage<ActiveThreadDto>>(
+        var page = await client.GetFromChatJsonAsync<CursorPage<ActiveThreadDto>>(
             "/api/v1/chat/threads/active?limit=10");
 
         page!.Items.Should().ContainSingle().Which.RootMessageId.Should().Be(rootId);

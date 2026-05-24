@@ -3,6 +3,7 @@ using FluentAssertions;
 using NSubstitute;
 using Urfu.Link.Services.Chat.Application.Cursors;
 using Urfu.Link.Services.Chat.Application.Messages;
+using Urfu.Link.Services.Chat.Application.Users;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
@@ -18,8 +19,16 @@ public class SearchMessagesQueryTests
 
     private readonly IConversationRepository _conversations = Substitute.For<IConversationRepository>();
     private readonly IMessageRepository _messages = Substitute.For<IMessageRepository>();
+    private readonly IUserServiceClient _users = Substitute.For<IUserServiceClient>();
 
-    private SearchMessagesQuery Build() => new(_conversations, _messages);
+    public SearchMessagesQueryTests()
+    {
+        _users.BatchGetUsersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyDictionary<Guid, UserSummary>>(
+                new Dictionary<Guid, UserSummary>()));
+    }
+
+    private SearchMessagesQuery Build() => new(_conversations, _messages, _users);
 
     [Fact]
     public async Task Execute_CallerHasNoConversations_ReturnsEmptyPage()
@@ -182,6 +191,44 @@ public class SearchMessagesQueryTests
         preview.Type.Should().Be(ConversationType.Direct);
         preview.PeerUserId.Should().Be(Peer);
         preview.Title.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Execute_SearchHit_EnrichesSenderNameAndAvatar()
+    {
+        var conv = Conversation.OpenDirect(Caller, Peer, Now);
+        _conversations.GetUserConversationIdsAsync(Caller, Arg.Any<CancellationToken>())
+            .Returns(new[] { conv.Id });
+        _conversations.GetByIdsAsync(Arg.Any<List<string>>(), Arg.Any<CancellationToken>())
+            .Returns(new[] { conv });
+
+        var msg = Message.Send(Guid.NewGuid(), conv.Id, Peer, "текст", Array.Empty<Attachment>(), "c1", Now);
+        _messages.SearchAsync(
+            Arg.Any<MessageSearchCriteria>(),
+            Arg.Any<IReadOnlyList<string>>(),
+            Arg.Any<MessageSearchCursor?>(),
+            Arg.Any<int>(),
+            Arg.Any<CancellationToken>())
+            .Returns(new[] { new MessageSearchHit(msg, 1.0) });
+        _users.BatchGetUsersAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyDictionary<Guid, UserSummary>>(
+                new Dictionary<Guid, UserSummary>
+                {
+                    [Peer] = new(Peer, "Peer User", "https://example.test/avatar.png", "peer@example.test"),
+                }));
+
+        var page = await Build().ExecuteAsync(
+            new SearchMessagesParameters("текст", null, null, null, null, null, null, null, null),
+            Caller, default);
+
+        page.Items.Should().ContainSingle();
+        var preview = page.Items[0].ConversationPreview;
+        preview.SenderName.Should().Be("Peer User");
+        preview.AvatarUrl.Should().Be("https://example.test/avatar.png");
+        preview.Title.Should().Be("Peer User");
+        await _users.Received(1).BatchGetUsersAsync(
+            Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Contains(Peer)),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

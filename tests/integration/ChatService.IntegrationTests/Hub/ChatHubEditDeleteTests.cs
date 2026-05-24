@@ -39,6 +39,7 @@ public class ChatHubEditDeleteTests : IAsyncLifetime
             Body = "hi",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await aliceConn.InvokeAsync<MessageDto>("EditMessage", new
@@ -74,6 +75,7 @@ public class ChatHubEditDeleteTests : IAsyncLifetime
             Body = "to delete",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         await aliceConn.InvokeAsync<MessageDto?>("DeleteMessage", sent.Id, "for-everyone");
@@ -104,6 +106,7 @@ public class ChatHubEditDeleteTests : IAsyncLifetime
             Body = "personal hide",
             AttachmentAssetIds = Array.Empty<Guid>(),
             ClientMessageId = $"c-{Guid.NewGuid():N}",
+            PeerUserId = bob,
         });
 
         // Bob hides locally; Alice must NOT receive a broadcast.
