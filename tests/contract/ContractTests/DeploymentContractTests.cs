@@ -19,11 +19,14 @@ public sealed class DeploymentContractTests
     {
         var overlay = ReadRepoFile("platform", "dev", "local-k8s", "kustomization.yaml");
         var dependencies = ReadRepoFile("platform", "dev", "local-k8s", "dependencies.yaml");
+        var localUpScript = ReadRepoFile("scripts", "local-k8s-up.ps1");
 
         Assert.Contains("dependencies.yaml", overlay, StringComparison.Ordinal);
         Assert.Contains("kind: Deployment", dependencies, StringComparison.Ordinal);
         Assert.Contains("name: kafka", dependencies, StringComparison.Ordinal);
         Assert.Contains("name: keycloak", dependencies, StringComparison.Ordinal);
+        Assert.Contains("deployment/minio", localUpScript, StringComparison.Ordinal);
+        Assert.Contains("job/minio-bootstrap-buckets", localUpScript, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -48,6 +51,53 @@ public sealed class DeploymentContractTests
         Assert.Contains("\"EXPO_PUBLIC_API_URL\": \"https://api.urfu-link.ghjc.ru\"", easConfig, StringComparison.Ordinal);
         Assert.Contains("ingress/api-gateway-ingress.yaml", platformKustomization, StringComparison.Ordinal);
         Assert.Contains("- ingress-nginx", gatewayValues, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProductionMediaStorageShouldExposeBrowserReachablePresignedUrls()
+    {
+        var mediaValues = ReadRepoFile("deploy", "helm", "services", "media-service", "values-prod.yaml");
+        var minioIngress = ReadRepoFile("deploy", "k8s", "platform", "ingress", "minio-ingress.yaml");
+        var minioBucketsJob = ReadRepoFile("deploy", "k8s", "platform", "stateful", "minio-buckets-job.yaml");
+
+        Assert.Contains(
+            "Storage__Endpoint: http://urfu-minio.urfu-platform.svc.cluster.local:9000",
+            mediaValues,
+            StringComparison.Ordinal);
+        Assert.Contains("Storage__PublicEndpoint: https://storage.ghjc.ru", mediaValues, StringComparison.Ordinal);
+        Assert.Contains("Storage__PrivateBucket: media-private", mediaValues, StringComparison.Ordinal);
+        Assert.Contains("Storage__PublicBucket: media-public", mediaValues, StringComparison.Ordinal);
+        Assert.Contains("host: storage.ghjc.ru", minioIngress, StringComparison.Ordinal);
+        Assert.Contains("number: 9000", minioIngress, StringComparison.Ordinal);
+        Assert.Contains("https://urfu-link.ghjc.ru", minioBucketsJob, StringComparison.Ordinal);
+        Assert.Contains("mc cors set minio/media-private", minioBucketsJob, StringComparison.Ordinal);
+        Assert.Contains("mc cors set minio/media-public", minioBucketsJob, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LocalKubernetesMediaStorageShouldUseClusterEndpointAndIngressHost()
+    {
+        var mediaValues = ReadRepoFile("deploy", "helm", "services", "media-service", "values-dev.yaml");
+        var localSecrets = ReadRepoFile("platform", "dev", "local-k8s", "dev-secrets.yaml");
+        var localIngress = ReadRepoFile("platform", "dev", "local-k8s", "local-ingress.yaml");
+        var dependencies = ReadRepoFile("platform", "dev", "local-k8s", "dependencies.yaml");
+        var mediaSecret = GetYamlDocumentByName(localSecrets, "media-service-secrets");
+
+        Assert.Contains(
+            "Storage__Endpoint: http://minio.urfu-platform.svc.cluster.local:9000",
+            mediaValues,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Storage__PublicEndpoint: http://storage.dev.127.0.0.1.nip.io",
+            mediaValues,
+            StringComparison.Ordinal);
+        Assert.Contains("Storage__AccessKey: minio", mediaSecret, StringComparison.Ordinal);
+        Assert.Contains("Storage__SecretKey: minio123", mediaSecret, StringComparison.Ordinal);
+        Assert.Contains("host: storage.dev.127.0.0.1.nip.io", localIngress, StringComparison.Ordinal);
+        Assert.Contains("name: minio-bootstrap-buckets", dependencies, StringComparison.Ordinal);
+        Assert.Contains("http://localhost:3000", dependencies, StringComparison.Ordinal);
+        Assert.Contains("http://app.dev.127.0.0.1.nip.io", dependencies, StringComparison.Ordinal);
+        Assert.Contains("mc cors set minio/media-private", dependencies, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -154,5 +204,17 @@ public sealed class DeploymentContractTests
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
 
         return File.ReadAllText(Path.Combine([repoRoot, .. pathSegments]));
+    }
+
+    private static string GetYamlDocumentByName(string manifest, string name)
+    {
+        var documentStart = manifest.IndexOf($"name: {name}", StringComparison.Ordinal);
+        Assert.True(documentStart >= 0, $"Could not find YAML document named {name}.");
+
+        documentStart = manifest.LastIndexOf("---", documentStart, StringComparison.Ordinal);
+        documentStart = documentStart < 0 ? 0 : documentStart + "---".Length;
+
+        var documentEnd = manifest.IndexOf("---", documentStart, StringComparison.Ordinal);
+        return documentEnd < 0 ? manifest[documentStart..] : manifest[documentStart..documentEnd];
     }
 }

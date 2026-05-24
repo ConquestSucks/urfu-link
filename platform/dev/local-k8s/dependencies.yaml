@@ -333,6 +333,54 @@ spec:
       port: 9001
       targetPort: console
 ---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: minio-bootstrap-buckets
+  namespace: urfu-platform
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              until mc alias set minio http://minio.urfu-platform.svc.cluster.local:9000 minio minio123; do
+                sleep 2
+              done
+
+              cat >/tmp/media-cors.json <<'EOF'
+              [
+                {
+                  "AllowedOrigins": [
+                    "http://localhost:3000",
+                    "http://127.0.0.1:3000",
+                    "http://app.dev.127.0.0.1.nip.io"
+                  ],
+                  "AllowedMethods": ["GET", "HEAD", "PUT"],
+                  "AllowedHeaders": ["*"],
+                  "ExposeHeaders": ["ETag"],
+                  "MaxAgeSeconds": 3000
+                }
+              ]
+              EOF
+
+              mc mb -p minio/user-avatars || true
+              mc mb -p minio/media-private || true
+              mc mb -p minio/media-public || true
+              mc anonymous set download minio/user-avatars
+              mc anonymous set download minio/media-public
+              mc cors set minio/media-private /tmp/media-cors.json
+              mc cors set minio/media-public /tmp/media-cors.json
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

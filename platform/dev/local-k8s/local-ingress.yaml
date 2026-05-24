@@ -16,3 +16,22 @@ spec:
                 name: api-gateway
                 port:
                   number: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minio-api-local
+  namespace: urfu-platform
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: storage.dev.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: minio
+                port:
+                  number: 9000
