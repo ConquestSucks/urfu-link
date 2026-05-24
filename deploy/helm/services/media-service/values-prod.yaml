@@ -26,6 +26,10 @@ env:
   Auth__NameClaim: email
   Auth__RoleClaim: groups
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
+  Storage__Endpoint: http://urfu-minio.urfu-platform.svc.cluster.local:9000
+  Storage__PublicEndpoint: https://storage.ghjc.ru
+  Storage__PrivateBucket: media-private
+  Storage__PublicBucket: media-public
 
 secrets:
   enabled: true

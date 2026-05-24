@@ -100,11 +100,14 @@ kubectl create configmap otel-collector-config -n observability --from-file=conf
 Write-Host "[urfu-link] Applying local platform resources..." -ForegroundColor Cyan
 kubectl delete job postgres-bootstrap -n urfu-platform --ignore-not-found=true
 kubectl delete job kafka-bootstrap -n urfu-platform --ignore-not-found=true
+kubectl delete job minio-bootstrap-buckets -n urfu-platform --ignore-not-found=true
 kubectl apply -k platform/dev/local-k8s
 kubectl wait --namespace urfu-platform --for=condition=available deployment/postgres --timeout=300s
 kubectl wait --namespace urfu-platform --for=condition=available deployment/kafka --timeout=300s
+kubectl wait --namespace urfu-platform --for=condition=available deployment/minio --timeout=300s
 kubectl wait --namespace urfu-platform --for=condition=complete job/postgres-bootstrap --timeout=300s
 kubectl wait --namespace urfu-platform --for=condition=complete job/kafka-bootstrap --timeout=300s
+kubectl wait --namespace urfu-platform --for=condition=complete job/minio-bootstrap-buckets --timeout=300s
 
 if ($BuildImages) {
     & .\scripts\local-k8s-load-images.ps1 -ClusterName $ClusterName

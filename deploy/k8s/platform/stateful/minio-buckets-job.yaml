@@ -16,17 +16,40 @@ spec:
           command:
             - /bin/sh
             - -c
-            - >-
-              until [ -s /bootstrap/endpoint ] && [ -s /bootstrap/access_key ] && [ -s /bootstrap/secret_key ]; do sleep 5; done &&
-              MINIO_ENDPOINT="$(cat /bootstrap/endpoint)" &&
-              MINIO_ACCESS_KEY="$(cat /bootstrap/access_key)" &&
-              MINIO_SECRET_KEY="$(cat /bootstrap/secret_key)" &&
-              until mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do sleep 5; done &&
-              mc mb -p minio/media-private || true &&
-              mc mb -p minio/media-public || true &&
-              mc anonymous set download minio/media-public &&
-              mc mb -p minio/user-avatars || true &&
+            - |
+              set -eu
+
+              until [ -s /bootstrap/endpoint ] && [ -s /bootstrap/access_key ] && [ -s /bootstrap/secret_key ]; do
+                sleep 5
+              done
+
+              MINIO_ENDPOINT="$(cat /bootstrap/endpoint)"
+              MINIO_ACCESS_KEY="$(cat /bootstrap/access_key)"
+              MINIO_SECRET_KEY="$(cat /bootstrap/secret_key)"
+
+              until mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"; do
+                sleep 5
+              done
+
+              cat >/tmp/media-cors.json <<'EOF'
+              [
+                {
+                  "AllowedOrigins": ["https://urfu-link.ghjc.ru"],
+                  "AllowedMethods": ["GET", "HEAD", "PUT"],
+                  "AllowedHeaders": ["*"],
+                  "ExposeHeaders": ["ETag"],
+                  "MaxAgeSeconds": 3000
+                }
+              ]
+              EOF
+
+              mc mb -p minio/media-private || true
+              mc mb -p minio/media-public || true
+              mc mb -p minio/user-avatars || true
+              mc anonymous set download minio/media-public
               mc anonymous set download minio/user-avatars
+              mc cors set minio/media-private /tmp/media-cors.json
+              mc cors set minio/media-public /tmp/media-cors.json
           volumeMounts:
             - name: bootstrap-secret
               mountPath: /bootstrap
