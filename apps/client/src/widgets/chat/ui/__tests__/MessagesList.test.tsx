@@ -190,7 +190,7 @@ describe("MessagesList loading state", () => {
         });
     });
 
-    it("renders a single inline date separator per message day", () => {
+    it("renders a single date separator per message day", () => {
         jest.useFakeTimers();
         jest.setSystemTime(new Date("2026-05-24T12:00:00.000Z"));
         mockChatState = {
@@ -221,6 +221,41 @@ describe("MessagesList loading state", () => {
         expect(screen.getAllByText("Сегодня")).toHaveLength(1);
         expect(screen.getByText(/мая/)).toBeTruthy();
         jest.useRealTimers();
+    });
+
+    it("keeps date separators as independent list rows", () => {
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "chat-date-rows": [
+                    {
+                        id: "message-today",
+                        body: "today",
+                        senderId: "peer-user",
+                        readAt: null,
+                        createdAt: "2026-05-24T10:00:00.000Z",
+                    },
+                    {
+                        id: "message-yesterday",
+                        body: "yesterday",
+                        senderId: "peer-user",
+                        readAt: null,
+                        createdAt: "2026-05-23T10:00:00.000Z",
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "chat-date-rows": true },
+        };
+
+        render(<MessagesList chatId="chat-date-rows" type="chat" />);
+
+        const list = screen.UNSAFE_getByType(FlatList);
+        expect(list.props.data).toEqual([
+            expect.objectContaining({ id: "message-today", type: "message" }),
+            expect.objectContaining({ dayKey: "2026-05-24", type: "date" }),
+            expect.objectContaining({ id: "message-yesterday", type: "message" }),
+            expect.objectContaining({ dayKey: "2026-05-23", type: "date" }),
+        ]);
     });
 
     it("highlights a message for a few seconds after imperative scroll", async () => {
