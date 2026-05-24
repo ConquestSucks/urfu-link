@@ -17,3 +17,11 @@
 {{- default "default" .Values.serviceAccount.name -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "urfu-service.migrationsServiceAccountName" -}}
+{{- if .Values.migrations.serviceAccount.create -}}
+{{- default (printf "%s-migrations" (include "urfu-service.fullname" .)) .Values.migrations.serviceAccount.name -}}
+{{- else -}}
+{{- default "default" .Values.migrations.serviceAccount.name -}}
+{{- end -}}
+{{- end -}}
