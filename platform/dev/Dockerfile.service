@@ -73,7 +73,7 @@ RUN dotnet publish "$SERVICE_PROJECT" \
     /p:UseAppHost=false
 
 # ── Runtime-стадия ──────────────────────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.4 AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.8 AS final
 WORKDIR /app
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080

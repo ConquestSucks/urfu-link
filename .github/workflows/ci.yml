@@ -98,6 +98,7 @@ jobs:
               - 'Directory.Build.props'
               - 'Directory.Packages.props'
               - 'NuGet.Config'
+              - 'platform/dev/Dockerfile.service'
             api-gateway:
               - 'src/Gateway/ApiGateway/**'
             media-service:
@@ -106,6 +107,8 @@ jobs:
               - 'src/Services/User/**'
             chat-service:
               - 'src/Services/Chat/**'
+            discipline-service:
+              - 'src/Services/Discipline/**'
             presence-service:
               - 'src/Services/Presence/**'
             notification-service:
@@ -123,6 +126,7 @@ jobs:
           PROJECT_MAP[media-service]="src/Services/Media/MediaService.Api/MediaService.Api.csproj"
           PROJECT_MAP[user-service]="src/Services/User/UserService.Api/UserService.Api.csproj"
           PROJECT_MAP[chat-service]="src/Services/Chat/ChatService.Api/ChatService.Api.csproj"
+          PROJECT_MAP[discipline-service]="src/Services/Discipline/DisciplineService.Api/DisciplineService.Api.csproj"
           PROJECT_MAP[presence-service]="src/Services/Presence/PresenceService.Api/PresenceService.Api.csproj"
           PROJECT_MAP[notification-service]="src/Services/Notification/NotificationService.Api/NotificationService.Api.csproj"
           PROJECT_MAP[call-service]="src/Services/Call/CallService.Api/CallService.Api.csproj"
@@ -132,11 +136,12 @@ jobs:
           DLL_MAP[media-service]="MediaService.Api.dll"
           DLL_MAP[user-service]="UserService.Api.dll"
           DLL_MAP[chat-service]="ChatService.Api.dll"
+          DLL_MAP[discipline-service]="DisciplineService.Api.dll"
           DLL_MAP[presence-service]="PresenceService.Api.dll"
           DLL_MAP[notification-service]="NotificationService.Api.dll"
           DLL_MAP[call-service]="CallService.Api.dll"
 
-          ALL_SERVICES=(api-gateway media-service user-service chat-service presence-service notification-service call-service)
+          ALL_SERVICES=(api-gateway media-service user-service chat-service discipline-service presence-service notification-service call-service)
 
           FORCE_ALL="${{ inputs.force_all }}"
           SHARED_CHANGED="${{ steps.filter.outputs.shared }}"
@@ -168,6 +173,7 @@ jobs:
                 media-service) svc_changed="${{ steps.filter.outputs.media-service }}" ;;
                 user-service) svc_changed="${{ steps.filter.outputs.user-service }}" ;;
                 chat-service) svc_changed="${{ steps.filter.outputs.chat-service }}" ;;
+                discipline-service) svc_changed="${{ steps.filter.outputs.discipline-service }}" ;;
                 presence-service) svc_changed="${{ steps.filter.outputs.presence-service }}" ;;
                 notification-service) svc_changed="${{ steps.filter.outputs.notification-service }}" ;;
                 call-service) svc_changed="${{ steps.filter.outputs.call-service }}" ;;
