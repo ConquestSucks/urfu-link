@@ -126,6 +126,29 @@ public sealed class DeploymentContractTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PlatformBootstrapShouldProvisionNotificationPostgresConnection()
+    {
+        var bootstrap = ReadRepoFile("deploy", "k8s", "platform", "stateful", "platform-bootstrap-job.yaml");
+        var externalSecrets = ReadRepoFile("deploy", "k8s", "platform", "external-secrets", "services-external-secrets.yaml");
+
+        Assert.Contains("notification_db_password", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CREATE ROLE notification LOGIN PASSWORD '$NOTIFICATION_DB_PASSWORD'", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("CREATE DATABASE notification_db OWNER notification", bootstrap, StringComparison.Ordinal);
+        Assert.Contains(
+            "primary_connection\":\"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s",
+            bootstrap,
+            StringComparison.Ordinal);
+
+        var notificationSecretStart = externalSecrets.IndexOf("name: notification-service-secrets", StringComparison.Ordinal);
+        var notificationSecretEnd = externalSecrets.IndexOf("---", notificationSecretStart, StringComparison.Ordinal);
+        var notificationSecret = externalSecrets[notificationSecretStart..notificationSecretEnd];
+
+        Assert.Contains("secretKey: ConnectionStrings__Primary", notificationSecret, StringComparison.Ordinal);
+        Assert.Contains("key: urfu-link/prod/notification-service", notificationSecret, StringComparison.Ordinal);
+        Assert.Contains("property: primary_connection", notificationSecret, StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] pathSegments)
     {
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
