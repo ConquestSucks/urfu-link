@@ -29,6 +29,20 @@ spec:
           config:
             server-snippet: |
               location = /.pomerium/sign_in {
+                set $legacy_pomerium_sign_in "";
+
+                if ($arg_pomerium_signature = "") {
+                  set $legacy_pomerium_sign_in "missing-signature";
+                }
+
+                if ($arg_pomerium_redirect_uri != "") {
+                  set $legacy_pomerium_sign_in "${legacy_pomerium_sign_in}-with-redirect";
+                }
+
+                if ($legacy_pomerium_sign_in = "missing-signature-with-redirect") {
+                  return 302 https://urfu-link.ghjc.ru/;
+                }
+
                 proxy_pass http://pomerium.urfu-platform.svc.cluster.local:80;
                 proxy_http_version 1.1;
                 proxy_set_header Host auth.ghjc.ru;
