@@ -3,7 +3,7 @@ fullnameOverride: presence-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/presence-service
   pullPolicy: IfNotPresent
-  tag: sha-d2ccf84
+  tag: sha-04412d7
 
 imagePullSecrets:
   - name: ghcr-pull-secret
