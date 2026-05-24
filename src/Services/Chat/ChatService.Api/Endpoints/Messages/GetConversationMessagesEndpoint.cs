@@ -1,4 +1,5 @@
 using FastEndpoints;
+using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Application.Cursors;
 using Urfu.Link.Services.Chat.Application.Messages;
@@ -37,6 +38,14 @@ public sealed class GetConversationMessagesEndpoint(GetConversationMessagesQuery
         {
             AddError("cursor", "Invalid cursor.");
             await Send.ErrorsAsync(StatusCodes.Status400BadRequest, ct).ConfigureAwait(false);
+        }
+        catch (ConversationNotFoundException)
+        {
+            await Send.NotFoundAsync(ct).ConfigureAwait(false);
+        }
+        catch (ChatAccessDeniedException)
+        {
+            await Send.ForbiddenAsync(ct).ConfigureAwait(false);
         }
     }
 }
