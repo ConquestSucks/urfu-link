@@ -12,6 +12,12 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    {{- if .Values.service.grpc.enabled }}
+    - port: {{ .Values.service.grpc.port }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    {{- end }}
   selector:
     app.kubernetes.io/name: {{ include "urfu-service.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}
@@ -31,6 +37,12 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    {{- if .Values.service.grpc.enabled }}
+    - port: {{ .Values.service.grpc.port }}
+      targetPort: grpc
+      protocol: TCP
+      name: grpc
+    {{- end }}
   selector:
     app.kubernetes.io/name: {{ include "urfu-service.name" . }}
     app.kubernetes.io/instance: {{ .Release.Name }}

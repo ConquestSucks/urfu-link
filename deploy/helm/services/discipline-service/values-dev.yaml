@@ -7,6 +7,10 @@ image:
 
 replicaCount: 1
 
+service:
+  grpc:
+    enabled: true
+
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: http://+:8080

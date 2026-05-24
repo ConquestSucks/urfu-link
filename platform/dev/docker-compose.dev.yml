@@ -94,6 +94,7 @@ services:
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.notification.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.call.events.v1 --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.discipline.events.v1 --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --create --if-not-exists --topic urfu.system.events.v1 --partitions 3 --replication-factor 1
         echo "Kafka topics created."
     restart: "no"
 
@@ -236,7 +237,7 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -252,6 +253,7 @@ services:
     container_name: urfu-user-service
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
       Keycloak__ClientSecret: user-service-admin-dev-secret
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
@@ -286,6 +288,9 @@ services:
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
       Infrastructure__Redis__Configuration: redis:6379
       # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
+      GrpcClients__InternalAuth__TokenEndpoint: http://keycloak:8080/realms/urfu-link/protocol/openid-connect/token
+      GrpcClients__InternalAuth__ClientId: chat-service-internal
+      GrpcClients__InternalAuth__ClientSecret: chat-service-internal-dev-secret
       GrpcClients__UserService__Address: http://user-service:8081
       GrpcClients__DisciplineService__Address: http://discipline-service:8081
       GrpcClients__MediaService__Address: http://media-service:8081
@@ -314,7 +319,7 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -332,7 +337,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
       Storage__Endpoint: http://minio:9000
       Storage__PublicEndpoint: http://localhost:9000
       Storage__AccessKey: minio
@@ -370,7 +375,7 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -390,7 +395,7 @@ services:
       Kafka__ConsumerTopic: urfu.user.events.v1
       Kafka__ConsumerGroup: presence-privacy-projection-v1
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       presence-migrations:
@@ -418,7 +423,7 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -436,7 +441,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
       Notification__Push__Provider: fake
       Notification__Smtp__Host: mailhog
@@ -507,7 +512,7 @@ services:
     command: ["--migrate"]
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
     depends_on:
       postgres:
         condition: service_healthy
@@ -525,7 +530,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
-      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline
+      ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
       discipline-migrations:
