@@ -3,6 +3,7 @@ import { SearchFilters, SearchResultDto, SearchUserDto } from "@urfu-link/api-cl
 import { apiClient } from "@/shared/lib/api";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
+import { saveDirectDraftConversation } from "@/entities/conversation/model/direct-draft-cache";
 
 // Поля, которыми UI рулит из SearchFiltersBar. conversationId исключён —
 // он задаётся самим режимом поиска (global/local), а не пользователем.
@@ -283,14 +284,14 @@ export const useSearchStore = create<SearchState>((set, get) => ({
             // по id после router.push. Если SignalR-событие потом прилетит, оно
             // просто перезапишет ту же запись (updateConversation идемпотентен).
             useChatStore.getState().updateConversation(conversation);
-            useParticipantsStore.getState().prime(conversation.id, [
-                {
-                    userId,
-                    role: "Member",
-                    displayName: user.displayName || user.username,
-                    avatarUrl: user.avatarUrl ?? "",
-                },
-            ]);
+            const peerParticipant = {
+                userId,
+                role: "Member" as const,
+                displayName: user.displayName || user.username,
+                avatarUrl: user.avatarUrl ?? "",
+            };
+            useParticipantsStore.getState().prime(conversation.id, [peerParticipant]);
+            saveDirectDraftConversation(conversation, [peerParticipant]);
 
             // Для нового direct-чата backend возвращает draft без Mongo-документа, поэтому
             // /participants до первого сообщения ещё недоступен. Имя собеседника уже есть из

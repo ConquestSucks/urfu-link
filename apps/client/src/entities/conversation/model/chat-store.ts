@@ -8,6 +8,7 @@ import {
 import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
 import { apiClient } from "@/shared/lib/api";
+import { resolveCurrentUserId } from "@/shared/lib/current-user";
 import { useAuthStore } from "@/shared/store/auth-store";
 
 /** Локальный (только клиентский) статус сообщения, не приходящий с сервера. */
@@ -751,10 +752,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (connection?.state !== HubConnectionState.Connected) {
             throw new Error("ChatHub is not connected");
         }
-        const currentUserId = useAuthStore.getState().userId;
-        if (!currentUserId) {
-            throw new Error("Not authenticated");
-        }
+        const currentUserId = await resolveCurrentUserId();
 
         const clientMessageId =
             typeof crypto !== "undefined" && "randomUUID" in crypto

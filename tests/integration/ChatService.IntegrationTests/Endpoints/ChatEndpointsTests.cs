@@ -94,7 +94,18 @@ public class ChatEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_ConversationById_NotParticipant_ReturnsConflictOrForbidden()
+    public async Task Get_ConversationById_Missing_Returns404()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/v1/chat/conversations/{Guid.NewGuid():N}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Get_ConversationById_NotParticipant_ReturnsForbidden()
     {
         // Open a conversation the caller is NOT part of.
         string convId;
@@ -119,10 +130,7 @@ public class ChatEndpointsTests : IAsyncLifetime
         using var client = _factory.CreateClient();
         var response = await client.GetAsync($"/api/v1/chat/conversations/{convId}");
 
-        // FastEndpoints maps unhandled exceptions to 500 by default, but ChatAccessDeniedException is
-        // not specifically mapped. We assert any non-success here to demonstrate the access path is
-        // wired; exception-to-status mapping will be tightened in a future iteration.
-        response.IsSuccessStatusCode.Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -252,7 +260,18 @@ public class ChatEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_ConversationParticipants_AsNonParticipant_NonSuccess()
+    public async Task Get_ConversationParticipants_Missing_Returns404()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/v1/chat/conversations/{Guid.NewGuid():N}/participants");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Get_ConversationParticipants_AsNonParticipant_ReturnsForbidden()
     {
         var teacherId = Guid.NewGuid();
         var disciplineId = Guid.NewGuid();
@@ -273,7 +292,7 @@ public class ChatEndpointsTests : IAsyncLifetime
         using var client = _factory.CreateClient();
         var response = await client.GetAsync($"/api/v1/chat/conversations/{conversationId}/participants");
 
-        response.IsSuccessStatusCode.Should().BeFalse();
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     [Fact]
@@ -332,5 +351,16 @@ public class ChatEndpointsTests : IAsyncLifetime
             $"/api/v1/chat/conversations/{convId}/messages?limit=10&direction=older");
 
         page!.Items.Select(m => m.Body).Should().Equal("m2", "m1", "m0");
+    }
+
+    [Fact]
+    public async Task Get_ConversationMessages_Missing_Returns404()
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(Guid.NewGuid());
+
+        using var client = _factory.CreateClient();
+        var response = await client.GetAsync($"/api/v1/chat/conversations/{Guid.NewGuid():N}/messages?limit=10");
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 }

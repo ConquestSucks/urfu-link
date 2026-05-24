@@ -209,6 +209,27 @@ describe("presence store subscriptions", () => {
         expect(connection.invoke).toHaveBeenCalledWith("UnsubscribeFromUsers", [peerUserId]);
     });
 
+    it("does not warn when subscribe is canceled by a closing hub connection", async () => {
+        const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+
+        await act(async () => {
+            await usePresenceStore.getState().connect();
+        });
+        connection.invoke.mockClear();
+        connection.invoke.mockRejectedValueOnce(
+            new Error("Invocation canceled due to the underlying connection being closed."),
+        );
+
+        await act(async () => {
+            await usePresenceStore.getState().watchUserPresence(peerUserId);
+        });
+
+        expect(connection.invoke).toHaveBeenCalledWith("SubscribeToUsers", [peerUserId]);
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        warnSpy.mockRestore();
+    });
+
     it("does not warn when unsubscribe is canceled by a closing hub connection", async () => {
         const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
 

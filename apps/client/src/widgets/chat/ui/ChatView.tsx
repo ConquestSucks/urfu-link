@@ -7,6 +7,11 @@ import { MessagesList, type MessagesListHandle } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
+import {
+    isDirectDraftConversation,
+    isDirectDraftId,
+    restoreDirectDraftConversation,
+} from "@/entities/conversation/model/direct-draft-cache";
 import { apiClient } from "@/shared/lib/api";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
@@ -45,7 +50,9 @@ export const ChatView = () => {
 
     const chatId = params.id as string;
     const type = currentTab === "chats" ? "chat" : "subject";
-    const isDirectDraft = conversation?.type === "Direct" && !conversation.lastMessagePreview;
+    const isDirectDraft = isDirectDraftConversation(conversation);
+    const isUnknownDirectDraft = type === "chat" && !conversation && isDirectDraftId(chatId);
+    const shouldSkipRemoteConversationLoads = isDirectDraft || isUnknownDirectDraft;
 
     const handleSend = useCallback(
         async (text: string, files: DocumentPickerAsset[], replyToMessageId?: string) => {
@@ -99,12 +106,26 @@ export const ChatView = () => {
         };
     }, [pendingScrollId, setPendingScrollToMessageId]);
 
+    useEffect(() => {
+        if (type !== "chat" || conversation || !isDirectDraftId(chatId)) {
+            return;
+        }
+
+        const restored = restoreDirectDraftConversation(chatId);
+        if (!restored) {
+            return;
+        }
+
+        useChatStore.getState().updateConversation(restored.conversation);
+        useParticipantsStore.getState().prime(chatId, restored.participants);
+    }, [chatId, conversation, type]);
+
     // Прогрев participants-store: нужен для @mentions autocomplete и для
     // resolve userId -> displayName в TypingIndicator. Кэш в сторе TTL 5 минут,
     // повторные load() для одного и того же chatId — no-op.
     useEffect(() => {
         if (!chatId) return;
-        if (isDirectDraft) {
+        if (shouldSkipRemoteConversationLoads) {
             return;
         }
 
@@ -114,7 +135,7 @@ export const ChatView = () => {
             .catch(() => {
                 /* fail-open: индикатор печати и mentions работают и без имён */
             });
-    }, [chatId, isDirectDraft]);
+    }, [chatId, shouldSkipRemoteConversationLoads]);
 
     const pinnedIds = conversation?.pinnedMessageIds ?? [];
     const isActionsTargetPinned = !!(
@@ -236,16 +257,18 @@ export const ChatView = () => {
                 ref={listRef}
                 chatId={chatId}
                 type={type}
-                skipInitialLoad={isDirectDraft}
+                skipInitialLoad={shouldSkipRemoteConversationLoads}
                 onMessageLongPress={(message) => openActionsMenu(message)}
                 onMessageContextMenu={openActionsMenu}
                 onThreadOpen={setOpenThreadRootId}
             />
-            <ChatInput
-                conversationId={chatId}
-                onSend={handleSend}
-                typingEnabled={!isDirectDraft}
-            />
+            {!isUnknownDirectDraft && (
+                <ChatInput
+                    conversationId={chatId}
+                    onSend={handleSend}
+                    typingEnabled={!isDirectDraft}
+                />
+            )}
         </View>
     );
 

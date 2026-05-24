@@ -2,6 +2,13 @@ import { mapMessageToProps, useChatStore } from "../chat-store";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { apiClient } from "@/shared/lib/api";
 
+const mockAuthState: { userId: string | null; setUserId: jest.Mock } = {
+    userId: "user-1",
+    setUserId: jest.fn((userId: string | null) => {
+        mockAuthState.userId = userId;
+    }),
+};
+
 jest.mock("@microsoft/signalr", () => ({
     HubConnectionState: {
         Connected: "Connected",
@@ -33,12 +40,15 @@ jest.mock("@/shared/lib/signalr", () => ({
 
 jest.mock("@/shared/store/auth-store", () => ({
     useAuthStore: {
-        getState: jest.fn(() => ({ userId: "user-1" })),
+        getState: jest.fn(() => mockAuthState),
     },
 }));
 
 jest.mock("@/shared/lib/api", () => ({
     apiClient: {
+        users: {
+            getMe: jest.fn(),
+        },
         chat: {
             editMessage: jest.fn(),
             deleteMessage: jest.fn(),
@@ -57,9 +67,37 @@ jest.mock("@/shared/lib/api", () => ({
 describe("chat store direct draft sending", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockAuthState.userId = "user-1";
         Object.keys(hubHandlers).forEach((key) => delete hubHandlers[key]);
         hubConnection.state = "Disconnected";
         (createHubConnection as jest.Mock).mockReturnValue(hubConnection);
+        (apiClient.users.getMe as jest.Mock).mockResolvedValue({
+            userId: "user-1",
+            identity: {
+                name: "Current User",
+                email: "current@example.com",
+                username: "current",
+            },
+            account: {
+                avatarUrl: null,
+                aboutMe: null,
+            },
+            privacy: {
+                showOnlineStatus: true,
+                showLastVisitTime: true,
+            },
+            notifications: {
+                newMessages: true,
+                notificationSound: true,
+                disciplineChatMessages: true,
+                mentions: true,
+            },
+            soundVideo: {
+                playbackDeviceId: null,
+                recordingDeviceId: null,
+                webcamDeviceId: null,
+            },
+        });
         useChatStore.setState({
             connection: null,
             isConnected: false,
@@ -140,6 +178,54 @@ describe("chat store direct draft sending", () => {
             }),
         );
         expect(conversation.lastMessageAtUtc).toBe("2026-05-24T10:00:00.000Z");
+    });
+
+    it("hydrates the current user before sending when the auth store has no jwt user", async () => {
+        mockAuthState.userId = null;
+        const invoke = jest.fn(async (_method: string, payload: { clientMessageId: string }) => ({
+            id: "message-1",
+            conversationId: "direct-1",
+            senderId: "user-1",
+            body: "hello",
+            attachments: [],
+            state: "Sent",
+            createdAtUtc: "2026-05-24T10:00:00.000Z",
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            clientMessageId: payload.clientMessageId,
+            editedAtUtc: null,
+            replyTo: null,
+            reactionsSummary: {},
+            mentions: [],
+            forwardedFrom: null,
+        }));
+
+        useChatStore.setState({
+            connection: { state: "Connected", invoke } as never,
+            isConnected: true,
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().sendMessage("direct-1", "hello");
+
+        expect(apiClient.users.getMe).toHaveBeenCalledTimes(1);
+        expect(mockAuthState.setUserId).toHaveBeenCalledWith("user-1");
+        expect(invoke).toHaveBeenCalledWith(
+            "SendMessage",
+            expect.objectContaining({
+                conversationId: "direct-1",
+                peerUserId: "peer-1",
+            }),
+        );
     });
 
     it("keeps media asset ids in mapped message attachments", () => {

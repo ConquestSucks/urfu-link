@@ -1,4 +1,5 @@
 import { appConfig } from "@/shared/lib/config";
+import { resolveCurrentUserId } from "@/shared/lib/current-user";
 import { useAuthStore } from "@/shared/store/auth-store";
 import { useCallback, useEffect, useRef } from "react";
 import type { PropsWithChildren } from "react";
@@ -85,6 +86,14 @@ export default function AuthProvider({ children }: PropsWithChildren) {
             if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
         };
     }, [isDev, scheduleRefresh]);
+
+    useEffect(() => {
+        if (isDev) return;
+
+        void resolveCurrentUserId({ forceRefresh: true }).catch(() => {
+            useAuthStore.getState().setUserId(null);
+        });
+    }, [isDev]);
 
     // Dev-only: schedule refresh when AuthGate sets a new token.
     useEffect(() => {

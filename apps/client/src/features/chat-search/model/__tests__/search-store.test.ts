@@ -2,6 +2,7 @@ const mockOpenDirectConversation = jest.fn();
 const mockUpdateConversation = jest.fn();
 const mockPrimeParticipants = jest.fn();
 const mockLoadParticipants = jest.fn();
+const mockStorage = new Map<string, string>();
 
 jest.mock("@/shared/lib/api", () => ({
     apiClient: {
@@ -33,17 +34,30 @@ jest.mock("@/entities/conversation/model/participants-store", () => ({
     },
 }));
 
+jest.mock("@/shared/lib/storage", () => ({
+    appStorage: {
+        getItem: jest.fn((name: string) => mockStorage.get(name) ?? null),
+        setItem: jest.fn((name: string, value: string) => {
+            mockStorage.set(name, value);
+        }),
+        removeItem: jest.fn((name: string) => {
+            mockStorage.delete(name);
+        }),
+    },
+}));
+
 const { useSearchStore } = require("../search-store") as typeof import("../search-store");
 
 describe("search store direct chat drafts", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockStorage.clear();
         useSearchStore.setState({ pendingUserId: null });
     });
 
     it("primes participants without loading the draft participants endpoint", async () => {
         mockOpenDirectConversation.mockResolvedValue({
-            id: "direct-1",
+            id: "8b52b1fc6ba59e5479e937392652af924b69a5e7",
             type: "Direct",
             participants: ["user-1", "peer-1"],
             createdAtUtc: "2026-05-24T10:00:00.000Z",
@@ -58,9 +72,9 @@ describe("search store direct chat drafts", () => {
             avatarUrl: null,
         });
 
-        expect(result).toBe("direct-1");
+        expect(result).toBe("8b52b1fc6ba59e5479e937392652af924b69a5e7");
         expect(mockUpdateConversation).toHaveBeenCalled();
-        expect(mockPrimeParticipants).toHaveBeenCalledWith("direct-1", [
+        expect(mockPrimeParticipants).toHaveBeenCalledWith("8b52b1fc6ba59e5479e937392652af924b69a5e7", [
             {
                 userId: "peer-1",
                 role: "Member",
@@ -69,5 +83,8 @@ describe("search store direct chat drafts", () => {
             },
         ]);
         expect(mockLoadParticipants).not.toHaveBeenCalled();
+        expect(mockStorage.get("chat.directDrafts.v1")).toContain(
+            "8b52b1fc6ba59e5479e937392652af924b69a5e7",
+        );
     });
 });
