@@ -96,7 +96,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const hasMore = hasMoreByConversation[chatId] || false;
         const listRef = useRef<FlatList<MessageDto>>(null);
         const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-        const [visibleDateLabel, setVisibleDateLabel] = useState("");
         const highlightOpacity = useRef(new Animated.Value(0)).current;
         const highlightAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
         const highlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -112,10 +111,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             if (skipInitialLoad) return;
             loadMessages(chatId, type, true);
         }, [chatId, type, skipInitialLoad, loadMessages]);
-
-        useEffect(() => {
-            setVisibleDateLabel(messages[0] ? formatMessageDateLabel(messages[0].createdAt) : "");
-        }, [messages]);
 
         useEffect(() => {
             return () => {
@@ -222,16 +217,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             }: {
                 viewableItems: Array<{ item: MessageDto; index: number | null }>;
             }) => {
-                const topVisible = viewableItems.reduce<
-                    { item: MessageDto; index: number | null } | null
-                >((current, next) => {
-                    if (!current) return next;
-                    return (next.index ?? -1) > (current.index ?? -1) ? next : current;
-                }, null);
-                if (topVisible?.item.createdAt) {
-                    setVisibleDateLabel(formatMessageDateLabel(topVisible.item.createdAt));
-                }
-
                 const {
                     chatId: activeChatId,
                     currentUserId: activeCurrentUserId,
@@ -429,18 +414,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         ) : null
                     }
                 />
-                {visibleDateLabel ? (
-                    <View
-                        className="absolute top-3 left-0 right-0 items-center"
-                        style={{ pointerEvents: "none" }}
-                    >
-                        <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
-                            <Text className="text-[12px] font-semibold text-text-subtle">
-                                {visibleDateLabel}
-                            </Text>
-                        </View>
-                    </View>
-                ) : null}
             </View>
         );
     },
