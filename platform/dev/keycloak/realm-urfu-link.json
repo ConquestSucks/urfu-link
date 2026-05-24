@@ -13,7 +13,9 @@
       { "name": "service" },
       { "name": "teacher", "description": "Discipline owner / instructor" },
       { "name": "student", "description": "Discipline participant" },
-      { "name": "service:discipline-read", "description": "Allows internal gRPC reads on DisciplineService.InternalApi (membership/listing)" }
+      { "name": "service:discipline-read", "description": "Allows internal gRPC reads on DisciplineService.InternalApi (membership/listing)" },
+      { "name": "service:media-internal", "description": "Allows internal gRPC calls on MediaService.InternalApi" },
+      { "name": "service:presence-internal", "description": "Allows internal gRPC calls on PresenceService.InternalApi" }
     ]
   },
   "clients": [
@@ -213,7 +215,7 @@
     {
       "clientId": "chat-service-internal",
       "name": "Chat Service (internal)",
-      "description": "Service-account client used by ChatService to call DisciplineService.InternalApi gRPC. The associated service-account user holds the realm role 'service:discipline-read'.",
+      "description": "Service-account client used by ChatService to call internal gRPC APIs. The associated service-account user holds service:* realm roles.",
       "enabled": true,
       "publicClient": false,
       "serviceAccountsEnabled": true,
@@ -336,7 +338,7 @@
       "username": "service-account-chat-service-internal",
       "enabled": true,
       "serviceAccountClientId": "chat-service-internal",
-      "realmRoles": ["service:discipline-read"]
+      "realmRoles": ["service:discipline-read", "service:media-internal", "service:presence-internal"]
     }
   ]
 }

@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Images;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
@@ -7,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.MongoDb;
@@ -180,8 +182,11 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
     private static void ReplaceAuthWithTestScheme(IServiceCollection services)
     {
         var authDescriptors = services
-            .Where(d => d.ServiceType.FullName?.Contains("AuthenticationScheme", StringComparison.Ordinal) == true
-                || d.ServiceType.FullName?.Contains("JwtBearer", StringComparison.Ordinal) == true)
+            .Where(d => d.ServiceType == typeof(IConfigureOptions<AuthenticationOptions>)
+                || d.ServiceType == typeof(IPostConfigureOptions<AuthenticationOptions>)
+                || d.ServiceType == typeof(IConfigureOptions<JwtBearerOptions>)
+                || d.ServiceType == typeof(IPostConfigureOptions<JwtBearerOptions>)
+                || d.ServiceType == typeof(IOptionsChangeTokenSource<JwtBearerOptions>))
             .ToList();
         foreach (var d in authDescriptors)
         {
