@@ -1,5 +1,7 @@
 import type { ConversationParticipantDto, ConversationPreview } from "@urfu-link/api-client";
 import { appStorage } from "@/shared/lib/storage";
+import { isDirectDraftConversation } from "./direct-draft-status";
+export { isDirectDraftConversation } from "./direct-draft-status";
 
 const STORAGE_KEY = "chat.directDrafts.v1";
 const MAX_CACHED_DRAFTS = 20;
@@ -15,10 +17,6 @@ type DirectDraftCache = Record<string, DirectDraftCacheEntry>;
 
 export const isDirectDraftId = (value: string | null | undefined): value is string =>
     typeof value === "string" && DIRECT_DRAFT_ID_PATTERN.test(value);
-
-export const isDirectDraftConversation = (
-    conversation: Pick<ConversationPreview, "type" | "lastMessagePreview"> | null | undefined,
-) => conversation?.type === "Direct" && !conversation.lastMessagePreview;
 
 const readCache = (): DirectDraftCache => {
     const raw = appStorage.getItem(STORAGE_KEY);

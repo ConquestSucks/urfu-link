@@ -10,6 +10,12 @@ import { HubConnection, HubConnectionState } from "@microsoft/signalr";
 import { apiClient } from "@/shared/lib/api";
 import { resolveCurrentUserId } from "@/shared/lib/current-user";
 import { useAuthStore } from "@/shared/store/auth-store";
+import {
+    isDirectDraftConversation,
+    normalizeConversationDraftStatus,
+    withDirectDraftStatus,
+    withoutDirectDraftStatus,
+} from "./direct-draft-status";
 
 /** Локальный (только клиентский) статус сообщения, не приходящий с сервера. */
 export type LocalMessageStatus = "sending" | "sent" | "failed";
@@ -170,7 +176,7 @@ const updateConversationPreviewFromMessage = (
     const next = [...conversations];
     const previous = next[index];
     const sentAtUtc = message.createdAt || undefined;
-    next[index] = {
+    const updated = {
         ...previous,
         lastMessageAtUtc: sentAtUtc ?? previous.lastMessageAtUtc,
         lastMessagePreview: {
@@ -183,6 +189,12 @@ const updateConversationPreviewFromMessage = (
             readAtUtc: message.readAt,
         },
     };
+    const isOptimistic = message.id.startsWith("optimistic:");
+    next[index] = isOptimistic
+        ? isDirectDraftConversation(previous)
+            ? withDirectDraftStatus(updated)
+            : updated
+        : withoutDirectDraftStatus(updated);
 
     next.sort(compareConversationActivity);
     return next;
@@ -627,7 +639,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 }
 
                 return {
-                    conversations: res.items,
+                    conversations: res.items.map(normalizeConversationDraftStatus),
                     unreadByConversation,
                     isConversationsLoading: false,
                 };
@@ -1017,15 +1029,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     updateConversation: (conversation) => {
         set((state) => {
-            const index = state.conversations.findIndex((c) => c.id === conversation.id);
+            const normalized = normalizeConversationDraftStatus(conversation);
+            const index = state.conversations.findIndex((c) => c.id === normalized.id);
             if (index === -1) {
-                return { conversations: [conversation, ...state.conversations] };
+                return { conversations: [normalized, ...state.conversations] };
             }
 
             const newConversations = [...state.conversations];
             newConversations[index] = mergeConversationUpdate(
                 newConversations[index],
-                conversation,
+                normalized,
             );
 
             newConversations.sort(compareConversationActivity);
