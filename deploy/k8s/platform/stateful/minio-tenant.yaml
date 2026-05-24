@@ -36,6 +36,8 @@ spec:
                   key: root_password
             - name: MINIO_BROWSER_REDIRECT_URL
               value: "https://minio.ghjc.ru"
+            - name: MINIO_API_CORS_ALLOW_ORIGIN
+              value: "https://urfu-link.ghjc.ru"
             - name: MINIO_IDENTITY_OPENID_CONFIG_URL
               value: "https://id.ghjc.ru/realms/urfu-link/.well-known/openid-configuration"
             - name: MINIO_IDENTITY_OPENID_CLIENT_ID
