@@ -7,6 +7,7 @@ using FastEndpoints;
 using FastEndpoints.Swagger;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 
@@ -71,7 +72,9 @@ app.UseSwaggerGen();
 app.MapScalarApiReference(o =>
     o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
 app.MapGrpcService<InternalApiService>()
-    .RequireAuthorization(InternalGrpcAuthorizationPolicy.PolicyName);
+    .RequireAuthorization(
+        AuthenticationExtensions.InternalGrpcPolicy,
+        InternalGrpcAuthorizationPolicy.PolicyName);
 
 await app.RunAsync();
 

@@ -12,6 +12,7 @@ using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Testcontainers.Redis;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
@@ -146,5 +147,11 @@ public sealed class PresenceServiceFactory : WebApplicationFactory<Program>, IAs
         services.AddAuthentication(defaultScheme: TestAuthHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                 TestAuthHandler.SchemeName, _ => { });
+        services.AddAuthorization(options =>
+            options.AddPolicy(
+                AuthenticationExtensions.InternalGrpcPolicy,
+                policy => policy
+                    .AddAuthenticationSchemes(TestAuthHandler.SchemeName)
+                    .RequireAuthenticatedUser()));
     }
 }

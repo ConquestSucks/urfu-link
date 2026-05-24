@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 
@@ -115,5 +116,11 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
         services.AddAuthentication(defaultScheme: TestAuthHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                 TestAuthHandler.SchemeName, _ => { });
+        services.AddAuthorization(options =>
+            options.AddPolicy(
+                AuthenticationExtensions.InternalGrpcPolicy,
+                policy => policy
+                    .AddAuthenticationSchemes(TestAuthHandler.SchemeName)
+                    .RequireAuthenticatedUser()));
     }
 }
