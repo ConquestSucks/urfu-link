@@ -357,20 +357,20 @@ spec:
                 sleep 2
               done
 
-              cat >/tmp/media-cors.json <<'EOF'
-              [
-                {
-                  "AllowedOrigins": [
-                    "http://localhost:3000",
-                    "http://127.0.0.1:3000",
-                    "http://app.dev.127.0.0.1.nip.io"
-                  ],
-                  "AllowedMethods": ["GET", "HEAD", "PUT"],
-                  "AllowedHeaders": ["*"],
-                  "ExposeHeaders": ["ETag"],
-                  "MaxAgeSeconds": 3000
-                }
-              ]
+              cat >/tmp/media-cors.xml <<'EOF'
+              <CORSConfiguration>
+                <CORSRule>
+                  <AllowedOrigin>http://localhost:3000</AllowedOrigin>
+                  <AllowedOrigin>http://127.0.0.1:3000</AllowedOrigin>
+                  <AllowedOrigin>http://app.dev.127.0.0.1.nip.io</AllowedOrigin>
+                  <AllowedMethod>GET</AllowedMethod>
+                  <AllowedMethod>HEAD</AllowedMethod>
+                  <AllowedMethod>PUT</AllowedMethod>
+                  <AllowedHeader>*</AllowedHeader>
+                  <ExposeHeader>ETag</ExposeHeader>
+                  <MaxAgeSeconds>3000</MaxAgeSeconds>
+                </CORSRule>
+              </CORSConfiguration>
               EOF
 
               mc mb -p minio/user-avatars || true
@@ -378,8 +378,8 @@ spec:
               mc mb -p minio/media-public || true
               mc anonymous set download minio/user-avatars
               mc anonymous set download minio/media-public
-              mc cors set minio/media-private /tmp/media-cors.json
-              mc cors set minio/media-public /tmp/media-cors.json
+              mc cors set minio/media-private /tmp/media-cors.xml
+              mc cors set minio/media-public /tmp/media-cors.xml
 ---
 apiVersion: apps/v1
 kind: Deployment

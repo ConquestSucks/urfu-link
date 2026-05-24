@@ -69,6 +69,7 @@ public sealed class DeploymentContractTests
         Assert.Contains("Storage__PublicBucket: media-public", mediaValues, StringComparison.Ordinal);
         Assert.Contains("host: storage.ghjc.ru", minioIngress, StringComparison.Ordinal);
         Assert.Contains("number: 9000", minioIngress, StringComparison.Ordinal);
+        Assert.Contains("<CORSConfiguration>", minioBucketsJob, StringComparison.Ordinal);
         Assert.Contains("https://urfu-link.ghjc.ru", minioBucketsJob, StringComparison.Ordinal);
         Assert.Contains("mc cors set minio/media-private", minioBucketsJob, StringComparison.Ordinal);
         Assert.Contains("mc cors set minio/media-public", minioBucketsJob, StringComparison.Ordinal);
@@ -95,6 +96,7 @@ public sealed class DeploymentContractTests
         Assert.Contains("Storage__SecretKey: minio123", mediaSecret, StringComparison.Ordinal);
         Assert.Contains("host: storage.dev.127.0.0.1.nip.io", localIngress, StringComparison.Ordinal);
         Assert.Contains("name: minio-bootstrap-buckets", dependencies, StringComparison.Ordinal);
+        Assert.Contains("<CORSConfiguration>", dependencies, StringComparison.Ordinal);
         Assert.Contains("http://localhost:3000", dependencies, StringComparison.Ordinal);
         Assert.Contains("http://app.dev.127.0.0.1.nip.io", dependencies, StringComparison.Ordinal);
         Assert.Contains("mc cors set minio/media-private", dependencies, StringComparison.Ordinal);
