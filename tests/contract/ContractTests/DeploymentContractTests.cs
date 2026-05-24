@@ -71,6 +71,24 @@ public sealed class DeploymentContractTests
         Assert.Contains("argocd.argoproj.io/sync-wave: \"3\"", manifest, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PlatformBootstrapShouldProvisionPresencePostgresConnection()
+    {
+        var manifest = ReadRepoFile("deploy", "k8s", "platform", "stateful", "platform-bootstrap-job.yaml");
+
+        Assert.Contains("presence_db_password", manifest, StringComparison.Ordinal);
+        Assert.Contains("CREATE ROLE presence LOGIN PASSWORD '$PRESENCE_DB_PASSWORD'", manifest, StringComparison.Ordinal);
+        Assert.Contains("CREATE DATABASE presence_db OWNER presence", manifest, StringComparison.Ordinal);
+        Assert.Contains(
+            "primary_connection\":\"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s",
+            manifest,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "PRESENCE_PAYLOAD='{\"data\":{\"primary_connection\":\"urfu-redis.urfu-platform.svc.cluster.local:6379\"}}'",
+            manifest,
+            StringComparison.Ordinal);
+    }
+
     private static string ReadRepoFile(params string[] pathSegments)
     {
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
