@@ -56,6 +56,9 @@
     <!-- Snappier is a transitive dep of MongoDB.Driver. The driver declares 1.0.0 (NU1903,
          GHSA-pggp-6c3x-2xmx); we pin to the patched 1.3.x line via transitive pinning. -->
     <PackageVersion Include="Snappier" Version="1.3.1" />
+    <!-- MongoDB.Driver currently brings SharpCompress transitively; pin the patched line
+         centrally so restore stays clean under NuGetAudit + TreatWarningsAsErrors. -->
+    <PackageVersion Include="SharpCompress" Version="0.48.1" />
 
     <PackageVersion Include="FirebaseAdmin" Version="3.5.0" />
     <PackageVersion Include="dotAPNS" Version="4.6.0" />
