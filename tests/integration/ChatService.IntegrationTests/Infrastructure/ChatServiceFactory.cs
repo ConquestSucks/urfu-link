@@ -11,6 +11,7 @@ using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.MongoDb;
 using Testcontainers.Redis;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Application.Authorization;
@@ -190,5 +191,11 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
         services.AddAuthentication(defaultScheme: TestAuthHandler.SchemeName)
             .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                 TestAuthHandler.SchemeName, _ => { });
+        services.AddAuthorization(options =>
+            options.AddPolicy(
+                AuthenticationExtensions.InternalGrpcPolicy,
+                policy => policy
+                    .AddAuthenticationSchemes(TestAuthHandler.SchemeName)
+                    .RequireAuthenticatedUser()));
     }
 }

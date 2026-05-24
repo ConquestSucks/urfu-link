@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using Urfu.Link.Services.Presence.Infrastructure;
@@ -92,7 +93,7 @@ app.MapServiceDefaults();
 app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
 app.UseSwaggerGen();
 app.MapScalarApiReference(o => o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
-app.MapGrpcService<InternalApiService>().RequireAuthorization();
+app.MapGrpcService<InternalApiService>().RequireAuthorization(AuthenticationExtensions.InternalGrpcPolicy);
 app.MapHub<PresenceHub>("/hubs/presence");
 
 await app.RunAsync();

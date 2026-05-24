@@ -369,7 +369,13 @@ spec:
               fi
               MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
               DISCIPLINE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=discipline_db;Username=discipline;Password=%s"}}' "$DISCIPLINE_DB_PASSWORD")"
-              CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
+              EXISTING_CHAT_SVC="$(vault_read urfu-link/prod/chat-service)"
+              EXISTING_INTERNAL_AUTH_SECRET="$(json_get_string "$EXISTING_CHAT_SVC" internal_auth_client_secret)"
+              if [ -n "$EXISTING_INTERNAL_AUTH_SECRET" ]; then
+                CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin","internal_auth_client_secret":"%s"}}' "$MONGO_APP_PASSWORD" "$EXISTING_INTERNAL_AUTH_SECRET")"
+              else
+                CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
+              fi
               PRESENCE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s"}}' "$PRESENCE_DB_PASSWORD")"
               NOTIFICATION_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s","kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}' "$NOTIFICATION_DB_PASSWORD")"
               CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
