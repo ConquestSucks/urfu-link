@@ -3,7 +3,7 @@ fullnameOverride: media-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/media-service
   pullPolicy: IfNotPresent
-  tag: sha-e8011a9
+  tag: sha-d2ccf84
 
 imagePullSecrets:
   - name: ghcr-pull-secret
