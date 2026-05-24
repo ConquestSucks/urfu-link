@@ -5,10 +5,8 @@ public sealed class DeploymentContractTests
     [Fact]
     public void HelmValuesShouldAlignWithPromotedImageTags()
     {
-        var prodValues = File.ReadAllText(Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "deploy", "helm", "services", "user-service", "values-prod.yaml")));
-        var devValues = File.ReadAllText(Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "deploy", "helm", "services", "user-service", "values-dev.yaml")));
+        var prodValues = ReadRepoFile("deploy", "helm", "services", "user-service", "values-prod.yaml");
+        var devValues = ReadRepoFile("deploy", "helm", "services", "user-service", "values-dev.yaml");
 
         Assert.Matches(@"tag:\s+sha-[0-9a-f]{7}", prodValues);
         Assert.Contains("tag: dev-local", devValues, StringComparison.Ordinal);
@@ -19,14 +17,64 @@ public sealed class DeploymentContractTests
     [Fact]
     public void LocalKubernetesOverlayShouldDefineClusterDependencies()
     {
-        var overlay = File.ReadAllText(Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "platform", "dev", "local-k8s", "kustomization.yaml")));
-        var dependencies = File.ReadAllText(Path.GetFullPath(Path.Combine(
-            AppContext.BaseDirectory, "..", "..", "..", "..", "..", "..", "platform", "dev", "local-k8s", "dependencies.yaml")));
+        var overlay = ReadRepoFile("platform", "dev", "local-k8s", "kustomization.yaml");
+        var dependencies = ReadRepoFile("platform", "dev", "local-k8s", "dependencies.yaml");
 
         Assert.Contains("dependencies.yaml", overlay, StringComparison.Ordinal);
         Assert.Contains("kind: Deployment", dependencies, StringComparison.Ordinal);
         Assert.Contains("name: kafka", dependencies, StringComparison.Ordinal);
         Assert.Contains("name: keycloak", dependencies, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProductionPomeriumRoutesShouldProxyApiAndSignalRHubsToGateway()
+    {
+        var config = ReadRepoFile("deploy", "k8s", "platform", "identity", "pomerium-config.yaml");
+
+        Assert.Contains("prefix: /api", config, StringComparison.Ordinal);
+        Assert.Contains("prefix: /hubs", config, StringComparison.Ordinal);
+        Assert.Contains("allow_websockets: true", config, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KeycloakBootstrapPolicyShouldAllowWritingChatServiceInternalSecret()
+    {
+        var config = ReadRepoFile("deploy", "k8s", "platform", "vault", "vault-auto-init-job.yaml");
+        var policyStart = config.IndexOf("vault policy write keycloak-bootstrap", StringComparison.Ordinal);
+        policyStart = config.IndexOf("<<EOF_POL", policyStart, StringComparison.Ordinal) + "<<EOF_POL".Length;
+        var policyEnd = config.IndexOf("EOF_POL", policyStart, StringComparison.Ordinal);
+        var keycloakBootstrapPolicy = config[policyStart..policyEnd];
+
+        Assert.Contains("path \"kv/data/urfu-link/prod/chat-service\"", keycloakBootstrapPolicy, StringComparison.Ordinal);
+        Assert.Contains("capabilities = [\"create\", \"update\", \"read\"]", keycloakBootstrapPolicy, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlatformStatefulShouldNotReconcileGeneratedMongoPassword()
+    {
+        var application = ReadRepoFile("deploy", "k8s", "platform", "argocd", "apps", "wave-5", "platform-stateful.yaml");
+
+        Assert.Contains("name: mongo-app-user-password", application, StringComparison.Ordinal);
+        Assert.Contains("/data/password", application, StringComparison.Ordinal);
+        Assert.Contains("/stringData", application, StringComparison.Ordinal);
+        Assert.Contains("RespectIgnoreDifferences=true", application, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MongoStatefulSetShouldStartAfterPlatformBootstrapGeneratesPassword()
+    {
+        var manifest = ReadRepoFile("deploy", "k8s", "platform", "stateful", "mongodb-cluster.yaml");
+
+        Assert.Contains("name: mongo-app-user-password", manifest, StringComparison.Ordinal);
+        Assert.Contains("argocd.argoproj.io/sync-wave: \"-1\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("name: urfu-mongo", manifest, StringComparison.Ordinal);
+        Assert.Contains("argocd.argoproj.io/sync-wave: \"3\"", manifest, StringComparison.Ordinal);
+    }
+
+    private static string ReadRepoFile(params string[] pathSegments)
+    {
+        var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
+
+        return File.ReadAllText(Path.Combine([repoRoot, .. pathSegments]));
     }
 }

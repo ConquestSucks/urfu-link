@@ -22,6 +22,7 @@ data:
       - from: https://urfu-link.ghjc.ru
         to: http://api-gateway.urfu-prod.svc.cluster.local:8080
         prefix: /hubs
+        allow_websockets: true
         policy:
           - allow:
               or:
