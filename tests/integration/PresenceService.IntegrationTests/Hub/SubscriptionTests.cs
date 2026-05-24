@@ -43,6 +43,35 @@ public class SubscriptionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SubscribeToUsers_SendsCurrentPresenceSnapshot()
+    {
+        var subscriberId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+
+        await using var target = await TestPresenceHubClient.ConnectAsync(_factory, targetId, Platform.Mobile);
+        await using var subscriber = await TestPresenceHubClient.ConnectAsync(_factory, subscriberId, Platform.Web);
+
+        var received = new TaskCompletionSource<(Guid UserId, PresenceStatus Status, Platform[] Platforms)>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        subscriber.On<Guid, PresenceStatus, Platform[], DateTimeOffset?>(
+            "UserPresenceChanged",
+            (uid, status, platforms, _) =>
+            {
+                if (uid == targetId)
+                {
+                    received.TrySetResult((uid, status, platforms));
+                }
+            });
+
+        await subscriber.InvokeAsync("SubscribeToUsers", new[] { targetId });
+
+        var observed = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        observed.UserId.Should().Be(targetId);
+        observed.Status.Should().Be(PresenceStatus.Online);
+        observed.Platforms.Should().Contain(Platform.Mobile);
+    }
+
+    [Fact]
     public async Task UnsubscribeFromUsers_StopsReceivingChanges()
     {
         var subscriberId = Guid.NewGuid();

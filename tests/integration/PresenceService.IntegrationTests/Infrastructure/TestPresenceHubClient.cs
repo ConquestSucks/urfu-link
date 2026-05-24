@@ -25,12 +25,34 @@ public static class TestPresenceHubClient
         var connection = new HubConnectionBuilder()
             .WithUrl(url, opts =>
             {
-                opts.HttpMessageHandlerFactory = _ => factory.Server.CreateHandler();
+                opts.HttpMessageHandlerFactory = _ => new FailingResponseBodyHandler(factory.Server.CreateHandler());
                 opts.Transports = HttpTransportType.LongPolling;
             })
             .Build();
 
         await connection.StartAsync();
         return connection;
+    }
+
+    private sealed class FailingResponseBodyHandler(HttpMessageHandler innerHandler) : DelegatingHandler(innerHandler)
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (response.IsSuccessStatusCode)
+            {
+                return response;
+            }
+
+            var body = response.Content is null
+                ? string.Empty
+                : await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new HttpRequestException(
+                $"SignalR test request failed with {(int)response.StatusCode} {response.ReasonPhrase}: {body}",
+                inner: null,
+                statusCode: response.StatusCode);
+        }
     }
 }

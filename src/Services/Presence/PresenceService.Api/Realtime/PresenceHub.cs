@@ -115,12 +115,15 @@ public sealed class PresenceHub(
         }
     }
 
-    public Task SubscribeToUsers(Guid[] userIds)
+    public async Task SubscribeToUsers(Guid[] userIds)
     {
         ArgumentNullException.ThrowIfNull(userIds);
         var ct = Context.ConnectionAborted;
-        return Task.WhenAll(userIds.Select(uid =>
-            Groups.AddToGroupAsync(Context.ConnectionId, GroupForUser(uid), ct)));
+        foreach (var userId in userIds.Distinct())
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, GroupForUser(userId), ct).ConfigureAwait(false);
+            await SendPresenceSnapshotToCallerAsync(userId, ct).ConfigureAwait(false);
+        }
     }
 
     public Task UnsubscribeFromUsers(Guid[] userIds)
@@ -154,6 +157,20 @@ public sealed class PresenceHub(
         var settings = await privacy.GetAsync(userId, ct).ConfigureAwait(false);
         var publicView = PrivacyFilter.Apply(aggregated, settings);
         await broadcaster.BroadcastPresenceAsync(userId, publicView, ct).ConfigureAwait(false);
+    }
+
+    private async Task SendPresenceSnapshotToCallerAsync(Guid userId, CancellationToken ct)
+    {
+        var userSessions = await sessions.GetSessionsAsync(userId, ct).ConfigureAwait(false);
+        var ls = await lastSeen.GetAsync(userId, ct).ConfigureAwait(false);
+        var aggregated = aggregator.Aggregate(userId, userSessions, ls?.LastSeenAt);
+        var settings = await privacy.GetAsync(userId, ct).ConfigureAwait(false);
+        var publicView = PrivacyFilter.Apply(aggregated, settings);
+        await Clients.Caller.UserPresenceChanged(
+            publicView.UserId,
+            publicView.Status,
+            publicView.Platforms.ToArray(),
+            publicView.LastSeenAt).ConfigureAwait(false);
     }
 
     private (Guid UserId, string DeviceId, Platform Platform) RequireConnectionContext()
