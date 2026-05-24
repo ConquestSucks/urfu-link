@@ -27,6 +27,8 @@ kind: StatefulSet
 metadata:
   name: urfu-mongo
   namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
 spec:
   serviceName: urfu-mongo-svc
   replicas: 1

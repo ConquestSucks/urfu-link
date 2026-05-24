@@ -18,6 +18,12 @@ spec:
       jsonPointers:
         - /data/password
         - /stringData
+    - kind: Secret
+      name: mongo-app-user-password
+      namespace: urfu-platform
+      jsonPointers:
+        - /data/password
+        - /stringData
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
