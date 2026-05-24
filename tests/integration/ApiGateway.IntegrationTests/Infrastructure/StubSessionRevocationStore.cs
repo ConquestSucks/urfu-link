@@ -1,6 +1,6 @@
 using Urfu.Link.BuildingBlocks.SessionRevocation;
 
-namespace ApiGateway.Tests.Infrastructure;
+namespace ApiGateway.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// In-memory <see cref="ISessionRevocationStore"/> stub: nothing is ever revoked.

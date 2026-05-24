@@ -1,9 +1,9 @@
 using System.Net;
-using ApiGateway.Tests.Infrastructure;
+using ApiGateway.IntegrationTests.Infrastructure;
 using FluentAssertions;
 using Xunit;
 
-namespace ApiGateway.Tests;
+namespace ApiGateway.IntegrationTests;
 
 public sealed class HealthCheckIntegrationTests : IAsyncLifetime
 {

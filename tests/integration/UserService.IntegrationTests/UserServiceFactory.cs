@@ -1,3 +1,4 @@
+using System.Net;
 using Amazon.S3;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -45,7 +46,10 @@ public sealed class UserServiceFactory : WebApplicationFactory<Program>
 
             // Replace Redis/Outbox with fakes
             services.RemoveAll<IConnectionMultiplexer>();
-            services.AddSingleton(Substitute.For<IConnectionMultiplexer>());
+            var redis = Substitute.For<IConnectionMultiplexer>();
+            redis.IsConnected.Returns(true);
+            redis.GetEndPoints().Returns([new DnsEndPoint("localhost", 6379)]);
+            services.AddSingleton(redis);
             services.RemoveAll<IOutboxStore>();
             services.RemoveAll<IOutboxWriter>();
             services.AddSingleton<IOutboxWriter, FakeOutboxWriter>();

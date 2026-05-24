@@ -7,7 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Urfu.Link.BuildingBlocks.SessionRevocation;
 
-namespace ApiGateway.Tests.Infrastructure;
+namespace ApiGateway.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// <see cref="WebApplicationFactory{TEntryPoint}"/> wrapper that wires the API Gateway against

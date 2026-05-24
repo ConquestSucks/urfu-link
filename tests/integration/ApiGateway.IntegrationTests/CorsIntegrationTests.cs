@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Xunit;
 
-namespace ApiGateway.Tests;
+namespace ApiGateway.IntegrationTests;
 
 public class CorsIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
 {

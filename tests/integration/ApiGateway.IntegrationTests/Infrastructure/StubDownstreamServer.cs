@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace ApiGateway.Tests.Infrastructure;
+namespace ApiGateway.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Real Kestrel-backed HTTP server used as a downstream stub in YARP integration tests.

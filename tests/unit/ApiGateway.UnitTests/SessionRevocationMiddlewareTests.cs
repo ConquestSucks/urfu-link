@@ -4,7 +4,7 @@ using NSubstitute;
 using Urfu.Link.BuildingBlocks.SessionRevocation;
 using Urfu.Link.Gateway.ApiGateway;
 
-namespace ApiGateway.Tests;
+namespace ApiGateway.UnitTests;
 
 public sealed class SessionRevocationMiddlewareTests
 {

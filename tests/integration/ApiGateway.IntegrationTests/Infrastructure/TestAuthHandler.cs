@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace ApiGateway.Tests.Infrastructure;
+namespace ApiGateway.IntegrationTests.Infrastructure;
 
 /// <summary>
 /// Minimal JWT-Bearer-shaped auth scheme for tests.
