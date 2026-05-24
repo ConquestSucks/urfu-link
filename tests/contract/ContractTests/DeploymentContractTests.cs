@@ -58,6 +58,7 @@ public sealed class DeploymentContractTests
     {
         var mediaValues = ReadRepoFile("deploy", "helm", "services", "media-service", "values-prod.yaml");
         var minioIngress = ReadRepoFile("deploy", "k8s", "platform", "ingress", "minio-ingress.yaml");
+        var minioTenant = ReadRepoFile("deploy", "k8s", "platform", "stateful", "minio-tenant.yaml");
         var minioBucketsJob = ReadRepoFile("deploy", "k8s", "platform", "stateful", "minio-buckets-job.yaml");
 
         Assert.Contains(
@@ -69,10 +70,9 @@ public sealed class DeploymentContractTests
         Assert.Contains("Storage__PublicBucket: media-public", mediaValues, StringComparison.Ordinal);
         Assert.Contains("host: storage.ghjc.ru", minioIngress, StringComparison.Ordinal);
         Assert.Contains("number: 9000", minioIngress, StringComparison.Ordinal);
-        Assert.Contains("<CORSConfiguration>", minioBucketsJob, StringComparison.Ordinal);
-        Assert.Contains("https://urfu-link.ghjc.ru", minioBucketsJob, StringComparison.Ordinal);
-        Assert.Contains("mc cors set minio/media-private", minioBucketsJob, StringComparison.Ordinal);
-        Assert.Contains("mc cors set minio/media-public", minioBucketsJob, StringComparison.Ordinal);
+        Assert.Contains("MINIO_API_CORS_ALLOW_ORIGIN", minioTenant, StringComparison.Ordinal);
+        Assert.Contains("https://urfu-link.ghjc.ru", minioTenant, StringComparison.Ordinal);
+        Assert.DoesNotContain("mc cors set", minioBucketsJob, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -96,10 +96,10 @@ public sealed class DeploymentContractTests
         Assert.Contains("Storage__SecretKey: minio123", mediaSecret, StringComparison.Ordinal);
         Assert.Contains("host: storage.dev.127.0.0.1.nip.io", localIngress, StringComparison.Ordinal);
         Assert.Contains("name: minio-bootstrap-buckets", dependencies, StringComparison.Ordinal);
-        Assert.Contains("<CORSConfiguration>", dependencies, StringComparison.Ordinal);
+        Assert.Contains("MINIO_API_CORS_ALLOW_ORIGIN", dependencies, StringComparison.Ordinal);
         Assert.Contains("http://localhost:3000", dependencies, StringComparison.Ordinal);
         Assert.Contains("http://app.dev.127.0.0.1.nip.io", dependencies, StringComparison.Ordinal);
-        Assert.Contains("mc cors set minio/media-private", dependencies, StringComparison.Ordinal);
+        Assert.DoesNotContain("mc cors set", dependencies, StringComparison.Ordinal);
     }
 
     [Fact]

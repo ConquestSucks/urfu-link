@@ -31,27 +31,11 @@ spec:
                 sleep 5
               done
 
-              cat >/tmp/media-cors.xml <<'EOF'
-              <CORSConfiguration>
-                <CORSRule>
-                  <AllowedOrigin>https://urfu-link.ghjc.ru</AllowedOrigin>
-                  <AllowedMethod>GET</AllowedMethod>
-                  <AllowedMethod>HEAD</AllowedMethod>
-                  <AllowedMethod>PUT</AllowedMethod>
-                  <AllowedHeader>*</AllowedHeader>
-                  <ExposeHeader>ETag</ExposeHeader>
-                  <MaxAgeSeconds>3000</MaxAgeSeconds>
-                </CORSRule>
-              </CORSConfiguration>
-              EOF
-
               mc mb -p minio/media-private || true
               mc mb -p minio/media-public || true
               mc mb -p minio/user-avatars || true
               mc anonymous set download minio/media-public
               mc anonymous set download minio/user-avatars
-              mc cors set minio/media-private /tmp/media-cors.xml
-              mc cors set minio/media-public /tmp/media-cors.xml
           volumeMounts:
             - name: bootstrap-secret
               mountPath: /bootstrap
