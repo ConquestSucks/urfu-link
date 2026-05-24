@@ -40,6 +40,7 @@ serviceMonitor:
 networkPolicy:
   allowedIngressNamespaces:
     - urfu-platform
+    - ingress-nginx
 
 resources:
   requests:

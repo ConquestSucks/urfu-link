@@ -1,5 +1,6 @@
 import React from "react";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { Animated, FlatList, Platform } from "react-native";
 
 import { MessagesList, type MessagesListHandle } from "../MessagesList";
 
@@ -9,6 +10,7 @@ const mockMarkRead = jest.fn();
 const mockAddReaction = jest.fn();
 const mockRemoveReaction = jest.fn();
 const mockTypingIndicator = jest.fn();
+const originalPlatformOS = Platform.OS;
 
 let mockChatState = {
     messagesByConversation: {},
@@ -110,6 +112,7 @@ jest.mock("@/entities/presence", () => ({
 describe("MessagesList loading state", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatformOS });
         mockChatState = {
             messagesByConversation: {},
             messagesLoadingByConversation: {},
@@ -265,6 +268,98 @@ describe("MessagesList loading state", () => {
         ]);
         expect(screen.queryByTestId("message-highlight-message-1")).toBeNull();
         jest.useRealTimers();
+    });
+
+    it("uses the JS animation driver for highlighted messages on web", async () => {
+        jest.useFakeTimers();
+        Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
+        const timingSpy = jest.spyOn(Animated, "timing");
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "chat-web": [
+                    {
+                        id: "message-web",
+                        body: "web",
+                        senderId: "peer-user",
+                        readAt: null,
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "chat-web": true },
+        };
+
+        const ref = React.createRef<MessagesListHandle>();
+        render(<MessagesList ref={ref} chatId="chat-web" type="chat" />);
+
+        await act(async () => {
+            await expect(ref.current!.scrollToMessage("message-web")).resolves.toBe(true);
+        });
+
+        expect(timingSpy).toHaveBeenCalled();
+        expect(timingSpy.mock.calls).toEqual(
+            expect.arrayContaining([
+                expect.arrayContaining([
+                    expect.anything(),
+                    expect.objectContaining({ useNativeDriver: false }),
+                ]),
+            ]),
+        );
+        expect(
+            timingSpy.mock.calls.every(([, config]) => config.useNativeDriver === false),
+        ).toBe(true);
+
+        act(() => {
+            jest.runOnlyPendingTimers();
+        });
+        timingSpy.mockRestore();
+        jest.useRealTimers();
+    });
+
+    it("does not auto-load older pages immediately after an imperative scroll", async () => {
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "chat-pinned": [
+                    {
+                        id: "message-new",
+                        body: "new",
+                        senderId: "peer-user",
+                        readAt: null,
+                    },
+                    {
+                        id: "message-old",
+                        body: "old",
+                        senderId: "peer-user",
+                        readAt: null,
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "chat-pinned": true },
+            hasMoreByConversation: { "chat-pinned": true },
+        };
+
+        const ref = React.createRef<MessagesListHandle>();
+        render(<MessagesList ref={ref} chatId="chat-pinned" type="chat" />);
+
+        await act(async () => {
+            await expect(ref.current!.scrollToMessage("message-old")).resolves.toBe(true);
+        });
+
+        const list = screen.UNSAFE_getByType(FlatList);
+        act(() => {
+            list.props.onEndReached?.({ distanceFromEnd: 0 });
+        });
+        expect(mockLoadMore).not.toHaveBeenCalled();
+
+        act(() => {
+            list.props.onScrollBeginDrag?.();
+            list.props.onScroll?.({ nativeEvent: { contentOffset: { y: 128 } } });
+            list.props.onScroll?.({ nativeEvent: { contentOffset: { y: 176 } } });
+            list.props.onEndReached?.({ distanceFromEnd: 0 });
+        });
+
+        expect(mockLoadMore).toHaveBeenCalledWith("chat-pinned", "chat");
     });
 
     it("scrolls to and highlights the original message from a reply preview", async () => {

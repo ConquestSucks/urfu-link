@@ -37,6 +37,20 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
+    public void ProductionApiHostShouldResolveToGateway()
+    {
+        var frontendValues = ReadRepoFile("deploy", "helm", "services", "frontend-web", "values-prod.yaml");
+        var easConfig = ReadRepoFile("apps", "client", "eas.json");
+        var platformKustomization = ReadRepoFile("deploy", "k8s", "platform", "kustomization.yaml");
+        var gatewayValues = ReadRepoFile("deploy", "helm", "services", "api-gateway", "values-prod.yaml");
+
+        Assert.Contains("EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru", frontendValues, StringComparison.Ordinal);
+        Assert.Contains("\"EXPO_PUBLIC_API_URL\": \"https://api.urfu-link.ghjc.ru\"", easConfig, StringComparison.Ordinal);
+        Assert.Contains("ingress/api-gateway-ingress.yaml", platformKustomization, StringComparison.Ordinal);
+        Assert.Contains("- ingress-nginx", gatewayValues, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KeycloakBootstrapPolicyShouldAllowWritingChatServiceInternalSecret()
     {
         var config = ReadRepoFile("deploy", "k8s", "platform", "vault", "vault-auto-init-job.yaml");

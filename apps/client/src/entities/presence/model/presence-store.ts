@@ -83,6 +83,9 @@ const normalizePlatforms = (platforms: Array<Platform | number | string>): Platf
         .map(normalizePlatform)
         .filter((platform): platform is Platform => platform !== null);
 
+const isActiveConnection = (connection: HubConnection | null) =>
+    connection !== null && connection.state !== HubConnectionState.Disconnected;
+
 export const toPresenceTypingConversationId = (conversationId: string) => {
     if (GUID_RE.test(conversationId)) {
         return conversationId.toLowerCase();
@@ -112,7 +115,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     connect: async () => {
         const { connection, isConnected } = get();
-        if (isConnected || connection?.state === HubConnectionState.Connected) {
+        if (isConnected || isActiveConnection(connection)) {
             return;
         }
 
@@ -206,13 +209,31 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
             void subscribeWatchedUsers();
         });
 
+        newConnection.onclose((err) => {
+            if (get().connection !== newConnection) {
+                return;
+            }
+
+            if (err) {
+                console.warn("PresenceHub closed", err);
+            }
+            set({ connection: null, isConnected: false });
+        });
+
         try {
+            set({ connection: newConnection, isConnected: false });
             await newConnection.start();
+            if (get().connection !== newConnection) {
+                await newConnection.stop().catch(() => undefined);
+                return;
+            }
             set({ connection: newConnection, isConnected: true });
             await subscribeWatchedUsers();
         } catch (e) {
             console.error("Failed to connect to PresenceHub", e);
-            set({ isConnected: false });
+            if (get().connection === newConnection) {
+                set({ connection: null, isConnected: false });
+            }
         }
     },
 

@@ -10,6 +10,7 @@ namespace Urfu.Link.Services.Presence.Infrastructure.Redis;
 
 internal sealed record StoredSession(
     string DeviceId,
+    string? ConnectionId,
     Platform Platform,
     PresenceStatus Status,
     string? CustomActivity,
@@ -27,6 +28,27 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
         """;
 
     private const string RemoveScript = """
+        local removed = redis.call('HDEL', KEYS[1], ARGV[1])
+        redis.call('ZREM', KEYS[2], ARGV[2])
+        local remaining = redis.call('HLEN', KEYS[1])
+        if remaining == 0 then redis.call('DEL', KEYS[1]) end
+        return {removed, remaining}
+        """;
+
+    private const string RemoveForConnectionScript = """
+        local raw = redis.call('HGET', KEYS[1], ARGV[1])
+        if not raw then
+            return {0, redis.call('HLEN', KEYS[1])}
+        end
+
+        local ok, stored = pcall(cjson.decode, raw)
+        if ok and stored then
+            local storedConnectionId = stored['connectionId']
+            if storedConnectionId and storedConnectionId ~= cjson.null and storedConnectionId ~= ARGV[3] then
+                return {0, redis.call('HLEN', KEYS[1])}
+            end
+        end
+
         local removed = redis.call('HDEL', KEYS[1], ARGV[1])
         redis.call('ZREM', KEYS[2], ARGV[2])
         local remaining = redis.call('HLEN', KEYS[1])
@@ -63,6 +85,7 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
         var sessionsKey = RedisKeys.UserSessions(session.UserId);
         var stored = new StoredSession(
             session.DeviceId,
+            session.ConnectionId,
             session.Platform,
             session.Status,
             session.CustomActivity,
@@ -101,6 +124,30 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
             RemoveScript,
             keys: [sessionsKey, RedisKeys.Heartbeats],
             values: [deviceId, member]).ConfigureAwait(false))!;
+
+        var removed = (long)result[0] == 1;
+        var remaining = (long)result[1];
+        return (removed, removed && remaining == 0);
+    }
+
+    public async Task<(bool Removed, bool WasLast)> RemoveSessionForConnectionAsync(
+        Guid userId,
+        string deviceId,
+        string connectionId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(deviceId);
+        ArgumentException.ThrowIfNullOrEmpty(connectionId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var db = _redis.GetDatabase();
+        var sessionsKey = RedisKeys.UserSessions(userId);
+        var member = RedisKeys.HeartbeatMember(userId, deviceId);
+
+        var result = (RedisResult[])(await db.ScriptEvaluateAsync(
+            RemoveForConnectionScript,
+            keys: [sessionsKey, RedisKeys.Heartbeats],
+            values: [deviceId, member, connectionId]).ConfigureAwait(false))!;
 
         var removed = (long)result[0] == 1;
         var remaining = (long)result[1];
@@ -179,7 +226,8 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
                 stored.Status,
                 stored.CustomActivity,
                 stored.ConnectedAt,
-                stored.LastHeartbeatAt));
+                stored.LastHeartbeatAt,
+                stored.ConnectionId));
         }
         return sessions;
     }

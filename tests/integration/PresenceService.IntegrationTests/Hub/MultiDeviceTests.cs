@@ -67,6 +67,35 @@ public class MultiDeviceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SameDevice_ReconnectBeforeOldDisconnect_OldDisconnectDoesNotRemoveReplacementSession()
+    {
+        var userId = Guid.NewGuid();
+        var c1 = await TestPresenceHubClient.ConnectAsync(_factory, userId, Platform.Web, "d1");
+        var c2 = await TestPresenceHubClient.ConnectAsync(_factory, userId, Platform.Web, "d1");
+
+        _factory.OutboxWriter.Clear();
+
+        await c1.StopAsync();
+        await c1.DisposeAsync();
+
+        await Task.Delay(500);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload).OfType<UserWentOfflineEvent>()
+            .Where(e => e.UserId == userId)
+            .Should().BeEmpty();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var sessions = scope.ServiceProvider.GetRequiredService<IPresenceSessionStore>();
+        var remaining = await sessions.GetSessionsAsync(userId, CancellationToken.None);
+        remaining.Should().ContainSingle(s => s.DeviceId == "d1");
+        remaining.Single().ConnectionId.Should().NotBeNullOrWhiteSpace();
+
+        await c2.StopAsync();
+        await c2.DisposeAsync();
+    }
+
+    [Fact]
     public async Task TwoDevices_BothDisconnect_PublishesOfflineEventOnce()
     {
         var userId = Guid.NewGuid();
