@@ -14,19 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!--
-      SharpCompress arrives transitively via MongoDB.Driver. CVE-2026-44788
-      (GHSA-6c8g-7p36-r338) is a path-traversal flaw in IArchive.WriteToDirectory();
-      it requires the caller to extract an untrusted archive to disk. MongoDB.Driver
-      only uses the library as an in-memory wire-protocol decompressor and never
-      touches WriteToDirectory(), so this code path is unreachable from our service.
-      No patched SharpCompress release exists upstream as of 2026-05-08. Re-evaluate
-      when the advisory lists a fixed version.
-    -->
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-6c8g-7p36-r338" />
-  </ItemGroup>
-
-  <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Both" />
   </ItemGroup>
 
