@@ -70,12 +70,18 @@ public class ChatHubReactionsTests : IAsyncLifetime
             PeerUserId = bob,
         });
 
-        await bobConn.InvokeAsync("AddReaction", sent.Id, "👍");
-
         var aliceCleared = new TaskCompletionSource<IReadOnlyDictionary<string, IReadOnlyList<Guid>>>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         aliceConn.On<Guid, IReadOnlyDictionary<string, IReadOnlyList<Guid>>>("ReactionUpdated",
-            (_, summary) => aliceCleared.TrySetResult(summary));
+            (messageId, summary) =>
+            {
+                if (messageId == sent.Id && summary.Count == 0)
+                {
+                    aliceCleared.TrySetResult(summary);
+                }
+            });
+
+        await bobConn.InvokeAsync("AddReaction", sent.Id, "👍");
 
         await bobConn.InvokeAsync("RemoveReaction", sent.Id, "👍");
 
