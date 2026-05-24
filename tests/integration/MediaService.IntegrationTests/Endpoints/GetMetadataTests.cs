@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Enums;
@@ -30,7 +29,7 @@ public class GetMetadataTests : IAsyncLifetime
         var response = await client.GetAsync($"/api/v1/media/{assetId}/metadata");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<AssetMetadataResponse>();
+        var body = await MediaJson.ReadAsync<AssetMetadataResponse>(response.Content);
         body!.AssetId.Should().Be(assetId);
         body.OwnerId.Should().Be(ownerId);
         body.MimeType.Should().Be("image/png");

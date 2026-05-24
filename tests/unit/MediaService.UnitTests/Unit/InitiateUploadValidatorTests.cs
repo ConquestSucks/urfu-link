@@ -43,6 +43,17 @@ public class InitiateUploadValidatorTests
     }
 
     [Fact]
+    public void AcceptsJsonDocument()
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(".claude.json", 21984, "application/json", Visibility.Private);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public void RejectsOverLongFileName()
     {
         var sut = CreateValidator();

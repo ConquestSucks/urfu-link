@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.Api.Application.Contracts.Requests;
@@ -54,6 +55,30 @@ public class InitiateUploadTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<UploadInitResponse>();
         body!.Bucket.Should().Be("media-public");
+    }
+
+    [Fact]
+    public async Task StringVisibility_ReturnsPresignedUrlAndAssetId()
+    {
+        var client = TestAssetBuilder.AuthorizedClient(_factory, Guid.NewGuid());
+        using var content = new StringContent(
+            """
+            {
+              "fileName": ".claude.json",
+              "size": 21984,
+              "mimeType": "application/json",
+              "visibility": "Private"
+            }
+            """,
+            Encoding.UTF8,
+            "application/json");
+
+        var response = await client.PostAsync("/api/v1/media/upload/init", content);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<UploadInitResponse>();
+        body.Should().NotBeNull();
+        body!.Bucket.Should().Be("media-private");
     }
 
     [Fact]

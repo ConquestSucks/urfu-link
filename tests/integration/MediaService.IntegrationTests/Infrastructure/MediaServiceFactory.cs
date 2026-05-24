@@ -1,5 +1,6 @@
 using Amazon.S3;
 using Amazon.S3.Model;
+using DotNet.Testcontainers.Images;
 using MediaService.Api.Domain.Interfaces;
 using MediaService.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
@@ -35,10 +36,12 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
         .WithImage("postgres:16-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .Build();
 
     private readonly MinioContainer _minio = new MinioBuilder()
         .WithImage("minio/minio:RELEASE.2025-09-07T16-13-09Z")
+        .WithImagePullPolicy(PullPolicy.Missing)
         .WithUsername(MinioRootUser)
         .WithPassword(MinioRootPassword)
         .Build();
@@ -101,6 +104,7 @@ public sealed class MediaServiceFactory : WebApplicationFactory<Program>, IAsync
                 ["ConnectionStrings:Primary"] = _postgres.GetConnectionString(),
                 ["ConnectionStrings:Redis"] = "localhost:9999,abortConnect=false",
                 ["Storage:Endpoint"] = MinioEndpoint,
+                ["Storage:PublicEndpoint"] = MinioEndpoint,
                 ["Storage:AccessKey"] = MinioRootUser,
                 ["Storage:SecretKey"] = MinioRootPassword,
                 ["Storage:PrivateBucket"] = PrivateBucket,

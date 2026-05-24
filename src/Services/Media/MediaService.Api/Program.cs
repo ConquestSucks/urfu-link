@@ -59,7 +59,12 @@ builder.Services.AddMediaModule(builder.Configuration);
 var app = builder.Build();
 
 app.MapServiceDefaults();
-app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
+app.UseFastEndpoints(c =>
+{
+    c.Endpoints.RoutePrefix = "api/v1";
+    c.Serializer.Options.Converters.Add(
+        new System.Text.Json.Serialization.JsonStringEnumConverter());
+});
 app.UseSwaggerGen();
 app.MapScalarApiReference(o =>
     o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));

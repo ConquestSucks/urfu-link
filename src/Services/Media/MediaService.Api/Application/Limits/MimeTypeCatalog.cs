@@ -43,6 +43,7 @@ public static class MimeTypeCatalog
             ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] = AssetKind.Document,
             ["application/vnd.ms-powerpoint"] = AssetKind.Document,
             ["application/vnd.openxmlformats-officedocument.presentationml.presentation"] = AssetKind.Document,
+            ["application/json"] = AssetKind.Document,
             ["text/plain"] = AssetKind.Document,
             ["text/csv"] = AssetKind.Document,
             ["text/markdown"] = AssetKind.Document,
