@@ -269,7 +269,7 @@ spec:
                 sleep 2
               done
 
-              topics="urfu.user.events.v1 urfu.media.events.v1 urfu.chat.events.v1 urfu.presence.events.v1 urfu.notification.events.v1 urfu.call.events.v1 urfu.user.events.v1.dlq urfu.media.events.v1.dlq urfu.chat.events.v1.dlq urfu.presence.events.v1.dlq urfu.notification.events.v1.dlq urfu.call.events.v1.dlq"
+              topics="urfu.user.events.v1 urfu.media.events.v1 urfu.chat.events.v1 urfu.discipline.events.v1 urfu.presence.events.v1 urfu.notification.events.v1 urfu.call.events.v1 urfu.user.events.v1.dlq urfu.media.events.v1.dlq urfu.chat.events.v1.dlq urfu.discipline.events.v1.dlq urfu.presence.events.v1.dlq urfu.notification.events.v1.dlq urfu.call.events.v1.dlq"
               for topic in $topics; do
                 /opt/kafka/bin/kafka-topics.sh \
                   --bootstrap-server kafka.urfu-platform.svc.cluster.local:9092 \

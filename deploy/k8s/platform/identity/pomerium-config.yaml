@@ -18,6 +18,18 @@ data:
         jwt_claims_headers:
           X-Session-Id: sid
 
+      # SignalR hubs: authenticated traffic goes through the same gateway as REST.
+      - from: https://urfu-link.ghjc.ru
+        to: http://api-gateway.urfu-prod.svc.cluster.local:8080
+        prefix: /hubs
+        policy:
+          - allow:
+              or:
+                - authenticated_user: true
+        pass_identity_headers: true
+        jwt_claims_headers:
+          X-Session-Id: sid
+
       # Static assets: allow unauthenticated access so app-config.js is loaded
       # before the auth flow starts. Without this Pomerium intercepts app-config.js
       # and the browser falls back to the default appEnv: "dev".
