@@ -29,7 +29,10 @@ export const MasterDetailLayout = ({ sidebar, isDetailView }: MasterDetailLayout
         return (
             <View style={styles.flex}>
                 {!isDetailView && (
-                    <View style={styles.sidebarOverlay} className="bg-app-bg" pointerEvents="box-none">
+                    <View
+                        style={[styles.sidebarOverlay, styles.pointerEventsBoxNone]}
+                        className="bg-app-bg"
+                    >
                         {sidebar}
                     </View>
                 )}
@@ -37,8 +40,8 @@ export const MasterDetailLayout = ({ sidebar, isDetailView }: MasterDetailLayout
                     style={[
                         styles.flex,
                         !isDetailView && styles.outletHidden,
+                        isDetailView ? styles.pointerEventsAuto : styles.pointerEventsNone,
                     ]}
-                    pointerEvents={isDetailView ? "auto" : "none"}
                 >
                     {stack}
                 </View>
@@ -66,5 +69,14 @@ const styles = StyleSheet.create({
     },
     outletHidden: {
         opacity: 0,
+    },
+    pointerEventsAuto: {
+        pointerEvents: "auto",
+    },
+    pointerEventsBoxNone: {
+        pointerEvents: "box-none",
+    },
+    pointerEventsNone: {
+        pointerEvents: "none",
     },
 });

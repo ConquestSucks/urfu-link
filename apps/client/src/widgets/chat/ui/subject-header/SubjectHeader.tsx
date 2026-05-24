@@ -14,8 +14,9 @@ const MOCK_MEMBERS = [
     { id: "4", name: "Соколов Дмитрий", role: "Студент", isOnline: true },
     { id: "5", name: "Кузнецова Мария", role: "Студент", isOnline: false },
 ];
-export const SubjectHeader = ({ subjectId }: {
+export const SubjectHeader = ({ subjectId, onOpenPinned }: {
     subjectId: string;
+    onOpenPinned?: () => void;
 }) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
     const { isMobile } = useWindowSize();
@@ -50,7 +51,10 @@ export const SubjectHeader = ({ subjectId }: {
          </View>
 
         
-        <SubjectHeaderActions onOpenMembers={() => setIsMembersOpen(true)}/>
+        <SubjectHeaderActions
+          onOpenMembers={() => setIsMembersOpen(true)}
+          onOpenPinned={() => onOpenPinned?.()}
+        />
       </View>
 
       

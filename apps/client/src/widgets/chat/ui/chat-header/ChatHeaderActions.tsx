@@ -6,15 +6,20 @@ import { getChatHeaderActions } from "../../config/headerActions";
 
 interface ChatHeaderActionsProps {
     onOpenProfile: () => void;
+    onOpenPinned: () => void;
     onSearchPress: () => void;
 }
 
-export const ChatHeaderActions = ({ onOpenProfile, onSearchPress }: ChatHeaderActionsProps) => {
+export const ChatHeaderActions = ({ onOpenProfile, onOpenPinned, onSearchPress }: ChatHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getChatHeaderActions({
         onOpenProfile: () => {
             menuRef.current?.close();
             onOpenProfile();
+        },
+        onOpenPinned: () => {
+            menuRef.current?.close();
+            onOpenPinned();
         },
     });
     return (

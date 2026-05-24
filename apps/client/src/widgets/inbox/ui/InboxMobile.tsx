@@ -55,7 +55,7 @@ export const InboxMobile = <T,>({ data, renderItem, isLoading }: InboxMobileProp
             <View className="flex-1">
                 {isSearchActive ? (
                     <GlobalSearchPanel />
-                ) : isLoading ? (
+                ) : isLoading && data.length === 0 ? (
                     <View className="gap-2 overflow-hidden px-3">
                         {[...Array(7)].map((_, index) => (
                             currentView === "notifications"

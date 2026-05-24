@@ -1,16 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
-import type { AttachmentType, ConversationParticipantDto } from "@urfu-link/api-client";
-import { Select } from "@/shared/ui";
+import type { AttachmentType } from "@urfu-link/api-client";
 import { FunnelIcon, XIcon } from "@/shared/ui/phosphor";
 import { SearchFilterValues } from "../model/search-store";
 
 interface SearchFiltersBarProps {
     value: SearchFilterValues;
     onChange: (next: SearchFilterValues) => void;
-    // Только для local-поиска по конкретному чату — picker отправителя.
-    // В global-поиске участников отдельного чата нет, поэтому скрыт.
-    participants?: ConversationParticipantDto[];
 }
 
 const ATTACHMENT_TYPES: { label: string; value: AttachmentType }[] = [
@@ -39,29 +35,21 @@ const formatDate = (iso?: string): string => {
     return d.toISOString().slice(0, 10);
 };
 
-export const SearchFiltersBar = ({ value, onChange, participants }: SearchFiltersBarProps) => {
+const noFocusOutline = { outlineStyle: "none" } as never;
+
+export const SearchFiltersBar = ({ value, onChange }: SearchFiltersBarProps) => {
     const [expanded, setExpanded] = useState(false);
     const [fromInput, setFromInput] = useState(formatDate(value.from));
     const [toInput, setToInput] = useState(formatDate(value.to));
 
     const activeCount = useMemo(() => {
         let n = 0;
-        if (value.senderId) n++;
         if (value.from) n++;
         if (value.to) n++;
         if (typeof value.hasAttachments === "boolean") n++;
         if (value.attachmentType) n++;
         return n;
     }, [value]);
-
-    const senderOptions = useMemo(
-        () =>
-            (participants ?? []).map((p) => ({
-                label: p.displayName || `Пользователь ${p.userId.slice(0, 6)}`,
-                value: p.userId,
-            })),
-        [participants],
-    );
 
     const commitFrom = () => {
         const next = fromInput ? parseDate(fromInput, false) : undefined;
@@ -167,35 +155,6 @@ export const SearchFiltersBar = ({ value, onChange, participants }: SearchFilter
                         </View>
                     </View>
 
-                    {/* Sender — только для local-поиска */}
-                    {participants && participants.length > 0 && (
-                        <View>
-                            <Text className="text-text-muted text-[11px] uppercase tracking-wider mb-1.5">
-                                Отправитель
-                            </Text>
-                            <Select
-                                options={senderOptions}
-                                selectedValue={value.senderId}
-                                placeholder="Любой"
-                                onSelect={(v) =>
-                                    onChange({
-                                        ...value,
-                                        senderId:
-                                            typeof v === "string" && v ? v : undefined,
-                                    })
-                                }
-                            />
-                            {value.senderId && (
-                                <Pressable
-                                    onPress={() => onChange({ ...value, senderId: undefined })}
-                                    className="mt-1 self-start px-2 py-1"
-                                    hitSlop={6}
-                                >
-                                    <Text className="text-text-muted text-xs">Сбросить отправителя</Text>
-                                </Pressable>
-                            )}
-                        </View>
-                    )}
                 </View>
             )}
         </View>
@@ -244,6 +203,7 @@ const DateField = ({
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={10}
+        style={noFocusOutline}
     />
 );
 

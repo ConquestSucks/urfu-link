@@ -20,15 +20,20 @@ export type ConversationPreview = {
   createdAt?: string;
   lastMessageAt?: string | null;
   lastMessagePreview: {
+    messageId?: string | null;
     senderId: string;
     body: string;
     sentAt?: string;
     sentAtUtc?: string;
     hasAttachments?: boolean;
+    attachmentFileNames?: string[];
+    readAt?: string | null;
+    readAtUtc?: string | null;
   } | null;
   pinnedMessageIds?: string[];
   title?: string;
   groupSubtype?: GroupSubtype | null;
+  unreadCount?: number | null;
 };
 
 export type MessageState = "Sent" | "Delivered" | "Read" | "Deleted";
@@ -172,6 +177,12 @@ export function createChatApi(
 
     getConversation(id: string): Promise<ConversationPreview> {
       return request<ConversationPreview>(`${PREFIX}/conversations/${encodeURIComponent(id)}`);
+    },
+
+    getPinnedMessages(id: string): Promise<MessageDto[]> {
+      return request<MessageDto[]>(`${PREFIX}/conversations/${encodeURIComponent(id)}/pinned`, {
+        method: "GET",
+      });
     },
 
     getConversationParticipants(id: string): Promise<ConversationParticipantDto[]> {

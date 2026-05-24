@@ -1,66 +1,80 @@
-import React, { useEffect, useRef } from "react";
-import { Animated, View, Text } from "react-native";
+import React from "react";
+import { View, Text } from "react-native";
+import { TypingEllipsis } from "@/shared/ui/TypingEllipsis";
 import { useConversationTypers } from "../model/presence-store";
 
 interface TypingIndicatorProps {
     conversationId: string;
     showNames?: boolean;
+    excludeUserId?: string | null;
+    variant?: "status" | "bubble";
 }
 
-const Dot = ({ delay }: { delay: number }) => {
-    const opacity = useRef(new Animated.Value(0.3)).current;
+const TypingDots = ({
+    testID,
+    className,
+}: {
+    testID: string;
+    className: string;
+}) => (
+    <TypingEllipsis testID={testID} className={`ml-1 leading-none ${className}`} />
+);
 
-    useEffect(() => {
-        const animation = Animated.loop(
-            Animated.sequence([
-                Animated.delay(delay),
-                Animated.timing(opacity, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(opacity, {
-                    toValue: 0.3,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
-            ])
-        );
-        animation.start();
-        return () => animation.stop();
-    }, []);
+const StatusTypingDots = () => (
+    <TypingEllipsis
+        testID="typing-inline-dots"
+        className="ml-0.5 text-brand-300 text-xs font-bold leading-none"
+    />
+);
 
-    return (
-        <Animated.View
-            style={{ opacity }}
-            className="w-1.5 h-1.5 rounded-full bg-text-muted"
-        />
-    );
-};
-
-export const TypingIndicator = ({ conversationId, showNames = false }: TypingIndicatorProps) => {
-    const typers = useConversationTypers(conversationId);
+export const TypingIndicator = ({
+    conversationId,
+    showNames = false,
+    excludeUserId = null,
+    variant = "status",
+}: TypingIndicatorProps) => {
+    const typers = useConversationTypers(conversationId, { excludeUserId });
 
     if (typers.length === 0) return null;
 
     const label = () => {
-        if (!showNames) return "Печатает...";
+        if (!showNames) return "Печатает";
         if (typers.length === 1) {
             return typers[0].displayName
-                ? `${typers[0].displayName} печатает...`
-                : "Печатает...";
+                ? `${typers[0].displayName} печатает`
+                : "Печатает";
         }
-        return `${typers.length} человека печатают...`;
+        return `${typers.length} человека печатают`;
     };
 
-    return (
-        <View className="flex-row items-center gap-1.5 px-4 py-1">
-            <View className="flex-row gap-0.5 items-center">
-                <Dot delay={0} />
-                <Dot delay={150} />
-                <Dot delay={300} />
+    if (variant === "bubble") {
+        return (
+            <View
+                testID="typing-indicator-bubble"
+                className="self-start max-w-[78%] rounded-2xl rounded-bl-md bg-white/5 border border-white/5 px-3 py-2"
+            >
+                <View className="flex-row items-center min-w-0">
+                    <Text
+                        numberOfLines={1}
+                        className="text-text-muted text-xs font-medium leading-none"
+                    >
+                        {label()}
+                    </Text>
+                    <TypingDots
+                        testID="typing-bubble-dots"
+                        className="text-text-muted text-xs font-bold"
+                    />
+                </View>
             </View>
-            <Text className="text-text-muted text-xs">{label()}</Text>
+        );
+    }
+
+    return (
+        <View testID="typing-indicator" className="flex-row items-center min-w-0">
+            <Text numberOfLines={1} className="text-brand-300 text-xs font-medium leading-none">
+                {label()}
+            </Text>
+            <StatusTypingDots />
         </View>
     );
 };

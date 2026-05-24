@@ -1,6 +1,6 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
-import { Avatar, StatusIndicator } from "@/shared/ui";
+import { Avatar, Skeleton, StatusIndicator } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useConversationParticipants } from "@/entities/conversation/model/participants-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
@@ -14,6 +14,7 @@ import {
     TypingIndicator,
     presenceStatusToLabel,
     useConversationTypers,
+    usePresenceStore,
     useUserPresence,
 } from "@/entities/presence";
 import type { UserStatus } from "@/shared/ui/StatusIndicator";
@@ -30,9 +31,10 @@ const presenceStatusToIndicator = (status?: string): UserStatus => {
 interface ChatHeaderProps {
     chatId: string;
     onOpenSearch?: () => void;
+    onOpenPinned?: () => void;
 }
 
-export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
+export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
     const conversation = useChatStore((s) =>
@@ -54,20 +56,35 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
         );
     }, [conversation, participants, currentUserId]);
 
-    // peerUserId для presence/typing подписки: в direct-чате используем id
-    // собеседника, для остального — chatId (presence per-user, typing per-room).
-    const presenceUserId = peer?.userId ?? chatId;
+    const presenceUserId = peer?.userId ?? "";
     const peerPresence = useUserPresence(presenceUserId);
-    const typers = useConversationTypers(chatId);
+    const watchUserPresence = usePresenceStore((s) => s.watchUserPresence);
+    const unwatchUserPresence = usePresenceStore((s) => s.unwatchUserPresence);
+    const typers = useConversationTypers(chatId, { excludeUserId: currentUserId });
+
+    React.useEffect(() => {
+        if (!peer?.userId) return;
+
+        void watchUserPresence(peer.userId);
+        return () => {
+            unwatchUserPresence(peer.userId);
+        };
+    }, [peer?.userId, unwatchUserPresence, watchUserPresence]);
 
     if (!conversation) return null;
 
+    const isDirectIdentityLoading =
+        conversation.type === "Direct" && participants.length === 0;
     const chatName =
-        conversation.title ??
-        peer?.displayName ??
-        (conversation.type === "Direct" ? "Личный чат" : "Чат");
-    const chatAvatarUrl = peer?.avatarUrl ?? "";
+        isDirectIdentityLoading
+            ? ""
+            : conversation.title ??
+              peer?.displayName ??
+              (conversation.type === "Direct" ? "Личный чат" : "Чат");
+    const chatAvatarUrl = isDirectIdentityLoading ? "" : peer?.avatarUrl ?? "";
 
+    const isDirectPresenceLoading =
+        conversation.type === "Direct" && (isDirectIdentityLoading || (!!peer?.userId && !peerPresence));
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
         ? presenceStatusToLabel(peerPresence.status)
@@ -88,23 +105,50 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                     )}
                     <View className="flex-row gap-3 items-center">
                         <View className="relative z-1 p-0.5">
-                            <Avatar size={38} src={chatAvatarUrl} name={chatName} />
-                            <StatusIndicator
-                                status={indicatorStatus}
-                                size={12}
-                                className="absolute bottom-0 right-0"
-                            />
+                            {isDirectIdentityLoading ? (
+                                <Skeleton
+                                    testID="chat-header-avatar-skeleton"
+                                    style={{ width: 38, height: 38 }}
+                                    className="rounded-xl"
+                                />
+                            ) : (
+                                <Avatar size={38} src={chatAvatarUrl} name={chatName} />
+                            )}
+                            {isDirectPresenceLoading ? (
+                                <View
+                                    testID="chat-header-presence-dot-skeleton"
+                                    className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-app-card bg-white/10 animate-pulse"
+                                />
+                            ) : (
+                                <StatusIndicator
+                                    status={indicatorStatus}
+                                    size={12}
+                                    className="absolute bottom-0 right-0"
+                                />
+                            )}
                         </View>
 
                         <View className="justify-center flex-1 gap-1.5">
-                            <Text
-                                numberOfLines={1}
-                                className="text-white leading-none text-base font-semibold"
-                            >
-                                {chatName}
-                            </Text>
+                            {isDirectIdentityLoading ? (
+                                <Skeleton testID="chat-header-title-skeleton" className="h-4 w-36 rounded" />
+                            ) : (
+                                <Text
+                                    numberOfLines={1}
+                                    className="text-white leading-none text-base font-semibold"
+                                >
+                                    {chatName}
+                                </Text>
+                            )}
                             {(() => {
                                 // Приоритет: typing > online/status label > last seen > "Не в сети".
+                                if (isDirectIdentityLoading) {
+                                    return (
+                                        <Skeleton
+                                            testID="chat-header-presence-skeleton"
+                                            className="h-3 w-20 rounded"
+                                        />
+                                    );
+                                }
                                 if (typers.length > 0) {
                                     // В direct-чате имя печатающего совпадает с заголовком — не дублируем.
                                     // В групповом (Discipline) показываем "Иван печатает...".
@@ -112,6 +156,15 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
                                         <TypingIndicator
                                             conversationId={chatId}
                                             showNames={conversation.type !== "Direct"}
+                                            excludeUserId={currentUserId}
+                                        />
+                                    );
+                                }
+                                if (isDirectPresenceLoading) {
+                                    return (
+                                        <View
+                                            testID="chat-header-presence-skeleton"
+                                            className="h-3 w-20 rounded bg-white/10 animate-pulse"
                                         />
                                     );
                                 }
@@ -148,6 +201,7 @@ export const ChatHeader = ({ chatId, onOpenSearch }: ChatHeaderProps) => {
 
                 <ChatHeaderActions
                     onOpenProfile={() => setIsProfileOpen(true)}
+                    onOpenPinned={() => onOpenPinned?.()}
                     onSearchPress={() => onOpenSearch?.()}
                 />
             </View>

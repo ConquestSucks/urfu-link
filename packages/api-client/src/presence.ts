@@ -11,6 +11,10 @@ export type PresenceInfo = {
   lastSeenAt?: string | null;
 };
 
+type BatchPresenceResponse = {
+  items: PresenceInfo[];
+};
+
 export function createPresenceApi(
   baseUrl: string,
   authHeaders: AuthHeaders,
@@ -23,11 +27,12 @@ export function createPresenceApi(
       return request<PresenceInfo>(`/api/presence/users/${encodeURIComponent(userId)}`);
     },
 
-    getBatchUserPresence(userIds: string[]): Promise<PresenceInfo[]> {
-      return request<PresenceInfo[]>("/api/presence/users/batch", {
+    async getBatchUserPresence(userIds: string[]): Promise<PresenceInfo[]> {
+      const response = await request<BatchPresenceResponse>("/api/presence/users/batch", {
         method: "POST",
         body: JSON.stringify({ userIds }),
       });
+      return response.items;
     }
   };
 }

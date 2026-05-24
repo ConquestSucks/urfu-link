@@ -11,13 +11,13 @@ import { apiClient } from "@/shared/lib/api";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
 import {
-    EditMessageModal,
     ForwardPickerModal,
     MessageActionsMenu,
     ReactionPickerModal,
 } from "@/features/message-actions";
 import type { MessageDto, SearchResultDto } from "@urfu-link/api-client";
 import { PinnedBar } from "./PinnedBar";
+import { PinnedMessagesModal } from "./PinnedMessagesModal";
 import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
@@ -32,15 +32,20 @@ export const ChatView = () => {
     const pendingScrollId = useChatStore((s) => s.pendingScrollToMessageId);
     const [isSearching, setIsSearching] = useState(false);
     const [actionsTarget, setActionsTarget] = useState<MessageDto | null>(null);
+    const [actionsAnchor, setActionsAnchor] = useState<{ x: number; y: number } | null>(null);
+    const [readStatusLabel, setReadStatusLabel] = useState<string | null>(null);
+    const [isReadStatusLoading, setIsReadStatusLoading] = useState(false);
     const [reactionTargetId, setReactionTargetId] = useState<string | null>(null);
     const [forwardIds, setForwardIds] = useState<string[] | null>(null);
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
+    const [isPinnedModalOpen, setIsPinnedModalOpen] = useState(false);
     const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
     const currentUserId = useCurrentUserId();
 
     const chatId = params.id as string;
     const type = currentTab === "chats" ? "chat" : "subject";
+    const isDirectDraft = conversation?.type === "Direct" && !conversation.lastMessagePreview;
 
     const handleSend = useCallback(
         async (text: string, files: DocumentPickerAsset[], replyToMessageId?: string) => {
@@ -74,18 +79,24 @@ export const ChatView = () => {
     );
 
     const handleSearchResultPress = useCallback(
-        (item: SearchResultDto) => {
-            const scrolled = listRef.current?.scrollToMessage(item.messageId) ?? false;
-            if (!scrolled) setPendingScrollToMessageId(item.messageId);
+        async (item: SearchResultDto) => {
             setIsSearching(false);
+            const scrolled = await (listRef.current?.scrollToMessage(item.messageId) ?? Promise.resolve(false));
+            if (!scrolled) setPendingScrollToMessageId(item.messageId);
         },
         [setPendingScrollToMessageId],
     );
 
     useEffect(() => {
         if (!pendingScrollId) return;
-        const ok = listRef.current?.scrollToMessage(pendingScrollId);
-        if (ok) setPendingScrollToMessageId(null);
+        let cancelled = false;
+        void (async () => {
+            const ok = await (listRef.current?.scrollToMessage(pendingScrollId) ?? Promise.resolve(false));
+            if (ok && !cancelled) setPendingScrollToMessageId(null);
+        })();
+        return () => {
+            cancelled = true;
+        };
     }, [pendingScrollId, setPendingScrollToMessageId]);
 
     // Прогрев participants-store: нужен для @mentions autocomplete и для
@@ -93,20 +104,106 @@ export const ChatView = () => {
     // повторные load() для одного и того же chatId — no-op.
     useEffect(() => {
         if (!chatId) return;
+        if (isDirectDraft) {
+            return;
+        }
+
         useParticipantsStore
             .getState()
             .load(chatId)
             .catch(() => {
                 /* fail-open: индикатор печати и mentions работают и без имён */
             });
-    }, [chatId]);
-
-    if (!chatId) return null;
+    }, [chatId, isDirectDraft]);
 
     const pinnedIds = conversation?.pinnedMessageIds ?? [];
     const isActionsTargetPinned = !!(
         actionsTarget && pinnedIds.includes(actionsTarget.id)
     );
+    const isActionsTargetOwn = !!currentUserId && actionsTarget?.senderId === currentUserId;
+
+    const openActionsMenu = useCallback(
+        (message: MessageDto, anchor: { x: number; y: number } | null = null) => {
+            setActionsTarget(message);
+            setActionsAnchor(anchor);
+        },
+        [],
+    );
+
+    const closeActionsMenu = useCallback(() => {
+        setActionsTarget(null);
+        setActionsAnchor(null);
+        setReadStatusLabel(null);
+        setIsReadStatusLoading(false);
+    }, []);
+
+    const jumpToMessage = useCallback(
+        async (messageId: string) => {
+            setIsPinnedModalOpen(false);
+            const ok = await (listRef.current?.scrollToMessage(messageId) ?? Promise.resolve(false));
+            if (!ok) setPendingScrollToMessageId(messageId);
+        },
+        [setPendingScrollToMessageId],
+    );
+
+    useEffect(() => {
+        if (!actionsTarget || !isActionsTargetOwn) {
+            setReadStatusLabel(null);
+            setIsReadStatusLoading(false);
+            return;
+        }
+
+        const formatTime = (value: string | null | undefined) => {
+            if (!value) return "";
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return "";
+            return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        };
+
+        if (conversation?.type === "Direct") {
+            const readTime = formatTime(actionsTarget.readAt);
+            setReadStatusLabel(readTime ? `Прочитано ${readTime}` : "Не прочитано");
+            setIsReadStatusLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        setIsReadStatusLoading(true);
+        setReadStatusLabel(null);
+        apiClient.chat
+            .getReadReceipts(actionsTarget.id)
+            .then((receipts) => {
+                if (cancelled) return;
+                if (receipts.length === 0) {
+                    setReadStatusLabel("Не прочитано");
+                    return;
+                }
+                const latest = receipts.reduce((prev, curr) =>
+                    new Date(curr.readAtUtc).getTime() > new Date(prev.readAtUtc).getTime()
+                        ? curr
+                        : prev,
+                );
+                const readTime = formatTime(latest.readAtUtc);
+                setReadStatusLabel(
+                    readTime
+                        ? `Прочитали ${receipts.length} • ${readTime}`
+                        : `Прочитали ${receipts.length}`,
+                );
+            })
+            .catch((error) => {
+                console.error("Failed to load read receipts", error);
+                if (!cancelled) setReadStatusLabel("Не прочитано");
+            })
+            .finally(() => {
+                if (!cancelled) setIsReadStatusLoading(false);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [actionsTarget, conversation?.type, isActionsTargetOwn]);
+
+    if (!chatId) return null;
 
     const mainColumn = (
         <View className="bg-app-card flex-1">
@@ -118,10 +215,17 @@ export const ChatView = () => {
                         onClose={() => setIsSearching(false)}
                     />
                 ) : (
-                    <ChatHeader chatId={chatId} onOpenSearch={() => setIsSearching(true)} />
+                    <ChatHeader
+                        chatId={chatId}
+                        onOpenSearch={() => setIsSearching(true)}
+                        onOpenPinned={() => setIsPinnedModalOpen(true)}
+                    />
                 )
             ) : (
-                <SubjectHeader subjectId={chatId} />
+                <SubjectHeader
+                    subjectId={chatId}
+                    onOpenPinned={() => setIsPinnedModalOpen(true)}
+                />
             )}
 
             {type === "chat" && pinnedIds.length > 0 && (
@@ -132,10 +236,16 @@ export const ChatView = () => {
                 ref={listRef}
                 chatId={chatId}
                 type={type}
-                onMessageLongPress={setActionsTarget}
+                skipInitialLoad={isDirectDraft}
+                onMessageLongPress={(message) => openActionsMenu(message)}
+                onMessageContextMenu={openActionsMenu}
                 onThreadOpen={setOpenThreadRootId}
             />
-            <ChatInput conversationId={chatId} onSend={handleSend} />
+            <ChatInput
+                conversationId={chatId}
+                onSend={handleSend}
+                typingEnabled={!isDirectDraft}
+            />
         </View>
     );
 
@@ -169,16 +279,19 @@ export const ChatView = () => {
 
             <MessageActionsMenu
                 message={actionsTarget}
-                isOwn={!!currentUserId && actionsTarget?.senderId === currentUserId}
+                isOwn={isActionsTargetOwn}
                 isPinned={isActionsTargetPinned}
-                onClose={() => setActionsTarget(null)}
+                anchor={actionsAnchor}
+                readStatusLabel={readStatusLabel}
+                isReadStatusLoading={isReadStatusLoading}
+                onClose={closeActionsMenu}
                 onForwardRequest={() => {
                     if (actionsTarget) setForwardIds([actionsTarget.id]);
-                    setActionsTarget(null);
+                    closeActionsMenu();
                 }}
                 onReactRequest={() => {
                     if (actionsTarget) setReactionTargetId(actionsTarget.id);
-                    setActionsTarget(null);
+                    closeActionsMenu();
                 }}
             />
             <ReactionPickerModal
@@ -189,7 +302,12 @@ export const ChatView = () => {
                 messageIds={forwardIds}
                 onClose={() => setForwardIds(null)}
             />
-            <EditMessageModal />
+            <PinnedMessagesModal
+                visible={isPinnedModalOpen}
+                conversationId={chatId}
+                onClose={() => setIsPinnedModalOpen(false)}
+                onJumpToMessage={jumpToMessage}
+            />
         </View>
     );
 };

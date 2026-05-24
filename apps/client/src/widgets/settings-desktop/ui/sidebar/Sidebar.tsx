@@ -11,7 +11,7 @@ interface SidebarProps {
 }
 
 export const Sidebar = ({ activeTab, onTabChange, onClose }: SidebarProps) => {
-  const { data: profile } = useCurrentUser();
+  const { data: profile, isLoading } = useCurrentUser();
 
   return (
     <View className="bg-app-bg h-full flex-col border-r border-white/10 p-6 gap-2 w-[calc(256/896*100%)]">
@@ -26,6 +26,7 @@ export const Sidebar = ({ activeTab, onTabChange, onClose }: SidebarProps) => {
           userDescription={profile?.account.aboutMe ?? ""}
           avatarUrl={profile?.account.avatarUrl ?? undefined}
           avatarSize={40}
+          isLoading={isLoading}
         />
       </View>
     </View>

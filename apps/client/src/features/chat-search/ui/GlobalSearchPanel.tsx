@@ -15,6 +15,7 @@ import { SearchScopeTabs } from "./SearchScopeTabs";
 import { UserSearchResults } from "./UserSearchResults";
 import { useRouter } from "expo-router";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { SearchResultSkeletonList } from "./SearchResultSkeleton";
 
 interface GlobalSearchPanelProps {
     /** Called when user picks a result. Default: navigate to conversation. */
@@ -54,9 +55,7 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
         );
     }
 
-    // Bar над выдачей — даём управление фильтрами hasAttachments / attachmentType / date.
-    // sender-picker для глобального поиска не показываем (нет конкретного списка
-    // участников — нужно было бы дёргать всех знакомых юзеров).
+    // Bar above results controls date and attachment filters.
     const filtersBar = <SearchFiltersBar value={filters} onChange={onFiltersChange} />;
 
     if (isLoading && results.length === 0) {
@@ -64,8 +63,8 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
             <View className="flex-1">
                 {scopeTabs}
                 {filtersBar}
-                <View className="flex-1 items-center justify-center py-8">
-                    <RNActivityIndicator color="#6B6FFF" />
+                <View className="flex-1 py-1">
+                    <SearchResultSkeletonList count={4} />
                 </View>
             </View>
         );

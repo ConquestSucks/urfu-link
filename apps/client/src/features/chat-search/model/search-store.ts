@@ -6,7 +6,7 @@ import { useParticipantsStore } from "@/entities/conversation/model/participants
 
 // Поля, которыми UI рулит из SearchFiltersBar. conversationId исключён —
 // он задаётся самим режимом поиска (global/local), а не пользователем.
-export type SearchFilterValues = Omit<SearchFilters, "conversationId">;
+export type SearchFilterValues = Omit<SearchFilters, "conversationId" | "senderId">;
 
 // Глобальный поиск имеет два scope: сообщения (messages) и пользователи (users).
 // Один SearchBar управляет обоими — scope переключается табами в GlobalSearchPanel.
@@ -53,7 +53,7 @@ type SearchState = {
     loadMoreUsers: () => Promise<void>;
     // Возвращает conversationId direct-чата (либо ловит ошибку и возвращает null).
     // Бэкенд идемпотентен по peerUserId — повторный вызов вернёт тот же чат.
-    openDirectWithUser: (userId: string) => Promise<string | null>;
+    openDirectWithUser: (user: SearchUserDto) => Promise<string | null>;
     clearGlobal: () => void;
 
     setLocalQuery: (query: string) => void;
@@ -78,7 +78,6 @@ const EMPTY_FILTERS: SearchFilterValues = {};
 
 const filtersToApi = (filters: SearchFilterValues): SearchFilters | undefined => {
     const hasAny =
-        filters.senderId ||
         filters.from ||
         filters.to ||
         typeof filters.hasAttachments === "boolean" ||
@@ -270,7 +269,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         }
     },
 
-    openDirectWithUser: async (userId) => {
+    openDirectWithUser: async (user) => {
+        const userId = user.id;
         // Если по этому id уже идёт запрос — не дубль. Если по другому — разрешаем
         // (race-protection: бэк идемпотентен, оба запроса вернут один и тот же чат).
         if (get().pendingUserId === userId) return null;
@@ -283,12 +283,23 @@ export const useSearchStore = create<SearchState>((set, get) => ({
             // по id после router.push. Если SignalR-событие потом прилетит, оно
             // просто перезапишет ту же запись (updateConversation идемпотентен).
             useChatStore.getState().updateConversation(conversation);
+            useParticipantsStore.getState().prime(conversation.id, [
+                {
+                    userId,
+                    role: "Member",
+                    displayName: user.displayName || user.username,
+                    avatarUrl: user.avatarUrl ?? "",
+                },
+            ]);
 
-            // Прогреваем participants-кэш заранее: ChatHeader/Inbox берут оттуда
-            // displayName и avatarUrl собеседника для direct-чата.
-            useParticipantsStore.getState().load(conversation.id).catch(() => {
-                /* fail-open: имя проступит после первого участникам-fetch retry */
-            });
+            // Для нового direct-чата backend возвращает draft без Mongo-документа, поэтому
+            // /participants до первого сообщения ещё недоступен. Имя собеседника уже есть из
+            // поиска и primed выше; persisted-чаты можно дозагрузить обычным endpoint'ом.
+            if (conversation.lastMessagePreview) {
+                useParticipantsStore.getState().load(conversation.id).catch(() => {
+                    /* fail-open: имя проступит после первого участникам-fetch retry */
+                });
+            }
 
             return conversation.id;
         } catch (error) {

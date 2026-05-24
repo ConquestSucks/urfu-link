@@ -1,8 +1,11 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import { ModalOverlay, Avatar, EmptyState } from "@/shared/ui";
 import { ChatsCircleIcon } from "@/shared/ui/phosphor";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
+import { useCurrentUserId } from "@/shared/store/auth-store";
+import type { ConversationParticipantDto, ConversationPreview } from "@urfu-link/api-client";
 
 interface ForwardPickerModalProps {
     messageIds: string[] | null;
@@ -11,7 +14,34 @@ interface ForwardPickerModalProps {
 
 export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalProps) => {
     const conversations = useChatStore((s) => s.conversations);
+    const messagesByConversation = useChatStore((s) => s.messagesByConversation);
     const forwardMessages = useChatStore((s) => s.forwardMessages);
+    const participantsByConversation = useParticipantsStore((s) => s.byConversationId);
+    const loadParticipants = useParticipantsStore((s) => s.load);
+    const currentUserId = useCurrentUserId();
+
+    const visibleConversations = useMemo(
+        () =>
+            conversations.filter((conversation) => {
+                if (conversation.type !== "Direct") return true;
+                return (
+                    conversation.lastMessagePreview != null ||
+                    (messagesByConversation[conversation.id]?.length ?? 0) > 0
+                );
+            }),
+        [conversations, messagesByConversation],
+    );
+
+    useEffect(() => {
+        for (const conversation of visibleConversations) {
+            if (conversation.type !== "Direct") continue;
+            if (participantsByConversation[conversation.id]) continue;
+
+            loadParticipants(conversation.id).catch(() => {
+                /* fail-open: fallback title remains until participants can be loaded */
+            });
+        }
+    }, [loadParticipants, participantsByConversation, visibleConversations]);
 
     if (!messageIds || messageIds.length === 0) return null;
 
@@ -36,17 +66,24 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                 </Text>
             </View>
             <FlatList
-                data={conversations}
+                data={visibleConversations}
                 keyExtractor={(c) => c.id}
                 renderItem={({ item }) => {
-                    const name =
-                        item.title ??
-                        (item.type === "Direct" ? "Личный чат" : "Дисциплина");
-                    const avatarUrl = "";
+                    const peer = getDirectPeer(
+                        item,
+                        participantsByConversation[item.id]?.items,
+                        currentUserId,
+                    );
+                    const name = resolveConversationName(item, peer);
+                    const avatarUrl =
+                        item.type === "Direct" && peer?.avatarUrl?.trim()
+                            ? peer.avatarUrl
+                            : "";
                     return (
                         <Pressable
+                            testID={`forward-conversation-${item.id}`}
                             onPress={() => handlePick(item.id)}
-                            className="flex-row items-center gap-3 px-4 py-3 active:bg-white/5"
+                            className="flex-row items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5 active:bg-white/5"
                         >
                             <Avatar size={36} src={avatarUrl} name={name} />
                             <Text
@@ -68,4 +105,29 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
             />
         </ModalOverlay>
     );
+};
+
+const getDirectPeer = (
+    conversation: ConversationPreview,
+    participants: ConversationParticipantDto[] | undefined,
+    currentUserId: string | null,
+) => {
+    if (conversation.type !== "Direct") return null;
+
+    return (
+        participants?.find((participant) => participant.userId !== currentUserId) ??
+        participants?.[0] ??
+        null
+    );
+};
+
+const resolveConversationName = (
+    conversation: ConversationPreview,
+    peer: ConversationParticipantDto | null,
+) => {
+    if (conversation.type !== "Direct") {
+        return conversation.title ?? "Дисциплина";
+    }
+
+    return peer?.displayName?.trim() || conversation.title || "Личный чат";
 };

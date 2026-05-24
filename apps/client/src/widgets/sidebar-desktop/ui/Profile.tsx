@@ -17,7 +17,7 @@ export const Profile = ({
   handleToggle,
   onSettingsPress,
 }: ProfileProps) => {
-  const { data: profile } = useCurrentUser();
+  const { data: profile, isLoading } = useCurrentUser();
 
   const userName = profile?.identity.name ?? "";
   const userDescription = profile?.account.aboutMe ?? "";
@@ -37,6 +37,7 @@ export const Profile = ({
               userDescription={userDescription}
               avatarUrl={avatarUrl}
               avatarSize={40}
+              isLoading={isLoading}
             />
 
             <AnimatedView style={textAnimatedStyle}>

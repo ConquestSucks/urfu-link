@@ -18,6 +18,7 @@ type ParticipantsState = {
     // же conversationId шарят один в полёте, чтобы typing-events / mentions /
     // sender-фильтр не дёргали API трижды на старте чата.
     load: (conversationId: string) => Promise<ConversationParticipantDto[]>;
+    prime: (conversationId: string, items: ConversationParticipantDto[]) => void;
     invalidate: (conversationId: string) => void;
 };
 
@@ -54,6 +55,14 @@ export const useParticipantsStore = create<ParticipantsState>((set, get) => ({
         set((s) => ({ inflight: { ...s.inflight, [conversationId]: promise } }));
         return promise;
     },
+
+    prime: (conversationId, items) =>
+        set((s) => ({
+            byConversationId: {
+                ...s.byConversationId,
+                [conversationId]: { items, fetchedAt: Date.now() },
+            },
+        })),
 
     invalidate: (conversationId) =>
         set((s) => {

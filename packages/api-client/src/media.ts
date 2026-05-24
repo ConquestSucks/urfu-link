@@ -35,6 +35,27 @@ export type AssetMetadata = {
   createdAt: string;
 };
 
+export type DownloadUrlResponse = {
+  downloadUrl: string;
+  expiresAtUtc?: string;
+};
+
+type DownloadUrlWireResponse = {
+  url?: string;
+  downloadUrl?: string;
+  Url?: string;
+  expiresAtUtc?: string;
+  ExpiresAtUtc?: string;
+};
+
+function createIdempotencyKey(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
+function idempotencyHeaders(): Record<string, string> {
+  return { "Idempotency-Key": createIdempotencyKey() };
+}
+
 export function createMediaApi(
   baseUrl: string,
   authHeaders: AuthHeaders,
@@ -46,6 +67,7 @@ export function createMediaApi(
     initUpload(dto: InitUploadRequest): Promise<InitUploadResponse> {
       return request<InitUploadResponse>("/api/media/upload/init", {
         method: "POST",
+        headers: idempotencyHeaders(),
         body: JSON.stringify(dto),
       });
     },
@@ -53,12 +75,22 @@ export function createMediaApi(
     completeUpload(dto: CompleteUploadRequest): Promise<void> {
       return request<void>("/api/media/upload/complete", {
         method: "POST",
+        headers: idempotencyHeaders(),
         body: JSON.stringify(dto),
       });
     },
 
-    getAssetDownloadUrl(assetId: string): Promise<{ downloadUrl: string }> {
-      return request<{ downloadUrl: string }>(`/api/media/${encodeURIComponent(assetId)}/download-url`);
+    async getAssetDownloadUrl(assetId: string): Promise<DownloadUrlResponse> {
+      const response = await request<DownloadUrlWireResponse>(`/api/media/${encodeURIComponent(assetId)}/download-url`);
+      const downloadUrl = response.downloadUrl ?? response.url ?? response.Url;
+      if (!downloadUrl) {
+        throw new Error("Download URL response did not include a URL.");
+      }
+
+      return {
+        downloadUrl,
+        expiresAtUtc: response.expiresAtUtc ?? response.ExpiresAtUtc,
+      };
     },
 
     getAssetMetadata(assetId: string): Promise<AssetMetadata> {
@@ -68,6 +100,7 @@ export function createMediaApi(
     deleteAsset(assetId: string): Promise<void> {
       return request<void>(`/api/media/${encodeURIComponent(assetId)}`, {
         method: "DELETE",
+        headers: idempotencyHeaders(),
       });
     }
   };

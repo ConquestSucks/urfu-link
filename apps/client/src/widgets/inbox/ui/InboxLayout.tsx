@@ -19,7 +19,7 @@ export const InboxLayout = () => {
 
     const { currentTab, currentView, params } = useInboxRouting();
 
-    const conversationsLoading = useChatStore((s) => s.isLoading);
+    const conversationsLoading = useChatStore((s) => s.isConversationsLoading);
     const loadConversations = useChatStore((s) => s.loadConversations);
     const chats = useInboxConversations("chats");
     const subjects = useInboxConversations("subjects");
@@ -64,12 +64,16 @@ export const InboxLayout = () => {
             }
 
             if (currentTab === "chats") {
+                const isActive = item.id === params.id;
+
                 return (
                     <View key={item.id}>
                         <InboxChat
                             {...item}
-                            isActive={item.id === params.id}
-                            onPress={() => router.push(`/chats/${item.id}`)}
+                            isActive={isActive}
+                            onPress={() => {
+                                router.push(`/chats/${item.id}`);
+                            }}
                         />
                     </View>
                 );
@@ -77,12 +81,16 @@ export const InboxLayout = () => {
 
             // For "subjects" tab we currently render the same chat-row variant.
             // A dedicated subject grouping is tracked separately in a follow-up.
+            const isActive = item.id === params.id;
+
             return (
                 <View key={item.id}>
                     <InboxChat
                         {...item}
-                        isActive={item.id === params.id}
-                        onPress={() => router.push(`/subjects/${item.id}`)}
+                        isActive={isActive}
+                        onPress={() => {
+                            router.push(`/subjects/${item.id}`);
+                        }}
                     />
                 </View>
             );

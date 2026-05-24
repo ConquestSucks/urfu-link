@@ -48,7 +48,6 @@ export default function AuthLayout() {
 
             {isMobile && (
                 <View
-                    pointerEvents="box-none"
                     style={{
                         position: "absolute",
                         left: 0,
@@ -56,6 +55,7 @@ export default function AuthLayout() {
                         bottom: 0,
                         zIndex: isThreadDetail ? 0 : 3,
                         elevation: isThreadDetail ? 0 : 3,
+                        pointerEvents: "box-none",
                     }}
                 >
                     <MobileBottomTabs />

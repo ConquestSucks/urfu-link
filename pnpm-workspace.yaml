@@ -2,9 +2,10 @@ packages:
   - apps/*
   - packages/*
 
-# pnpm 10+ blocks postinstall scripts of transitive deps by default (supply-chain
-# hardening). esbuild — fetches a platform-specific native binary in its
-# postinstall; msgpackr-extract — нужен Metro/SignalR на mobile.
+# pnpm 10+ blocks postinstall scripts of transitive deps by default.
+# esbuild fetches a native binary; msgpackr-extract is needed by Metro/SignalR.
+# msw runs its package setup script.
 allowBuilds:
   esbuild: true
   msgpackr-extract: true
+  msw: true

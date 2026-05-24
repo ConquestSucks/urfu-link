@@ -7,6 +7,7 @@ import { useUserSearch } from "../model/use-search";
 import { useSearchStore } from "../model/search-store";
 import { UserSearchResultItem } from "./UserSearchResultItem";
 import { useRouter } from "expo-router";
+import { SearchResultSkeletonList } from "./SearchResultSkeleton";
 
 export const UserSearchResults = () => {
     const { query, results, isLoading, error, hasMore, pendingUserId, loadMore, retry, openDirectWithUser } =
@@ -15,7 +16,7 @@ export const UserSearchResults = () => {
     const router = useRouter();
 
     const handlePress = async (item: SearchUserDto) => {
-        const conversationId = await openDirectWithUser(item.id);
+        const conversationId = await openDirectWithUser(item);
         if (!conversationId) return;
         // Сбрасываем поиск — иначе при возврате на Inbox пользователь увидит
         // прежнюю выдачу. Кроме того clearGlobal вернёт scope в "messages".
@@ -27,8 +28,8 @@ export const UserSearchResults = () => {
 
     if (isLoading && results.length === 0) {
         return (
-            <View className="flex-1 items-center justify-center py-8">
-                <RNActivityIndicator color="#6B6FFF" />
+            <View className="flex-1 py-1">
+                <SearchResultSkeletonList count={3} showSnippet={false} />
             </View>
         );
     }

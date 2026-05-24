@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { View, Pressable, Text, TextInput, Keyboard, Animated, Dimensions } from "react-native";
+import { View, Pressable, Text, TextInput, Keyboard, Animated, Dimensions, Platform } from "react-native";
 import {
     PaperPlaneRightIcon,
     PencilSimpleIcon,
@@ -20,25 +20,69 @@ import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const MAX_INPUT_HEIGHT = SCREEN_HEIGHT * 0.35;
+const MIN_INPUT_CONTENT_HEIGHT = 24;
+const INPUT_LINE_HEIGHT = 24;
+const INPUT_VERTICAL_PADDING = 10;
+const MAX_INPUT_CONTENT_HEIGHT = SCREEN_HEIGHT * 0.35;
 const MAX_FILES_LIMIT = 10;
+const WEB_STALE_MEASUREMENT_THRESHOLD = INPUT_LINE_HEIGHT * 4;
+
+const getComposerInputHeight = (contentHeight: number) =>
+    Math.max(MIN_INPUT_CONTENT_HEIGHT, Math.min(contentHeight, MAX_INPUT_CONTENT_HEIGHT)) +
+    INPUT_VERTICAL_PADDING * 2;
+
+const getExplicitLineCount = (text: string) => text.split("\n").length;
+
+const getExplicitLineContentHeight = (text: string) =>
+    Math.max(
+        MIN_INPUT_CONTENT_HEIGHT,
+        getExplicitLineCount(text) * INPUT_LINE_HEIGHT +
+            (MIN_INPUT_CONTENT_HEIGHT - INPUT_LINE_HEIGHT),
+    );
+
+const normalizeMeasuredContentHeight = (measuredHeight: number, text: string) => {
+    if (text.length === 0) return MIN_INPUT_CONTENT_HEIGHT;
+    if (Platform.OS !== "web") return measuredHeight;
+
+    const measuredWithoutPadding = Math.max(
+        MIN_INPUT_CONTENT_HEIGHT,
+        measuredHeight - INPUT_VERTICAL_PADDING * 2,
+    );
+    const explicitLineHeight = getExplicitLineContentHeight(text);
+
+    if (
+        text.length < 200 &&
+        measuredWithoutPadding > explicitLineHeight + WEB_STALE_MEASUREMENT_THRESHOLD
+    ) {
+        return explicitLineHeight;
+    }
+
+    return Math.max(measuredWithoutPadding, explicitLineHeight);
+};
 
 interface ChatInputProps {
     conversationId: string;
     onSend: (text: string, files: DocumentPickerAsset[], replyToMessageId?: string) => void;
+    typingEnabled?: boolean;
 }
 
-export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
+export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: ChatInputProps) => {
     const [query, setQuery] = useState("");
-    const { onTextChange: notifyTyping, onSend: notifyStopTyping } = useTypingIndicator(conversationId);
+    const { onTextChange: notifyTyping, onSend: notifyStopTyping } = useTypingIndicator(
+        conversationId,
+        { enabled: typingEnabled },
+    );
     const [isEmojiVisible, setIsEmojiVisible] = useState(false);
-    const [inputHeight, setInputHeight] = useState(24);
+    const [inputHeight, setInputHeight] = useState(MIN_INPUT_CONTENT_HEIGHT);
     // Курсор: позиция точки вставки в тексте. Нужен для детекта @-токена.
     const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
     // Программно проставляемая selection после вставки @mention. RN сбрасывает
     // её обратно в "контролируемый" режим до следующего пользовательского ввода.
     const [pendingSelection, setPendingSelection] = useState<{ start: number; end: number } | null>(null);
     const inputRef = useRef<TextInput>(null);
+    const previousLineCountRef = useRef(1);
+    const pendingLineChangeContentHeightRef = useRef<number | null>(null);
+    const pendingLineChangeDirectionRef = useRef<"grow" | "shrink" | null>(null);
 
     const heightAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(320)).current;
@@ -73,6 +117,7 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
             const next = query.slice(0, mentionToken.start) + insertion + query.slice(mentionToken.end);
             const cursor = mentionToken.start + insertion.length;
             setQuery(next);
+            previousLineCountRef.current = getExplicitLineCount(next);
             setPendingSelection({ start: cursor, end: cursor });
             // notifyTyping не дёргаем — это всё ещё ввод, useTypingIndicator
             // получит событие на следующем onChangeText.
@@ -81,7 +126,11 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     );
 
     useEffect(() => {
-        if (editing) setQuery(editing.body);
+        if (editing) {
+            setQuery(editing.body);
+            previousLineCountRef.current = getExplicitLineCount(editing.body);
+            setInputHeight(getExplicitLineContentHeight(editing.body));
+        }
     }, [editing?.id]);
 
     // Когда query становится пустым — на вебе onContentSizeChange textarea не
@@ -90,9 +139,10 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
     // которое onContentSizeChange выставит после onChangeText.
     useEffect(() => {
         if (query.length !== 0) return;
-        const raf = requestAnimationFrame(() => setInputHeight(24));
+        if (inputHeight === MIN_INPUT_CONTENT_HEIGHT) return;
+        const raf = requestAnimationFrame(() => setInputHeight(MIN_INPUT_CONTENT_HEIGHT));
         return () => cancelAnimationFrame(raf);
-    }, [query]);
+    }, [inputHeight, query]);
 
     const animate = useCallback(
         (show: boolean) => {
@@ -105,7 +155,7 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                 Animated.timing(slideAnim, {
                     toValue: show ? 0 : 320,
                     duration: 250,
-                    useNativeDriver: true,
+                    useNativeDriver: Platform.OS !== "web",
                 }),
             ]).start(() => {
                 if (!show) setIsEmojiVisible(false);
@@ -127,6 +177,62 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
 
     const handlePickEmoji = useCallback((emoji: string) => setQuery((prev) => prev + emoji), []);
 
+    const handleQueryChange = useCallback(
+        (text: string) => {
+            const previousLineCount = previousLineCountRef.current;
+            const nextLineCount = getExplicitLineCount(text);
+
+            previousLineCountRef.current = nextLineCount;
+
+            if (Platform.OS === "web" && nextLineCount !== previousLineCount) {
+                const nextContentHeight = getExplicitLineContentHeight(text);
+                pendingLineChangeContentHeightRef.current = nextContentHeight;
+                pendingLineChangeDirectionRef.current =
+                    nextLineCount > previousLineCount ? "grow" : "shrink";
+                setInputHeight(nextContentHeight);
+            }
+
+            setQuery(text);
+            if (!editing) notifyTyping(text);
+        },
+        [editing, notifyTyping],
+    );
+
+    const handleInputContentSizeChange = useCallback(
+        (measuredHeight: number) => {
+            const nextHeight = normalizeMeasuredContentHeight(measuredHeight, query);
+            const pendingLineChangeHeight = pendingLineChangeContentHeightRef.current;
+            const pendingLineChangeDirection = pendingLineChangeDirectionRef.current;
+
+            if (
+                pendingLineChangeHeight !== null &&
+                pendingLineChangeDirection === "grow" &&
+                nextHeight < pendingLineChangeHeight
+            ) {
+                pendingLineChangeContentHeightRef.current = null;
+                pendingLineChangeDirectionRef.current = null;
+                setInputHeight(pendingLineChangeHeight);
+                return;
+            }
+
+            if (
+                pendingLineChangeHeight !== null &&
+                pendingLineChangeDirection === "shrink" &&
+                nextHeight > pendingLineChangeHeight
+            ) {
+                pendingLineChangeContentHeightRef.current = null;
+                pendingLineChangeDirectionRef.current = null;
+                setInputHeight(pendingLineChangeHeight);
+                return;
+            }
+
+            pendingLineChangeContentHeightRef.current = null;
+            pendingLineChangeDirectionRef.current = null;
+            setInputHeight(nextHeight);
+        },
+        [query],
+    );
+
     const handleSend = async () => {
         if (!canSend) return;
 
@@ -141,7 +247,10 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
             }
             setQuery("");
             resetComposer();
-            setInputHeight(24);
+            previousLineCountRef.current = 1;
+            pendingLineChangeContentHeightRef.current = null;
+            pendingLineChangeDirectionRef.current = null;
+            setInputHeight(MIN_INPUT_CONTENT_HEIGHT);
             return;
         }
 
@@ -150,7 +259,28 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
         setQuery("");
         clearAttachments();
         if (replyTo) setReply(null);
-        setInputHeight(24);
+        previousLineCountRef.current = 1;
+        pendingLineChangeContentHeightRef.current = null;
+        pendingLineChangeDirectionRef.current = null;
+        setInputHeight(MIN_INPUT_CONTENT_HEIGHT);
+    };
+
+    const handleInputKeyPress = (event: {
+        nativeEvent?: {
+            key?: string;
+            shiftKey?: boolean;
+            preventDefault?: () => void;
+        };
+        preventDefault?: () => void;
+    }) => {
+        if (Platform.OS !== "web") return;
+
+        const nativeEvent = event.nativeEvent;
+        if (nativeEvent?.key !== "Enter" || nativeEvent.shiftKey) return;
+
+        nativeEvent.preventDefault?.();
+        event.preventDefault?.();
+        void handleSend();
     };
 
     const composerHint = editing
@@ -208,17 +338,16 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                     <PlusCircleIcon size={28} className="text-text-subtle" />
                 </Pressable>
 
-                <View className="flex-1 flex-row items-end bg-white/5 rounded-2xl px-4">
+                <View className="flex-1 flex-row items-center bg-white/5 rounded-2xl px-4">
                     <TextInput
                         ref={inputRef}
-                        className="text-white flex-1 text-[15px]"
+                        testID="chat-input-text"
+                        className="text-white flex-1 text-[15px] outline-none focus:outline-none"
                         placeholder={editing ? "Изменение сообщения" : "Сообщение"}
                         placeholderTextColor="#8B8FA8"
                         value={query}
-                        onChangeText={(text) => {
-                            setQuery(text);
-                            if (!editing) notifyTyping(text);
-                        }}
+                        onChangeText={handleQueryChange}
+                        onKeyPress={handleInputKeyPress}
                         selection={pendingSelection ?? undefined}
                         onSelectionChange={(e) => {
                             const next = e.nativeEvent.selection;
@@ -231,16 +360,21 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                         onFocus={() => isEmojiVisible && animate(false)}
                         multiline
                         onContentSizeChange={(e) =>
-                            setInputHeight(e.nativeEvent.contentSize.height)
+                            handleInputContentSizeChange(e.nativeEvent.contentSize.height)
                         }
                         style={{
-                            height: Math.max(24, Math.min(inputHeight, MAX_INPUT_HEIGHT)),
+                            height: getComposerInputHeight(inputHeight),
                             textAlignVertical: "center",
-                            paddingTop: 12,
-                            paddingBottom: 12,
+                            lineHeight: INPUT_LINE_HEIGHT,
+                            paddingTop: INPUT_VERTICAL_PADDING,
+                            paddingBottom: INPUT_VERTICAL_PADDING,
+                            paddingLeft: 0,
+                            paddingRight: 0,
+                            outlineWidth: 0,
                         }}
                     />
                     <Pressable
+                        testID="chat-input-emoji-button"
                         onPress={() => {
                             Keyboard.dismiss();
                             const willShow = !isEmojiVisible;
@@ -248,6 +382,7 @@ export const ChatInput = ({ conversationId, onSend }: ChatInputProps) => {
                             animate(willShow);
                         }}
                         className="py-2.5 ml-2"
+                        style={{ alignSelf: "flex-end" }}
                     >
                         <SmileyIcon
                             size={24}

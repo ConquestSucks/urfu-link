@@ -1,9 +1,10 @@
 import React from "react";
-import { Pressable, Text, View } from "react-native";
+import { Modal, Pressable, Text, useWindowDimensions, View } from "react-native";
 import { ModalOverlay } from "@/shared/ui";
 import {
     ArrowBendUpLeftIcon,
     ArrowBendDoubleUpRightIcon,
+    ChecksIcon,
     CopyIcon,
     PencilSimpleIcon,
     PushPinIcon,
@@ -20,18 +21,25 @@ type Action =
     | "reply"
     | "forward"
     | "edit"
-    | "delete-for-me"
-    | "delete-for-everyone"
+    | "delete"
     | "copy"
     | "react"
     | "pin"
     | "unpin";
+
+interface ContextMenuAnchor {
+    x: number;
+    y: number;
+}
 
 interface MessageActionsMenuProps {
     message: MessageDto | null;
     onClose: () => void;
     isOwn: boolean;
     isPinned: boolean;
+    anchor?: ContextMenuAnchor | null;
+    readStatusLabel?: string | null;
+    isReadStatusLoading?: boolean;
     onForwardRequest: () => void;
     onReactRequest: () => void;
 }
@@ -48,11 +56,15 @@ export const MessageActionsMenu = ({
     onClose,
     isOwn,
     isPinned,
+    anchor,
+    readStatusLabel,
+    isReadStatusLoading = false,
     onForwardRequest,
     onReactRequest,
 }: MessageActionsMenuProps) => {
     const { setReply, setEditing } = useComposerStore();
     const { deleteMessage, pinMessage, unpinMessage } = useChatStore();
+    const { width, height } = useWindowDimensions();
 
     if (!message) return null;
 
@@ -68,14 +80,13 @@ export const MessageActionsMenu = ({
             ? ([
                   { id: "edit", label: "Изменить", Icon: PencilSimpleIcon },
                   {
-                      id: "delete-for-everyone",
-                      label: "Удалить у всех",
+                      id: "delete",
+                      label: "Удалить",
                       Icon: TrashIcon,
                       danger: true,
                   },
               ] as MenuItemConfig[])
             : []),
-        { id: "delete-for-me", label: "Удалить у меня", Icon: TrashIcon, danger: true },
     ];
 
     const handle = async (action: Action) => {
@@ -101,15 +112,68 @@ export const MessageActionsMenu = ({
             case "unpin":
                 await unpinMessage(message.conversationId, message.id);
                 break;
-            case "delete-for-me":
-                await deleteMessage(message.id, "for-me");
-                break;
-            case "delete-for-everyone":
+            case "delete":
                 await deleteMessage(message.id, "for-everyone");
                 break;
         }
         onClose();
     };
+
+    const content = (
+        <View>
+            {isOwn && (readStatusLabel || isReadStatusLoading) && (
+                <View className="flex-row items-center gap-3 px-4 py-3 border-b border-white/5">
+                    <ChecksIcon size={18} className="text-text-subtle" />
+                    <Text className="text-[13px] text-text-subtle">
+                        {isReadStatusLoading ? "Загрузка..." : readStatusLabel}
+                    </Text>
+                </View>
+            )}
+            {items.map((item) => (
+                <Pressable
+                    key={item.id}
+                    testID={`message-action-${item.id}`}
+                    onPress={() => handle(item.id)}
+                    className={`flex-row items-center gap-3 px-4 py-3 transition-colors ${
+                        item.danger
+                            ? "hover:bg-danger-500/10 active:bg-danger-500/10"
+                            : "hover:bg-white/5 active:bg-white/5"
+                    }`}
+                >
+                    <item.Icon
+                        size={18}
+                        className={item.danger ? "text-danger-500" : "text-text-subtle"}
+                    />
+                    <Text
+                        className={`text-[15px] ${item.danger ? "text-danger-500" : "text-white"}`}
+                    >
+                        {item.label}
+                    </Text>
+                </Pressable>
+            ))}
+        </View>
+    );
+
+    if (anchor) {
+        const menuWidth = 288;
+        const menuHeight = isOwn ? 410 : 290;
+        const left = Math.max(12, Math.min(anchor.x, width - menuWidth - 12));
+        const top = Math.max(12, Math.min(anchor.y, height - menuHeight - 12));
+
+        return (
+            <Modal visible={!!message} transparent animationType="fade" onRequestClose={onClose}>
+                <Pressable className="flex-1 cursor-default" onPress={onClose}>
+                    <Pressable
+                        onPress={(e) => e.stopPropagation()}
+                        style={{ position: "absolute", left, top, width: menuWidth }}
+                        className="cursor-default bg-app-card border border-white/10 rounded-2xl overflow-hidden"
+                    >
+                        {content}
+                    </Pressable>
+                </Pressable>
+            </Modal>
+        );
+    }
 
     return (
         <ModalOverlay
@@ -117,25 +181,7 @@ export const MessageActionsMenu = ({
             onClose={onClose}
             contentClassName="bg-app-card border border-white/10 rounded-2xl overflow-hidden w-72"
         >
-            <View>
-                {items.map((item) => (
-                    <Pressable
-                        key={item.id}
-                        onPress={() => handle(item.id)}
-                        className="flex-row items-center gap-3 px-4 py-3 active:bg-white/5"
-                    >
-                        <item.Icon
-                            size={18}
-                            className={item.danger ? "text-danger-500" : "text-text-subtle"}
-                        />
-                        <Text
-                            className={`text-[15px] ${item.danger ? "text-danger-500" : "text-white"}`}
-                        >
-                            {item.label}
-                        </Text>
-                    </Pressable>
-                ))}
-            </View>
+            {content}
         </ModalOverlay>
     );
 };

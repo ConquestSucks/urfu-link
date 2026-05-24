@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import {
     View,
     TextInput,
@@ -13,13 +13,15 @@ import { SearchResultDto } from "@urfu-link/api-client";
 import { useLocalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
 import { SearchFiltersBar } from "./SearchFiltersBar";
-import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
+import { SearchResultSkeletonList } from "./SearchResultSkeleton";
 
 interface LocalSearchPanelProps {
     conversationId: string;
     onResultPress: (item: SearchResultDto) => void;
     onClose: () => void;
 }
+
+const noFocusOutline = { outlineStyle: "none" } as never;
 
 export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: LocalSearchPanelProps) => {
     const {
@@ -36,20 +38,6 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
         clear,
     } = useLocalSearch(conversationId);
     const inputRef = useRef<TextInput>(null);
-    const participants = useParticipantsStore(
-        (s) => s.byConversationId[conversationId]?.items,
-    );
-
-    // Если участников ещё нет в кэше (например, юзер открыл поиск раньше,
-    // чем ChatView успел дёрнуть load) — догружаем для sender-фильтра.
-    useEffect(() => {
-        if (!participants) {
-            useParticipantsStore.getState().load(conversationId).catch(() => {
-                /* fail-open: sender-фильтр просто не покажется */
-            });
-        }
-    }, [conversationId, participants]);
-
     const handleClose = () => {
         clear();
         onClose();
@@ -69,6 +57,7 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                     value={query}
                     onChangeText={onQueryChange}
                     returnKeyType="search"
+                    style={noFocusOutline}
                 />
                 {query.length > 0 && (
                     <Pressable onPress={() => onQueryChange("")} hitSlop={8}>
@@ -83,15 +72,14 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
             <SearchFiltersBar
                 value={filters}
                 onChange={onFiltersChange}
-                participants={participants}
             />
 
             {/* Results */}
             {query.length >= 2 && (
                 <View className="max-h-64 border-t border-white/5">
                     {isLoading && results.length === 0 ? (
-                        <View className="py-6 items-center">
-                            <RNActivityIndicator color="#6B6FFF" />
+                        <View className="py-1">
+                            <SearchResultSkeletonList count={3} />
                         </View>
                     ) : error && results.length === 0 ? (
                         <View className="py-2">
@@ -120,7 +108,11 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                             data={results}
                             keyExtractor={(item) => item.messageId}
                             renderItem={({ item }) => (
-                                <SearchResultItem item={item} onPress={onResultPress} />
+                                <SearchResultItem
+                                    item={item}
+                                    onPress={onResultPress}
+                                    showConversationLabel={false}
+                                />
                             )}
                             onEndReached={hasMore ? loadMore : undefined}
                             onEndReachedThreshold={0.3}

@@ -8,6 +8,8 @@ interface SearchBarProps {
     onChange?: (text: string) => void;
 }
 
+const noFocusOutline = { outlineStyle: "none" } as never;
+
 export const SearchBar = ({ placeholder = "Поиск...", value, onChange }: SearchBarProps) => {
     const isControlled = value !== undefined;
     const [internalQuery, setInternalQuery] = useState("");
@@ -31,6 +33,7 @@ export const SearchBar = ({ placeholder = "Поиск...", value, onChange }: Se
                 onChangeText={handleChangeText}
                 underlineColorAndroid="transparent"
                 returnKeyType="search"
+                style={noFocusOutline}
             />
 
             {query.length > 0 && (

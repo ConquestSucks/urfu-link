@@ -26,7 +26,7 @@ export type ChatMessagePropsMapped = {
     avatarUrl: string;
     showAvatar?: boolean;
     seen?: boolean;
-    attachments?: { name: string; url: string }[];
+    attachments?: { name: string; url: string; mediaAssetId?: string }[];
 };
 
 type ThreadEvent =
@@ -46,9 +46,15 @@ type ChatState = {
     connection: HubConnection | null;
     isConnected: boolean;
     conversations: ConversationPreview[];
+    isConversationsLoading: boolean;
     messagesByConversation: Record<string, MessageDto[]>;
+    unreadByConversation: Record<string, number>;
     cursors: Record<string, string | undefined>;
     hasMoreByConversation: Record<string, boolean>;
+    messagesLoadingByConversation: Record<string, boolean>;
+    messagesLoadedByConversation: Record<string, boolean>;
+    pinnedMessagesByConversation: Record<string, MessageDto[]>;
+    pinnedLoadingByConversation: Record<string, boolean>;
     isLoading: boolean;
     pendingScrollToMessageId: string | null;
     threadEventListeners: Set<ThreadEventHandler>;
@@ -61,6 +67,7 @@ type ChatState = {
     loadConversations: (type?: "Direct" | "Discipline") => Promise<void>;
     loadMessages: (chatId: string, type: "chat" | "subject", reset?: boolean) => Promise<void>;
     loadMore: (chatId: string, type: "chat" | "subject") => Promise<void>;
+    loadPinnedMessages: (conversationId: string) => Promise<void>;
     sendMessage: (
         chatId: string,
         text: string,
@@ -76,6 +83,8 @@ type ChatState = {
     removeReaction: (messageId: string, emoji: string) => Promise<void>;
     pinMessage: (conversationId: string, messageId: string) => Promise<void>;
     unpinMessage: (conversationId: string, messageId: string) => Promise<void>;
+    startTyping: (conversationId: string) => void;
+    stopTyping: (conversationId: string) => void;
 
     setPendingScrollToMessageId: (messageId: string | null) => void;
     subscribeThreadEvents: (handler: ThreadEventHandler) => () => void;
@@ -91,6 +100,29 @@ type ChatState = {
     ) => void;
     applyReactionsUpdated: (messageId: string, reactions: ReactionsSummary) => void;
     applyPinsUpdated: (conversationId: string, pinned: MessageDto[]) => void;
+};
+
+type ServerMessageDto = MessageDto & {
+    createdAtUtc?: string;
+    deliveredAtUtc?: string | null;
+    readAtUtc?: string | null;
+    reactionsSummary?: ReactionsSummary;
+    deleteMode?: DeleteMode | null;
+};
+
+const normalizeMessage = (message: MessageDto): MessageDto => {
+    const raw = message as ServerMessageDto;
+    return {
+        ...message,
+        attachments: message.attachments ?? [],
+        createdAt: message.createdAt || raw.createdAtUtc || "",
+        deliveredAt: message.deliveredAt ?? raw.deliveredAtUtc ?? null,
+        readAt: message.readAt ?? raw.readAtUtc ?? null,
+        reactions: message.reactions ?? raw.reactionsSummary ?? {},
+        mentions: message.mentions ?? [],
+        forwardedFrom: message.forwardedFrom ?? null,
+        deletedMode: message.deletedMode ?? raw.deleteMode ?? null,
+    };
 };
 
 const updateMessageInState = (
@@ -116,13 +148,247 @@ const updateMessageInState = (
     };
 };
 
+const hasAnyLoadingMessages = (loading: Record<string, boolean>) =>
+    Object.values(loading).some(Boolean);
+
+const compareConversationActivity = (a: ConversationPreview, b: ConversationPreview) => {
+    const dateA = a.lastMessageAtUtc ?? a.lastMessageAt;
+    const dateB = b.lastMessageAtUtc ?? b.lastMessageAt;
+    const timeA = dateA ? new Date(dateA).getTime() : 0;
+    const timeB = dateB ? new Date(dateB).getTime() : 0;
+    return timeB - timeA;
+};
+
+const updateConversationPreviewFromMessage = (
+    conversations: ConversationPreview[],
+    message: MessageDto,
+) => {
+    const index = conversations.findIndex((c) => c.id === message.conversationId);
+    if (index === -1) return conversations;
+
+    const next = [...conversations];
+    const previous = next[index];
+    const sentAtUtc = message.createdAt || undefined;
+    next[index] = {
+        ...previous,
+        lastMessageAtUtc: sentAtUtc ?? previous.lastMessageAtUtc,
+        lastMessagePreview: {
+            messageId: message.id,
+            senderId: message.senderId,
+            body: message.body,
+            sentAtUtc,
+            hasAttachments: message.attachments.length > 0,
+            attachmentFileNames: message.attachments.map((a) => a.fileName),
+            readAtUtc: message.readAt,
+        },
+    };
+
+    next.sort(compareConversationActivity);
+    return next;
+};
+
+const mergeConversationUpdate = (
+    current: ConversationPreview,
+    incoming: ConversationPreview,
+): ConversationPreview => {
+    const currentPreview = current.lastMessagePreview;
+    const incomingPreview = incoming.lastMessagePreview;
+    const unreadCount = typeof incoming.unreadCount === "number"
+        ? incoming.unreadCount
+        : current.unreadCount;
+    if (!currentPreview || !incomingPreview) {
+        return { ...incoming, unreadCount };
+    }
+
+    const currentSentAt = currentPreview.sentAtUtc ?? currentPreview.sentAt;
+    const incomingSentAt = incomingPreview.sentAtUtc ?? incomingPreview.sentAt;
+    const samePreview =
+        (currentPreview.messageId &&
+            incomingPreview.messageId &&
+            currentPreview.messageId === incomingPreview.messageId) ||
+        (!incomingPreview.messageId &&
+            currentPreview.senderId === incomingPreview.senderId &&
+            currentPreview.body === incomingPreview.body &&
+            currentSentAt === incomingSentAt);
+
+    if (!samePreview) {
+        return { ...incoming, unreadCount };
+    }
+
+    return {
+        ...incoming,
+        unreadCount,
+        lastMessagePreview: {
+            ...incomingPreview,
+            messageId: incomingPreview.messageId ?? currentPreview.messageId,
+            readAtUtc:
+                incomingPreview.readAtUtc ??
+                incomingPreview.readAt ??
+                currentPreview.readAtUtc ??
+                currentPreview.readAt ??
+                null,
+            attachmentFileNames:
+                incomingPreview.attachmentFileNames ??
+                currentPreview.attachmentFileNames,
+        },
+    };
+};
+
+const replaceMessageInList = (
+    list: MessageDto[] | undefined,
+    messageId: string,
+    replacement: MessageDto,
+) => {
+    if (!list) return { list, touched: false };
+
+    let touched = false;
+    const next = list.map((message) => {
+        if (message.id !== messageId) return message;
+        touched = true;
+        return replacement;
+    });
+
+    return { list: touched ? next : list, touched };
+};
+
+const markLastPreviewRead = (
+    conversations: ConversationPreview[],
+    conversationId: string,
+    messageId: string,
+    currentUserId: string,
+    readAtUtc: string,
+) => {
+    const index = conversations.findIndex((c) => c.id === conversationId);
+    if (index === -1) return conversations;
+
+    const conversation = conversations[index];
+    const preview = conversation.lastMessagePreview;
+    if (
+        !preview ||
+        preview.senderId !== currentUserId ||
+        preview.messageId !== messageId ||
+        (preview.readAtUtc ?? preview.readAt ?? null) !== null
+    ) {
+        return conversations;
+    }
+
+    const next = [...conversations];
+    next[index] = {
+        ...conversation,
+        lastMessagePreview: {
+            ...preview,
+            readAtUtc,
+        },
+    };
+    return next;
+};
+
+const updateConversationPreviewForEditedMessage = (
+    conversations: ConversationPreview[],
+    message: MessageDto,
+) => {
+    const index = conversations.findIndex((c) => c.id === message.conversationId);
+    if (index === -1) return conversations;
+
+    const conversation = conversations[index];
+    const preview = conversation.lastMessagePreview;
+    if (!preview || preview.messageId !== message.id) return conversations;
+
+    const next = [...conversations];
+    next[index] = {
+        ...conversation,
+        lastMessagePreview: {
+            ...preview,
+            body: message.body,
+            hasAttachments: message.attachments.length > 0,
+            attachmentFileNames: message.attachments.map((a) => a.fileName),
+            readAtUtc: message.readAt,
+        },
+    };
+
+    return next;
+};
+
+const withoutUnread = (unread: Record<string, number>, conversationId: string) => {
+    if (!(conversationId in unread)) return unread;
+    const next = { ...unread };
+    delete next[conversationId];
+    return next;
+};
+
+const incrementUnread = (
+    unread: Record<string, number>,
+    conversationId: string,
+    baseline = 0,
+) => ({
+    ...unread,
+    [conversationId]: (unread[conversationId] ?? baseline) + 1,
+});
+
+const updateConversationUnreadCount = (
+    conversations: ConversationPreview[],
+    conversationId: string,
+    unreadCount: number,
+) => {
+    const index = conversations.findIndex((c) => c.id === conversationId);
+    if (index === -1 || conversations[index].unreadCount === unreadCount) {
+        return conversations;
+    }
+
+    const next = [...conversations];
+    next[index] = {
+        ...next[index],
+        unreadCount,
+    };
+    return next;
+};
+
+const markIncomingReadInState = (
+    state: Pick<ChatState, "conversations" | "messagesByConversation" | "unreadByConversation">,
+    conversationId: string,
+    upToMessageId: string,
+    currentUserId: string | null,
+) => {
+    const list = state.messagesByConversation[conversationId];
+    const unreadByConversation = withoutUnread(state.unreadByConversation, conversationId);
+    const conversations = updateConversationUnreadCount(state.conversations, conversationId, 0);
+    if (!list || !currentUserId) {
+        return { conversations, unreadByConversation };
+    }
+
+    const readIndex = list.findIndex((m) => m.id === upToMessageId);
+    if (readIndex === -1) {
+        return { conversations, unreadByConversation };
+    }
+
+    const readAt = new Date().toISOString();
+    return {
+        messagesByConversation: {
+            ...state.messagesByConversation,
+            [conversationId]: list.map((m, idx) =>
+                idx >= readIndex && m.senderId !== currentUserId && m.readAt === null
+                    ? { ...m, readAt }
+                    : m,
+            ),
+        },
+        conversations,
+        unreadByConversation,
+    };
+};
+
 export const useChatStore = create<ChatState>((set, get) => ({
     connection: null,
     isConnected: false,
     conversations: [],
+    isConversationsLoading: false,
     messagesByConversation: {},
+    unreadByConversation: {},
     cursors: {},
     hasMoreByConversation: {},
+    messagesLoadingByConversation: {},
+    messagesLoadedByConversation: {},
+    pinnedMessagesByConversation: {},
+    pinnedLoadingByConversation: {},
     isLoading: false,
     pendingScrollToMessageId: null,
     threadEventListeners: new Set<ThreadEventHandler>(),
@@ -136,7 +402,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const newConnection = createHubConnection("/hubs/chat");
 
         newConnection.on("MessageReceived", (message: MessageDto) => {
-            get().addMessage(message);
+            get().addMessage(normalizeMessage(message));
         });
 
         newConnection.on("ConversationUpdated", (conversation: ConversationPreview) => {
@@ -145,7 +411,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         newConnection.on(
             "MessageReadUpdate",
-            (conversationId: string, upToMessageId: string, _readerUserId: string) => {
+            (conversationId: string, upToMessageId: string, readerUserId: string) => {
+                const currentUserId = useAuthStore.getState().userId;
+                if (!currentUserId || readerUserId === currentUserId) {
+                    return;
+                }
+
                 set((state) => {
                     const msgs = state.messagesByConversation[conversationId];
                     if (!msgs) return state;
@@ -154,7 +425,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     if (readIndex === -1) return state;
 
                     const updated = msgs.map((m, idx) => {
-                        if (idx >= readIndex && m.readAt === null) {
+                        if (idx >= readIndex && m.senderId === currentUserId && m.readAt === null) {
                             return { ...m, readAt: new Date().toISOString() };
                         }
                         return m;
@@ -165,13 +436,76 @@ export const useChatStore = create<ChatState>((set, get) => ({
                             ...state.messagesByConversation,
                             [conversationId]: updated,
                         },
+                        conversations: markLastPreviewRead(
+                            state.conversations,
+                            conversationId,
+                            upToMessageId,
+                            currentUserId,
+                            new Date().toISOString(),
+                        ),
                     };
                 });
             },
         );
 
+        newConnection.on(
+            "MessageReadByUpdate",
+            (
+                conversationId: string,
+                messageId: string,
+                readerUserId: string,
+                readAtUtc: string,
+            ) => {
+                const currentUserId = useAuthStore.getState().userId;
+                if (!currentUserId || readerUserId === currentUserId) {
+                    return;
+                }
+
+                set((state) => {
+                    const list = state.messagesByConversation[conversationId];
+                    let messagesByConversation = state.messagesByConversation;
+                    if (list) {
+                        let touched = false;
+                        const next = list.map((m) => {
+                            if (
+                                m.id === messageId &&
+                                m.senderId === currentUserId &&
+                                m.readAt === null
+                            ) {
+                                touched = true;
+                                return { ...m, readAt: readAtUtc };
+                            }
+                            return m;
+                        });
+                        if (touched) {
+                            messagesByConversation = {
+                                ...state.messagesByConversation,
+                                [conversationId]: next,
+                            };
+                        }
+                    }
+
+                    const conversations = markLastPreviewRead(
+                        state.conversations,
+                        conversationId,
+                        messageId,
+                        currentUserId,
+                        readAtUtc,
+                    );
+                    if (
+                        messagesByConversation === state.messagesByConversation &&
+                        conversations === state.conversations
+                    ) {
+                        return state;
+                    }
+
+                    return { messagesByConversation, conversations };
+                });
+            },
+        );
+
         newConnection.on("MessageEdited", (message: MessageDto) => {
-            get().applyMessageEdited(message);
+            get().applyMessageEdited(normalizeMessage(message));
         });
 
         newConnection.on(
@@ -196,7 +530,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         newConnection.on(
             "PinsUpdated",
             (conversationId: string, pinned: MessageDto[]) => {
-                get().applyPinsUpdated(conversationId, pinned);
+                get().applyPinsUpdated(conversationId, pinned.map(normalizeMessage));
             },
         );
 
@@ -204,7 +538,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             "ThreadReplyReceived",
             (rootMessageId: string, reply: MessageDto) => {
                 get().threadEventListeners.forEach((listener) =>
-                    listener({ kind: "ThreadReplyReceived", rootMessageId, reply }),
+                    listener({ kind: "ThreadReplyReceived", rootMessageId, reply: normalizeMessage(reply) }),
                 );
             },
         );
@@ -277,11 +611,29 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     loadConversations: async (type) => {
+        set({ isConversationsLoading: true });
         try {
             const res = await apiClient.chat.getConversations(type, undefined, 50);
-            set({ conversations: res.items });
+            set((state) => {
+                const unreadByConversation = { ...state.unreadByConversation };
+                for (const conversation of res.items) {
+                    if (typeof conversation.unreadCount !== "number") continue;
+                    if (conversation.unreadCount > 0) {
+                        unreadByConversation[conversation.id] = conversation.unreadCount;
+                    } else {
+                        delete unreadByConversation[conversation.id];
+                    }
+                }
+
+                return {
+                    conversations: res.items,
+                    unreadByConversation,
+                    isConversationsLoading: false,
+                };
+            });
         } catch (error) {
             console.error("Failed to load conversations", error);
+            set({ isConversationsLoading: false });
         }
     },
 
@@ -291,38 +643,107 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
         if (!reset && !currentHasMore) return;
 
-        set({ isLoading: true });
+        set((prev) => ({
+            messagesLoadingByConversation: {
+                ...prev.messagesLoadingByConversation,
+                [chatId]: true,
+            },
+            isLoading: true,
+        }));
         try {
             const cursor = reset ? undefined : state.cursors[chatId];
             const res = await apiClient.chat.getConversationMessages(chatId, cursor, 20, "older");
+            const items = res.items.map(normalizeMessage);
+            const currentUserId = useAuthStore.getState().userId;
 
-            set((prev) => ({
-                messagesByConversation: {
-                    ...prev.messagesByConversation,
-                    [chatId]: reset
-                        ? res.items
-                        : [...(prev.messagesByConversation[chatId] || []), ...res.items],
-                },
-                cursors: {
-                    ...prev.cursors,
-                    [chatId]: res.nextCursor,
-                },
-                hasMoreByConversation: {
-                    ...prev.hasMoreByConversation,
-                    [chatId]: !!res.nextCursor,
-                },
-                isLoading: false,
-            }));
+            set((prev) => {
+                const messagesLoadingByConversation = {
+                    ...prev.messagesLoadingByConversation,
+                    [chatId]: false,
+                };
+
+                const unreadCount = currentUserId
+                    ? items.filter((m) => m.senderId !== currentUserId && m.readAt === null).length
+                    : 0;
+                const unreadByConversation = reset
+                    ? unreadCount > 0
+                        ? {
+                              ...prev.unreadByConversation,
+                              [chatId]: unreadCount,
+                          }
+                        : withoutUnread(prev.unreadByConversation, chatId)
+                    : prev.unreadByConversation;
+
+                return {
+                    messagesByConversation: {
+                        ...prev.messagesByConversation,
+                        [chatId]: reset
+                            ? items
+                            : [...(prev.messagesByConversation[chatId] || []), ...items],
+                    },
+                    cursors: {
+                        ...prev.cursors,
+                        [chatId]: res.nextCursor,
+                    },
+                    hasMoreByConversation: {
+                        ...prev.hasMoreByConversation,
+                        [chatId]: !!res.nextCursor,
+                    },
+                    messagesLoadingByConversation,
+                    messagesLoadedByConversation: {
+                        ...prev.messagesLoadedByConversation,
+                        [chatId]: true,
+                    },
+                    conversations: reset
+                        ? updateConversationUnreadCount(prev.conversations, chatId, unreadCount)
+                        : prev.conversations,
+                    unreadByConversation,
+                    isLoading: hasAnyLoadingMessages(messagesLoadingByConversation),
+                };
+            });
         } catch (error) {
             console.error("Failed to load messages", error);
-            set({ isLoading: false });
+            set((prev) => {
+                const messagesLoadingByConversation = {
+                    ...prev.messagesLoadingByConversation,
+                    [chatId]: false,
+                };
+
+                return {
+                    messagesLoadingByConversation,
+                    isLoading: hasAnyLoadingMessages(messagesLoadingByConversation),
+                };
+            });
         }
     },
 
     loadMore: async (chatId, type) => {
-        const { isLoading, hasMoreByConversation, loadMessages } = get();
-        if (isLoading || !hasMoreByConversation[chatId]) return;
+        const { messagesLoadingByConversation, hasMoreByConversation, loadMessages } = get();
+        if (messagesLoadingByConversation[chatId] || !hasMoreByConversation[chatId]) return;
         await loadMessages(chatId, type, false);
+    },
+
+    loadPinnedMessages: async (conversationId) => {
+        set((state) => ({
+            pinnedLoadingByConversation: {
+                ...state.pinnedLoadingByConversation,
+                [conversationId]: true,
+            },
+        }));
+
+        try {
+            const pinned = await apiClient.chat.getPinnedMessages(conversationId);
+            get().applyPinsUpdated(conversationId, pinned.map(normalizeMessage));
+        } catch (error) {
+            console.error("Failed to load pinned messages", error);
+        } finally {
+            set((state) => ({
+                pinnedLoadingByConversation: {
+                    ...state.pinnedLoadingByConversation,
+                    [conversationId]: false,
+                },
+            }));
+        }
     },
 
     sendMessage: async (chatId, text, attachments = [], replyToMessageId) => {
@@ -386,10 +807,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 attachmentAssetIds: attachments,
                 clientMessageId,
                 replyToMessageId: replyToMessageId ?? null,
+                peerUserId:
+                    get().conversations
+                        .find((c) => c.id === chatId && c.type === "Direct")
+                        ?.participants.find((id) => id !== currentUserId) ?? null,
             });
             // Sender не получает MessageReceived (recipients = participants кроме отправителя),
             // поэтому подменяем оптимистичный экземпляр на серверный сами.
-            get().addMessage({ ...real, _localStatus: "sent" } as LocalMessageDto);
+            get().addMessage(normalizeMessage({ ...real, _localStatus: "sent" } as LocalMessageDto));
         } catch (error) {
             console.error("Failed to send message", error);
             set((state) => {
@@ -413,6 +838,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const { connection } = get();
         if (connection?.state === HubConnectionState.Connected) {
             await connection.invoke("MarkRead", chatId, messageId);
+            const currentUserId = useAuthStore.getState().userId;
+            set((state) =>
+                markIncomingReadInState(state, chatId, messageId, currentUserId ?? null),
+            );
         }
     },
 
@@ -421,7 +850,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (connection?.state === HubConnectionState.Connected) {
             await connection.invoke("EditMessage", { messageId, newBody: body });
         } else {
-            await apiClient.chat.editMessage(messageId, body);
+            const updated = await apiClient.chat.editMessage(messageId, body);
+            get().applyMessageEdited(normalizeMessage(updated));
         }
     },
 
@@ -430,7 +860,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (connection?.state === HubConnectionState.Connected) {
             await connection.invoke("DeleteMessage", messageId, mode);
         } else {
-            await apiClient.chat.deleteMessage(messageId, mode);
+            const deleted = await apiClient.chat.deleteMessage(messageId, mode);
+            if (deleted) {
+                get().applyMessageEdited(normalizeMessage(deleted));
+            }
         }
     },
 
@@ -439,7 +872,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         if (connection?.state === HubConnectionState.Connected) {
             await connection.invoke("ForwardMessages", targetConversationId, messageIds);
         } else {
-            await apiClient.chat.forwardMessages(targetConversationId, messageIds);
+            const forwarded = await apiClient.chat.forwardMessages(targetConversationId, messageIds);
+            forwarded.map(normalizeMessage).forEach((message) => get().addMessage(message));
         }
     },
 
@@ -464,18 +898,48 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pinMessage: async (conversationId, messageId) => {
         const { connection } = get();
         if (connection?.state === HubConnectionState.Connected) {
-            await connection.invoke("PinMessage", conversationId, messageId);
+            const pinned = await connection.invoke<MessageDto[]>(
+                "PinMessage",
+                conversationId,
+                messageId,
+            );
+            get().applyPinsUpdated(conversationId, pinned.map(normalizeMessage));
         } else {
-            await apiClient.chat.pinMessage(conversationId, messageId);
+            const pinned = await apiClient.chat.pinMessage(conversationId, messageId);
+            get().applyPinsUpdated(conversationId, pinned.map(normalizeMessage));
         }
     },
 
     unpinMessage: async (conversationId, messageId) => {
         const { connection } = get();
         if (connection?.state === HubConnectionState.Connected) {
-            await connection.invoke("UnpinMessage", conversationId, messageId);
+            const pinned = await connection.invoke<MessageDto[]>(
+                "UnpinMessage",
+                conversationId,
+                messageId,
+            );
+            get().applyPinsUpdated(conversationId, pinned.map(normalizeMessage));
         } else {
-            await apiClient.chat.unpinMessage(conversationId, messageId);
+            const pinned = await apiClient.chat.unpinMessage(conversationId, messageId);
+            get().applyPinsUpdated(conversationId, pinned.map(normalizeMessage));
+        }
+    },
+
+    startTyping: (conversationId) => {
+        const { connection } = get();
+        if (connection?.state === HubConnectionState.Connected) {
+            connection.invoke("StartTyping", conversationId).catch((error) =>
+                console.warn("StartTyping failed", error),
+            );
+        }
+    },
+
+    stopTyping: (conversationId) => {
+        const { connection } = get();
+        if (connection?.state === HubConnectionState.Connected) {
+            connection.invoke("StopTyping", conversationId).catch((error) =>
+                console.warn("StopTyping failed", error),
+            );
         }
     },
 
@@ -491,13 +955,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     addMessage: (message) => {
         set((state) => {
-            const conversationId = message.conversationId;
+            const normalized = normalizeMessage(message);
+            const conversationId = normalized.conversationId;
             const existing = state.messagesByConversation[conversationId] || [];
 
-            const incomingCmid = (message as LocalMessageDto).clientMessageId;
+            const incomingCmid = (normalized as LocalMessageDto).clientMessageId;
             // Если приходит реальный (не optimistic) экземпляр с тем же clientMessageId —
             // заменяем оптимистичный плейсхолдер на него.
-            if (incomingCmid && !message.id.startsWith("optimistic:")) {
+            if (incomingCmid && !normalized.id.startsWith("optimistic:")) {
                 const optimisticIdx = existing.findIndex(
                     (m) =>
                         (m as LocalMessageDto).clientMessageId === incomingCmid &&
@@ -505,26 +970,49 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 );
                 if (optimisticIdx !== -1) {
                     const next = [...existing];
-                    next[optimisticIdx] = message;
+                    next[optimisticIdx] = normalized;
                     return {
                         messagesByConversation: {
                             ...state.messagesByConversation,
                             [conversationId]: next,
                         },
+                        conversations: updateConversationPreviewFromMessage(
+                            state.conversations,
+                            normalized,
+                        ),
                     };
                 }
             }
 
             // Дедуп по реальному id (повторный MessageReceived).
-            if (existing.some((m) => m.id === message.id)) {
+            if (existing.some((m) => m.id === normalized.id)) {
                 return state;
             }
+
+            const currentUserId = useAuthStore.getState().userId;
+            const isIncomingUnread =
+                !!currentUserId &&
+                normalized.senderId !== currentUserId &&
+                normalized.readAt === null &&
+                !normalized.id.startsWith("optimistic:");
+            const serverUnreadCount = state.conversations.find((c) => c.id === conversationId)
+                ?.unreadCount;
+            const unreadBaseline = typeof serverUnreadCount === "number"
+                ? serverUnreadCount
+                : 0;
 
             return {
                 messagesByConversation: {
                     ...state.messagesByConversation,
-                    [conversationId]: [message, ...existing],
+                    [conversationId]: [normalized, ...existing],
                 },
+                conversations: updateConversationPreviewFromMessage(
+                    state.conversations,
+                    normalized,
+                ),
+                unreadByConversation: isIncomingUnread
+                    ? incrementUnread(state.unreadByConversation, conversationId, unreadBaseline)
+                    : state.unreadByConversation,
             };
         });
     },
@@ -537,22 +1025,53 @@ export const useChatStore = create<ChatState>((set, get) => ({
             }
 
             const newConversations = [...state.conversations];
-            newConversations[index] = conversation;
+            newConversations[index] = mergeConversationUpdate(
+                newConversations[index],
+                conversation,
+            );
 
-            newConversations.sort((a, b) => {
-                const dateA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
-                const dateB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
-                return dateB - dateA;
-            });
+            newConversations.sort(compareConversationActivity);
 
             return { conversations: newConversations };
         });
     },
 
     applyMessageEdited: (message) => {
-        set((state) =>
-            updateMessageInState(state, message.conversationId, message.id, () => message),
-        );
+        const normalized = normalizeMessage(message);
+        set((state) => {
+            const existingMessages = state.messagesByConversation[normalized.conversationId];
+            const messagesUpdate = replaceMessageInList(
+                existingMessages,
+                normalized.id,
+                normalized,
+            );
+            const existingPinned =
+                state.pinnedMessagesByConversation[normalized.conversationId];
+            const pinnedUpdate = replaceMessageInList(
+                existingPinned,
+                normalized.id,
+                normalized,
+            );
+
+            return {
+                messagesByConversation: messagesUpdate.touched
+                    ? {
+                          ...state.messagesByConversation,
+                          [normalized.conversationId]: messagesUpdate.list ?? [],
+                      }
+                    : state.messagesByConversation,
+                pinnedMessagesByConversation: pinnedUpdate.touched
+                    ? {
+                          ...state.pinnedMessagesByConversation,
+                          [normalized.conversationId]: pinnedUpdate.list ?? [],
+                      }
+                    : state.pinnedMessagesByConversation,
+                conversations: updateConversationPreviewForEditedMessage(
+                    state.conversations,
+                    normalized,
+                ),
+            };
+        });
     },
 
     applyMessageDeleted: (conversationId, messageId, mode) => {
@@ -596,21 +1115,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
     applyPinsUpdated: (conversationId, pinned) => {
         set((state) => {
             const idx = state.conversations.findIndex((c) => c.id === conversationId);
-            if (idx === -1) return state;
-            const updated = {
-                ...state.conversations[idx],
-                pinnedMessageIds: pinned.map((m) => m.id),
-            };
-            const next = [...state.conversations];
-            next[idx] = updated;
+            const pinnedMessages = pinned.map(normalizeMessage);
+            const pinnedMessageIds = pinnedMessages.map((m) => m.id);
+            let next = state.conversations;
+            if (idx !== -1) {
+                const updated = {
+                    ...state.conversations[idx],
+                    pinnedMessageIds,
+                };
+                next = [...state.conversations];
+                next[idx] = updated;
+            }
 
             // Если pinned-сообщения уже в буфере — обновляем их инкрементально,
             // НЕ перересортировывая весь список (иначе сообщение "телепортируется"
             // при unpin, потому что reactions/state поменялся и порядок поедет).
             const list = state.messagesByConversation[conversationId];
             let nextMessages = state.messagesByConversation;
-            if (list && pinned.length > 0) {
-                const pinnedById = new Map(pinned.map((p) => [p.id, p]));
+            if (list && pinnedMessages.length > 0) {
+                const pinnedById = new Map(pinnedMessages.map((p) => [p.id, p]));
                 let touched = false;
                 const merged = list.map((m) => {
                     const fresh = pinnedById.get(m.id);
@@ -630,7 +1153,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 // независимо, поднимая полный pinned-snapshot через отдельный API.
             }
 
-            return { conversations: next, messagesByConversation: nextMessages };
+            return {
+                conversations: next,
+                messagesByConversation: nextMessages,
+                pinnedMessagesByConversation: {
+                    ...state.pinnedMessagesByConversation,
+                    [conversationId]: pinnedMessages,
+                },
+            };
         });
     },
 }));
@@ -639,20 +1169,26 @@ export const mapMessageToProps = (
     dto: MessageDto,
     currentUserId?: string | null,
 ): ChatMessagePropsMapped => {
-    const timeStr = new Date(dto.createdAt).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-    });
+    const normalized = normalizeMessage(dto);
+    const date = normalized.createdAt ? new Date(normalized.createdAt) : null;
+    const timeStr = date && !Number.isNaN(date.getTime())
+        ? date.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+          })
+        : "";
+
     return {
-        id: dto.id,
-        text: dto.body,
-        isOwn: dto.senderId === currentUserId,
+        id: normalized.id,
+        text: normalized.body,
+        isOwn: normalized.senderId === currentUserId,
         time: timeStr,
         avatarUrl: "",
-        seen: dto.readAt !== null,
-        attachments: dto.attachments.map((a) => ({
+        seen: normalized.readAt !== null,
+        attachments: normalized.attachments.map((a) => ({
             name: a.fileName,
             url: `/api/media/${a.mediaAssetId}/download-url`,
+            mediaAssetId: a.mediaAssetId,
         })),
     };
 };

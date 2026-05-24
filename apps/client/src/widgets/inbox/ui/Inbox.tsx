@@ -30,7 +30,7 @@ export const Inbox = <T,>({ data, renderItem, isLoading }: InboxProps<T>) => {
 
             {isSearchActive ? (
                 <GlobalSearchPanel />
-            ) : isLoading ? (
+            ) : isLoading && data.length === 0 ? (
                 <View className="px-3 gap-2 overflow-hidden">
                     {[...Array(currentTab === "subjects" ? 3 : 7)].map((_, index) =>
                         currentView === "notifications" ? (

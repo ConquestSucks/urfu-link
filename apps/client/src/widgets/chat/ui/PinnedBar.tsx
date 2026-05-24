@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import { PushPinIcon, XIcon } from "@/shared/ui/phosphor";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
@@ -14,18 +14,27 @@ export const PinnedBar = ({ conversationId, listRef }: PinnedBarProps) => {
         s.conversations.find((c) => c.id === conversationId),
     );
     const messages = useChatStore((s) => s.messagesByConversation[conversationId]);
+    const pinnedMessages = useChatStore((s) => s.pinnedMessagesByConversation[conversationId]);
+    const loadPinnedMessages = useChatStore((s) => s.loadPinnedMessages);
     const unpin = useChatStore((s) => s.unpinMessage);
     const setPendingScrollToMessageId = useChatStore((s) => s.setPendingScrollToMessageId);
 
     const pinnedIds = conversation?.pinnedMessageIds ?? [];
+    useEffect(() => {
+        if (pinnedIds.length > 0 && !pinnedMessages) {
+            void loadPinnedMessages(conversationId);
+        }
+    }, [conversationId, loadPinnedMessages, pinnedIds.length, pinnedMessages]);
+
     if (pinnedIds.length === 0) return null;
 
     const lastId = pinnedIds[pinnedIds.length - 1];
-    const lastPinned = messages?.find((m) => m.id === lastId);
+    const lastPinned =
+        pinnedMessages?.find((m) => m.id === lastId) ?? messages?.find((m) => m.id === lastId);
 
-    const handleJump = () => {
+    const handleJump = async () => {
         if (!lastId) return;
-        const ok = listRef.current?.scrollToMessage(lastId);
+        const ok = await (listRef.current?.scrollToMessage(lastId) ?? Promise.resolve(false));
         if (!ok) setPendingScrollToMessageId(lastId);
     };
 
