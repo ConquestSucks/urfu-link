@@ -2,6 +2,7 @@ using FluentAssertions;
 using global::Grpc.Net.Client;
 using Microsoft.Extensions.DependencyInjection;
 using PresenceService.IntegrationTests.Infrastructure;
+using Urfu.Link.Services.Presence.Infrastructure.Auth;
 using Urfu.Link.Services.Presence.Domain.Enums;
 using Urfu.Link.Services.Presence.Domain.Interfaces;
 using Urfu.Link.Services.Presence.Domain.ValueObjects;
@@ -39,7 +40,21 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
 
     private InternalApi.InternalApiClient AuthorizedClient(Guid userId)
     {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.MakeUser(
+            userId,
+            roles: [InternalGrpcAuthorizationPolicy.PresenceInternalRole]);
+        return new InternalApi.InternalApiClient(_channel);
+    }
+
+    private InternalApi.InternalApiClient ClientWithoutInternalRole(Guid userId)
+    {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.MakeUser(userId);
+        return new InternalApi.InternalApiClient(_channel);
+    }
+
+    private InternalApi.InternalApiClient AnonymousClient()
+    {
+        TestAuthHandler.CurrentPrincipal = null;
         return new InternalApi.InternalApiClient(_channel);
     }
 
@@ -52,6 +67,49 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
 
         reply.Service.Should().Be("presence-service");
         reply.Message.Should().Be("pong:hi");
+    }
+
+    [Fact]
+    public async Task Ping_WithoutAuthentication_IsRejected()
+    {
+        var client = AnonymousClient();
+        var act = () => client.PingAsync(new PingRequest { Message = "no-auth" }).ResponseAsync;
+
+        await act.Should().ThrowAsync<global::Grpc.Core.RpcException>()
+            .Where(ex => ex.StatusCode == global::Grpc.Core.StatusCode.Unauthenticated);
+    }
+
+    [Fact]
+    public async Task Ping_WithoutPresenceInternalRole_IsRejected()
+    {
+        var client = ClientWithoutInternalRole(Guid.NewGuid());
+        var act = () => client.PingAsync(new PingRequest { Message = "wrong-role" }).ResponseAsync;
+
+        await act.Should().ThrowAsync<global::Grpc.Core.RpcException>()
+            .Where(ex => ex.StatusCode == global::Grpc.Core.StatusCode.PermissionDenied
+                || ex.StatusCode == global::Grpc.Core.StatusCode.Unauthenticated);
+    }
+
+    [Fact]
+    public async Task SetTyping_WithPresenceInternalRole_UpdatesTypingState()
+    {
+        var caller = Guid.NewGuid();
+        var conv = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        var client = AuthorizedClient(caller);
+
+        var reply = await client.SetTypingAsync(new SetTypingRequest
+        {
+            ConversationId = conv.ToString(),
+            UserId = target.ToString(),
+            IsTyping = true,
+        });
+
+        reply.Changed.Should().BeTrue();
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var typing = scope.ServiceProvider.GetRequiredService<ITypingStore>();
+        var isTyping = await typing.IsTypingAsync(conv, target, CancellationToken.None);
+        isTyping.Should().BeTrue();
     }
 
     [Fact]

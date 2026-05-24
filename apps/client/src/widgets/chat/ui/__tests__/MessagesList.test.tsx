@@ -190,7 +190,7 @@ describe("MessagesList loading state", () => {
         });
     });
 
-    it("renders a single date separator per message day", () => {
+    it("renders date separators as sticky list rows", () => {
         jest.useFakeTimers();
         jest.setSystemTime(new Date("2026-05-24T12:00:00.000Z"));
         mockChatState = {
@@ -218,6 +218,11 @@ describe("MessagesList loading state", () => {
 
         render(<MessagesList chatId="chat-dates" type="chat" />);
 
+        const list = screen.UNSAFE_getByType(FlatList);
+        expect(screen.getByTestId("message-date-separator-2026-05-24")).toBeTruthy();
+        expect(screen.getByTestId("message-date-separator-2026-05-23")).toBeTruthy();
+        expect(list.props.stickyHeaderIndices).toEqual([2, 4]);
+        expect(list.props.invertStickyHeaders).toBe(true);
         expect(screen.getAllByText("Сегодня")).toHaveLength(1);
         expect(screen.getByText(/мая/)).toBeTruthy();
         jest.useRealTimers();

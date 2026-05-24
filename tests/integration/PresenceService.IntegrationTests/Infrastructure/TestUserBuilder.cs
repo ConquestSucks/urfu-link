@@ -4,7 +4,7 @@ namespace PresenceService.IntegrationTests.Infrastructure;
 
 public static class TestUserBuilder
 {
-    public static ClaimsPrincipal MakeUser(Guid userId, string? deviceId = null)
+    public static ClaimsPrincipal MakeUser(Guid userId, string? deviceId = null, params string[] roles)
     {
         var claims = new List<Claim>
         {
@@ -14,6 +14,11 @@ public static class TestUserBuilder
         if (!string.IsNullOrEmpty(deviceId))
         {
             claims.Add(new Claim("device_id", deviceId));
+        }
+        foreach (var role in roles ?? [])
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+            claims.Add(new Claim("groups", role));
         }
 
         var identity = new ClaimsIdentity(claims, authenticationType: TestAuthHandler.SchemeName);

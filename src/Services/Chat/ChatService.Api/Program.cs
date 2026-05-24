@@ -2,6 +2,7 @@ using FastEndpoints;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using StackExchange.Redis;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.Services.Chat.Domain;
@@ -77,7 +78,7 @@ app.UseFastEndpoints(c =>
     c.Serializer.Options.Converters.Add(
         new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
-app.MapGrpcService<InternalApiService>().RequireAuthorization();
+app.MapGrpcService<InternalApiService>().RequireAuthorization(AuthenticationExtensions.InternalGrpcPolicy);
 app.MapHub<ChatHub>("/hubs/chat");
 
 app.MapGet("/", (ServiceProfile descriptor) => Results.Ok(new

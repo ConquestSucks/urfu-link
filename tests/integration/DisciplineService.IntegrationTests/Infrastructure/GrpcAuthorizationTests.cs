@@ -1,48 +1,43 @@
+using DisciplineService.Api.Infrastructure.Auth;
 using FluentAssertions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authorization.Infrastructure;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-using MediaService.Api.Infrastructure.Auth;
 using Urfu.Link.BuildingBlocks.Auth;
 
-namespace MediaService.IntegrationTests.Infrastructure;
+namespace DisciplineService.IntegrationTests.Infrastructure;
 
 [Collection(IntegrationCollection.Name)]
 public class GrpcAuthorizationTests
 {
-    private readonly MediaServiceFactory _factory;
+    private readonly DisciplineServiceFactory _factory;
 
-    public GrpcAuthorizationTests(MediaServiceFactory factory)
+    public GrpcAuthorizationTests(DisciplineServiceFactory factory)
     {
         _factory = factory;
     }
 
     [Fact]
-    public void InternalApiGrpcEndpoints_RequireAuthorization()
+    public void InternalApiGrpcEndpoints_UseInternalGrpcPolicy()
     {
-        // Force the host to build so endpoints are registered.
         _ = _factory.CreateClient();
 
         var dataSource = _factory.Services.GetRequiredService<EndpointDataSource>();
         var grpcEndpoints = dataSource.Endpoints
-            .Where(e => e.DisplayName?.Contains("media.internal.v1.InternalApi", StringComparison.Ordinal) == true)
+            .Where(e => e.DisplayName?.Contains("discipline.internal.v1.InternalApi", StringComparison.Ordinal) == true)
             .ToList();
 
-        grpcEndpoints.Should().NotBeEmpty(
-            "MediaService must expose the InternalApi gRPC service");
-
+        grpcEndpoints.Should().NotBeEmpty();
         foreach (var endpoint in grpcEndpoints)
         {
             var policies = endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>()
                 .Select(data => data.Policy)
                 .ToList();
 
-            policies.Should().Contain(AuthenticationExtensions.InternalGrpcPolicy,
-                "every gRPC endpoint on InternalApi must use internal gRPC authentication");
-            policies.Should().Contain(InternalGrpcAuthorizationPolicy.PolicyName,
-                "every gRPC endpoint on InternalApi must require the media internal service role");
+            policies.Should().Contain(AuthenticationExtensions.InternalGrpcPolicy);
+            policies.Should().Contain(InternalGrpcAuthorizationPolicy.PolicyName);
         }
 
         var options = _factory.Services.GetRequiredService<IOptions<AuthorizationOptions>>().Value;
@@ -55,6 +50,6 @@ public class GrpcAuthorizationTests
         rolePolicy!.Requirements.OfType<RolesAuthorizationRequirement>()
             .Should().ContainSingle()
             .Which.AllowedRoles.Should()
-            .Contain(InternalGrpcAuthorizationPolicy.MediaInternalRole);
+            .Contain(InternalGrpcAuthorizationPolicy.DisciplineReadRole);
     }
 }

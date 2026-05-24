@@ -25,6 +25,10 @@ env:
   Auth__ValidIssuer: urfu-link.ghjc.ru
   Auth__NameClaim: email
   Auth__RoleClaim: groups
+  Auth__Internal__JwksUrl: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/certs
+  Auth__Internal__Audience: urfu-link-api
+  Auth__Internal__ValidIssuer: https://id.ghjc.ru/realms/urfu-link
+  Auth__Internal__RoleClaim: groups
   Infrastructure__Redis__Configuration: urfu-redis.urfu-platform.svc.cluster.local:6379
   Storage__Endpoint: http://urfu-minio.urfu-platform.svc.cluster.local:9000
   Storage__PublicEndpoint: https://storage.ghjc.ru

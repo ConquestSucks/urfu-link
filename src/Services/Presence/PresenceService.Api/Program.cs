@@ -5,8 +5,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
 using StackExchange.Redis;
+using Urfu.Link.BuildingBlocks.Auth;
 using Urfu.Link.BuildingBlocks.Outbox;
 using Urfu.Link.BuildingBlocks.ServiceDefaults;
+using Urfu.Link.Services.Presence.Infrastructure.Auth;
 using Urfu.Link.Services.Presence.Infrastructure;
 using Urfu.Link.Services.Presence.Infrastructure.Persistence;
 using Urfu.Link.Services.Presence.Messaging;
@@ -59,6 +61,10 @@ builder.Services.SwaggerDocument(o =>
 });
 
 builder.Services.AddServiceDefaults(builder.Configuration, "presence-service");
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(InternalGrpcAuthorizationPolicy.PolicyName, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(InternalGrpcAuthorizationPolicy.AllowedRoles));
 
 // SignalR clients can't set the Authorization header during the WebSocket
 // upgrade handshake — accept the bearer token via ?access_token= for /hubs/*.
@@ -92,7 +98,10 @@ app.MapServiceDefaults();
 app.UseFastEndpoints(c => c.Endpoints.RoutePrefix = "api/v1");
 app.UseSwaggerGen();
 app.MapScalarApiReference(o => o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
-app.MapGrpcService<InternalApiService>().RequireAuthorization();
+app.MapGrpcService<InternalApiService>()
+    .RequireAuthorization(
+        AuthenticationExtensions.InternalGrpcPolicy,
+        InternalGrpcAuthorizationPolicy.PolicyName);
 app.MapHub<PresenceHub>("/hubs/presence");
 
 await app.RunAsync();

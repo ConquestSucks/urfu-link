@@ -1,5 +1,9 @@
 # URFU Link
 
+## Cluster Access
+
+- `root@89.167.93.199` is for cluster management and log viewing.
+
 Монорепозиторий под on-prem Kubernetes. Бэкенд — ASP.NET 10, шлюз YARP, идентичность через Keycloak, очереди Kafka, данные в PostgreSQL/MongoDB/Redis/MinIO. Фронт — Expo Router (web + mobile). Доставка: GitHub Actions + Argo CD, деплой Blue/Green.
 
 **Стек зафиксирован:** один регион, self-hosted Kafka (KRaft), LiveKit + Coturn для медиа, Linkerd + Viz как service mesh.

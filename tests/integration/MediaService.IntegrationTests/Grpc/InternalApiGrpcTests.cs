@@ -1,5 +1,6 @@
 using FluentAssertions;
 using global::Grpc.Net.Client;
+using MediaService.Api.Infrastructure.Auth;
 using MediaService.Api.Grpc;
 using MediaService.IntegrationTests.Infrastructure;
 
@@ -34,7 +35,21 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
 
     private InternalApi.InternalApiClient AuthorizedClient(Guid userId)
     {
+        TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(
+            userId,
+            InternalGrpcAuthorizationPolicy.MediaInternalRole);
+        return new InternalApi.InternalApiClient(_channel);
+    }
+
+    private InternalApi.InternalApiClient ClientWithoutInternalRole(Guid userId)
+    {
         TestAuthHandler.CurrentPrincipal = TestAssetBuilder.MakeUser(userId);
+        return new InternalApi.InternalApiClient(_channel);
+    }
+
+    private InternalApi.InternalApiClient AnonymousClient()
+    {
+        TestAuthHandler.CurrentPrincipal = null;
         return new InternalApi.InternalApiClient(_channel);
     }
 
@@ -47,6 +62,27 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
 
         reply.Service.Should().Be("media-service");
         reply.Message.Should().Be("pong:hello");
+    }
+
+    [Fact]
+    public async Task Ping_WithoutAuthentication_IsRejected()
+    {
+        var client = AnonymousClient();
+        var act = () => client.PingAsync(new PingRequest { Message = "no-auth" }).ResponseAsync;
+
+        await act.Should().ThrowAsync<global::Grpc.Core.RpcException>()
+            .Where(ex => ex.StatusCode == global::Grpc.Core.StatusCode.Unauthenticated);
+    }
+
+    [Fact]
+    public async Task Ping_WithoutMediaInternalRole_IsRejected()
+    {
+        var client = ClientWithoutInternalRole(Guid.NewGuid());
+        var act = () => client.PingAsync(new PingRequest { Message = "wrong-role" }).ResponseAsync;
+
+        await act.Should().ThrowAsync<global::Grpc.Core.RpcException>()
+            .Where(ex => ex.StatusCode == global::Grpc.Core.StatusCode.PermissionDenied
+                || ex.StatusCode == global::Grpc.Core.StatusCode.Unauthenticated);
     }
 
     [Fact]
