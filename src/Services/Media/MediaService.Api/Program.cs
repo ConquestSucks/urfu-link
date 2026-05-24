@@ -1,6 +1,7 @@
 using FastEndpoints;
 using FastEndpoints.Swagger;
 using MediaService.Api.Infrastructure;
+using MediaService.Api.Infrastructure.Auth;
 using MediaService.Api.Infrastructure.Persistence;
 using MediaService.Api.Messaging;
 using MediaService.Api.Services;
@@ -43,6 +44,10 @@ builder.Services.SwaggerDocument(o =>
 });
 
 builder.Services.AddServiceDefaults(builder.Configuration, "media-service");
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy(InternalGrpcAuthorizationPolicy.PolicyName, policy => policy
+        .RequireAuthenticatedUser()
+        .RequireRole(InternalGrpcAuthorizationPolicy.AllowedRoles));
 
 // DataProtection keys persisted to Redis (so they survive pod restarts and scale-out).
 builder.Services.AddDataProtection().SetApplicationName("urfu-link-media-service");
@@ -69,7 +74,10 @@ app.UseFastEndpoints(c =>
 app.UseSwaggerGen();
 app.MapScalarApiReference(o =>
     o.WithOpenApiRoutePattern("/swagger/v1/swagger.json"));
-app.MapGrpcService<InternalApiService>().RequireAuthorization(AuthenticationExtensions.InternalGrpcPolicy);
+app.MapGrpcService<InternalApiService>()
+    .RequireAuthorization(
+        AuthenticationExtensions.InternalGrpcPolicy,
+        InternalGrpcAuthorizationPolicy.PolicyName);
 
 await app.RunAsync();
 

@@ -6,6 +6,7 @@ using MediaService.Api.Application.Contracts.Requests;
 using MediaService.Api.Application.Contracts.Responses;
 using MediaService.Api.Domain.Enums;
 using MediaService.Api.Grpc;
+using MediaService.Api.Infrastructure.Auth;
 
 namespace MediaService.IntegrationTests.Infrastructure;
 
@@ -18,8 +19,20 @@ public static class TestAssetBuilder
     /// <summary>Default in-memory payload used by helpers that just need "some bytes".</summary>
     public const int DefaultContentSize = 64;
 
-    public static ClaimsPrincipal MakeUser(Guid userId)
-        => new(new ClaimsIdentity([new Claim("sub", userId.ToString())], TestAuthHandler.SchemeName));
+    public static ClaimsPrincipal MakeUser(Guid userId, params string[] roles)
+    {
+        var claims = new List<Claim>
+        {
+            new("sub", userId.ToString()),
+        };
+        foreach (var role in roles ?? [])
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+            claims.Add(new Claim("groups", role));
+        }
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, TestAuthHandler.SchemeName));
+    }
 
     public static HttpClient AuthorizedClient(MediaServiceFactory factory, Guid userId)
     {
@@ -37,7 +50,7 @@ public static class TestAssetBuilder
     public static (GrpcChannel Channel, HttpClient Http, InternalApi.InternalApiClient Client) CreateGrpcClient(
         MediaServiceFactory factory, Guid userId)
     {
-        TestAuthHandler.CurrentPrincipal = MakeUser(userId);
+        TestAuthHandler.CurrentPrincipal = MakeUser(userId, InternalGrpcAuthorizationPolicy.MediaInternalRole);
         var http = factory.CreateClient();
         var channel = GrpcChannel.ForAddress(http.BaseAddress!,
             new GrpcChannelOptions { HttpClient = http });

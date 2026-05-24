@@ -329,6 +329,10 @@ spec:
               ensure_realm
               ensure_realm_role "service:discipline-read" \
                 "Allows internal gRPC reads on DisciplineService.InternalApi."
+              ensure_realm_role "service:media-internal" \
+                "Allows internal gRPC calls on MediaService.InternalApi."
+              ensure_realm_role "service:presence-internal" \
+                "Allows internal gRPC calls on PresenceService.InternalApi."
 
               # --- Linkerd Viz ---
               ensure_client "linkerd-viz" '["https://linkerd.ghjc.ru/oauth2/callback"]' '["https://linkerd.ghjc.ru"]' "false" "Linkerd Dashboard" "https://linkerd.ghjc.ru"
@@ -392,13 +396,19 @@ spec:
               DISCIPLINE_READ_ROLE="$(curl --silent --fail \
                 -H "Authorization: Bearer ${KC_TOKEN}" \
                 "${KEYCLOAK_URL}/admin/realms/urfu-link/roles/service:discipline-read")"
+              MEDIA_INTERNAL_ROLE="$(curl --silent --fail \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/roles/service:media-internal")"
+              PRESENCE_INTERNAL_ROLE="$(curl --silent --fail \
+                -H "Authorization: Bearer ${KC_TOKEN}" \
+                "${KEYCLOAK_URL}/admin/realms/urfu-link/roles/service:presence-internal")"
               curl --fail --silent --show-error \
                 -X POST \
                 -H "Authorization: Bearer ${KC_TOKEN}" \
                 -H "Content-Type: application/json" \
                 "${KEYCLOAK_URL}/admin/realms/urfu-link/users/${CHAT_SA_ID}/role-mappings/realm" \
-                -d "[${DISCIPLINE_READ_ROLE}]" >/dev/null
-              echo "Granted service:discipline-read to chat-service-internal service account"
+                -d "[${DISCIPLINE_READ_ROLE},${MEDIA_INTERNAL_ROLE},${PRESENCE_INTERNAL_ROLE}]" >/dev/null
+              echo "Granted internal gRPC roles to chat-service-internal service account"
 
               # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*","http://app.dev.127.0.0.1.nip.io/*"]' '["https://urfu-link.ghjc.ru","http://app.dev.127.0.0.1.nip.io"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"

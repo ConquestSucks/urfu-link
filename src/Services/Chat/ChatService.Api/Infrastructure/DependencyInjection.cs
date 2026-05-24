@@ -76,7 +76,7 @@ public static class ModuleRegistration
             }
 
             // Built-in Grpc.Net retry on transient errors. ChatService relies on MediaService for
-            // attachment validation/grant; a single brief outage shouldn't fail SendMessage.
+            // attachment validation/grant; after retries are exhausted SendMessage must still fail.
             var retryPolicy = new RetryPolicy
             {
                 MaxAttempts = 3,

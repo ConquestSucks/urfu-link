@@ -27,7 +27,7 @@ public sealed class TestAuthHandler : AuthenticationHandler<AuthenticationScheme
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var ticket = new AuthenticationTicket(CurrentPrincipal, SchemeName);
+        var ticket = new AuthenticationTicket(CurrentPrincipal, Scheme.Name);
         return Task.FromResult(AuthenticateResult.Success(ticket));
     }
 }
