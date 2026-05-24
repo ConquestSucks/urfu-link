@@ -51,6 +51,29 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
+    public void MigrationHookShouldNotDependOnWorkloadServiceAccount()
+    {
+        var migrationJob = ReadRepoFile("deploy", "helm", "charts", "urfu-service", "templates", "migrations-job.yaml");
+        var migrationServiceAccount = ReadRepoFile(
+            "deploy",
+            "helm",
+            "charts",
+            "urfu-service",
+            "templates",
+            "migrations-serviceaccount.yaml");
+        var chartValues = ReadRepoFile("deploy", "helm", "charts", "urfu-service", "values.yaml");
+
+        Assert.Contains("serviceAccountName: {{ include \"urfu-service.migrationsServiceAccountName\" . }}", migrationJob, StringComparison.Ordinal);
+        Assert.Contains("automountServiceAccountToken: {{ .Values.migrations.serviceAccount.automountServiceAccountToken }}", migrationJob, StringComparison.Ordinal);
+        Assert.Contains("kind: ServiceAccount", migrationServiceAccount, StringComparison.Ordinal);
+        Assert.Contains("helm.sh/hook", migrationServiceAccount, StringComparison.Ordinal);
+        Assert.Contains("pre-install,pre-upgrade", migrationServiceAccount, StringComparison.Ordinal);
+        Assert.Contains("\"helm.sh/hook-weight\": \"-10\"", migrationServiceAccount, StringComparison.Ordinal);
+        Assert.Contains("automountServiceAccountToken: {{ .Values.migrations.serviceAccount.automountServiceAccountToken }}", migrationServiceAccount, StringComparison.Ordinal);
+        Assert.Contains("automountServiceAccountToken: false", chartValues, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void KeycloakBootstrapPolicyShouldAllowWritingChatServiceInternalSecret()
     {
         var config = ReadRepoFile("deploy", "k8s", "platform", "vault", "vault-auto-init-job.yaml");
