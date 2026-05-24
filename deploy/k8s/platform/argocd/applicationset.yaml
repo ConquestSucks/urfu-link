@@ -19,6 +19,9 @@ spec:
           - service: chat-service
             env: prod
             namespace: urfu-prod
+          - service: discipline-service
+            env: prod
+            namespace: urfu-prod
           - service: presence-service
             env: prod
             namespace: urfu-prod

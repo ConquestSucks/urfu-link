@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet("api-gateway", "media-service", "user-service", "chat-service", "presence-service", "notification-service", "call-service", "frontend-web")]
+    [ValidateSet("api-gateway", "media-service", "user-service", "chat-service", "discipline-service", "presence-service", "notification-service", "call-service", "frontend-web")]
     [string]$Service,
 
     [Parameter(Mandatory = $true)]

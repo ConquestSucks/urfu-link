@@ -26,6 +26,19 @@ WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'media_db')
 
 DO $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'discipline') THEN
+        CREATE ROLE discipline LOGIN PASSWORD 'discipline';
+    ELSE
+        ALTER ROLE discipline WITH LOGIN PASSWORD 'discipline';
+    END IF;
+END $$;
+
+SELECT 'CREATE DATABASE discipline_db OWNER discipline'
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'discipline_db')
+\gexec
+
+DO $$
+BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'keycloak') THEN
         CREATE ROLE keycloak LOGIN PASSWORD 'keycloak';
     ELSE

@@ -5,7 +5,7 @@ namespace Urfu.Link.Gateway.ApiGateway.HealthChecks;
 
 /// <summary>
 /// Reads destination health populated by YARP active probes (configured per-cluster in
-/// <c>appsettings.json</c>) and aggregates it into a single readiness signal:
+/// <c>appsettings.json</c>) and aggregates it into a downstream dependency signal:
 /// <list type="bullet">
 ///   <item><description><see cref="HealthStatus.Healthy"/> — every cluster has at least one destination whose Active or Passive health is not <see cref="DestinationHealth.Unhealthy"/>.</description></item>
 ///   <item><description><see cref="HealthStatus.Unhealthy"/> — at least one cluster has no usable destinations.</description></item>

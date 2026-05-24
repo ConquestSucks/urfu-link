@@ -14,6 +14,7 @@ $images = @(
     @{ Service = "media-service"; Dockerfile = "src/Services/Media/MediaService.Api/Dockerfile" },
     @{ Service = "user-service"; Dockerfile = "src/Services/User/UserService.Api/Dockerfile" },
     @{ Service = "chat-service"; Dockerfile = "src/Services/Chat/ChatService.Api/Dockerfile" },
+    @{ Service = "discipline-service"; Dockerfile = "src/Services/Discipline/DisciplineService.Api/Dockerfile" },
     @{ Service = "presence-service"; Dockerfile = "src/Services/Presence/PresenceService.Api/Dockerfile" },
     @{ Service = "notification-service"; Dockerfile = "src/Services/Notification/NotificationService.Api/Dockerfile" },
     @{ Service = "call-service"; Dockerfile = "src/Services/Call/CallService.Api/Dockerfile" },

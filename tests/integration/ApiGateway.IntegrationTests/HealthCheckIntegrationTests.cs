@@ -64,7 +64,38 @@ public sealed class HealthCheckIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Ready_ReturnsServiceUnavailable_WhenAnyClusterHasNoUsableDestinations()
+    public async Task Ready_ReturnsHealthy_WhenAnyDownstreamClusterHasNoUsableDestinations()
+    {
+        var unreachableFactory = new GatewayTestFactory(
+            new Dictionary<string, string>
+            {
+                ["user-cluster"] = "http://127.0.0.1:1",
+                ["chat-cluster"] = _chatStub.BaseUrl,
+                ["media-cluster"] = _chatStub.BaseUrl,
+                ["presence-cluster"] = _chatStub.BaseUrl,
+                ["notification-cluster"] = _chatStub.BaseUrl,
+                ["call-cluster"] = _chatStub.BaseUrl,
+                ["discipline-cluster"] = _chatStub.BaseUrl,
+            },
+            extraConfiguration: new Dictionary<string, string?>
+            {
+                ["ReverseProxy:Clusters:user-cluster:HealthCheck:Active:Enabled"] = "true",
+                ["ReverseProxy:Clusters:user-cluster:HealthCheck:Active:Interval"] = "00:00:01",
+                ["ReverseProxy:Clusters:user-cluster:HealthCheck:Active:Timeout"] = "00:00:01",
+                ["ReverseProxy:Clusters:user-cluster:HealthCheck:Active:Path"] = "/health/ready",
+                ["ReverseProxy:Clusters:user-cluster:HealthCheck:Active:Policy"] = "ConsecutiveFailures",
+            });
+        await using var _ = unreachableFactory;
+        using var unreachableClient = unreachableFactory.CreateClient();
+
+        using var response = await unreachableClient.GetAsync("/health/ready");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            "gateway readiness must not remove every API route from Kubernetes endpoints when one downstream fails");
+    }
+
+    [Fact]
+    public async Task Downstreams_ReturnsServiceUnavailable_WhenAnyClusterHasNoUsableDestinations()
     {
         // Active YARP probes mark the destination Unhealthy after one failure round-trip.
         // We point user-cluster at an unreachable endpoint, then wait until a probe round runs.
@@ -96,7 +127,7 @@ public sealed class HealthCheckIntegrationTests : IAsyncLifetime
             for (var attempt = 0; attempt < 10; attempt++)
             {
                 response?.Dispose();
-                response = await unreachableClient.GetAsync("/health/ready");
+                response = await unreachableClient.GetAsync("/health/downstreams");
                 if (response.StatusCode == HttpStatusCode.ServiceUnavailable)
                 {
                     break;
@@ -105,7 +136,7 @@ public sealed class HealthCheckIntegrationTests : IAsyncLifetime
             }
 
             response!.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable,
-                "active probes mark unreachable user-cluster Unhealthy and the readiness check aggregates that into 503");
+                "the dedicated downstream health endpoint should still expose broken YARP destinations");
         }
         finally
         {

@@ -140,6 +140,34 @@ public sealed class RoutingIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task HubRoute_WithConfiguredTokenHeader_ProxiesToDownstream()
+    {
+        await using var pomeriumFactory = new GatewayTestFactory(
+            new Dictionary<string, string>
+            {
+                ["chat-cluster"] = _chatStub.BaseUrl,
+            },
+            extraConfiguration: new Dictionary<string, string?>
+            {
+                ["Auth:TokenHeader"] = "X-Pomerium-Jwt-Assertion",
+            });
+        using var pomeriumClient = pomeriumFactory.CreateClient();
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/chat/negotiate")
+        {
+            Content = new StringContent(string.Empty),
+        };
+        request.Headers.Add("X-Pomerium-Jwt-Assertion", "signed-pomerium-jwt");
+
+        var response = await pomeriumClient.SendAsync(request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        _chatStub.Requests.Should().ContainSingle(r => r.Path == "/hubs/chat/negotiate")
+            .Which.Headers.Should().ContainKey("X-Pomerium-Jwt-Assertion")
+            .WhoseValue.Should().Be("signed-pomerium-jwt");
+    }
+
+    [Fact]
     public async Task DirectHubRoute_PresenceConnect_ProxiesWebSocketHandshake()
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/hubs/presence/negotiate?access_token=user-42")
