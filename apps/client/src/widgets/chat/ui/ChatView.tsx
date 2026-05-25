@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ChatHeader } from "./chat-header/ChatHeader";
-import { ChatInput } from "./chat-input/Input";
+import { ChatInput, type ChatInputHandle } from "./chat-input/Input";
 import { MessagesList, type MessagesListHandle } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
@@ -54,6 +54,7 @@ export const ChatView = () => {
     );
     const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
+    const inputRef = useRef<ChatInputHandle>(null);
     const currentUserId = useCurrentUserId();
     const setViewingContexts = usePresenceStore((s) => s.setViewingContexts);
 
@@ -78,10 +79,10 @@ export const ChatView = () => {
                         visibility: "Private",
                     });
 
-                    const blob = await fetch(file.uri).then((r) => r.blob());
+                    const uploadBody = file.file ?? (await fetch(file.uri).then((r) => r.blob()));
                     await fetch(initRes.presignedPutUrl, {
                         method: "PUT",
-                        body: blob,
+                        body: uploadBody,
                     });
 
                     await apiClient.media.completeUpload({ assetId: initRes.assetId });
@@ -91,6 +92,7 @@ export const ChatView = () => {
                 await sendMessage(chatId, text, assetIds, replyToMessageId);
             } catch (error) {
                 console.error("Failed to send message", error);
+                throw error;
             }
         },
         [chatId, sendMessage],
@@ -322,9 +324,11 @@ export const ChatView = () => {
                 onMessageLongPress={(message) => openActionsMenu(message)}
                 onMessageContextMenu={openActionsMenu}
                 onThreadOpen={setOpenThreadRootId}
+                onFilesDropped={(files) => inputRef.current?.addFilesAndOpenModal(files)}
             />
             {!isUnknownDirectDraft && (
                 <ChatInput
+                    ref={inputRef}
                     conversationId={chatId}
                     onSend={handleSend}
                     typingEnabled={!isDirectDraft}

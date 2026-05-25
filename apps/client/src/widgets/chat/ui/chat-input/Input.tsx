@@ -1,4 +1,12 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React, {
+    forwardRef,
+    useCallback,
+    useEffect,
+    useImperativeHandle,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
 import { View, Pressable, Text, TextInput, Keyboard, Animated, Dimensions, Platform } from "react-native";
 import {
     PaperPlaneRightIcon,
@@ -62,17 +70,27 @@ const normalizeMeasuredContentHeight = (measuredHeight: number, text: string) =>
 
 interface ChatInputProps {
     conversationId: string;
-    onSend: (text: string, files: DocumentPickerAsset[], replyToMessageId?: string) => void;
+    onSend: (
+        text: string,
+        files: DocumentPickerAsset[],
+        replyToMessageId?: string,
+    ) => void | Promise<void>;
     typingEnabled?: boolean;
 }
 
-export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: ChatInputProps) => {
+export type ChatInputHandle = {
+    addFilesAndOpenModal: (files: File[]) => void;
+};
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
+    ({ conversationId, onSend, typingEnabled = true }, ref) => {
     const [query, setQuery] = useState("");
     const { onTextChange: notifyTyping, onSend: notifyStopTyping } = useTypingIndicator(
         conversationId,
         { enabled: typingEnabled },
     );
     const [isEmojiVisible, setIsEmojiVisible] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [inputHeight, setInputHeight] = useState(MIN_INPUT_CONTENT_HEIGHT);
     // Курсор: позиция точки вставки в тексте. Нужен для детекта @-токена.
     const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
@@ -168,12 +186,35 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
         attachments,
         isFilesModalVisible,
         setIsFilesModalVisible,
+        addAttachments,
         handleAttachFiles,
         removeAttachment,
         clearAttachments,
     } = useAttachments(MAX_FILES_LIMIT, () => animate(false));
 
-    const canSend = query.trim().length > 0 || attachments.length > 0;
+    const canSend = !isSubmitting && (query.trim().length > 0 || attachments.length > 0);
+
+    const resetInput = useCallback(() => {
+        setQuery("");
+        clearAttachments();
+        if (replyTo) setReply(null);
+        previousLineCountRef.current = 1;
+        pendingLineChangeContentHeightRef.current = null;
+        pendingLineChangeDirectionRef.current = null;
+        setInputHeight(MIN_INPUT_CONTENT_HEIGHT);
+    }, [clearAttachments, replyTo, setReply]);
+
+    useImperativeHandle(
+        ref,
+        () => ({
+            addFilesAndOpenModal: (files: File[]) => {
+                if (files.length === 0 || editing) return;
+                animate(false);
+                addAttachments(files, { openModal: true });
+            },
+        }),
+        [addAttachments, animate, editing],
+    );
 
     const handlePickEmoji = useCallback((emoji: string) => setQuery((prev) => prev + emoji), []);
 
@@ -233,7 +274,7 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
         [query],
     );
 
-    const handleSend = async () => {
+    const submitComposer = useCallback(async () => {
         if (!canSend) return;
 
         const trimmed = query.trim();
@@ -254,16 +295,27 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
             return;
         }
 
-        onSend(trimmed, attachments, replyTo?.id);
-
-        setQuery("");
-        clearAttachments();
-        if (replyTo) setReply(null);
-        previousLineCountRef.current = 1;
-        pendingLineChangeContentHeightRef.current = null;
-        pendingLineChangeDirectionRef.current = null;
-        setInputHeight(MIN_INPUT_CONTENT_HEIGHT);
-    };
+        setIsSubmitting(true);
+        try {
+            await onSend(trimmed, attachments, replyTo?.id);
+            resetInput();
+        } catch (error) {
+            console.error("Failed to submit composer", error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    }, [
+        attachments,
+        canSend,
+        editMessage,
+        editing,
+        notifyStopTyping,
+        onSend,
+        query,
+        replyTo?.id,
+        resetComposer,
+        resetInput,
+    ]);
 
     const handleInputKeyPress = (event: {
         nativeEvent?: {
@@ -280,7 +332,7 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
 
         nativeEvent.preventDefault?.();
         event.preventDefault?.();
-        void handleSend();
+        void submitComposer();
     };
 
     const composerHint = editing
@@ -331,7 +383,10 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
 
             <View className="flex-row items-end gap-3">
                 <Pressable
-                    onPress={handleAttachFiles}
+                    onPress={() => {
+                        animate(false);
+                        setIsFilesModalVisible(true);
+                    }}
                     className={`active:opacity-60 mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing ? "opacity-30" : ""}`}
                     disabled={attachments.length >= MAX_FILES_LIMIT || !!editing}
                 >
@@ -393,7 +448,7 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
                 </View>
 
                 <Pressable
-                    onPress={handleSend}
+                    onPress={submitComposer}
                     disabled={!canSend}
                     className={`w-11 h-11 rounded-full items-center justify-center ${canSend ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"}`}
                 >
@@ -419,8 +474,14 @@ export const ChatInput = ({ conversationId, onSend, typingEnabled = true }: Chat
                 visible={isFilesModalVisible}
                 onClose={() => setIsFilesModalVisible(false)}
                 attachments={attachments}
+                onPickFiles={handleAttachFiles}
+                onAddDroppedFiles={(files) => addAttachments(files, { openModal: true })}
                 onRemove={removeAttachment}
+                onSubmit={submitComposer}
+                isSubmitting={isSubmitting}
             />
         </View>
     );
-};
+});
+
+ChatInput.displayName = "ChatInput";

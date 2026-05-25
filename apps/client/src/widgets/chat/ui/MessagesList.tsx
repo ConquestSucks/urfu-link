@@ -39,6 +39,7 @@ interface MessagesListProps {
     onMessageLongPress?: (message: MessageDto) => void;
     onMessageContextMenu?: (message: MessageDto, anchor: MessageContextMenuAnchor) => void;
     onThreadOpen?: (rootMessageId: string) => void;
+    onFilesDropped?: (files: File[]) => void;
 }
 
 export interface MessagesListHandle {
@@ -67,6 +68,15 @@ type MessageListDateItem = {
 };
 
 type MessageListItem = MessageListMessageItem | MessageListDateItem;
+
+type WebDragEvent = {
+    preventDefault?: () => void;
+    stopPropagation?: () => void;
+    dataTransfer?: DataTransfer;
+    nativeEvent?: {
+        dataTransfer?: DataTransfer;
+    };
+};
 
 const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] => {
     const items: MessageListItem[] = [];
@@ -150,6 +160,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             onMessageLongPress,
             onMessageContextMenu,
             onThreadOpen,
+            onFilesDropped,
         },
         ref,
     ) => {
@@ -361,6 +372,30 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             loadMore(chatId, type);
         }, [chatId, loadMore, type]);
 
+        const preventDefaultDrag = useCallback((event: WebDragEvent) => {
+            event.preventDefault?.();
+            event.stopPropagation?.();
+        }, []);
+
+        const handleDrop = useCallback(
+            (event: WebDragEvent) => {
+                preventDefaultDrag(event);
+                const transfer = event.nativeEvent?.dataTransfer ?? event.dataTransfer;
+                const files = transfer?.files ? Array.from(transfer.files) : [];
+                if (files.length > 0) onFilesDropped?.(files);
+            },
+            [onFilesDropped, preventDefaultDrag],
+        );
+
+        const dropTargetProps =
+            Platform.OS === "web" && onFilesDropped
+                ? ({
+                      onDragEnter: preventDefaultDrag,
+                      onDragOver: preventDefaultDrag,
+                      onDrop: handleDrop,
+                  } as Record<string, unknown>)
+                : {};
+
         const renderItem = useMemo(
             () =>
                 ({ item, index }: { item: MessageListItem; index: number }) => {
@@ -482,7 +517,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         if (isInitialLoading) {
             return (
-                <View className="flex-1 px-6 py-6 justify-end overflow-hidden" style={{ gap: 24 }}>
+                <View
+                    testID="messages-list-drop-target"
+                    className="flex-1 px-6 py-6 justify-end overflow-hidden"
+                    style={{ gap: 24 }}
+                    {...dropTargetProps}
+                >
                     <ChatMessageSkeleton isOwn={false} showAvatar={shouldShowAvatars} />
                     <ChatMessageSkeleton isOwn={true} />
                     <ChatMessageSkeleton isOwn={false} showAvatar={shouldShowAvatars} />
@@ -494,7 +534,11 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         if (messages.length === 0) {
             return (
-                <View className="flex-1 px-6 py-6 justify-end overflow-hidden">
+                <View
+                    testID="messages-list-drop-target"
+                    className="flex-1 px-6 py-6 justify-end overflow-hidden"
+                    {...dropTargetProps}
+                >
                     <EmptyState
                         size="full"
                         icon={ChatCircleTextIcon}
@@ -506,7 +550,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         }
 
         return (
-            <View className="flex-1">
+            <View testID="messages-list-drop-target" className="flex-1" {...dropTargetProps}>
                 <FlatList
                     ref={listRef}
                     className="flex-1 px-6 py-6"
