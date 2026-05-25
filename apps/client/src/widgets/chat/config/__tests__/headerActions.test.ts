@@ -9,6 +9,8 @@ describe("chat header action menus", () => {
             getChatHeaderActions({
                 onOpenProfile: jest.fn(),
                 onOpenPinned: jest.fn(),
+                onToggleNotifications: jest.fn(),
+                notificationsMuted: false,
             }),
         );
 
@@ -27,6 +29,8 @@ describe("chat header action menus", () => {
             getSubjectHeaderActions({
                 onOpenMembers: jest.fn(),
                 onOpenPinned: jest.fn(),
+                onToggleNotifications: jest.fn(),
+                notificationsMuted: false,
             }) as ReturnType<typeof getChatHeaderActions>,
         );
 
@@ -39,10 +43,26 @@ describe("chat header action menus", () => {
         const item = getChatHeaderActions({
             onOpenProfile: jest.fn(),
             onOpenPinned,
+            onToggleNotifications: jest.fn(),
+            notificationsMuted: false,
         }).find((action) => action.label === "Закрепленные");
 
         item?.command?.();
 
         expect(onOpenPinned).toHaveBeenCalled();
+    });
+
+    it("wires notification toggle and reflects muted state", () => {
+        const onToggleNotifications = jest.fn();
+        const item = getChatHeaderActions({
+            onOpenProfile: jest.fn(),
+            onOpenPinned: jest.fn(),
+            onToggleNotifications,
+            notificationsMuted: true,
+        }).find((action) => action.label === "Включить уведомления");
+
+        item?.command?.();
+
+        expect(onToggleNotifications).toHaveBeenCalled();
     });
 });

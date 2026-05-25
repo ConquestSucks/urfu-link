@@ -63,13 +63,15 @@ public sealed class GetMyProfileEndpoint(IUserRepository userRepository)
                 NewMessages: legacyDirect.Push || legacyDirect.InApp,
                 NotificationSound: prefs.Sound,
                 DisciplineChatMessages: legacyDiscipline.Push || legacyDiscipline.InApp,
-                Mentions: legacyMentions.Push || legacyMentions.InApp),
+                Mentions: legacyMentions.Push || legacyMentions.InApp,
+                MutedConversationIds: prefs.MutedConversationIds),
             Preferences: new NotificationPreferencesResponse(
                 categories,
                 quietHours,
                 prefs.DndEnabled,
                 prefs.Locale,
-                prefs.Sound),
+                prefs.Sound,
+                prefs.MutedConversationIds),
             SoundVideo: new SoundVideoResponse(
                 user.SoundVideo.PlaybackDeviceId,
                 user.SoundVideo.RecordingDeviceId,

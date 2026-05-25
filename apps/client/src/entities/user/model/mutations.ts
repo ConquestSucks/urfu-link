@@ -5,6 +5,7 @@ import type {
   UpdateNotificationsDto,
   UpdatePrivacyDto,
   UpdateSoundVideoDto,
+  UserProfile,
 } from "@urfu-link/api-client";
 import { userKeys } from "./queries";
 
@@ -51,6 +52,53 @@ export function useUpdateNotifications() {
     mutationFn: (dto: UpdateNotificationsDto) =>
       apiClient.users.updateNotifications(dto),
     onSuccess: invalidateMe,
+  });
+}
+
+const updateMutedConversationCache = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  conversationId: string,
+  muted: boolean,
+) => {
+  queryClient.setQueryData<UserProfile>(userKeys.me, (current) => {
+    if (!current) return current;
+
+    const existing = current.notifications.mutedConversationIds ?? [];
+    const nextMuted = muted
+      ? Array.from(new Set([...existing, conversationId]))
+      : existing.filter((id) => id !== conversationId);
+
+    return {
+      ...current,
+      notifications: {
+        ...current.notifications,
+        mutedConversationIds: nextMuted,
+      },
+    };
+  });
+};
+
+export function useMuteConversationNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      apiClient.users.muteConversationNotifications(conversationId),
+    onSuccess: (_data, conversationId) => {
+      updateMutedConversationCache(queryClient, conversationId, true);
+      queryClient.invalidateQueries({ queryKey: userKeys.me });
+    },
+  });
+}
+
+export function useUnmuteConversationNotifications() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (conversationId: string) =>
+      apiClient.users.unmuteConversationNotifications(conversationId),
+    onSuccess: (_data, conversationId) => {
+      updateMutedConversationCache(queryClient, conversationId, false);
+      queryClient.invalidateQueries({ queryKey: userKeys.me });
+    },
   });
 }
 

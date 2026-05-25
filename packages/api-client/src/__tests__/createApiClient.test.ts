@@ -225,6 +225,27 @@ describe("createApiClient", () => {
     });
   });
 
+  describe("users notification muting", () => {
+    it("mutes and unmutes one conversation", async () => {
+      const fetchSpy = mockFetchWith({ status: 204, ok: true });
+
+      const client = createApiClient({ baseUrl: "" });
+      await client.users.muteConversationNotifications("direct:1");
+      await client.users.unmuteConversationNotifications("direct:1");
+
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        "/api/users/me/notifications/muted-conversations/direct%3A1",
+        expect.objectContaining({ method: "POST" }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        "/api/users/me/notifications/muted-conversations/direct%3A1",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+  });
+
   describe("media", () => {
     it("does not send JSON content type for bodyless download-url requests", async () => {
       const fetchSpy = mockFetchWith({

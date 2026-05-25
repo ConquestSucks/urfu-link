@@ -12,7 +12,8 @@ public sealed record UpdatePreferencesRequest(
     QuietHoursResponse QuietHours,
     bool DndEnabled,
     string Locale,
-    bool Sound);
+    bool Sound,
+    IReadOnlyList<string>? MutedConversationIds = null);
 
 public sealed class UpdatePreferencesEndpoint(IUserPreferencesClient client)
     : Endpoint<UpdatePreferencesRequest>
@@ -43,7 +44,14 @@ public sealed class UpdatePreferencesEndpoint(IUserPreferencesClient client)
             quietHours,
             req.DndEnabled,
             string.IsNullOrWhiteSpace(req.Locale) ? "ru-RU" : req.Locale,
-            req.Sound);
+            req.Sound,
+            req.MutedConversationIds is null
+                ? Array.Empty<string>()
+                : req.MutedConversationIds
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray());
 
         await client.UpdateAsync(userId, preferences, ct).ConfigureAwait(false);
         client.Invalidate(userId);

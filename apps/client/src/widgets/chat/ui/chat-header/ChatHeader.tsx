@@ -4,6 +4,11 @@ import { Avatar, Skeleton, StatusIndicator } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useConversationParticipants } from "@/entities/conversation/model/participants-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import {
+    useCurrentUser,
+    useMuteConversationNotifications,
+    useUnmuteConversationNotifications,
+} from "@/entities/user";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -43,6 +48,13 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
 
     const participants = useConversationParticipants(chatId);
     const currentUserId = useCurrentUserId();
+    const { data: profile } = useCurrentUser();
+    const muteNotifications = useMuteConversationNotifications();
+    const unmuteNotifications = useUnmuteConversationNotifications();
+    const notificationsMuted =
+        profile?.notifications.mutedConversationIds?.includes(chatId) ?? false;
+    const notificationsPending =
+        muteNotifications.isPending || unmuteNotifications.isPending;
 
     // Для direct-чата peerUserId — тот, кто не равен currentUserId.
     // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
@@ -203,6 +215,15 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
                     onOpenProfile={() => setIsProfileOpen(true)}
                     onOpenPinned={() => onOpenPinned?.()}
                     onSearchPress={() => onOpenSearch?.()}
+                    notificationsMuted={notificationsMuted}
+                    notificationsPending={notificationsPending}
+                    onToggleNotifications={() => {
+                        if (notificationsMuted) {
+                            unmuteNotifications.mutate(chatId);
+                        } else {
+                            muteNotifications.mutate(chatId);
+                        }
+                    }}
                 />
             </View>
 

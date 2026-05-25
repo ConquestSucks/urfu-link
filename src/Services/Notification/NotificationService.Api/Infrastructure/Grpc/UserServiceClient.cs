@@ -122,7 +122,12 @@ public sealed class UserServiceClient(
             quietHours,
             payload.DndEnabled,
             string.IsNullOrWhiteSpace(payload.Locale) ? "ru-RU" : payload.Locale,
-            payload.Sound);
+            payload.Sound,
+            payload.MutedConversationIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray());
     }
 
     private static NotificationPreferencesPayload MapToGrpc(UserPreferences preferences)
@@ -158,6 +163,8 @@ public sealed class UserServiceClient(
                 },
             });
         }
+
+        payload.MutedConversationIds.AddRange(preferences.MutedConversationIds);
 
         return payload;
     }

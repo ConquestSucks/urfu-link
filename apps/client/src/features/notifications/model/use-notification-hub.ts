@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { NotificationBadgeDto, NotificationDto } from "@urfu-link/api-client";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { useNotificationStore } from "@/shared/store/notification-store";
+import { showServerBrowserNotification } from "@/shared/lib/browser-notifications";
 import { notificationKeys } from "./queries";
 
 export function useNotificationHub() {
@@ -24,11 +25,13 @@ export function useNotificationHub() {
             queryClient.setQueryData(notificationKeys.badge(), badge);
         });
 
-        connection.on("NotificationReceived", (_notification: NotificationDto) => {
+        connection.on("NotificationReceived", (notification: NotificationDto) => {
+            showServerBrowserNotification(notification);
             invalidateNotifications();
         });
 
-        connection.on("NotificationUpserted", (_notification: NotificationDto) => {
+        connection.on("NotificationUpserted", (notification: NotificationDto) => {
+            showServerBrowserNotification(notification);
             invalidateNotifications();
         });
 

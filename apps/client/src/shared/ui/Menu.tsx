@@ -12,6 +12,7 @@ export interface MenuItem {
     label?: string;
     command?: () => void;
     danger?: boolean;
+    disabled?: boolean;
 }
 interface MenuProps {
     model: MenuItem[];
@@ -29,10 +30,11 @@ export const Menu = forwardRef<MenuRef, MenuProps>(({ model }, ref) => {
             if (item.separator) {
                 return (<View key={index} className="h-[1px] bg-white/5 my-1 mx-2"/>);
             }
-            return (<Pressable key={index} className="px-4 py-[11px] flex-row gap-3 items-center hover:bg-white/5 active:bg-white/10 transition-colors duration-200" onPress={() => {
-                    if (item.command)
+            return (<Pressable key={index} disabled={item.disabled} className={`px-4 py-[11px] flex-row gap-3 items-center hover:bg-white/5 active:bg-white/10 transition-colors duration-200 ${item.disabled ? "opacity-50" : ""}`} onPress={() => {
+                    if (!item.disabled && item.command)
                         item.command();
-                    setIsVisible(false);
+                    if (!item.disabled)
+                        setIsVisible(false);
                 }}>
                 {item.icon && (<item.icon className={item.iconClassName} size={item.iconSize ?? 18}/>)}
                 {item.label && (<Text className={`text-sm leading-none select-none ${item.danger ? "text-danger-300" : "text-text-secondary"}`}>

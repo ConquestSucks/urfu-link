@@ -63,6 +63,7 @@ describe("message sounds", () => {
             notificationSound: false,
             disciplineChatMessages: true,
             mentions: true,
+            mutedConversationIds: [],
         });
 
         await expect(playMessageSound("send")).resolves.toBe(false);
@@ -73,19 +74,42 @@ describe("message sounds", () => {
         expect(createAudioPlayer).not.toHaveBeenCalled();
     });
 
-    it("respects direct and discipline message notification preferences", async () => {
+    it("keeps direct receive sounds independent from the hidden direct-message toggle", async () => {
         configureMessageSounds({
             newMessages: false,
             notificationSound: true,
             disciplineChatMessages: true,
             mentions: true,
+            mutedConversationIds: [],
         });
 
         await expect(
             playMessageSound("receive", { conversationId: "direct-1", now: 1000 }),
-        ).resolves.toBe(false);
+        ).resolves.toBe(true);
+        await expect(
+            playMessageSound("receive", { conversationId: "discipline:math", now: 1400 }),
+        ).resolves.toBe(true);
+
+        expect(createAudioPlayer).toHaveBeenCalledTimes(1);
+    });
+
+    it("respects discipline and muted conversation preferences", async () => {
+        configureMessageSounds({
+            newMessages: true,
+            notificationSound: true,
+            disciplineChatMessages: false,
+            mentions: true,
+            mutedConversationIds: ["direct-muted"],
+        });
+
         await expect(
             playMessageSound("receive", { conversationId: "discipline:math", now: 1000 }),
+        ).resolves.toBe(false);
+        await expect(
+            playMessageSound("receive", { conversationId: "direct-muted", now: 1000 }),
+        ).resolves.toBe(false);
+        await expect(
+            playMessageSound("receive", { conversationId: "direct-1", now: 1000 }),
         ).resolves.toBe(true);
 
         expect(createAudioPlayer).toHaveBeenCalledTimes(1);

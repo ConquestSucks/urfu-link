@@ -6,8 +6,17 @@ import { getSubjectHeaderActions } from "../../config/headerActions";
 interface SubjectHeaderActionsProps {
     onOpenMembers: () => void;
     onOpenPinned: () => void;
+    notificationsMuted: boolean;
+    notificationsPending?: boolean;
+    onToggleNotifications: () => void;
 }
-export const SubjectHeaderActions = ({ onOpenMembers, onOpenPinned }: SubjectHeaderActionsProps) => {
+export const SubjectHeaderActions = ({
+    onOpenMembers,
+    onOpenPinned,
+    notificationsMuted,
+    notificationsPending,
+    onToggleNotifications,
+}: SubjectHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getSubjectHeaderActions({
         onOpenMembers: () => {
@@ -18,6 +27,12 @@ export const SubjectHeaderActions = ({ onOpenMembers, onOpenPinned }: SubjectHea
             menuRef.current?.close();
             onOpenPinned();
         },
+        onToggleNotifications: () => {
+            menuRef.current?.close();
+            onToggleNotifications();
+        },
+        notificationsMuted,
+        notificationsPending,
     });
     return (<View className="flex-row gap-1 items-center">
       <Pressable className="p-2 rounded-xl active:bg-white/10">
