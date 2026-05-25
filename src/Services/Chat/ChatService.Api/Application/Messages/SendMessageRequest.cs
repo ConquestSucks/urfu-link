@@ -8,4 +8,5 @@ public sealed record SendMessageRequest(
     string ClientMessageId,
     Guid? ReplyToMessageId = null,
     bool CallerIsAdmin = false,
-    Guid? PeerUserId = null);
+    Guid? PeerUserId = null,
+    IReadOnlyList<Guid>? MentionUserIds = null);

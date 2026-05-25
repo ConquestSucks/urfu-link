@@ -163,6 +163,32 @@ describe("MessagesList loading state", () => {
         expect(screen.getByTestId("empty-state")).toBeTruthy();
     });
 
+    it("forwards dropped web files from the messages area", () => {
+        Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
+        const file = { name: "materials.pdf" } as File;
+        const onFilesDropped = jest.fn();
+        const preventDefault = jest.fn();
+        const stopPropagation = jest.fn();
+
+        render(
+            <MessagesList
+                chatId="chat-drop"
+                type="chat"
+                onFilesDropped={onFilesDropped}
+            />,
+        );
+
+        fireEvent(screen.getByTestId("messages-list-drop-target"), "drop", {
+            dataTransfer: { files: [file] },
+            preventDefault,
+            stopPropagation,
+        });
+
+        expect(preventDefault).toHaveBeenCalled();
+        expect(stopPropagation).toHaveBeenCalled();
+        expect(onFilesDropped).toHaveBeenCalledWith([file]);
+    });
+
     it("renders the peer typing indicator inside the dialog", () => {
         mockChatState = {
             ...mockChatState,

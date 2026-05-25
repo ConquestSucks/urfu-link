@@ -9,3 +9,6 @@ allowBuilds:
   esbuild: true
   msgpackr-extract: true
   msw: true
+
+patchedDependencies:
+  rn-emoji-keyboard@1.7.0: patches/rn-emoji-keyboard@1.7.0.patch

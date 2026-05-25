@@ -264,6 +264,27 @@ public class SendMessageServiceTests
     }
 
     [Fact]
+    public async Task SendAsync_WithExplicitMentionIds_PublishesMentionEvent()
+    {
+        var conv = SeedConversation();
+        var request = new SendMessageRequest(
+            conv.Id,
+            Sender,
+            "@Mikhail Mikhailets посмотри",
+            Array.Empty<Guid>(),
+            "c-mention",
+            MentionUserIds: [Peer]);
+
+        var dto = await Build().SendAsync(request, default);
+
+        dto.Mentions.Should().Equal(Peer);
+        _outbox.Captured.OfType<ChatMessageSentEvent>().Should().ContainSingle()
+            .Which.Mentions.Should().Equal(Peer);
+        _outbox.Captured.OfType<ChatMentionCreatedEvent>().Should().ContainSingle()
+            .Which.MentionedUserIds.Should().Equal(Peer);
+    }
+
+    [Fact]
     public async Task SendAsync_DuplicateClientMessageId_ReturnsPriorMessage_WithoutDoublePublish()
     {
         var conv = SeedConversation();

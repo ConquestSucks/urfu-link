@@ -4,8 +4,8 @@ using Urfu.Link.Services.Notification.Domain.Interfaces;
 namespace Urfu.Link.Services.Notification.Application.Handlers.Chat;
 
 /// <summary>
-/// Stores the conversation→discipline mapping so subsequent <c>chat.message.sent.v1</c>
-/// events can be classified as <c>ChatMessageDiscipline</c>.
+/// Stores the conversation→discipline mapping for notification handlers that need
+/// discipline context.
 /// </summary>
 public sealed class ChatDisciplineConversationCreatedHandler(IDisciplineConversationLookup lookup)
 {

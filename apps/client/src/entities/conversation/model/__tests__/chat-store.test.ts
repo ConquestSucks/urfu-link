@@ -247,6 +247,56 @@ describe("chat store direct draft sending", () => {
         expect(conversation.lastMessageAtUtc).toBe("2026-05-24T10:00:00.000Z");
     });
 
+    it("passes selected mention user ids to the hub payload", async () => {
+        const invoke = jest.fn(async (_method: string, payload: { clientMessageId: string; mentionUserIds: string[] }) => ({
+            id: "message-1",
+            conversationId: "direct-1",
+            senderId: "user-1",
+            body: "@Mikhail Mikhailets привет",
+            attachments: [],
+            state: "Sent",
+            createdAtUtc: "2026-05-24T10:00:00.000Z",
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            clientMessageId: payload.clientMessageId,
+            editedAtUtc: null,
+            replyTo: null,
+            reactionsSummary: {},
+            mentions: payload.mentionUserIds,
+            forwardedFrom: null,
+        }));
+
+        useChatStore.setState({
+            connection: { state: "Connected", invoke } as never,
+            isConnected: true,
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().sendMessage(
+            "direct-1",
+            "@Mikhail Mikhailets привет",
+            [],
+            undefined,
+            ["peer-1"],
+        );
+
+        expect(invoke).toHaveBeenCalledWith(
+            "SendMessage",
+            expect.objectContaining({
+                mentionUserIds: ["peer-1"],
+            }),
+        );
+    });
+
     it("hydrates the current user before sending when the auth store has no jwt user", async () => {
         mockAuthState.userId = null;
         const invoke = jest.fn(async (_method: string, payload: { clientMessageId: string }) => ({

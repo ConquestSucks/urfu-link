@@ -1,8 +1,31 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
-import { Platform, StyleSheet } from "react-native";
-import type { ReactNode } from "react";
+import { Platform, Pressable, StyleSheet, Text } from "react-native";
+import type { ReactElement, ReactNode } from "react";
 import { ChatInput } from "../Input";
 import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
+import type { DocumentPickerAsset } from "expo-document-picker";
+
+let mockAttachments: DocumentPickerAsset[] = [];
+const mockSetIsFilesModalVisible = jest.fn();
+const mockAddAttachments = jest.fn();
+const mockHandleAttachFiles = jest.fn();
+const mockRemoveAttachment = jest.fn();
+const mockClearAttachments = jest.fn();
+
+let mockConversationParticipants: Array<{
+    userId: string;
+    role: string;
+    displayName: string;
+    avatarUrl: string;
+}> = [];
+let mockMentionToken: { start: number; end: number; query: string } | null = null;
+let mockMentionSuggestions = ({
+    items,
+    onSelect,
+}: {
+    items: Array<{ userId: string; displayName: string }>;
+    onSelect: (item: { userId: string; displayName: string }) => void;
+}) => null as ReactElement | null;
 
 jest.mock("@/entities/conversation/model/chat-store", () => ({
     useChatStore: (selector: (state: { editMessage: jest.Mock }) => unknown) =>
@@ -10,21 +33,40 @@ jest.mock("@/entities/conversation/model/chat-store", () => ({
 }));
 
 jest.mock("@/entities/conversation/model/participants-store", () => ({
-    useConversationParticipants: () => [],
+    useConversationParticipants: () => mockConversationParticipants,
     useParticipantsStore: jest.fn(),
 }));
 
-jest.mock("@/features/attach-file", () => ({
-    FilesModal: () => null,
-    useAttachments: () => ({
-        attachments: [],
-        isFilesModalVisible: false,
-        setIsFilesModalVisible: jest.fn(),
-        handleAttachFiles: jest.fn(),
-        removeAttachment: jest.fn(),
-        clearAttachments: jest.fn(),
-    }),
-}));
+jest.mock("@/features/attach-file", () => {
+    const { Pressable, Text } = require("react-native");
+
+    return {
+        FilesModal: ({
+            onSubmit,
+            attachments,
+        }: {
+            onSubmit: () => void;
+            attachments: unknown[];
+        }) => (
+            <Pressable
+                testID="files-modal-submit"
+                onPress={onSubmit}
+                disabled={attachments.length === 0}
+            >
+                <Text>modal submit</Text>
+            </Pressable>
+        ),
+        useAttachments: () => ({
+            attachments: mockAttachments,
+            isFilesModalVisible: false,
+            setIsFilesModalVisible: mockSetIsFilesModalVisible,
+            addAttachments: mockAddAttachments,
+            handleAttachFiles: mockHandleAttachFiles,
+            removeAttachment: mockRemoveAttachment,
+            clearAttachments: mockClearAttachments,
+        }),
+    };
+});
 
 jest.mock("@/features/emoji-picker", () => ({
     EmojiPicker: () => null,
@@ -48,8 +90,11 @@ jest.mock("@/features/message-actions", () => ({
 }));
 
 jest.mock("@/features/mentions", () => ({
-    MentionSuggestions: () => null,
-    findMentionAtCursor: () => null,
+    MentionSuggestions: (props: {
+        items: Array<{ userId: string; displayName: string }>;
+        onSelect: (item: { userId: string; displayName: string }) => void;
+    }) => mockMentionSuggestions(props),
+    findMentionAtCursor: () => mockMentionToken,
 }));
 
 jest.mock("@/shared/lib/useTypingIndicator", () => ({
@@ -68,6 +113,7 @@ jest.mock("@/shared/ui/phosphor", () => {
     const Icon = ({ children }: { children?: ReactNode }) => <Text>{children}</Text>;
 
     return {
+        FileIcon: Icon,
         PaperPlaneRightIcon: Icon,
         PencilSimpleIcon: Icon,
         PlusCircleIcon: Icon,
@@ -80,6 +126,15 @@ describe("ChatInput", () => {
     beforeEach(() => {
         Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
         (useTypingIndicator as jest.Mock).mockClear();
+        mockAttachments = [];
+        mockSetIsFilesModalVisible.mockClear();
+        mockAddAttachments.mockClear();
+        mockHandleAttachFiles.mockClear();
+        mockRemoveAttachment.mockClear();
+        mockClearAttachments.mockClear();
+        mockConversationParticipants = [];
+        mockMentionToken = null;
+        mockMentionSuggestions = () => null;
     });
 
     it("keeps the placeholder vertically centered and removes the browser focus outline", () => {
@@ -186,6 +241,53 @@ describe("ChatInput", () => {
         expect(onSend).toHaveBeenCalledWith("hello", [], undefined);
     });
 
+    it("passes selected mention ids when sending", async () => {
+        const onSend = jest.fn();
+        const preventDefault = jest.fn();
+        mockConversationParticipants = [
+            {
+                userId: "peer-1",
+                role: "Member",
+                displayName: "Mikhail Mikhailets",
+                avatarUrl: "",
+            },
+        ];
+        mockMentionToken = { start: 0, end: 3, query: "mik" };
+        mockMentionSuggestions = ({ items, onSelect }) => (
+            <>
+                {items.map((item) => (
+                    <Pressable
+                        key={item.userId}
+                        testID={`mention-suggestion-${item.userId}`}
+                        onPress={() => onSelect(item)}
+                    >
+                        <Text>{item.displayName}</Text>
+                    </Pressable>
+                ))}
+            </>
+        );
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+
+        fireEvent.changeText(screen.getByTestId("chat-input-text"), "@mi");
+        fireEvent.press(screen.getByTestId("mention-suggestion-peer-1"));
+
+        await act(async () => {
+            fireEvent(screen.getByTestId("chat-input-text"), "keyPress", {
+                nativeEvent: { key: "Enter", shiftKey: false, preventDefault },
+                preventDefault,
+            });
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+        });
+
+        expect(onSend).toHaveBeenCalledWith(
+            "@Mikhail Mikhailets",
+            [],
+            undefined,
+            ["peer-1"],
+        );
+    });
+
     it("keeps Shift+Enter available for line breaks on web", async () => {
         const onSend = jest.fn();
         const preventDefault = jest.fn();
@@ -202,5 +304,27 @@ describe("ChatInput", () => {
 
         expect(preventDefault).not.toHaveBeenCalled();
         expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it("submits the current composer text and attachments from the files modal", async () => {
+        const attachment: DocumentPickerAsset = {
+            name: "lecture.pdf",
+            uri: "file://lecture.pdf",
+            size: 2048,
+            mimeType: "application/pdf",
+            lastModified: 1,
+        };
+        mockAttachments = [attachment];
+        const onSend = jest.fn();
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+        fireEvent.changeText(screen.getByTestId("chat-input-text"), "materials");
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("files-modal-submit"));
+        });
+
+        expect(onSend).toHaveBeenCalledWith("materials", [attachment], undefined);
+        expect(mockClearAttachments).toHaveBeenCalled();
     });
 });

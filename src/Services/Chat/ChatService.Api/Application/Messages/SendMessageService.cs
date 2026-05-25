@@ -97,7 +97,12 @@ public sealed class SendMessageService(
 
         var opts = options.Value;
         var mentions = await mentionResolver
-            .ResolveAsync(request.Body, conversation, opts.MaxMentionsPerMessage, cancellationToken)
+            .ResolveAsync(
+                request.Body,
+                conversation,
+                opts.MaxMentionsPerMessage,
+                cancellationToken,
+                request.MentionUserIds)
             .ConfigureAwait(false);
 
         var now = clock.GetUtcNow();
