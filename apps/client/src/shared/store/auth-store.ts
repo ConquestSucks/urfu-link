@@ -4,10 +4,11 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 type AuthState = {
     accessToken: string | null;
+    idToken: string | null;
     refreshToken: string | null;
     expiresAt: number | null; // Unix ms
     userId: string | null;
-    setTokens: (accessToken: string, refreshToken: string, expiresAt: number) => void;
+    setTokens: (accessToken: string, refreshToken: string, expiresAt: number, idToken?: string | null) => void;
     setUserId: (userId: string | null) => void;
     clearTokens: () => void;
     isTokenValid: () => boolean;
@@ -36,20 +37,23 @@ export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
             accessToken: null,
+            idToken: null,
             refreshToken: null,
             expiresAt: null,
             userId: null,
-            setTokens: (accessToken, refreshToken, expiresAt) =>
-                set({
+            setTokens: (accessToken, refreshToken, expiresAt, idToken) =>
+                set((state) => ({
                     accessToken,
+                    idToken: idToken === undefined ? state.idToken : idToken,
                     refreshToken,
                     expiresAt,
                     userId: extractUserId(accessToken),
-                }),
+                })),
             setUserId: (userId) => set({ userId }),
             clearTokens: () =>
                 set({
                     accessToken: null,
+                    idToken: null,
                     refreshToken: null,
                     expiresAt: null,
                     userId: null,
@@ -66,6 +70,7 @@ export const useAuthStore = create<AuthState>()(
             storage: createJSONStorage(() => appStorage),
             partialize: (state) => ({
                 accessToken: state.accessToken,
+                idToken: state.idToken,
                 refreshToken: state.refreshToken,
                 expiresAt: state.expiresAt,
                 userId: state.userId,

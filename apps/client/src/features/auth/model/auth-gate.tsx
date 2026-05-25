@@ -51,7 +51,7 @@ async function startPKCEFlow(): Promise<void> {
 async function handleCallback(
     code: string,
     state: string
-): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
+): Promise<{ accessToken: string; refreshToken: string; expiresAt: number; idToken: string | null } | null> {
     const storedVerifier = sessionStorage.getItem("pkce_code_verifier");
     const storedState = sessionStorage.getItem("pkce_state");
 
@@ -81,6 +81,7 @@ async function handleCallback(
         accessToken: data.access_token,
         refreshToken: data.refresh_token ?? "",
         expiresAt: Date.now() + data.expires_in * 1000,
+        idToken: typeof data.id_token === "string" ? data.id_token : null,
     };
 }
 
@@ -100,7 +101,7 @@ function DevAuthGate({ children }: PropsWithChildren) {
             handleCallback(code, state)
                 .then((result) => {
                     if (result) {
-                        setTokens(result.accessToken, result.refreshToken, result.expiresAt);
+                        setTokens(result.accessToken, result.refreshToken, result.expiresAt, result.idToken);
                     }
                 })
                 .finally(() => setExchanging(false));

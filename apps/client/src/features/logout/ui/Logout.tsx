@@ -1,13 +1,14 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Button } from "@/shared/ui";
 import { SignOutIcon } from "@/shared/ui/phosphor";
+import { performLogout } from "../model/logout";
 
 export const Logout = () => {
     const { isMobile } = useWindowSize();
     return (
         <Button
             label="Выйти"
-            onPress={() => {}}
+            onPress={performLogout}
             variant="danger"
             className={`
               justify-start
