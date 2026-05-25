@@ -11,7 +11,13 @@ public sealed record ListNotificationsRequest(
     string? Cursor,
     int? Limit,
     int? Category,
-    bool? UnreadOnly);
+    bool? UnreadOnly,
+    string? Status,
+    string? Type,
+    int? Severity,
+    string? Query,
+    DateTimeOffset? From,
+    DateTimeOffset? To);
 
 public sealed record ListNotificationsResponse(
     IReadOnlyList<NotificationDto> Items,
@@ -33,14 +39,22 @@ public sealed class ListNotificationsEndpoint(INotificationRepository repository
         var limit = Math.Clamp(req.Limit ?? 20, 1, 100);
         Cursor.TryDecode(req.Cursor, out var cursorTs, out var cursorId);
 
-        NotificationCategory? category = req.Category.HasValue
-            ? (NotificationCategory)req.Category.Value
+        var category = req.Category.HasValue
+            ? (NotificationCategory?)((NotificationCategory)req.Category.Value)
             : null;
+        var status = req.UnreadOnly == true ? "unread" : req.Status;
+        var severity = req.Severity.HasValue ? (NotificationSeverity)req.Severity.Value : (NotificationSeverity?)null;
 
         var notifications = await repository.ListAsync(
             userId,
-            category,
-            req.UnreadOnly ?? false,
+            new NotificationListFilter(
+                category,
+                req.Type,
+                severity,
+                status,
+                req.Query,
+                req.From,
+                req.To),
             cursorTs == default ? null : cursorTs,
             cursorId == Guid.Empty ? null : cursorId,
             limit,

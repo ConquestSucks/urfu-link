@@ -151,6 +151,88 @@ public sealed class NotificationTests
     }
 
     [Fact]
+    public void Create_AssignsEnterpriseDefaults()
+    {
+        var notification = NewNotification();
+
+        notification.Type.Should().Be("chat.message.direct");
+        notification.SeenAtUtc.Should().BeNull();
+        notification.SavedAtUtc.Should().BeNull();
+        notification.DoneAtUtc.Should().BeNull();
+        notification.ArchivedAtUtc.Should().BeNull();
+        notification.SnoozedUntilUtc.Should().BeNull();
+        notification.ExpiresAtUtc.Should().BeNull();
+        notification.OccurrenceCount.Should().Be(1);
+        notification.LastOccurrenceAtUtc.Should().Be(notification.CreatedAtUtc);
+        notification.Actions.Should().Contain(a => a.Id == "open");
+    }
+
+    [Fact]
+    public void MarkSeen_SetsSeenAtOnce()
+    {
+        var notification = NewNotification();
+        var first = DateTimeOffset.UtcNow;
+
+        notification.MarkSeen(first).Should().BeTrue();
+        notification.MarkSeen(first.AddMinutes(1)).Should().BeFalse();
+
+        notification.SeenAtUtc.Should().Be(first);
+    }
+
+    [Fact]
+    public void MarkUnread_ClearsReadStateButKeepsSeenState()
+    {
+        var notification = NewNotification();
+        var seenAt = DateTimeOffset.UtcNow;
+        notification.MarkSeen(seenAt);
+        notification.MarkRead(seenAt.AddMinutes(1));
+
+        notification.MarkUnread().Should().BeTrue();
+
+        notification.ReadAtUtc.Should().BeNull();
+        notification.SeenAtUtc.Should().Be(seenAt);
+    }
+
+    [Fact]
+    public void SaveAndUnsave_AreIdempotent()
+    {
+        var notification = NewNotification();
+        var savedAt = DateTimeOffset.UtcNow;
+
+        notification.Save(savedAt).Should().BeTrue();
+        notification.Save(savedAt.AddMinutes(1)).Should().BeFalse();
+        notification.Unsave().Should().BeTrue();
+        notification.Unsave().Should().BeFalse();
+
+        notification.SavedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
+    public void MarkDone_ReadsAndRemovesFromActiveInbox()
+    {
+        var notification = NewNotification();
+        var doneAt = DateTimeOffset.UtcNow;
+
+        notification.MarkDone(doneAt).Should().BeTrue();
+
+        notification.DoneAtUtc.Should().Be(doneAt);
+        notification.ReadAtUtc.Should().Be(doneAt);
+        notification.SeenAtUtc.Should().Be(doneAt);
+    }
+
+    [Fact]
+    public void Restore_ClearsDoneAndArchiveState()
+    {
+        var notification = NewNotification();
+        notification.MarkDone(DateTimeOffset.UtcNow);
+
+        notification.Restore().Should().BeTrue();
+
+        notification.DoneAtUtc.Should().BeNull();
+        notification.ArchivedAtUtc.Should().BeNull();
+    }
+
+    [Fact]
     public void AddDelivery_AppendsToCollection()
     {
         var notification = NewNotification();

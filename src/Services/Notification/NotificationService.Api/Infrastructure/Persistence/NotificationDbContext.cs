@@ -18,6 +18,8 @@ public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext
 
     public DbSet<DisciplineConversation> DisciplineConversations => Set<DisciplineConversation>();
 
+    public DbSet<NotificationDedupKey> NotificationDedupKeys => Set<NotificationDedupKey>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

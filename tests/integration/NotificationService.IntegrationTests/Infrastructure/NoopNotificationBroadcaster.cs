@@ -13,9 +13,17 @@ public sealed class NoopNotificationBroadcaster : INotificationBroadcaster
 {
     public Task NotifyReceivedAsync(NotificationDto notification, CancellationToken cancellationToken) => Task.CompletedTask;
 
+    public Task NotifyUpsertedAsync(NotificationDto notification, CancellationToken cancellationToken) => Task.CompletedTask;
+
     public Task NotifyReadAsync(Guid recipientUserId, Guid notificationId, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task NotifyStateChangedAsync(Guid recipientUserId, NotificationStateChangedDto change, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task NotifyRemovedAsync(Guid recipientUserId, Guid notificationId, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task NotifyBatchReadAsync(Guid recipientUserId, IReadOnlyList<Guid> notificationIds, CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task NotifyBadgeUpdatedAsync(Guid recipientUserId, BadgeSnapshotDto snapshot, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task NotifyBackfillRequiredAsync(Guid recipientUserId, string reason, CancellationToken cancellationToken) => Task.CompletedTask;
 }
