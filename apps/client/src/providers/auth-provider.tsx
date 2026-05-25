@@ -8,7 +8,7 @@ import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "@/features/auth/keycloak-con
 async function refreshAccessToken(
     keycloakUrl: string,
     refreshToken: string,
-): Promise<{ accessToken: string; refreshToken: string; expiresAt: number } | null> {
+): Promise<{ accessToken: string; refreshToken: string; expiresAt: number; idToken?: string } | null> {
     try {
         const res = await fetch(
             `${keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
@@ -28,6 +28,7 @@ async function refreshAccessToken(
             accessToken: data.access_token,
             refreshToken: data.refresh_token ?? refreshToken,
             expiresAt: Date.now() + data.expires_in * 1000,
+            idToken: typeof data.id_token === "string" ? data.id_token : undefined,
         };
     } catch {
         return null;
@@ -49,7 +50,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
                 if (!currentRefreshToken) return;
                 const result = await refreshAccessToken(appConfig.keycloakUrl, currentRefreshToken);
                 if (result) {
-                    setTokens(result.accessToken, result.refreshToken, result.expiresAt);
+                    setTokens(result.accessToken, result.refreshToken, result.expiresAt, result.idToken);
                     scheduleRefresh(result.expiresAt);
                 } else {
                     clearTokens();
@@ -73,7 +74,7 @@ export default function AuthProvider({ children }: PropsWithChildren) {
             if (rt) {
                 const result = await refreshAccessToken(appConfig.keycloakUrl, rt);
                 if (result) {
-                    set(result.accessToken, result.refreshToken, result.expiresAt);
+                    set(result.accessToken, result.refreshToken, result.expiresAt, result.idToken);
                     scheduleRefresh(result.expiresAt);
                 } else {
                     clear();
