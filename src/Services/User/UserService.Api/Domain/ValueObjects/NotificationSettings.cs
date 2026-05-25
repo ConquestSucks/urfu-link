@@ -5,7 +5,8 @@ public sealed record NotificationSettings(
     QuietHours QuietHours,
     bool DndEnabled,
     string Locale,
-    bool Sound)
+    bool Sound,
+    IReadOnlyList<string> MutedConversationIds)
 {
     public const string DefaultLocale = "ru-RU";
 
@@ -14,7 +15,8 @@ public sealed record NotificationSettings(
         QuietHours.Default,
         DndEnabled: false,
         Locale: DefaultLocale,
-        Sound: true);
+        Sound: true,
+        MutedConversationIds: Array.Empty<string>());
 
     public ChannelToggle GetToggle(int category)
         => Categories.TryGetValue(category, out var toggle) ? toggle : ChannelToggle.AllOn;
@@ -42,21 +44,58 @@ public sealed record NotificationSettings(
 
     public NotificationSettings WithSound(bool enabled) => this with { Sound = enabled };
 
-    public static NotificationSettings FromLegacy(
+    public NotificationSettings WithMutedConversation(string conversationId)
+    {
+        var normalized = NormalizeConversationId(conversationId);
+        if (IsConversationMuted(normalized))
+        {
+            return this;
+        }
+
+        return this with { MutedConversationIds = MutedConversationIds.Append(normalized).ToArray() };
+    }
+
+    public NotificationSettings WithoutMutedConversation(string conversationId)
+    {
+        var normalized = NormalizeConversationId(conversationId);
+        if (!IsConversationMuted(normalized))
+        {
+            return this;
+        }
+
+        return this with
+        {
+            MutedConversationIds = MutedConversationIds
+                .Where(id => !string.Equals(id, normalized, StringComparison.Ordinal))
+                .ToArray(),
+        };
+    }
+
+    public bool IsConversationMuted(string conversationId)
+        => MutedConversationIds.Any(id => string.Equals(id, conversationId, StringComparison.Ordinal));
+
+    public NotificationSettings WithLegacyToggles(
         bool newMessages,
         bool sound,
         bool disciplineChatMessages,
         bool mentions)
     {
-        var copy = new Dictionary<int, ChannelToggle>(BuildDefaultCategories())
+        var copy = new Dictionary<int, ChannelToggle>(Categories)
         {
             [NotificationCategoryCode.ChatMessageDirect] = newMessages ? ChannelToggle.AllOn : ChannelToggle.AllOff,
             [NotificationCategoryCode.ChatMessageDiscipline] = disciplineChatMessages ? ChannelToggle.AllOn : ChannelToggle.AllOff,
             [NotificationCategoryCode.ChatMessageMention] = mentions ? ChannelToggle.AllOn : ChannelToggle.AllOff,
         };
 
-        return new NotificationSettings(copy, QuietHours.Default, DndEnabled: false, DefaultLocale, sound);
+        return this with { Categories = copy, Sound = sound };
     }
+
+    public static NotificationSettings FromLegacy(
+        bool newMessages,
+        bool sound,
+        bool disciplineChatMessages,
+        bool mentions)
+        => Default.WithLegacyToggles(newMessages, sound, disciplineChatMessages, mentions);
 
     private static Dictionary<int, ChannelToggle> BuildDefaultCategories()
     {
@@ -67,5 +106,11 @@ public sealed record NotificationSettings(
         }
 
         return dict;
+    }
+
+    private static string NormalizeConversationId(string conversationId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
+        return conversationId.Trim();
     }
 }

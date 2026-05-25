@@ -66,6 +66,12 @@ jest.mock("@/shared/store/auth-store", () => ({
     useCurrentUserId: () => mockCurrentUserId,
 }));
 
+jest.mock("@/entities/user", () => ({
+    useCurrentUser: () => ({ data: { notifications: { mutedConversationIds: [] } } }),
+    useMuteConversationNotifications: () => ({ mutate: jest.fn(), isPending: false }),
+    useUnmuteConversationNotifications: () => ({ mutate: jest.fn(), isPending: false }),
+}));
+
 jest.mock("@/entities/presence", () => ({
     LastSeenLabel: ({ lastSeenAt }: { lastSeenAt: string }) => {
         const { Text } = require("react-native");

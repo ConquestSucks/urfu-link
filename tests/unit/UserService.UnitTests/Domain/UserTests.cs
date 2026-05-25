@@ -25,6 +25,7 @@ public sealed class UserTests
         Assert.False(user.Notifications.QuietHours.Enabled);
         Assert.True(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageDirect).Push);
         Assert.Equal(NotificationCategoryCode.All.Count, user.Notifications.Categories.Count);
+        Assert.Empty(user.Notifications.MutedConversationIds);
         Assert.Null(user.SoundVideo.PlaybackDeviceId);
         Assert.Null(user.SoundVideo.RecordingDeviceId);
         Assert.Null(user.SoundVideo.WebcamDeviceId);
@@ -137,6 +138,12 @@ public sealed class UserTests
     public void UpdateNotificationsShouldMapLegacyFlagsAndRaiseEvent()
     {
         var user = UserProfile.CreateDefault(TestUserId);
+        user.UpdateNotificationPreferences(
+            NotificationSettings.Default
+                .WithDnd(true)
+                .WithLocale("en-US")
+                .WithMutedConversation("direct:abc"));
+        user.ClearDomainEvents();
 
         user.UpdateNotifications(
             newMessages: false,
@@ -148,14 +155,18 @@ public sealed class UserTests
         Assert.False(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageDirect).Push);
         Assert.True(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageDiscipline).Push);
         Assert.False(user.Notifications.GetToggle(NotificationCategoryCode.ChatMessageMention).Push);
+        Assert.True(user.Notifications.DndEnabled);
+        Assert.Equal("en-US", user.Notifications.Locale);
+        Assert.Contains("direct:abc", user.Notifications.MutedConversationIds);
 
         var evt = Assert.Single(user.DomainEvents);
         var notifEvent = Assert.IsType<UserNotificationSettingsChangedEvent>(evt);
         Assert.Equal(TestUserId, notifEvent.UserId);
-        Assert.Equal("ru-RU", notifEvent.Preferences.Locale);
-        Assert.False(notifEvent.Preferences.DndEnabled);
+        Assert.Equal("en-US", notifEvent.Preferences.Locale);
+        Assert.True(notifEvent.Preferences.DndEnabled);
         Assert.False(notifEvent.Preferences.Categories[NotificationCategoryCode.ChatMessageDirect].Push);
         Assert.True(notifEvent.Preferences.Categories[NotificationCategoryCode.ChatMessageDiscipline].Push);
+        Assert.Contains("direct:abc", notifEvent.Preferences.MutedConversationIds ?? []);
     }
 
     [Fact]
@@ -177,6 +188,27 @@ public sealed class UserTests
         var notifEvent = Assert.IsType<UserNotificationSettingsChangedEvent>(evt);
         Assert.Equal("en-US", notifEvent.Preferences.Locale);
         Assert.True(notifEvent.Preferences.DndEnabled);
+    }
+
+    [Fact]
+    public void MuteAndUnmuteConversationShouldUpdatePreferencesAndRaiseEvent()
+    {
+        var user = UserProfile.CreateDefault(TestUserId);
+
+        user.MuteConversationNotifications(" direct:abc ");
+
+        Assert.Contains("direct:abc", user.Notifications.MutedConversationIds);
+        var muteEvent = Assert.IsType<UserNotificationSettingsChangedEvent>(
+            Assert.Single(user.DomainEvents));
+        Assert.Contains("direct:abc", muteEvent.Preferences.MutedConversationIds ?? []);
+
+        user.ClearDomainEvents();
+        user.UnmuteConversationNotifications("direct:abc");
+
+        Assert.DoesNotContain("direct:abc", user.Notifications.MutedConversationIds);
+        var unmuteEvent = Assert.IsType<UserNotificationSettingsChangedEvent>(
+            Assert.Single(user.DomainEvents));
+        Assert.DoesNotContain("direct:abc", unmuteEvent.Preferences.MutedConversationIds ?? []);
     }
 
     [Fact]

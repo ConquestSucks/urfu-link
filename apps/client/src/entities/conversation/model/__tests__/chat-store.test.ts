@@ -2,6 +2,7 @@ import { mapMessageToProps, useChatStore } from "../chat-store";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { apiClient } from "@/shared/lib/api";
 import { playMessageSound } from "@/shared/lib/message-sounds";
+import { showMessageBrowserNotification } from "@/shared/lib/browser-notifications";
 
 const mockAuthState: { userId: string | null; setUserId: jest.Mock } = {
     userId: "user-1",
@@ -41,6 +42,10 @@ jest.mock("@/shared/lib/signalr", () => ({
 
 jest.mock("@/shared/lib/message-sounds", () => ({
     playMessageSound: jest.fn(),
+}));
+
+jest.mock("@/shared/lib/browser-notifications", () => ({
+    showMessageBrowserNotification: jest.fn(),
 }));
 
 jest.mock("@/shared/store/auth-store", () => ({
@@ -96,6 +101,7 @@ describe("chat store direct draft sending", () => {
                 notificationSound: true,
                 disciplineChatMessages: true,
                 mentions: true,
+                mutedConversationIds: [],
             },
             soundVideo: {
                 playbackDeviceId: null,
@@ -456,6 +462,14 @@ describe("chat store direct draft sending", () => {
             conversationId: "direct-1",
             isDiscipline: false,
         });
+        expect(showMessageBrowserNotification).toHaveBeenCalledTimes(1);
+        expect(showMessageBrowserNotification).toHaveBeenCalledWith(
+            expect.objectContaining({ id: "message-2" }),
+            expect.objectContaining({
+                currentUserId: "user-1",
+                isDiscipline: false,
+            }),
+        );
     });
 
     it("does not play the receive sound for own realtime messages", async () => {
@@ -487,6 +501,7 @@ describe("chat store direct draft sending", () => {
         });
 
         expect(playMessageSound).not.toHaveBeenCalled();
+        expect(showMessageBrowserNotification).not.toHaveBeenCalled();
     });
 
     it("keeps media asset ids in mapped message attachments", () => {

@@ -210,6 +210,46 @@ public sealed class NotificationRouterTests
         captured!.Deliveries.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task RouteAsync_MutedConversation_SkipsAllDeliveriesAndBadge()
+    {
+        var recipient = Guid.NewGuid();
+        _prefs.GetAsync(recipient, Arg.Any<CancellationToken>())
+            .Returns(UserPreferences.Default with { MutedConversationIds = ["direct-1"] });
+
+        var intent = new NotificationIntent(
+            RecipientUserId: recipient,
+            Category: NotificationCategory.ChatMessageMention,
+            Severity: NotificationSeverity.High,
+            Content: Urfu.Link.Services.Notification.Domain.ValueObjects.NotificationContent.Create("title", "body"),
+            Data: Urfu.Link.Services.Notification.Domain.ValueObjects.NotificationData.From(
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["conversationId"] = "direct-1",
+                }),
+            GroupKey: null,
+            SourceEventId: Guid.NewGuid(),
+            SourceEventType: "test.event.v1",
+            SourceActionId: "chat:message:direct-1:00000000000000000000000000000001",
+            Priority: NotificationPriority.Mention);
+
+        var outcome = await _router.RouteAsync(
+            new TestEvent(),
+            new StaticHandler<TestEvent>([intent]),
+            default);
+
+        outcome.Created.Should().Be(0);
+        outcome.Updated.Should().Be(0);
+        outcome.Skipped.Should().Be(1);
+        await _repository.DidNotReceive().UpsertAsync(
+            Arg.Any<NotificationAggregate>(),
+            Arg.Any<CancellationToken>());
+        await _badgeStore.DidNotReceive().IncrementAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<NotificationCategory>(),
+            Arg.Any<CancellationToken>());
+    }
+
     private sealed record TestEvent : Urfu.Link.BuildingBlocks.Contracts.Integration.IIntegrationEvent
     {
         public Guid EventId { get; } = Guid.NewGuid();

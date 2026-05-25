@@ -10,7 +10,9 @@ import { HubConnection, HubConnectionState } from "@microsoft/signalr";
 import { apiClient } from "@/shared/lib/api";
 import { resolveCurrentUserId } from "@/shared/lib/current-user";
 import { playMessageSound } from "@/shared/lib/message-sounds";
+import { showMessageBrowserNotification } from "@/shared/lib/browser-notifications";
 import { useAuthStore } from "@/shared/store/auth-store";
+import { lookupParticipantName } from "./participants-store";
 import {
     isDirectDraftConversation,
     normalizeConversationDraftStatus,
@@ -429,11 +431,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 const conversation = state.conversations.find(
                     (c) => c.id === normalized.conversationId,
                 );
+                const isDiscipline =
+                    conversation?.groupSubtype === "Discipline" ||
+                    normalized.conversationId.startsWith("discipline:");
                 void playMessageSound("receive", {
                     conversationId: normalized.conversationId,
-                    isDiscipline:
-                        conversation?.groupSubtype === "Discipline" ||
-                        normalized.conversationId.startsWith("discipline:"),
+                    isDiscipline,
+                });
+                showMessageBrowserNotification(normalized, {
+                    currentUserId,
+                    title:
+                        lookupParticipantName(normalized.conversationId, normalized.senderId) ??
+                        conversation?.title ??
+                        "Новое сообщение",
+                    isDiscipline,
                 });
             }
         });

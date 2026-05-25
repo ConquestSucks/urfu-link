@@ -19,6 +19,7 @@ const DEFAULT_PREFERENCES: UserNotifications = {
     notificationSound: true,
     disciplineChatMessages: true,
     mentions: true,
+    mutedConversationIds: [],
 };
 
 let preferences: UserNotifications = DEFAULT_PREFERENCES;
@@ -44,6 +45,9 @@ const getSoundSource = (kind: SoundKind) =>
 const isDisciplineConversation = (context?: MessageSoundContext) =>
     context?.isDiscipline ?? context?.conversationId?.startsWith("discipline:") ?? false;
 
+const isMutedConversation = (conversationId?: string | null) =>
+    !!conversationId && preferences.mutedConversationIds.includes(conversationId);
+
 const configureAudioMode = async (audio: AudioRuntime) => {
     if (audioModeConfigured) return;
 
@@ -61,10 +65,10 @@ const shouldPlaySound = (kind: SoundKind, context?: MessageSoundContext) => {
     if (!preferences.notificationSound) return false;
 
     if (kind === "send") return true;
+    if (isMutedConversation(context?.conversationId)) return false;
 
     const isDiscipline = isDisciplineConversation(context);
     if (isDiscipline && !preferences.disciplineChatMessages) return false;
-    if (!isDiscipline && !preferences.newMessages) return false;
 
     const now = context?.now ?? Date.now();
     if (now - lastReceivePlayedAt < RECEIVE_THROTTLE_MS) return false;
@@ -86,8 +90,10 @@ const getPlayer = async (kind: SoundKind) => {
 };
 
 export const configureMessageSounds = (nextPreferences: UserNotifications | null | undefined) => {
-    if (!nextPreferences) return;
-    preferences = nextPreferences;
+    preferences = {
+        ...(nextPreferences ?? DEFAULT_PREFERENCES),
+        mutedConversationIds: nextPreferences?.mutedConversationIds ?? [],
+    };
 };
 
 export const playMessageSound = async (

@@ -8,9 +8,19 @@ interface ChatHeaderActionsProps {
     onOpenProfile: () => void;
     onOpenPinned: () => void;
     onSearchPress: () => void;
+    notificationsMuted: boolean;
+    notificationsPending?: boolean;
+    onToggleNotifications: () => void;
 }
 
-export const ChatHeaderActions = ({ onOpenProfile, onOpenPinned, onSearchPress }: ChatHeaderActionsProps) => {
+export const ChatHeaderActions = ({
+    onOpenProfile,
+    onOpenPinned,
+    onSearchPress,
+    notificationsMuted,
+    notificationsPending,
+    onToggleNotifications,
+}: ChatHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getChatHeaderActions({
         onOpenProfile: () => {
@@ -21,6 +31,12 @@ export const ChatHeaderActions = ({ onOpenProfile, onOpenPinned, onSearchPress }
             menuRef.current?.close();
             onOpenPinned();
         },
+        onToggleNotifications: () => {
+            menuRef.current?.close();
+            onToggleNotifications();
+        },
+        notificationsMuted,
+        notificationsPending,
     });
     return (
         <View className="flex-row gap-1 items-center">

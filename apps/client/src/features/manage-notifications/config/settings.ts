@@ -1,12 +1,7 @@
 export const NOTIFICATIONS_SETTINGS = {
-  directMessages: {
-    label: "Личные чаты",
+  general: {
+    label: "Общие",
     items: [
-      {
-        key: "newMessages",
-        label: "Новые сообщения",
-        description: "Уведомления о новых личных сообщениях",
-      },
       {
         key: "notificationSound",
         label: "Звук уведомлений",
@@ -32,5 +27,5 @@ export const NOTIFICATIONS_SETTINGS = {
 } as const;
 
 export type NotificationField =
-  | (typeof NOTIFICATIONS_SETTINGS.directMessages.items)[number]["key"]
+  | (typeof NOTIFICATIONS_SETTINGS.general.items)[number]["key"]
   | (typeof NOTIFICATIONS_SETTINGS.subjects.items)[number]["key"];
