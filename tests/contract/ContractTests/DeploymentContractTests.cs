@@ -75,6 +75,26 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
+    public void UserServiceAvatarUploadShouldHaveWritableTempVolume()
+    {
+        var chartValues = ReadRepoFile("deploy", "helm", "charts", "urfu-service", "values.yaml");
+        var rollout = ReadRepoFile("deploy", "helm", "charts", "urfu-service", "templates", "rollout.yaml");
+        var deployment = ReadRepoFile("deploy", "helm", "charts", "urfu-service", "templates", "deployment.yaml");
+        var userValues = ReadRepoFile("deploy", "helm", "services", "user-service", "values-prod.yaml");
+
+        Assert.Contains("extraVolumeMounts: []", chartValues, StringComparison.Ordinal);
+        Assert.Contains("extraVolumes: []", chartValues, StringComparison.Ordinal);
+        Assert.Contains("{{- with .Values.extraVolumeMounts }}", rollout, StringComparison.Ordinal);
+        Assert.Contains("{{- with .Values.extraVolumes }}", rollout, StringComparison.Ordinal);
+        Assert.Contains("{{- with .Values.extraVolumeMounts }}", deployment, StringComparison.Ordinal);
+        Assert.Contains("{{- with .Values.extraVolumes }}", deployment, StringComparison.Ordinal);
+        Assert.Contains("readOnlyRootFilesystem: true", chartValues, StringComparison.Ordinal);
+        Assert.Contains("name: tmp", userValues, StringComparison.Ordinal);
+        Assert.Contains("mountPath: /tmp", userValues, StringComparison.Ordinal);
+        Assert.Contains("emptyDir:", userValues, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionMediaStorageShouldExposeBrowserReachablePresignedUrls()
     {
         var mediaValues = ReadRepoFile("deploy", "helm", "services", "media-service", "values-prod.yaml");
