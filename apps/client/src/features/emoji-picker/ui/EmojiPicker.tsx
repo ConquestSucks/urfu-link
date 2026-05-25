@@ -99,8 +99,9 @@ export const EmojiPicker = memo(({ onPick }: { onPick: (emoji: string) => void }
             <EmojiKeyboard
                 onEmojiSelected={handleEmojiSelected}
                 translation={ru}
-                enableSearchBar
                 enableRecentlyUsed
+                enableSearchBar
+                enableCategoryChangeGesture
                 categoryPosition="bottom"
                 emojiSize={28}
                 disableSafeArea
