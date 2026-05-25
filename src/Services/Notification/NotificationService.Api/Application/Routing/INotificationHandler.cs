@@ -5,5 +5,5 @@ namespace Urfu.Link.Services.Notification.Application.Routing;
 public interface INotificationHandler<in TEvent>
     where TEvent : IIntegrationEvent
 {
-    Task<IReadOnlyList<NotificationDraft>> PrepareAsync(TEvent integrationEvent, CancellationToken cancellationToken);
+    Task<IReadOnlyList<NotificationIntent>> PrepareAsync(TEvent integrationEvent, CancellationToken cancellationToken);
 }

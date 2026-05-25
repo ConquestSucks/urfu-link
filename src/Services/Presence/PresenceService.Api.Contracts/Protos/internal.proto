@@ -8,6 +8,7 @@ service InternalApi {
   rpc GetPresence(GetPresenceRequest) returns (PresenceInfo);
   rpc GetPresenceBatch(GetPresenceBatchRequest) returns (GetPresenceBatchReply);
   rpc IsOnline(IsOnlineRequest) returns (IsOnlineReply);
+  rpc IsViewing(IsViewingRequest) returns (IsViewingReply);
   rpc IsTyping(IsTypingRequest) returns (IsTypingReply);
   // Server-to-server signal that a user started or stopped typing in a conversation.
   // ChatHub.StartTyping/StopTyping fan out to this endpoint instead of clients calling
@@ -68,6 +69,15 @@ message IsOnlineRequest {
 
 message IsOnlineReply {
   bool is_online = 1;
+}
+
+message IsViewingRequest {
+  string user_id = 1;
+  string context_key = 2;
+}
+
+message IsViewingReply {
+  bool is_viewing = 1;
 }
 
 message IsTypingRequest {

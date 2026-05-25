@@ -27,6 +27,11 @@ import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import {
+    toChatThreadViewingContext,
+    toChatViewingContext,
+    usePresenceStore,
+} from "@/entities/presence";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
@@ -44,11 +49,17 @@ export const ChatView = () => {
     const [forwardIds, setForwardIds] = useState<string[] | null>(null);
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
     const [isPinnedModalOpen, setIsPinnedModalOpen] = useState(false);
+    const [isDocumentVisible, setIsDocumentVisible] = useState(() =>
+        typeof document === "undefined" || document.visibilityState === "visible",
+    );
     const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
     const currentUserId = useCurrentUserId();
+    const setViewingContexts = usePresenceStore((s) => s.setViewingContexts);
 
     const chatId = params.id as string;
+    const routeMessageId = typeof params.message === "string" ? params.message : null;
+    const routeThreadRootId = typeof params.thread === "string" ? params.thread : null;
     const type = currentTab === "chats" ? "chat" : "subject";
     const isDirectDraft = isDirectDraftConversation(conversation);
     const isUnknownDirectDraft = type === "chat" && !conversation && isDirectDraftId(chatId);
@@ -107,6 +118,18 @@ export const ChatView = () => {
     }, [pendingScrollId, setPendingScrollToMessageId]);
 
     useEffect(() => {
+        if (routeThreadRootId) {
+            setOpenThreadRootId(routeThreadRootId);
+            setPendingScrollToMessageId(routeThreadRootId);
+            return;
+        }
+
+        if (routeMessageId) {
+            setPendingScrollToMessageId(routeMessageId);
+        }
+    }, [routeMessageId, routeThreadRootId, setPendingScrollToMessageId]);
+
+    useEffect(() => {
         if (type !== "chat" || conversation || !isDirectDraftId(chatId)) {
             return;
         }
@@ -136,6 +159,44 @@ export const ChatView = () => {
                 /* fail-open: индикатор печати и mentions работают и без имён */
             });
     }, [chatId, shouldSkipRemoteConversationLoads]);
+
+    useEffect(() => {
+        if (typeof document === "undefined") {
+            return;
+        }
+
+        const handleVisibilityChange = () => {
+            setIsDocumentVisible(document.visibilityState === "visible");
+        };
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!chatId || shouldSkipRemoteConversationLoads || !isDocumentVisible) {
+            setViewingContexts([]);
+            return;
+        }
+
+        const contexts = [toChatViewingContext(chatId)];
+        if (openThreadRootId) {
+            contexts.push(toChatThreadViewingContext(chatId, openThreadRootId));
+        }
+
+        setViewingContexts(contexts);
+        return () => {
+            setViewingContexts([]);
+        };
+    }, [
+        chatId,
+        isDocumentVisible,
+        openThreadRootId,
+        setViewingContexts,
+        shouldSkipRemoteConversationLoads,
+    ]);
 
     const pinnedIds = conversation?.pinnedMessageIds ?? [];
     const isActionsTargetPinned = !!(
@@ -280,6 +341,9 @@ export const ChatView = () => {
                 <View className="w-[420px] max-w-[40%]">
                     <ThreadPanel
                         rootMessageId={openThreadRootId}
+                        targetMessageId={
+                            openThreadRootId === routeThreadRootId ? routeMessageId : null
+                        }
                         onClose={() => setOpenThreadRootId(null)}
                     />
                 </View>
@@ -294,6 +358,9 @@ export const ChatView = () => {
                     {openThreadRootId && (
                         <ThreadPanel
                             rootMessageId={openThreadRootId}
+                            targetMessageId={
+                                openThreadRootId === routeThreadRootId ? routeMessageId : null
+                            }
                             onClose={() => setOpenThreadRootId(null)}
                         />
                     )}

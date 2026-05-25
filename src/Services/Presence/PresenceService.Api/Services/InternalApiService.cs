@@ -61,6 +61,24 @@ public sealed class InternalApiService(
         return new IsOnlineReply { IsOnline = aggregated.Status != DomainEnums.PresenceStatus.Offline };
     }
 
+    public override async Task<IsViewingReply> IsViewing(IsViewingRequest request, ServerCallContext context)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(context);
+        var userId = ParseUserId(request.UserId);
+        if (string.IsNullOrWhiteSpace(request.ContextKey))
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "context_key is required"));
+        }
+
+        var contextKey = request.ContextKey.Trim();
+        var userSessions = await sessions.GetSessionsAsync(userId, context.CancellationToken).ConfigureAwait(false);
+        var isViewing = userSessions.Any(session =>
+            session.ViewingContexts?.Contains(contextKey, StringComparer.Ordinal) == true);
+
+        return new IsViewingReply { IsViewing = isViewing };
+    }
+
     public override async Task<IsTypingReply> IsTyping(IsTypingRequest request, ServerCallContext context)
     {
         ArgumentNullException.ThrowIfNull(request);

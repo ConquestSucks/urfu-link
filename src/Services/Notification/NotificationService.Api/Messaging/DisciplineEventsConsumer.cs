@@ -36,6 +36,14 @@ public sealed class DisciplineEventsConsumer(
                     break;
                 }
 
+            case "discipline.user_unenrolled.v1":
+                {
+                    var evt = payload.Deserialize<UserUnenrolledEvent>(JsonOptions)
+                        ?? throw new JsonException("UserUnenrolledEvent payload null");
+                    await RoutingDispatcher.Route(scope, scope.GetRequiredService<UserUnenrolledHandler>(), evt, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
             case "discipline.enrollment_role_changed.v1":
                 {
                     var evt = payload.Deserialize<EnrollmentRoleChangedEvent>(JsonOptions)
@@ -67,6 +75,11 @@ public sealed class DisciplineEventsConsumer(
                     await RoutingDispatcher.Route(scope, scope.GetRequiredService<DisciplineDeadlineHandler>(), evt, cancellationToken).ConfigureAwait(false);
                     break;
                 }
+
+            case "discipline.created.v1":
+            case "discipline.updated.v1":
+            case "discipline.deleted.v1":
+                break;
 
             default:
                 break;

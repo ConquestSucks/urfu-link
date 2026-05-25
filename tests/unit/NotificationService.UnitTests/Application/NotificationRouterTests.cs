@@ -34,8 +34,10 @@ public sealed class NotificationRouterTests
             .Returns(new UserContact("user@urfu.ru", "User", "ru-RU"));
         _presence.IsOnlineOnWebAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(false);
-        _repository.TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
-            .Returns(true);
+        _presence.IsViewingAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _repository.UpsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
+            .Returns(call => NotificationUpsertResult.Created(call.Arg<NotificationAggregate>()));
         _pushDevices.ListActiveByUserAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(Array.Empty<Urfu.Link.Services.Notification.Domain.Aggregates.PushDevice>());
         _badgeStore.GetSnapshotAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -71,7 +73,7 @@ public sealed class NotificationRouterTests
         var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
 
         outcome.Should().Be(RoutingOutcome.NoDrafts);
-        await _repository.DidNotReceive().TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>());
+        await _repository.DidNotReceive().UpsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -93,17 +95,43 @@ public sealed class NotificationRouterTests
         outcome.Created.Should().Be(1);
         outcome.Skipped.Should().Be(0);
 
-        await _repository.Received(1).TryInsertAsync(
+        await _repository.Received(1).UpsertAsync(
             Arg.Is<NotificationAggregate>(n => n.RecipientUserId == bob && n.Category == NotificationCategory.ChatMessageDirect),
             Arg.Any<CancellationToken>());
         await _badgeStore.Received(1).IncrementAsync(bob, NotificationCategory.ChatMessageDirect, Arg.Any<CancellationToken>());
     }
 
     [Fact]
+    public async Task RouteAsync_ResolvesActorDisplayNameBeforePersisting()
+    {
+        var sender = Guid.NewGuid();
+        var bob = Guid.NewGuid();
+        _prefs.GetContactAsync(sender, Arg.Any<CancellationToken>())
+            .Returns(new UserContact(string.Empty, "Иван Петров", "ru-RU"));
+        var evt = new ChatMessageSentEvent(
+            Guid.NewGuid().ToString(),
+            Guid.NewGuid(),
+            sender,
+            Recipients: [bob],
+            "Привет",
+            false,
+            DateTimeOffset.UtcNow);
+
+        await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
+
+        await _repository.Received(1).UpsertAsync(
+            Arg.Is<NotificationAggregate>(n =>
+                n.Actor != null &&
+                n.Actor.Id == sender &&
+                n.Actor.DisplayName == "Иван Петров"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RouteAsync_DuplicateInsert_CountsSkippedAndDoesNotIncrementBadge()
     {
-        _repository.TryInsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
-            .Returns(false);
+        _repository.UpsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
+            .Returns(NotificationUpsertResult.Skipped());
 
         var evt = new ChatMessageSentEvent(
             Guid.NewGuid().ToString(),
@@ -122,6 +150,44 @@ public sealed class NotificationRouterTests
     }
 
     [Fact]
+    public async Task RouteAsync_RecipientAlreadyViewingContext_SkipsBellItem()
+    {
+        var recipient = Guid.NewGuid();
+        const string viewingContext = "chat:conversation:direct-1";
+        _presence.IsViewingAsync(recipient, viewingContext, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var intent = new NotificationIntent(
+            RecipientUserId: recipient,
+            Category: NotificationCategory.ChatMessageDirect,
+            Severity: NotificationSeverity.Normal,
+            Content: Urfu.Link.Services.Notification.Domain.ValueObjects.NotificationContent.Create("title", "body"),
+            Data: Urfu.Link.Services.Notification.Domain.ValueObjects.NotificationData.Empty,
+            GroupKey: null,
+            SourceEventId: Guid.NewGuid(),
+            SourceEventType: "test.event.v1",
+            SourceActionId: "chat:message:direct-1:00000000000000000000000000000001",
+            Priority: NotificationPriority.ChatMessage,
+            SuppressWhenViewingContextKey: viewingContext);
+
+        var outcome = await _router.RouteAsync(
+            new TestEvent(),
+            new StaticHandler<TestEvent>([intent]),
+            default);
+
+        outcome.Created.Should().Be(0);
+        outcome.Updated.Should().Be(0);
+        outcome.Skipped.Should().Be(1);
+        await _repository.DidNotReceive().UpsertAsync(
+            Arg.Any<NotificationAggregate>(),
+            Arg.Any<CancellationToken>());
+        await _badgeStore.DidNotReceive().IncrementAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<NotificationCategory>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task RouteAsync_PreferencesDisableInApp_NoInAppDelivery()
     {
         _prefs.GetAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
@@ -134,8 +200,8 @@ public sealed class NotificationRouterTests
             });
 
         NotificationAggregate? captured = null;
-        _repository.TryInsertAsync(Arg.Do<NotificationAggregate>(n => captured = n), Arg.Any<CancellationToken>())
-            .Returns(true);
+        _repository.UpsertAsync(Arg.Do<NotificationAggregate>(n => captured = n), Arg.Any<CancellationToken>())
+            .Returns(call => NotificationUpsertResult.Created(call.Arg<NotificationAggregate>()));
 
         var evt = new ChatMessageSentEvent(
             Guid.NewGuid().ToString(),
@@ -150,5 +216,23 @@ public sealed class NotificationRouterTests
 
         captured.Should().NotBeNull();
         captured!.Deliveries.Should().BeEmpty();
+    }
+
+    private sealed record TestEvent : Urfu.Link.BuildingBlocks.Contracts.Integration.IIntegrationEvent
+    {
+        public Guid EventId { get; } = Guid.NewGuid();
+        public string EventType => "test.event.v1";
+        public DateTimeOffset OccurredAtUtc { get; } = DateTimeOffset.UtcNow;
+    }
+
+    private sealed class StaticHandler<TEvent>(IReadOnlyList<NotificationIntent> intents) : INotificationHandler<TEvent>
+        where TEvent : Urfu.Link.BuildingBlocks.Contracts.Integration.IIntegrationEvent
+    {
+        public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(TEvent integrationEvent, CancellationToken cancellationToken)
+        {
+            _ = integrationEvent;
+            _ = cancellationToken;
+            return Task.FromResult(intents);
+        }
     }
 }

@@ -21,7 +21,6 @@ function TabItems({ pathname }: { pathname: string }) {
                     tab.href === "/chats" &&
                     (pathname === "/chats" ||
                         pathname.startsWith("/chats/") ||
-                        pathname === "/notifications" ||
                         pathname.startsWith("/subjects"));
                 const isActive =
                     isChatsOrInbox ||

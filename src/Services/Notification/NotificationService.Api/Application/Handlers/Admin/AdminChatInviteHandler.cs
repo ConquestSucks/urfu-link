@@ -11,7 +11,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Admin;
 /// </summary>
 public sealed class AdminChatInviteHandler : INotificationHandler<ChatParticipantJoinedEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         ChatParticipantJoinedEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -29,7 +29,7 @@ public sealed class AdminChatInviteHandler : INotificationHandler<ChatParticipan
             ["conversationId"] = integrationEvent.ConversationId,
         });
 
-        var draft = new NotificationDraft(
+        var draft = new NotificationIntent(
             RecipientUserId: integrationEvent.UserId,
             Category: NotificationCategory.AdminChatInvite,
             Severity: NotificationSeverity.Normal,
@@ -39,6 +39,6 @@ public sealed class AdminChatInviteHandler : INotificationHandler<ChatParticipan
             SourceEventId: integrationEvent.EventId,
             SourceEventType: integrationEvent.EventType);
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>([draft]);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>([draft]);
     }
 }

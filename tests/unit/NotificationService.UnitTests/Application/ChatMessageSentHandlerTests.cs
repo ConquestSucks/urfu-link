@@ -38,7 +38,7 @@ public sealed class ChatMessageSentHandlerTests
     }
 
     [Fact]
-    public async Task PrepareAsync_MentionedRecipients_GetMentionCategoryAndHighSeverity()
+    public async Task PrepareAsync_MentionedRecipients_AreSuppressedFromGenericMessage()
     {
         var sender = Guid.NewGuid();
         var alice = Guid.NewGuid();
@@ -55,13 +55,12 @@ public sealed class ChatMessageSentHandlerTests
 
         var drafts = await new ChatMessageSentHandler(NoDisciplineLookup()).PrepareAsync(evt, default);
 
-        var mentionDraft = drafts.Single(d => d.RecipientUserId == alice);
-        var directDraft = drafts.Single(d => d.RecipientUserId == bob);
+        var directDraft = drafts.Single();
 
-        mentionDraft.Category.Should().Be(NotificationCategory.ChatMessageMention);
-        mentionDraft.Severity.Should().Be(NotificationSeverity.High);
+        directDraft.RecipientUserId.Should().Be(bob);
         directDraft.Category.Should().Be(NotificationCategory.ChatMessageDirect);
         directDraft.Severity.Should().Be(NotificationSeverity.Normal);
+        drafts.Should().NotContain(d => d.RecipientUserId == alice);
     }
 
     [Fact]
@@ -88,6 +87,11 @@ public sealed class ChatMessageSentHandlerTests
         draft.Data.Values["conversationId"].Should().Be(convId.ToString());
         draft.Data.Values["messageId"].Should().Be(msgId.ToString("N"));
         draft.Data.Values["senderId"].Should().Be(sender.ToString("N"));
+        draft.Actor.Should().NotBeNull();
+        draft.Actor!.Id.Should().Be(sender);
+        draft.SourceActionId.Should().Be($"chat:message:{convId}:{msgId:N}");
+        draft.Priority.Should().Be(NotificationPriority.ChatMessage);
+        draft.SuppressWhenViewingContextKey.Should().Be($"chat:conversation:{convId}");
     }
 
     [Fact]

@@ -7,6 +7,13 @@ public interface INotificationRepository
 {
     Task<bool> TryInsertAsync(NotificationAggregate notification, CancellationToken cancellationToken);
 
+    Task<NotificationUpsertResult> UpsertAsync(NotificationAggregate notification, CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<NotificationAggregate>> ArchiveBySourceActionAsync(
+        string sourceActionId,
+        DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken);
+
     Task<NotificationAggregate?> GetByIdAsync(Guid notificationId, Guid recipientUserId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<NotificationAggregate>> ListAsync(
@@ -59,3 +66,22 @@ public sealed record NotificationBadgeCounts(
     int UrgentUnread,
     IReadOnlyDictionary<NotificationCategory, int> PerCategory,
     IReadOnlyDictionary<string, int> PerType);
+
+public enum NotificationUpsertStatus
+{
+    Created,
+    Updated,
+    Skipped,
+}
+
+public sealed record NotificationUpsertResult(NotificationUpsertStatus Status, NotificationAggregate? Notification)
+{
+    public static NotificationUpsertResult Created(NotificationAggregate notification) =>
+        new(NotificationUpsertStatus.Created, notification);
+
+    public static NotificationUpsertResult Updated(NotificationAggregate notification) =>
+        new(NotificationUpsertStatus.Updated, notification);
+
+    public static NotificationUpsertResult Skipped(NotificationAggregate? notification = null) =>
+        new(NotificationUpsertStatus.Skipped, notification);
+}

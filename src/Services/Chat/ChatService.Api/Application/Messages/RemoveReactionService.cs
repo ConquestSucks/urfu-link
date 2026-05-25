@@ -39,7 +39,13 @@ public sealed class RemoveReactionService(
 
         var now = clock.GetUtcNow();
         await dispatcher.PublishAsync(
-            new ChatReactionRemovedEvent(conversation.Id, request.MessageId, request.UserId, request.Emoji, now),
+            new ChatReactionRemovedEvent(
+                conversation.Id,
+                request.MessageId,
+                request.UserId,
+                request.Emoji,
+                now,
+                message.SenderId),
             cancellationToken).ConfigureAwait(false);
 
         var summary = await BuildSummaryAsync(request.MessageId, cancellationToken).ConfigureAwait(false);

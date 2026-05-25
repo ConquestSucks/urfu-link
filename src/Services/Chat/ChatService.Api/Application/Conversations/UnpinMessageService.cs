@@ -51,7 +51,12 @@ public sealed class UnpinMessageService(
 
         var now = clock.GetUtcNow();
         await dispatcher.PublishAsync(
-            new ChatMessageUnpinnedEvent(conversation.Id, request.MessageId, request.CallerUserId, now),
+            new ChatMessageUnpinnedEvent(
+                conversation.Id,
+                request.MessageId,
+                request.CallerUserId,
+                now,
+                conversation.Participants),
             cancellationToken).ConfigureAwait(false);
 
         var refreshed = await conversations.GetByIdAsync(conversation.Id, cancellationToken).ConfigureAwait(false) ?? conversation;

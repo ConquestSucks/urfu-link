@@ -106,7 +106,7 @@ public sealed class PresenceAwareRoutingTests(NotificationServiceFactory factory
             "urgent severity always reaches the device regardless of web presence.");
     }
 
-    private async Task<RoutingOutcome> RouteAsync(NotificationDraft draft)
+    private async Task<RoutingOutcome> RouteAsync(NotificationIntent draft)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var router = scope.ServiceProvider.GetRequiredService<NotificationRouter>();
@@ -143,7 +143,7 @@ public sealed class PresenceAwareRoutingTests(NotificationServiceFactory factory
         await db.SaveChangesAsync();
     }
 
-    private static NotificationDraft ChatDraft(Guid userId, NotificationCategory category, NotificationSeverity severity) =>
+    private static NotificationIntent ChatDraft(Guid userId, NotificationCategory category, NotificationSeverity severity) =>
         new(
             RecipientUserId: userId,
             Category: category,
@@ -161,10 +161,10 @@ public sealed class PresenceAwareRoutingTests(NotificationServiceFactory factory
         public DateTimeOffset OccurredAtUtc { get; } = DateTimeOffset.UtcNow;
     }
 
-    private sealed class StaticHandler<TEvent>(NotificationDraft[] drafts) : INotificationHandler<TEvent>
+    private sealed class StaticHandler<TEvent>(NotificationIntent[] drafts) : INotificationHandler<TEvent>
         where TEvent : IIntegrationEvent
     {
-        public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(TEvent integrationEvent, CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(TEvent integrationEvent, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<NotificationIntent>>(drafts);
     }
 }

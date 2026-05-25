@@ -8,7 +8,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Call;
 
 public sealed class CallMissedHandler : INotificationHandler<CallMissedEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         CallMissedEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -29,7 +29,7 @@ public sealed class CallMissedHandler : INotificationHandler<CallMissedEvent>
             ["ringSeconds"] = ((int)integrationEvent.RingDuration.TotalSeconds).ToString(CultureInfo.InvariantCulture),
         });
 
-        var draft = new NotificationDraft(
+        var draft = new NotificationIntent(
             RecipientUserId: integrationEvent.RecipientId,
             Category: NotificationCategory.CallMissed,
             Severity: NotificationSeverity.Normal,
@@ -37,8 +37,11 @@ public sealed class CallMissedHandler : INotificationHandler<CallMissedEvent>
             Data: data,
             GroupKey: GroupKey.ForCall(integrationEvent.CallId),
             SourceEventId: integrationEvent.EventId,
-            SourceEventType: integrationEvent.EventType);
+            SourceEventType: integrationEvent.EventType,
+            SourceActionId: NotificationSourceActions.CallMissed(integrationEvent.CallId, integrationEvent.RecipientId),
+            Priority: NotificationPriority.ChatMessage,
+            Actor: new NotificationActor(integrationEvent.CallerId, null, null));
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>([draft]);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>([draft]);
     }
 }

@@ -55,7 +55,13 @@ public sealed class AddReactionService(
         }
 
         await dispatcher.PublishAsync(
-            new ChatReactionAddedEvent(conversation.Id, request.MessageId, request.UserId, request.Emoji, now),
+            new ChatReactionAddedEvent(
+                conversation.Id,
+                request.MessageId,
+                request.UserId,
+                request.Emoji,
+                now,
+                message.SenderId),
             cancellationToken).ConfigureAwait(false);
 
         var summary = await BuildSummaryAsync(request.MessageId, cancellationToken).ConfigureAwait(false);

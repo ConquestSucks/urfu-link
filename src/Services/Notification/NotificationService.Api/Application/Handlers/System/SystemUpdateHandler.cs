@@ -7,7 +7,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.System;
 
 public sealed class SystemUpdateHandler : INotificationHandler<SystemUpdateEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         SystemUpdateEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -28,10 +28,10 @@ public sealed class SystemUpdateHandler : INotificationHandler<SystemUpdateEvent
 
         var groupKey = GroupKey.ForSystem($"update:{integrationEvent.UpdateId}");
 
-        var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
+        var drafts = new List<NotificationIntent>(integrationEvent.Recipients.Count);
         foreach (var recipientId in integrationEvent.Recipients)
         {
-            drafts.Add(new NotificationDraft(
+            drafts.Add(new NotificationIntent(
                 RecipientUserId: recipientId,
                 Category: NotificationCategory.SystemUpdate,
                 Severity: NotificationSeverity.Low,
@@ -42,6 +42,6 @@ public sealed class SystemUpdateHandler : INotificationHandler<SystemUpdateEvent
                 SourceEventType: integrationEvent.EventType));
         }
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>(drafts);
     }
 }

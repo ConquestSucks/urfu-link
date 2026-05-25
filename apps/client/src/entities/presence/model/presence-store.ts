@@ -18,11 +18,13 @@ type PresenceState = {
     typingByConversation: Record<string, TypingUser[]>;
     watchedUserIds: string[];
     watchedUserRefCounts: Record<string, number>;
+    viewingContexts: string[];
 
     connect: () => Promise<void>;
     disconnect: () => Promise<void>;
     watchUserPresence: (userId: string) => Promise<void>;
     unwatchUserPresence: (userId: string) => void;
+    setViewingContexts: (contexts: string[]) => void;
 
     setUserPresence: (info: PresenceInfo) => void;
     setTyping: (typing: TypingUser) => void;
@@ -105,6 +107,32 @@ export const toPresenceTypingConversationId = (conversationId: string) => {
         : conversationId;
 };
 
+export const toChatViewingContext = (conversationId: string) =>
+    `chat:conversation:${conversationId}`;
+
+export const toChatThreadViewingContext = (conversationId: string, rootMessageId: string) =>
+    `chat:thread:${conversationId}:${rootMessageId.replace(/-/g, "").toLowerCase()}`;
+
+const normalizeViewingContexts = (contexts: string[]) =>
+    Array.from(
+        new Set(
+            contexts
+                .map((context) => context.trim())
+                .filter((context) => context.length > 0 && context.length <= 200),
+        ),
+    ).slice(0, 16);
+
+const publishViewingContexts = (
+    connection: HubConnection | null,
+    contexts: string[],
+) => {
+    if (connection?.state === HubConnectionState.Connected) {
+        connection.invoke("SetViewingContexts", contexts).catch((e) =>
+            warnUnlessConnectionClosingError("SetViewingContexts failed", e)
+        );
+    }
+};
+
 export const usePresenceStore = create<PresenceState>((set, get) => ({
     connection: null,
     isConnected: false,
@@ -112,6 +140,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
     typingByConversation: {},
     watchedUserIds: [],
     watchedUserRefCounts: {},
+    viewingContexts: [],
 
     connect: async () => {
         const { connection, isConnected } = get();
@@ -206,6 +235,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
             }
 
             set({ isConnected: true });
+            publishViewingContexts(newConnection, get().viewingContexts);
             void subscribeWatchedUsers();
         });
 
@@ -228,6 +258,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 return;
             }
             set({ connection: newConnection, isConnected: true });
+            publishViewingContexts(newConnection, get().viewingContexts);
             await subscribeWatchedUsers();
         } catch (e) {
             console.error("Failed to connect to PresenceHub", e);
@@ -294,6 +325,12 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 warnUnlessConnectionClosingError("Presence unsubscribe failed", error),
             );
         }
+    },
+
+    setViewingContexts: (contexts) => {
+        const normalized = normalizeViewingContexts(contexts);
+        set({ viewingContexts: normalized });
+        publishViewingContexts(get().connection, normalized);
     },
 
     setUserPresence: (info) => {

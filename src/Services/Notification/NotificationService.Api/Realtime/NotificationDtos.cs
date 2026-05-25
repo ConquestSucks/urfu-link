@@ -26,7 +26,10 @@ public sealed record NotificationDto(
     DateTimeOffset? DoneAtUtc,
     DateTimeOffset? ArchivedAtUtc,
     DateTimeOffset? SnoozedUntilUtc,
-    DateTimeOffset? ExpiresAtUtc);
+    DateTimeOffset? ExpiresAtUtc,
+    string? SourceActionId = null,
+    NotificationPriority? Priority = null,
+    Guid? SupersededByNotificationId = null);
 
 public sealed record NotificationActorDto(Guid? Id, string? DisplayName, string? AvatarUrl);
 

@@ -8,7 +8,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Discipline;
 
 public sealed class DisciplineMaterialHandler : INotificationHandler<DisciplineMaterialPublishedEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         DisciplineMaterialPublishedEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -30,7 +30,7 @@ public sealed class DisciplineMaterialHandler : INotificationHandler<DisciplineM
 
         var groupKey = GroupKey.ForDisciplineMaterial(integrationEvent.DisciplineId);
 
-        var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
+        var drafts = new List<NotificationIntent>(integrationEvent.Recipients.Count);
         foreach (var recipientId in integrationEvent.Recipients)
         {
             if (recipientId == integrationEvent.AuthorTeacherId)
@@ -38,7 +38,7 @@ public sealed class DisciplineMaterialHandler : INotificationHandler<DisciplineM
                 continue;
             }
 
-            drafts.Add(new NotificationDraft(
+            drafts.Add(new NotificationIntent(
                 RecipientUserId: recipientId,
                 Category: NotificationCategory.DisciplineMaterial,
                 Severity: NotificationSeverity.Normal,
@@ -46,9 +46,15 @@ public sealed class DisciplineMaterialHandler : INotificationHandler<DisciplineM
                 Data: data,
                 GroupKey: groupKey,
                 SourceEventId: integrationEvent.EventId,
-                SourceEventType: integrationEvent.EventType));
+                SourceEventType: integrationEvent.EventType,
+                SourceActionId: NotificationSourceActions.DisciplineItem(
+                    integrationEvent.DisciplineId,
+                    integrationEvent.MaterialId,
+                    "material"),
+                Priority: NotificationPriority.PinSystemAdmin,
+                Actor: new NotificationActor(integrationEvent.AuthorTeacherId, null, null)));
         }
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>(drafts);
     }
 }

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using Urfu.Link.Services.Notification.Domain.Aggregates;
+using Urfu.Link.Services.Notification.Domain;
 using Urfu.Link.Services.Notification.Domain.Enums;
 using Urfu.Link.Services.Notification.Domain.Interfaces;
 using NotificationAggregate = Urfu.Link.Services.Notification.Domain.Aggregates.Notification;
@@ -8,9 +9,9 @@ using NotificationAggregate = Urfu.Link.Services.Notification.Domain.Aggregates.
 namespace Urfu.Link.Services.Notification.Infrastructure.Persistence.Repositories;
 
 /// <summary>
-/// EF Core repository for notifications and their owned deliveries. Idempotent insert
-/// is implemented by translating Postgres unique-violation 23505 on
-/// <c>ux_notifications_idempotency</c> into a "duplicate, swallow" signal.
+/// EF Core repository for notifications and their owned deliveries. Idempotent writes
+/// use event-level keys for exact Kafka duplicates and source-action keys for the
+/// user-facing "one visible item per action" contract.
 /// </summary>
 public sealed class NotificationRepository(NotificationDbContext db) : INotificationRepository
 {
@@ -40,6 +41,167 @@ public sealed class NotificationRepository(NotificationDbContext db) : INotifica
             db.ChangeTracker.Clear();
             return false;
         }
+    }
+
+    public async Task<NotificationUpsertResult> UpsertAsync(
+        NotificationAggregate notification,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        if (string.IsNullOrWhiteSpace(notification.SourceActionId))
+        {
+            return await TryInsertAsync(notification, cancellationToken).ConfigureAwait(false)
+                ? NotificationUpsertResult.Created(notification)
+                : NotificationUpsertResult.Skipped();
+        }
+
+        var exactDuplicate = await db.NotificationDedupKeys
+            .AsNoTracking()
+            .AnyAsync(k =>
+                k.RecipientUserId == notification.RecipientUserId &&
+                k.SourceEventId == notification.SourceEventId &&
+                k.NotificationType == notification.Type,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (exactDuplicate)
+        {
+            return NotificationUpsertResult.Skipped();
+        }
+
+        var actionKey = await db.NotificationSourceActionKeys
+            .AsTracking()
+            .FirstOrDefaultAsync(k =>
+                k.RecipientUserId == notification.RecipientUserId &&
+                k.SourceActionId == notification.SourceActionId,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        NotificationAggregate? existing = null;
+        if (actionKey is not null)
+        {
+            existing = await db.Notifications
+                .AsTracking()
+                .FirstOrDefaultAsync(n =>
+                    n.Id == actionKey.NotificationId &&
+                    n.CreatedAtUtc == actionKey.NotificationCreatedAtUtc,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (existing is null)
+        {
+            db.NotificationDedupKeys.Add(NotificationDedupKey.Create(
+                notification.RecipientUserId,
+                notification.SourceEventId,
+                notification.Type,
+                notification.Id,
+                notification.CreatedAtUtc));
+            db.NotificationSourceActionKeys.Add(NotificationSourceActionKey.Create(
+                notification.RecipientUserId,
+                notification.SourceActionId,
+                notification.Id,
+                notification.CreatedAtUtc,
+                notification.Priority,
+                notification.CreatedAtUtc));
+            db.Notifications.Add(notification);
+            foreach (var delivery in notification.Deliveries)
+            {
+                db.Deliveries.Add(delivery);
+            }
+
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                return NotificationUpsertResult.Created(notification);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                db.ChangeTracker.Clear();
+                return NotificationUpsertResult.Skipped();
+            }
+        }
+
+        actionKey ??= NotificationSourceActionKey.Create(
+            notification.RecipientUserId,
+            notification.SourceActionId,
+            existing.Id,
+            existing.CreatedAtUtc,
+            existing.Priority,
+            notification.CreatedAtUtc);
+
+        db.NotificationDedupKeys.Add(NotificationDedupKey.Create(
+            notification.RecipientUserId,
+            notification.SourceEventId,
+            notification.Type,
+            existing.Id,
+            notification.CreatedAtUtc));
+
+        if (NotificationPriorityPolicy.ShouldUpgrade(existing.Priority, notification.Priority))
+        {
+            existing.ApplyIntent(
+                notification.Category,
+                notification.Severity,
+                notification.Type,
+                notification.Content,
+                notification.Data,
+                notification.Actor,
+                notification.Entity,
+                notification.Actions,
+                notification.GroupKey,
+                notification.Priority,
+                notification.SourceEventId,
+                notification.SourceEventType,
+                notification.LastOccurrenceAtUtc);
+            actionKey.PointTo(existing.Id, existing.CreatedAtUtc, existing.Priority);
+
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                return NotificationUpsertResult.Updated(existing);
+            }
+            catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == PostgresErrorCodes.UniqueViolation)
+            {
+                db.ChangeTracker.Clear();
+                return NotificationUpsertResult.Skipped();
+            }
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return NotificationUpsertResult.Skipped(existing);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException pg && pg.SqlState == PostgresErrorCodes.UniqueViolation)
+        {
+            db.ChangeTracker.Clear();
+            return NotificationUpsertResult.Skipped();
+        }
+    }
+
+    public async Task<IReadOnlyList<NotificationAggregate>> ArchiveBySourceActionAsync(
+        string sourceActionId,
+        DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourceActionId);
+
+        var notifications = await db.Notifications
+            .AsTracking()
+            .Where(n =>
+                n.SourceActionId == sourceActionId &&
+                n.DoneAtUtc == null &&
+                n.ArchivedAtUtc == null)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        foreach (var notification in notifications)
+        {
+            notification.Archive(archivedAtUtc);
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return notifications;
     }
 
     public Task<NotificationAggregate?> GetByIdAsync(Guid notificationId, Guid recipientUserId, CancellationToken cancellationToken)

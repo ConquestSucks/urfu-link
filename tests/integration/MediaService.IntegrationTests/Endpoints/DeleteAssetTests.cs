@@ -1,7 +1,7 @@
 using System.Net;
 using FluentAssertions;
-using MediaService.Api.Domain.Events;
 using MediaService.IntegrationTests.Infrastructure;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Media;
 
 namespace MediaService.IntegrationTests.Endpoints;
 

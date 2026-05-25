@@ -12,7 +12,8 @@ public sealed record ChatThreadReplyPostedEvent(
     Guid SenderId,
     IReadOnlyList<Guid> Subscribers,
     IReadOnlyList<Guid>? Mentions,
-    DateTimeOffset OccurredAtUtc) : IIntegrationEvent
+    DateTimeOffset OccurredAtUtc,
+    Guid? RootMessageAuthorId = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

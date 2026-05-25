@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
         pointerEvents: "none",
     },
     messageAfterMessage: {
-        marginTop: 24,
+        marginTop: 12,
     },
 });
 

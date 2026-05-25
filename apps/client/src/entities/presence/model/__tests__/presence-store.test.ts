@@ -4,6 +4,7 @@ import { apiClient } from "@/shared/lib/api";
 import { createHubConnection } from "@/shared/lib/signalr";
 import {
     presenceStatusToLabel,
+    toChatViewingContext,
     toPresenceTypingConversationId,
     useConversationTypers,
     usePresenceStore,
@@ -83,6 +84,7 @@ describe("presence store subscriptions", () => {
             typingByConversation: {},
             watchedUserIds: [],
             watchedUserRefCounts: {},
+            viewingContexts: [],
         });
     });
 
@@ -221,6 +223,20 @@ describe("presence store subscriptions", () => {
 
         expect(connection.invoke).toHaveBeenCalledWith("SubscribeToUsers", [peerUserId]);
         expect(usePresenceStore.getState().isConnected).toBe(true);
+    });
+
+    it("publishes active viewing contexts through the presence hub", async () => {
+        await act(async () => {
+            await usePresenceStore.getState().connect();
+        });
+        connection.invoke.mockClear();
+
+        const context = toChatViewingContext("direct-1");
+        act(() => {
+            usePresenceStore.getState().setViewingContexts([context]);
+        });
+
+        expect(connection.invoke).toHaveBeenCalledWith("SetViewingContexts", [context]);
     });
 
     it("keeps a shared user subscription until every watcher releases it", async () => {
