@@ -1,47 +1,112 @@
 import { memo, useCallback } from "react";
-import { FlatList, Pressable, Text, View } from "react-native";
-import { EMOJI_DATA } from "../config/emoji";
+import { View } from "react-native";
+import {
+    EmojiKeyboard,
+    ru,
+    useRecentPicksPersistence,
+    type EmojiType,
+} from "rn-emoji-keyboard";
+import { appStorage } from "@/shared/lib/storage";
 
-const EmojiItem = memo(({ emoji, onPress }: { emoji: string; onPress: (e: string) => void }) => (
-    <Pressable
-        onPress={() => onPress(emoji)}
-        className="justify-center items-center w-10 h-10 active:bg-white/10 rounded-lg"
-    >
-        <Text style={{ fontSize: 24 }}>{emoji}</Text>
-    </Pressable>
-));
+const RECENT_EMOJIS_STORAGE_KEY = "urfu-link-recent-emojis";
+const RECENT_EMOJIS_LIMIT = 48;
+
+const emojiKeyboardTheme = {
+    backdrop: "rgba(0, 0, 0, 0.6)",
+    container: "#0B1225",
+    header: "#CAD5E2",
+    knob: "#62748E",
+    skinTonesContainer: "#0F172B",
+    category: {
+        icon: "#8B8FA8",
+        iconActive: "#51A2FF",
+        container: "#0F172B",
+        containerActive: "rgba(43, 127, 255, 0.14)",
+    },
+    search: {
+        background: "rgba(255, 255, 255, 0.05)",
+        text: "#FFFFFF",
+        placeholder: "#8B8FA8",
+        icon: "#8B8FA8",
+    },
+    customButton: {
+        icon: "#8B8FA8",
+        iconPressed: "#51A2FF",
+        background: "rgba(255, 255, 255, 0.05)",
+        backgroundPressed: "rgba(43, 127, 255, 0.14)",
+    },
+    emoji: {
+        selected: "rgba(43, 127, 255, 0.2)",
+    },
+};
+
+const emojiKeyboardStyles = {
+    container: {
+        borderRadius: 0,
+        elevation: 0,
+        shadowOpacity: 0,
+    },
+    searchBar: {
+        container: {
+            borderRadius: 14,
+            minHeight: 40,
+            marginTop: 12,
+            marginBottom: 4,
+        },
+        text: {
+            fontSize: 15,
+        },
+    },
+    category: {
+        container: {
+            borderRadius: 12,
+        },
+    },
+};
+
+const readRecentEmojis = async () => {
+    const raw = await appStorage.getItem(RECENT_EMOJIS_STORAGE_KEY);
+    if (!raw) return [];
+
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+};
 
 export const EmojiPicker = memo(({ onPick }: { onPick: (emoji: string) => void }) => {
-    const renderCategory = useCallback(
-        ({ item }: { item: (typeof EMOJI_DATA)[0] }) => (
-            <View>
-                <Text className="text-text-subtle px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
-                    {item.category}
-                </Text>
-                <View className="flex-row flex-wrap px-2">
-                    {item.data.map((emoji, index) => (
-                        <EmojiItem
-                            key={`${item.category}-${index}`}
-                            emoji={emoji}
-                            onPress={onPick}
-                        />
-                    ))}
-                </View>
-            </View>
-        ),
+    useRecentPicksPersistence({
+        initialization: readRecentEmojis,
+        onStateChange: async (nextState) => {
+            await appStorage.setItem(
+                RECENT_EMOJIS_STORAGE_KEY,
+                JSON.stringify(nextState.slice(0, RECENT_EMOJIS_LIMIT)),
+            );
+        },
+    });
+
+    const handleEmojiSelected = useCallback(
+        (emoji: EmojiType) => {
+            onPick(emoji.emoji);
+        },
         [onPick],
     );
 
     return (
-        <FlatList
-            data={EMOJI_DATA}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item.category}
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={10}
-            windowSize={5}
-            initialNumToRender={15}
-            keyboardShouldPersistTaps="handled"
-        />
+        <View className="flex-1 bg-app-card">
+            <EmojiKeyboard
+                onEmojiSelected={handleEmojiSelected}
+                translation={ru}
+                enableSearchBar
+                enableRecentlyUsed
+                categoryPosition="bottom"
+                emojiSize={28}
+                disableSafeArea
+                theme={emojiKeyboardTheme}
+                styles={emojiKeyboardStyles}
+            />
+        </View>
     );
 });

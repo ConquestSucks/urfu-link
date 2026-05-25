@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { ActiveThreadDto, MessageDto } from "@urfu-link/api-client";
 import { apiClient } from "@/shared/lib/api";
+import { playMessageSound } from "@/shared/lib/message-sounds";
 import { useChatStore } from "./chat-store";
 import { HubConnectionState } from "@microsoft/signalr";
 
@@ -177,6 +178,7 @@ export const useThreadStore = create<ThreadState>((set, get) => {
                     replyToMessageId,
                 );
             }
+            void playMessageSound("send");
         },
 
         loadActiveThreads: async () => {
