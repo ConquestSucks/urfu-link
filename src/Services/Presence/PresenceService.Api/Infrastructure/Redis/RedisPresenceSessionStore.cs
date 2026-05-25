@@ -62,18 +62,17 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
     };
 
     private readonly IConnectionMultiplexer _redis;
-    private readonly TimeProvider _clock;
-    private readonly TimeSpan _sessionTtl;
+    private readonly TimeSpan _sessionKeyTtl;
 
     public RedisPresenceSessionStore(
         IConnectionMultiplexer redis,
         TimeProvider clock,
         IOptions<PresenceOptions> options)
     {
+        ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(options);
         _redis = redis;
-        _clock = clock;
-        _sessionTtl = options.Value.SessionTtl;
+        _sessionKeyTtl = ComputeSessionKeyTtl(options.Value);
     }
 
     public async Task<bool> AddSessionAsync(PresenceSession session, CancellationToken cancellationToken)
@@ -103,7 +102,7 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
                 session.DeviceId,
                 json,
                 nowMs,
-                (long)_sessionTtl.TotalSeconds,
+                (long)Math.Ceiling(_sessionKeyTtl.TotalSeconds),
                 member,
             ]).ConfigureAwait(false);
 
@@ -174,7 +173,7 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
 
         var batch = db.CreateBatch();
         var hset = batch.HashSetAsync(sessionsKey, deviceId, json);
-        var expire = batch.KeyExpireAsync(sessionsKey, _sessionTtl);
+        var expire = batch.KeyExpireAsync(sessionsKey, _sessionKeyTtl);
         var zadd = batch.SortedSetAddAsync(RedisKeys.Heartbeats, member, utcNow.ToUnixTimeMilliseconds());
         batch.Execute();
         await Task.WhenAll(hset, expire, zadd).ConfigureAwait(false);
@@ -201,7 +200,7 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
         var updated = stored with { Status = status, CustomActivity = customActivity };
         var json = JsonSerializer.Serialize(updated, JsonOptions);
         await db.HashSetAsync(sessionsKey, deviceId, json).ConfigureAwait(false);
-        await db.KeyExpireAsync(sessionsKey, _sessionTtl).ConfigureAwait(false);
+        await db.KeyExpireAsync(sessionsKey, _sessionKeyTtl).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<PresenceSession>> GetSessionsAsync(
@@ -258,5 +257,20 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
             if (p is { } v) parsed.Add(v);
         }
         return parsed;
+    }
+
+    private static TimeSpan ComputeSessionKeyTtl(PresenceOptions options)
+    {
+        var heartbeatGrace = options.HeartbeatExpectedInterval > TimeSpan.Zero
+            ? options.HeartbeatExpectedInterval
+            : TimeSpan.FromSeconds(15);
+        var sweeperGrace = options.SweeperInterval > TimeSpan.Zero
+            ? options.SweeperInterval
+            : TimeSpan.FromSeconds(10);
+        var grace = heartbeatGrace > sweeperGrace ? heartbeatGrace : sweeperGrace;
+
+        // The sweeper needs the hash payload after SessionTtl elapses so it can
+        // remove the session and persist last_seen. Redis TTL is only a backstop.
+        return options.SessionTtl + grace + TimeSpan.FromSeconds(5);
     }
 }
