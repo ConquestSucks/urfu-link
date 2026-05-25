@@ -45,7 +45,10 @@ kubectl get pods -A -o json \
           ready: ([.status.containerStatuses[]? | select(.ready == true)] | length),
           total: ([.status.containerStatuses[]?] | length)
         }
-      | select(.phase != "Running" and .phase != "Succeeded" or .waiting != "" or .ready != .total)
+      | select(
+          (.phase != "Running" and .phase != "Succeeded")
+          or (.phase == "Running" and (.waiting != "" or .ready != .total))
+        )
       | [.ns, .name, .phase, .waiting, (.ready|tostring)+"/"+(.total|tostring), (.restarts|tostring)]
       | @tsv
     ' \
