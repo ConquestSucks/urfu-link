@@ -183,6 +183,27 @@ spec:
         - protocol: TCP
           port: 9000
 ---
+# MinIO: allow OIDC discovery against the internal Keycloak service.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: minio-egress-keycloak
+  namespace: urfu-platform
+spec:
+  podSelector:
+    matchLabels:
+      app: urfu-minio
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+---
 # LiveKit + CoTURN: allow ingress from urfu-prod (call-service)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

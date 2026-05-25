@@ -4,7 +4,9 @@ kind: Kustomization
 resources:
   - storageclass-fast-ssd.yaml
   - postgres-cluster.yaml
+  - mongo-app-user-password-external-secret.yaml
   - mongodb-cluster.yaml
+  - mongodb-auth-preflight-job.yaml
   - mongodb-backup-cronjob.yaml
   - redis.yaml
   - kafka-cluster.yaml

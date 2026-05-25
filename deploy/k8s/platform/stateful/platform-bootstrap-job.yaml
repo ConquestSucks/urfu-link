@@ -136,6 +136,7 @@ spec:
                 KEYCLOAK_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" keycloak_admin_password 2>/dev/null || true)"
                 API_GATEWAY_CLIENT_SECRET="$(secret_value "$GENERATED_JSON" api_gateway_client_secret 2>/dev/null || true)"
                 POMERIUM_DB_PASSWORD="$(secret_value "$GENERATED_JSON" pomerium_db_password 2>/dev/null || true)"
+                MONGO_APP_PASSWORD="$(secret_value "$GENERATED_JSON" mongo_app_password 2>/dev/null || true)"
 
                 [ -n "$USER_DB_PASSWORD" ] || USER_DB_PASSWORD="$(rand 32)"
                 [ -n "$MEDIA_DB_PASSWORD" ] || MEDIA_DB_PASSWORD="$(rand 32)"
@@ -146,11 +147,19 @@ spec:
                 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ] || KEYCLOAK_ADMIN_PASSWORD="$(rand 32)"
                 [ -n "$API_GATEWAY_CLIENT_SECRET" ] || API_GATEWAY_CLIENT_SECRET="$(rand 40)"
                 [ -n "$POMERIUM_DB_PASSWORD" ] || POMERIUM_DB_PASSWORD="$(rand 32)"
+                if [ -z "$MONGO_APP_PASSWORD" ]; then
+                  EXISTING_MONGO_JSON="$(get_secret_json mongo-app-user-password)"
+                  MONGO_APP_PASSWORD="$(secret_value "$EXISTING_MONGO_JSON" password 2>/dev/null || true)"
+                  if echo "$MONGO_APP_PASSWORD" | grep -q "PLACEHOLDER"; then
+                    MONGO_APP_PASSWORD=""
+                  fi
+                fi
+                [ -n "$MONGO_APP_PASSWORD" ] || MONGO_APP_PASSWORD="$(rand 32)"
 
                 GRAFANA_ADMIN_PASSWORD="$(secret_value "$GENERATED_JSON" grafana_admin_password 2>/dev/null || true)"
                 [ -n "$GRAFANA_ADMIN_PASSWORD" ] || GRAFANA_ADMIN_PASSWORD="$(rand 32)"
 
-                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","discipline_db_password":"%s","presence_db_password":"%s","notification_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
+                GENERATED_PATCH="$(printf '{"data":{"user_db_password":"%s","media_db_password":"%s","discipline_db_password":"%s","presence_db_password":"%s","notification_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s","mongo_app_password":"%s"}}' \
                   "$(b64 "$USER_DB_PASSWORD")" \
                   "$(b64 "$MEDIA_DB_PASSWORD")" \
                   "$(b64 "$DISCIPLINE_DB_PASSWORD")" \
@@ -160,12 +169,13 @@ spec:
                   "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
                   "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
                   "$(b64 "$GRAFANA_ADMIN_PASSWORD")" \
-                  "$(b64 "$POMERIUM_DB_PASSWORD")")"
+                  "$(b64 "$POMERIUM_DB_PASSWORD")" \
+                  "$(b64 "$MONGO_APP_PASSWORD")")"
 
                 if [ "$GENERATED_EXISTS" = "true" ]; then
                   patch_secret_json platform-bootstrap-generated "$GENERATED_PATCH"
                 else
-                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","discipline_db_password":"%s","presence_db_password":"%s","notification_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s"}}' \
+                  GENERATED_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"platform-bootstrap-generated"},"type":"Opaque","data":{"user_db_password":"%s","media_db_password":"%s","discipline_db_password":"%s","presence_db_password":"%s","notification_db_password":"%s","keycloak_db_password":"%s","keycloak_admin_password":"%s","api_gateway_client_secret":"%s","grafana_admin_password":"%s","pomerium_db_password":"%s","mongo_app_password":"%s"}}' \
                     "$(b64 "$USER_DB_PASSWORD")" \
                     "$(b64 "$MEDIA_DB_PASSWORD")" \
                     "$(b64 "$DISCIPLINE_DB_PASSWORD")" \
@@ -175,25 +185,9 @@ spec:
                     "$(b64 "$KEYCLOAK_ADMIN_PASSWORD")" \
                     "$(b64 "$API_GATEWAY_CLIENT_SECRET")" \
                     "$(b64 "$GRAFANA_ADMIN_PASSWORD")" \
-                    "$(b64 "$POMERIUM_DB_PASSWORD")")"
+                    "$(b64 "$POMERIUM_DB_PASSWORD")" \
+                    "$(b64 "$MONGO_APP_PASSWORD")")"
                   create_secret_json "$GENERATED_CREATE"
-                fi
-              }
-
-              ensure_mongo_password_secret() {
-                MONGO_JSON="$(get_secret_json mongo-app-user-password)"
-                MONGO_CODE="$(secret_http_code mongo-app-user-password)"
-                if [ "$MONGO_CODE" = "404" ]; then
-                  MONGO_APP_PASSWORD="$(rand 32)"
-                  MONGO_CREATE="$(printf '{"apiVersion":"v1","kind":"Secret","metadata":{"name":"mongo-app-user-password"},"type":"Opaque","data":{"password":"%s"}}' "$(b64 "$MONGO_APP_PASSWORD")")"
-                  create_secret_json "$MONGO_CREATE"
-                else
-                  MONGO_APP_PASSWORD="$(secret_value "$MONGO_JSON" password 2>/dev/null || true)"
-                  if [ -z "$MONGO_APP_PASSWORD" ] || echo "$MONGO_APP_PASSWORD" | grep -q "PLACEHOLDER"; then
-                    MONGO_APP_PASSWORD="$(rand 32)"
-                    MONGO_PATCH="$(printf '{"data":{"password":"%s"}}' "$(b64 "$MONGO_APP_PASSWORD")")"
-                    patch_secret_json mongo-app-user-password "$MONGO_PATCH"
-                  fi
                 fi
               }
 
@@ -347,7 +341,6 @@ spec:
               }
 
               ensure_generated_secret
-              ensure_mongo_password_secret
               ensure_postgres_superuser_secret
               bootstrap_postgres
               wait_for_vault
@@ -363,12 +356,12 @@ spec:
               EXISTING_USER_SVC="$(vault_read urfu-link/prod/user-service)"
               EXISTING_KC_SECRET="$(json_get_string "$EXISTING_USER_SVC" keycloak_client_secret)"
               if [ -n "$EXISTING_KC_SECRET" ]; then
-                USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s","keycloak_client_secret":"%s"}}' "$USER_DB_PASSWORD" "$EXISTING_KC_SECRET")"
+                USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s;GSS Encryption Mode=Disable","keycloak_client_secret":"%s"}}' "$USER_DB_PASSWORD" "$EXISTING_KC_SECRET")"
               else
-                USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s"}}' "$USER_DB_PASSWORD")"
+                USER_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=user_db;Username=user;Password=%s;GSS Encryption Mode=Disable"}}' "$USER_DB_PASSWORD")"
               fi
-              MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s"}}' "$MEDIA_DB_PASSWORD")"
-              DISCIPLINE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=discipline_db;Username=discipline;Password=%s"}}' "$DISCIPLINE_DB_PASSWORD")"
+              MEDIA_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=media_db;Username=media;Password=%s;GSS Encryption Mode=Disable"}}' "$MEDIA_DB_PASSWORD")"
+              DISCIPLINE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=discipline_db;Username=discipline;Password=%s;GSS Encryption Mode=Disable"}}' "$DISCIPLINE_DB_PASSWORD")"
               EXISTING_CHAT_SVC="$(vault_read urfu-link/prod/chat-service)"
               EXISTING_INTERNAL_AUTH_SECRET="$(json_get_string "$EXISTING_CHAT_SVC" internal_auth_client_secret)"
               if [ -n "$EXISTING_INTERNAL_AUTH_SECRET" ]; then
@@ -376,12 +369,13 @@ spec:
               else
                 CHAT_PAYLOAD="$(printf '{"data":{"primary_connection":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin"}}' "$MONGO_APP_PASSWORD")"
               fi
-              PRESENCE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s"}}' "$PRESENCE_DB_PASSWORD")"
-              NOTIFICATION_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s","kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}' "$NOTIFICATION_DB_PASSWORD")"
+              PRESENCE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s;GSS Encryption Mode=Disable"}}' "$PRESENCE_DB_PASSWORD")"
+              NOTIFICATION_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s;GSS Encryption Mode=Disable","kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}' "$NOTIFICATION_DB_PASSWORD")"
               CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
               GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
               KAFKA_PAYLOAD='{"data":{"bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
               API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"
+              MONGO_PAYLOAD="$(printf '{"data":{"app_user_password":"%s"}}' "$MONGO_APP_PASSWORD")"
               MONGO_BACKUP_PAYLOAD="$(printf '{"data":{"mongo_uri":"mongodb://app-user:%s@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/chat_db?authSource=admin","minio_endpoint":"http://urfu-minio.urfu-platform.svc.cluster.local:9000","minio_access_key":"%s","minio_secret_key":"%s"}}' \
                 "$MONGO_APP_PASSWORD" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY")"  
 
@@ -399,4 +393,5 @@ spec:
               vault_put urfu-link/prod/grafana "$GRAFANA_PAYLOAD"
               vault_put urfu-link/prod/kafka "$KAFKA_PAYLOAD"
               vault_put urfu-link/prod/api-gateway "$API_GATEWAY_PAYLOAD"
+              vault_put urfu-link/prod/mongo "$MONGO_PAYLOAD"
               vault_put urfu-link/prod/mongo-backup "$MONGO_BACKUP_PAYLOAD"

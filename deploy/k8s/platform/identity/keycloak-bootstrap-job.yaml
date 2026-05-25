@@ -309,6 +309,45 @@ spec:
                 fi
               }
 
+              verify_internal_grpc_token() {
+                echo "Verifying chat-service-internal token claims..."
+                TOKEN_RESPONSE="$(curl --silent --fail \
+                  -X POST "${KEYCLOAK_URL}/realms/urfu-link/protocol/openid-connect/token" \
+                  -d "grant_type=client_credentials" \
+                  -d "client_id=chat-service-internal" \
+                  -d "client_secret=${CHAT_SERVICE_INTERNAL_SECRET}")"
+                ACCESS_TOKEN="$(echo "$TOKEN_RESPONSE" | jq -r '.access_token')"
+                if [ -z "$ACCESS_TOKEN" ] || [ "$ACCESS_TOKEN" = "null" ]; then
+                  echo "chat-service-internal token response did not contain access_token"
+                  exit 1
+                fi
+
+                PAYLOAD_B64="$(printf "%s" "$ACCESS_TOKEN" | cut -d. -f2 | tr '_-' '/+')"
+                case $(( ${#PAYLOAD_B64} % 4 )) in
+                  2) PAYLOAD_B64="${PAYLOAD_B64}==" ;;
+                  3) PAYLOAD_B64="${PAYLOAD_B64}=" ;;
+                  1) echo "Invalid JWT payload padding"; exit 1 ;;
+                esac
+                PAYLOAD="$(printf "%s" "$PAYLOAD_B64" | base64 -d)"
+
+                echo "$PAYLOAD" | jq -e \
+                  --arg iss "https://id.ghjc.ru/realms/urfu-link" \
+                  --arg aud "urfu-link-api" \
+                  --arg discipline "service:discipline-read" \
+                  --arg presence "service:presence-internal" \
+                  '
+                    def aud_has($expected):
+                      (.aud == $expected)
+                      or ((.aud | type) == "array" and ((.aud | index($expected)) != null));
+
+                    .iss == $iss
+                    and aud_has($aud)
+                    and (((.groups // []) | index($discipline)) != null)
+                    and (((.groups // []) | index($presence)) != null)
+                  ' >/dev/null
+                echo "chat-service-internal token claims verified."
+              }
+
               # --- Main ---
 
               wait_for_vault
@@ -409,6 +448,7 @@ spec:
                 "${KEYCLOAK_URL}/admin/realms/urfu-link/users/${CHAT_SA_ID}/role-mappings/realm" \
                 -d "[${DISCIPLINE_READ_ROLE},${MEDIA_INTERNAL_ROLE},${PRESENCE_INTERNAL_ROLE}]" >/dev/null
               echo "Granted internal gRPC roles to chat-service-internal service account"
+              verify_internal_grpc_token
 
               # --- Frontend Web (public client for mobile) ---
               ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*","http://app.dev.127.0.0.1.nip.io/*"]' '["https://urfu-link.ghjc.ru","http://app.dev.127.0.0.1.nip.io"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
