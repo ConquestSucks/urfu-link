@@ -12,6 +12,7 @@ internal static class NotificationDtoMapper
         return new NotificationDto(
             Id: notification.Id,
             RecipientUserId: notification.RecipientUserId,
+            Type: notification.Type,
             Category: notification.Category,
             Severity: notification.Severity,
             Title: notification.Content.Title,
@@ -19,8 +20,25 @@ internal static class NotificationDtoMapper
             ImageUrl: notification.Content.ImageUrl,
             DeepLink: notification.Content.DeepLink,
             Data: notification.Data.Values,
+            Actor: notification.Actor is null
+                ? null
+                : new NotificationActorDto(notification.Actor.Id, notification.Actor.DisplayName, notification.Actor.AvatarUrl),
+            Entity: notification.Entity is null
+                ? null
+                : new NotificationEntityDto(notification.Entity.Kind, notification.Entity.Id, notification.Entity.DisplayName),
+            Actions: notification.Actions
+                .Select(a => new NotificationActionDto(a.Id, a.Label, a.Kind, a.DeepLink))
+                .ToArray(),
             GroupKey: notification.GroupKey?.Value,
+            OccurrenceCount: notification.OccurrenceCount,
             CreatedAtUtc: notification.CreatedAtUtc,
-            ReadAtUtc: notification.ReadAtUtc);
+            LastOccurrenceAtUtc: notification.LastOccurrenceAtUtc,
+            ReadAtUtc: notification.ReadAtUtc,
+            SeenAtUtc: notification.SeenAtUtc,
+            SavedAtUtc: notification.SavedAtUtc,
+            DoneAtUtc: notification.DoneAtUtc,
+            ArchivedAtUtc: notification.ArchivedAtUtc,
+            SnoozedUntilUtc: notification.SnoozedUntilUtc,
+            ExpiresAtUtc: notification.ExpiresAtUtc);
     }
 }

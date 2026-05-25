@@ -1,4 +1,6 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
+import { useNotificationBadge } from "@/features/notifications";
+import { useNotificationStore } from "@/shared/store/notification-store";
 import { BellIcon, ChatCircleTextIcon } from "@/shared/ui/phosphor";
 import { Link } from "expo-router";
 import React from "react";
@@ -17,6 +19,9 @@ const TOGGLE_ITEMS = [
 
 export const ViewToggle = ({ currentView, createHref }: ViewToggleProps) => {
     const { isMobile } = useWindowSize();
+    const { data } = useNotificationBadge();
+    const liveBadge = useNotificationStore((s) => s.badge);
+    const unreadCount = (liveBadge ?? data)?.total ?? 0;
 
     const containerClasses = isMobile
         ? "flex-row items-center gap-1"
@@ -49,7 +54,7 @@ export const ViewToggle = ({ currentView, createHref }: ViewToggleProps) => {
                         >
                             <View className="relative">
                                 <Icon size={iconSize} weight={iconWeight} className={iconColor} />
-                                {hasBadge && (
+                                {hasBadge && unreadCount > 0 && (
                                     <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" />
                                 )}
                             </View>

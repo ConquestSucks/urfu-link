@@ -15,11 +15,34 @@ public sealed class NotificationBroadcaster(IHubContext<NotificationHub, INotifi
             .NotificationReceived(notification);
     }
 
+    public Task NotifyUpsertedAsync(NotificationDto notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+        _ = cancellationToken;
+        return _hub.Clients.Group(NotificationHub.GroupForUser(notification.RecipientUserId))
+            .NotificationUpserted(notification);
+    }
+
     public Task NotifyReadAsync(Guid recipientUserId, Guid notificationId, CancellationToken cancellationToken)
     {
         _ = cancellationToken;
         return _hub.Clients.Group(NotificationHub.GroupForUser(recipientUserId))
             .NotificationRead(notificationId);
+    }
+
+    public Task NotifyStateChangedAsync(Guid recipientUserId, NotificationStateChangedDto change, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        _ = cancellationToken;
+        return _hub.Clients.Group(NotificationHub.GroupForUser(recipientUserId))
+            .NotificationStateChanged(change);
+    }
+
+    public Task NotifyRemovedAsync(Guid recipientUserId, Guid notificationId, CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        return _hub.Clients.Group(NotificationHub.GroupForUser(recipientUserId))
+            .NotificationRemoved(notificationId);
     }
 
     public Task NotifyBadgeUpdatedAsync(Guid recipientUserId, BadgeSnapshotDto snapshot, CancellationToken cancellationToken)
@@ -36,5 +59,12 @@ public sealed class NotificationBroadcaster(IHubContext<NotificationHub, INotifi
         _ = cancellationToken;
         return _hub.Clients.Group(NotificationHub.GroupForUser(recipientUserId))
             .NotificationsBatchRead(notificationIds);
+    }
+
+    public Task NotifyBackfillRequiredAsync(Guid recipientUserId, string reason, CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        return _hub.Clients.Group(NotificationHub.GroupForUser(recipientUserId))
+            .NotificationBackfillRequired(reason);
     }
 }

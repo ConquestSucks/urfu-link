@@ -11,10 +11,16 @@ public interface INotificationRepository
 
     Task<IReadOnlyList<NotificationAggregate>> ListAsync(
         Guid recipientUserId,
-        NotificationCategory? category,
-        bool unreadOnly,
+        NotificationListFilter filter,
         DateTimeOffset? cursorCreatedAtUtc,
         Guid? cursorId,
+        int limit,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<NotificationAggregate>> ListForBulkAsync(
+        Guid recipientUserId,
+        NotificationListFilter filter,
+        IReadOnlyList<Guid>? ids,
         int limit,
         CancellationToken cancellationToken);
 
@@ -30,5 +36,26 @@ public interface INotificationRepository
         Guid recipientUserId,
         CancellationToken cancellationToken);
 
+    Task<NotificationBadgeCounts> CountBadgeAsync(Guid recipientUserId, CancellationToken cancellationToken);
+
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
+
+public sealed record NotificationListFilter(
+    NotificationCategory? Category = null,
+    string? Type = null,
+    NotificationSeverity? Severity = null,
+    string? Status = null,
+    string? Query = null,
+    DateTimeOffset? From = null,
+    DateTimeOffset? To = null)
+{
+    public bool IsUnread => string.Equals(Status, "unread", StringComparison.OrdinalIgnoreCase);
+}
+
+public sealed record NotificationBadgeCounts(
+    int TotalUnread,
+    int TotalUnseen,
+    int UrgentUnread,
+    IReadOnlyDictionary<NotificationCategory, int> PerCategory,
+    IReadOnlyDictionary<string, int> PerType);

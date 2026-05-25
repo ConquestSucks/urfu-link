@@ -17,6 +17,7 @@ public sealed class InAppChannel(INotificationBroadcaster broadcaster, BadgeServ
 
         var dto = NotificationDtoMapper.Map(notification);
         await broadcaster.NotifyReceivedAsync(dto, cancellationToken).ConfigureAwait(false);
+        await broadcaster.NotifyUpsertedAsync(dto, cancellationToken).ConfigureAwait(false);
 
         var snapshot = await badgeService.GetSnapshotAsync(notification.RecipientUserId, cancellationToken)
             .ConfigureAwait(false);

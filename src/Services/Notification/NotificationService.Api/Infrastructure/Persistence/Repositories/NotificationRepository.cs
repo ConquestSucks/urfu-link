@@ -18,6 +18,12 @@ public sealed class NotificationRepository(NotificationDbContext db) : INotifica
     {
         ArgumentNullException.ThrowIfNull(notification);
 
+        db.NotificationDedupKeys.Add(NotificationDedupKey.Create(
+            notification.RecipientUserId,
+            notification.SourceEventId,
+            notification.Type,
+            notification.Id,
+            notification.CreatedAtUtc));
         db.Notifications.Add(notification);
         foreach (var delivery in notification.Deliveries)
         {
@@ -45,26 +51,19 @@ public sealed class NotificationRepository(NotificationDbContext db) : INotifica
 
     public async Task<IReadOnlyList<NotificationAggregate>> ListAsync(
         Guid recipientUserId,
-        NotificationCategory? category,
-        bool unreadOnly,
+        NotificationListFilter filter,
         DateTimeOffset? cursorCreatedAtUtc,
         Guid? cursorId,
         int limit,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(filter);
+
         IQueryable<NotificationAggregate> query = db.Notifications
             .AsNoTracking()
             .Where(n => n.RecipientUserId == recipientUserId);
 
-        if (category.HasValue)
-        {
-            query = query.Where(n => n.Category == category.Value);
-        }
-
-        if (unreadOnly)
-        {
-            query = query.Where(n => n.ReadAtUtc == null);
-        }
+        query = ApplyFilter(query, filter);
 
         if (cursorCreatedAtUtc.HasValue && cursorId.HasValue)
         {
@@ -79,6 +78,36 @@ public sealed class NotificationRepository(NotificationDbContext db) : INotifica
             .OrderByDescending(n => n.CreatedAtUtc)
             .ThenByDescending(n => n.Id)
             .Take(Math.Clamp(limit, 1, 100))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<NotificationAggregate>> ListForBulkAsync(
+        Guid recipientUserId,
+        NotificationListFilter filter,
+        IReadOnlyList<Guid>? ids,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        IQueryable<NotificationAggregate> query = db.Notifications
+            .AsTracking()
+            .Where(n => n.RecipientUserId == recipientUserId);
+
+        if (ids is { Count: > 0 })
+        {
+            query = query.Where(n => ids.Contains(n.Id));
+        }
+        else
+        {
+            query = ApplyFilter(query, filter);
+        }
+
+        return await query
+            .OrderByDescending(n => n.CreatedAtUtc)
+            .ThenByDescending(n => n.Id)
+            .Take(Math.Clamp(limit, 1, 1000))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
@@ -125,8 +154,108 @@ public sealed class NotificationRepository(NotificationDbContext db) : INotifica
         return grouped.ToDictionary(g => g.Key, g => g.Count);
     }
 
+    public async Task<NotificationBadgeCounts> CountBadgeAsync(Guid recipientUserId, CancellationToken cancellationToken)
+    {
+        var unreadQuery = db.Notifications
+            .AsNoTracking()
+            .Where(n =>
+                n.RecipientUserId == recipientUserId &&
+                n.ReadAtUtc == null &&
+                n.DoneAtUtc == null &&
+                n.ArchivedAtUtc == null);
+
+        var totalUnread = await unreadQuery.CountAsync(cancellationToken).ConfigureAwait(false);
+        var totalUnseen = await unreadQuery.CountAsync(n => n.SeenAtUtc == null, cancellationToken).ConfigureAwait(false);
+        var urgentUnread = await unreadQuery.CountAsync(n => n.Severity == NotificationSeverity.Urgent, cancellationToken)
+            .ConfigureAwait(false);
+
+        var perCategory = await unreadQuery
+            .GroupBy(n => n.Category)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var perType = await unreadQuery
+            .GroupBy(n => n.Type)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new NotificationBadgeCounts(
+            totalUnread,
+            totalUnseen,
+            urgentUnread,
+            perCategory.ToDictionary(g => g.Key, g => g.Count),
+            perType.ToDictionary(g => g.Key, g => g.Count, StringComparer.Ordinal));
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken)
     {
         return db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static IQueryable<NotificationAggregate> ApplyFilter(
+        IQueryable<NotificationAggregate> query,
+        NotificationListFilter filter)
+    {
+        if (filter.Category.HasValue)
+        {
+            query = query.Where(n => n.Category == filter.Category.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Type))
+        {
+            var type = filter.Type.Trim();
+            query = query.Where(n => n.Type == type);
+        }
+
+        if (filter.Severity.HasValue)
+        {
+            query = query.Where(n => n.Severity == filter.Severity.Value);
+        }
+
+        if (filter.From.HasValue)
+        {
+            var from = filter.From.Value;
+            query = query.Where(n => n.CreatedAtUtc >= from);
+        }
+
+        if (filter.To.HasValue)
+        {
+            var to = filter.To.Value;
+            query = query.Where(n => n.CreatedAtUtc <= to);
+        }
+
+        if (!string.IsNullOrWhiteSpace(filter.Query))
+        {
+            var term = filter.Query.Trim();
+            query = query.Where(n =>
+                EF.Functions.ILike(n.Content.Title, $"%{term}%") ||
+                EF.Functions.ILike(n.Content.Body, $"%{term}%"));
+        }
+
+        return NormalizeStatus(query, filter.Status);
+    }
+
+    private static IQueryable<NotificationAggregate> NormalizeStatus(
+        IQueryable<NotificationAggregate> query,
+        string? status)
+    {
+        if (string.IsNullOrWhiteSpace(status) || string.Equals(status, "all", StringComparison.OrdinalIgnoreCase))
+        {
+            return query.Where(n => n.DoneAtUtc == null && n.ArchivedAtUtc == null);
+        }
+
+        return status.Trim().ToUpperInvariant() switch
+        {
+            "UNREAD" => query.Where(n => n.ReadAtUtc == null && n.DoneAtUtc == null && n.ArchivedAtUtc == null),
+            "READ" => query.Where(n => n.ReadAtUtc != null && n.DoneAtUtc == null && n.ArchivedAtUtc == null),
+            "SEEN" => query.Where(n => n.SeenAtUtc != null && n.DoneAtUtc == null && n.ArchivedAtUtc == null),
+            "UNSEEN" => query.Where(n => n.SeenAtUtc == null && n.DoneAtUtc == null && n.ArchivedAtUtc == null),
+            "SAVED" => query.Where(n => n.SavedAtUtc != null && n.ArchivedAtUtc == null),
+            "DONE" => query.Where(n => n.DoneAtUtc != null),
+            "ARCHIVED" => query.Where(n => n.ArchivedAtUtc != null),
+            _ => query.Where(n => n.DoneAtUtc == null && n.ArchivedAtUtc == null),
+        };
     }
 }
