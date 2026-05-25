@@ -5,4 +5,3 @@ export {
     useMarkAllNotificationsRead,
 } from "./model/mutations";
 export { useNotificationHub } from "./model/use-notification-hub";
-export { NotificationCenterScreen } from "./ui/NotificationCenterScreen";

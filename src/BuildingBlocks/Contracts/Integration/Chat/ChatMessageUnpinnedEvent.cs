@@ -4,7 +4,8 @@ public sealed record ChatMessageUnpinnedEvent(
     string ConversationId,
     Guid MessageId,
     Guid UnpinnedByUserId,
-    DateTimeOffset OccurredAtUtc) : IIntegrationEvent
+    DateTimeOffset OccurredAtUtc,
+    IReadOnlyList<Guid>? Recipients = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

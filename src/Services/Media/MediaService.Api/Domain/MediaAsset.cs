@@ -1,6 +1,8 @@
 using MediaService.Api.Domain.Enums;
-using MediaService.Api.Domain.Events;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Media;
+using IntegrationAssetKind = Urfu.Link.BuildingBlocks.Contracts.Integration.Media.MediaAssetKind;
+using IntegrationVisibility = Urfu.Link.BuildingBlocks.Contracts.Integration.Media.MediaVisibility;
 
 namespace MediaService.Api.Domain;
 
@@ -86,7 +88,15 @@ public sealed class MediaAsset
         State = AssetState.Uploaded;
         UploadedAtUtc = DateTimeOffset.UtcNow;
         _domainEvents.Add(new MediaAssetUploadedEvent(
-            Id, OwnerId, Visibility, Kind, Bucket, ObjectKey, Size, MimeType, OriginalFileName));
+            Id,
+            OwnerId,
+            (IntegrationVisibility)(int)Visibility,
+            (IntegrationAssetKind)(int)Kind,
+            Bucket,
+            ObjectKey,
+            Size,
+            MimeType,
+            OriginalFileName));
     }
 
     /// <summary>

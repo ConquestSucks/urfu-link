@@ -23,6 +23,8 @@ public sealed class PresenceHub(
     PresenceEventDispatcher dispatcher,
     TimeProvider clock) : Hub<IPresenceClient>
 {
+    private const int MaxViewingContexts = 16;
+    private const int MaxViewingContextLength = 200;
     private const string DeviceIdItemKey = "deviceId";
     private const string UserIdItemKey = "userId";
     private const string PlatformItemKey = "platform";
@@ -96,6 +98,13 @@ public sealed class PresenceHub(
         var ct = Context.ConnectionAborted;
         await sessions.UpdateSessionStatusAsync(userId, deviceId, status, customActivity, ct).ConfigureAwait(false);
         await BroadcastPresenceAsync(userId, ct).ConfigureAwait(false);
+    }
+
+    public Task SetViewingContexts(string[] contextKeys)
+    {
+        var (userId, deviceId, _) = RequireConnectionContext();
+        var normalized = NormalizeViewingContexts(contextKeys);
+        return sessions.UpdateViewingContextsAsync(userId, deviceId, normalized, Context.ConnectionAborted);
     }
 
     public async Task StartTyping(Guid conversationId)
@@ -187,6 +196,22 @@ public sealed class PresenceHub(
             throw new HubException("Connection context not initialised");
         }
         return (userId, deviceId, platform);
+    }
+
+    private static string[] NormalizeViewingContexts(string[]? contextKeys)
+    {
+        if (contextKeys is null || contextKeys.Length == 0)
+        {
+            return [];
+        }
+
+        return contextKeys
+            .Where(context => !string.IsNullOrWhiteSpace(context))
+            .Select(context => context.Trim())
+            .Where(context => context.Length <= MaxViewingContextLength)
+            .Distinct(StringComparer.Ordinal)
+            .Take(MaxViewingContexts)
+            .ToArray();
     }
 
     private static Guid ResolveUserId(ClaimsPrincipal? user)

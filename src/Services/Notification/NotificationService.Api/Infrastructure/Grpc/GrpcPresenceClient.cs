@@ -41,6 +41,35 @@ public sealed class GrpcPresenceClient(
         }
     }
 
+    public async Task<bool> IsViewingAsync(Guid userId, string contextKey, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(contextKey))
+        {
+            return false;
+        }
+
+        try
+        {
+            var reply = await client.IsViewingAsync(
+                new PresenceGrpc.IsViewingRequest
+                {
+                    UserId = userId.ToString(),
+                    ContextKey = contextKey.Trim(),
+                },
+                cancellationToken: cancellationToken);
+
+            return reply.IsViewing;
+        }
+        catch (RpcException ex)
+        {
+            logger.LogWarning(
+                ex,
+                "Presence viewing-context lookup failed for {UserId}; treating as not viewing.",
+                userId);
+            return false;
+        }
+    }
+
     /// <summary>
     /// Pure mapping from the protobuf reply to the boolean contract; exposed at internal scope
     /// so the unit tests can exercise every status × platform combination without booting a

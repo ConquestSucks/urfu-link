@@ -179,6 +179,12 @@ namespace NotificationService.Api.Migrations
                         .HasDefaultValue(1)
                         .HasColumnName("occurrence_count");
 
+                    b.Property<short>("Priority")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("smallint")
+                        .HasDefaultValue((short)20)
+                        .HasColumnName("priority");
+
                     b.Property<DateTimeOffset?>("ReadAtUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("read_at_utc");
@@ -203,6 +209,11 @@ namespace NotificationService.Api.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("snoozed_until_utc");
 
+                    b.Property<string>("SourceActionId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_action_id");
+
                     b.Property<Guid>("SourceEventId")
                         .HasColumnType("uuid")
                         .HasColumnName("source_event_id");
@@ -212,6 +223,10 @@ namespace NotificationService.Api.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)")
                         .HasColumnName("source_event_type");
+
+                    b.Property<Guid?>("SupersededByNotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("superseded_by_notification_id");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -255,6 +270,41 @@ namespace NotificationService.Api.Migrations
                         .HasDatabaseName("ix_notification_dedup_keys_notification");
 
                     b.ToTable("notification_dedup_keys", "notifications");
+                });
+
+            modelBuilder.Entity("Urfu.Link.Services.Notification.Domain.Aggregates.NotificationSourceActionKey", b =>
+                {
+                    b.Property<Guid>("RecipientUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recipient_user_id");
+
+                    b.Property<string>("SourceActionId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("source_action_id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<DateTimeOffset>("NotificationCreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notification_created_at_utc");
+
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<short>("Priority")
+                        .HasColumnType("smallint")
+                        .HasColumnName("priority");
+
+                    b.HasKey("RecipientUserId", "SourceActionId");
+
+                    b.HasIndex("NotificationId")
+                        .HasDatabaseName("ix_notification_source_action_keys_notification");
+
+                    b.ToTable("notification_source_action_keys", "notifications");
                 });
 
             modelBuilder.Entity("Urfu.Link.Services.Notification.Domain.Aggregates.OutboxMessage", b =>

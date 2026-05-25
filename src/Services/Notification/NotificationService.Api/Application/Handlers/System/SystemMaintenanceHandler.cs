@@ -8,7 +8,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.System;
 
 public sealed class SystemMaintenanceHandler : INotificationHandler<SystemMaintenanceEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         SystemMaintenanceEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -34,10 +34,10 @@ public sealed class SystemMaintenanceHandler : INotificationHandler<SystemMainte
 
         var groupKey = GroupKey.ForSystem($"maintenance:{integrationEvent.MaintenanceId:N}");
 
-        var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
+        var drafts = new List<NotificationIntent>(integrationEvent.Recipients.Count);
         foreach (var recipientId in integrationEvent.Recipients)
         {
-            drafts.Add(new NotificationDraft(
+            drafts.Add(new NotificationIntent(
                 RecipientUserId: recipientId,
                 Category: NotificationCategory.SystemMaintenance,
                 Severity: severity,
@@ -48,6 +48,6 @@ public sealed class SystemMaintenanceHandler : INotificationHandler<SystemMainte
                 SourceEventType: integrationEvent.EventType));
         }
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>(drafts);
     }
 }

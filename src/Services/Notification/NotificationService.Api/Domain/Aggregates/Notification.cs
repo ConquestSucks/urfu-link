@@ -8,6 +8,7 @@ namespace Urfu.Link.Services.Notification.Domain.Aggregates;
 public sealed class Notification
 {
     public const int SourceEventTypeMaxLength = 128;
+    public const int SourceActionIdMaxLength = 256;
 
     private readonly List<IIntegrationEvent> _domainEvents = [];
     private readonly List<Delivery> _deliveries = [];
@@ -37,6 +38,12 @@ public sealed class Notification
     public Guid SourceEventId { get; private set; }
 
     public string SourceEventType { get; private set; } = null!;
+
+    public string? SourceActionId { get; private set; }
+
+    public NotificationPriority Priority { get; private set; }
+
+    public Guid? SupersededByNotificationId { get; private set; }
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
@@ -76,6 +83,8 @@ public sealed class Notification
         Guid sourceEventId,
         string sourceEventType,
         DateTimeOffset createdAtUtc,
+        string? sourceActionId = null,
+        NotificationPriority priority = NotificationPriority.PinSystemAdmin,
         string? type = null,
         NotificationActor? actor = null,
         NotificationEntity? entity = null,
@@ -102,6 +111,12 @@ public sealed class Notification
             throw new ArgumentException($"Source event type exceeds {SourceEventTypeMaxLength} characters.", nameof(sourceEventType));
         }
 
+        var trimmedSourceActionId = string.IsNullOrWhiteSpace(sourceActionId) ? null : sourceActionId.Trim();
+        if (trimmedSourceActionId?.Length > SourceActionIdMaxLength)
+        {
+            throw new ArgumentException($"Source action id exceeds {SourceActionIdMaxLength} characters.", nameof(sourceActionId));
+        }
+
         var descriptor = string.IsNullOrWhiteSpace(type)
             ? NotificationCatalog.GetByCategory(category)
             : null;
@@ -122,12 +137,12 @@ public sealed class Notification
             Data = data,
             Actor = actor,
             Entity = entity,
-            Actions = actions is null || actions.Count == 0
-                ? descriptor?.DefaultActions ?? []
-                : actions.ToArray(),
+            Actions = NormalizeActions(actions, category, content, descriptor),
             GroupKey = groupKey,
             SourceEventId = sourceEventId,
             SourceEventType = trimmedType,
+            SourceActionId = trimmedSourceActionId,
+            Priority = priority,
             CreatedAtUtc = createdAtUtc,
             ExpiresAtUtc = expiresAtUtc,
             OccurrenceCount = 1,
@@ -255,9 +270,17 @@ public sealed class Notification
         return true;
     }
 
-    public void RegisterOccurrence(
+    public void ApplyIntent(
+        NotificationCategory category,
+        NotificationSeverity severity,
+        string type,
         NotificationContent content,
         NotificationData data,
+        NotificationActor? actor,
+        NotificationEntity? entity,
+        IReadOnlyList<NotificationAction>? actions,
+        GroupKey? groupKey,
+        NotificationPriority priority,
         Guid sourceEventId,
         string sourceEventType,
         DateTimeOffset occurredAtUtc)
@@ -265,16 +288,54 @@ public sealed class Notification
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(data);
         ArgumentException.ThrowIfNullOrWhiteSpace(sourceEventType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(type);
 
+        var trimmedNotificationType = type.Trim();
+        if (trimmedNotificationType.Length > NotificationTypeMaxLength)
+        {
+            throw new ArgumentException($"Notification type exceeds {NotificationTypeMaxLength} characters.", nameof(type));
+        }
+
+        Category = category;
+        Severity = severity;
+        Type = trimmedNotificationType;
         Content = content;
         Data = data;
+        Actor = actor;
+        Entity = entity;
+        Actions = NormalizeActions(actions, category, content);
+        GroupKey = groupKey;
+        Priority = priority;
         SourceEventId = sourceEventId;
         SourceEventType = sourceEventType.Trim();
-        OccurrenceCount++;
         LastOccurrenceAtUtc = occurredAtUtc;
         DoneAtUtc = null;
         ArchivedAtUtc = null;
         ReadAtUtc = null;
+    }
+
+    public void RegisterOccurrence(
+        NotificationContent content,
+        NotificationData data,
+        Guid sourceEventId,
+        string sourceEventType,
+        DateTimeOffset occurredAtUtc)
+    {
+        ApplyIntent(
+            Category,
+            Severity,
+            Type,
+            content,
+            data,
+            Actor,
+            Entity,
+            Actions,
+            GroupKey,
+            Priority,
+            sourceEventId,
+            sourceEventType,
+            occurredAtUtc);
+        OccurrenceCount++;
     }
 
     public void AddDelivery(Delivery delivery)
@@ -288,6 +349,29 @@ public sealed class Notification
         }
 
         _deliveries.Add(delivery);
+    }
+
+    private static NotificationAction[] NormalizeActions(
+        IReadOnlyList<NotificationAction>? actions,
+        NotificationCategory category,
+        NotificationContent content,
+        NotificationDescriptor? descriptor = null)
+    {
+        var source = actions is null || actions.Count == 0
+            ? descriptor?.DefaultActions ?? NotificationCatalog.GetByCategory(category).DefaultActions
+            : actions;
+
+        if (string.IsNullOrWhiteSpace(content.DeepLink))
+        {
+            return source.ToArray();
+        }
+
+        return source
+            .Select(action =>
+                action.Kind == "deep-link" && string.IsNullOrWhiteSpace(action.DeepLink)
+                    ? action with { DeepLink = content.DeepLink }
+                    : action)
+            .ToArray();
     }
 
     public void ClearDomainEvents() => _domainEvents.Clear();

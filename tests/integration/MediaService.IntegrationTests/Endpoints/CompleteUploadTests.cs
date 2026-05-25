@@ -2,8 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using MediaService.Api.Application.Contracts.Requests;
-using MediaService.Api.Domain.Events;
 using MediaService.IntegrationTests.Infrastructure;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Media;
 
 namespace MediaService.IntegrationTests.Endpoints;
 

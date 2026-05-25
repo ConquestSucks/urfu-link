@@ -168,6 +168,28 @@ public sealed class NotificationTests
     }
 
     [Fact]
+    public void Create_AttachesContentDeepLinkToDefaultOpenAction()
+    {
+        const string deepLink = "urfulink://chat/conv/direct-1/msg/3f7d3e57b4f5481e93a1c8e9b4d70a11";
+
+        var notification = Notification.Create(
+            recipientUserId: Recipient,
+            category: NotificationCategory.ChatMessageDirect,
+            severity: NotificationSeverity.Normal,
+            content: NotificationContent.Create("Hello", "World", deepLink: deepLink),
+            data: NotificationData.Empty,
+            groupKey: null,
+            sourceEventId: SourceEventId,
+            sourceEventType: "chat.message.sent.v1",
+            createdAtUtc: DateTimeOffset.UtcNow);
+
+        notification.Actions.Should().Contain(a =>
+            a.Id == "open" &&
+            a.Kind == "deep-link" &&
+            a.DeepLink == deepLink);
+    }
+
+    [Fact]
     public void MarkSeen_SetsSeenAtOnce()
     {
         var notification = NewNotification();

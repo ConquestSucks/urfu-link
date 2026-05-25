@@ -1,7 +1,6 @@
 import { InboxNotificationProps } from "@/entities/inbox-notification";
 import { apiClient } from "@/shared/lib/api";
-
-const chatCategories = new Set([1, 2, 10, 11, 40, 41]);
+import { inferNotificationScope } from "@/shared/lib/notificationDeepLink";
 
 const formatTime = (iso: string) =>
     new Intl.DateTimeFormat("ru-RU", {
@@ -18,13 +17,33 @@ const formatTime = (iso: string) =>
 export const inboxApi = {
     getNotifications: async (): Promise<InboxNotificationProps[]> => {
         const response = await apiClient.notifications.list({ limit: 50, status: "all" });
-        return response.items.map((item) => ({
-            id: item.id,
-            title: item.title,
-            description: item.body,
-            time: formatTime(item.lastOccurrenceAtUtc),
-            scope: chatCategories.has(item.category) ? "chats" : "subjects",
-            isRead: item.readAtUtc !== null,
-        }));
+        return response.items.map((item) => {
+            const deepLink =
+                item.deepLink ??
+                item.actions.find((action) => action.deepLink)?.deepLink ??
+                null;
+
+            return {
+                id: item.id,
+                title: item.title,
+                description: item.body,
+                time: formatTime(item.lastOccurrenceAtUtc),
+                scope: inferNotificationScope({ ...item, deepLink }),
+                deepLink,
+                actorName: item.actor?.displayName ?? null,
+                isRead: item.readAtUtc !== null,
+            };
+        });
     },
+
+    markNotificationRead: (id: string): Promise<void> =>
+        apiClient.notifications.markRead(id),
+
+    markNotificationsRead: (ids: string[]): Promise<{ updated: number }> =>
+        apiClient.notifications.bulk({
+            action: "read",
+            ids,
+        }),
+
+    getNotificationBadge: () => apiClient.notifications.getBadge(),
 };

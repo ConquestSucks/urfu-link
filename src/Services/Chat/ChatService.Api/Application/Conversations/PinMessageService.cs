@@ -77,7 +77,12 @@ public sealed class PinMessageService(
 
         var now = clock.GetUtcNow();
         await dispatcher.PublishAsync(
-            new ChatMessagePinnedEvent(conversation.Id, request.MessageId, request.CallerUserId, now),
+            new ChatMessagePinnedEvent(
+                conversation.Id,
+                request.MessageId,
+                request.CallerUserId,
+                now,
+                conversation.Participants),
             cancellationToken).ConfigureAwait(false);
 
         var dtos = await BuildPinnedDtosAsync(

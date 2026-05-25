@@ -41,6 +41,12 @@ public interface IPresenceSessionStore
         string? customActivity,
         CancellationToken cancellationToken);
 
+    Task UpdateViewingContextsAsync(
+        Guid userId,
+        string deviceId,
+        IReadOnlyList<string> viewingContexts,
+        CancellationToken cancellationToken);
+
     Task<IReadOnlyList<PresenceSession>> GetSessionsAsync(Guid userId, CancellationToken cancellationToken);
 
     /// <summary>

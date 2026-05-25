@@ -1,6 +1,5 @@
 using FluentAssertions;
 using MediaService.Api.Domain.Enums;
-using MediaService.Api.Domain.Events;
 using MediaService.Api.Infrastructure.Persistence;
 using MediaService.Api.Workers;
 using MediaService.IntegrationTests.Infrastructure;
@@ -8,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Media;
 
 namespace MediaService.IntegrationTests.Workers;
 

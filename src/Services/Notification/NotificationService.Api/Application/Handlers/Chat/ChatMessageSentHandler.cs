@@ -8,22 +8,20 @@ using Urfu.Link.Services.Notification.Domain.ValueObjects;
 namespace Urfu.Link.Services.Notification.Application.Handlers.Chat;
 
 /// <summary>
-/// Maps <see cref="ChatMessageSentEvent"/> into per-recipient drafts. Mentions get a
-/// high-severity Mention draft; messages in known discipline conversations are
-/// classified as ChatMessageDiscipline (looked up from the projection populated by
-/// <see cref="ChatDisciplineConversationCreatedHandler"/>); everything else lands in
-/// ChatMessageDirect.
+/// Maps <see cref="ChatMessageSentEvent"/> into per-recipient intents. Mentions are
+/// intentionally skipped here and are handled only from <c>chat.mention.created.v1</c>
+/// so one message action cannot create a generic and mention notification for the same user.
 /// </summary>
 public sealed class ChatMessageSentHandler(IDisciplineConversationLookup disciplineLookup)
     : INotificationHandler<ChatMessageSentEvent>
 {
-    public async Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public async Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         ChatMessageSentEvent integrationEvent,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(integrationEvent);
 
-        var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
+        var drafts = new List<NotificationIntent>(integrationEvent.Recipients.Count);
         var mentions = new HashSet<Guid>(integrationEvent.Mentions ?? []);
 
         var conversationId = integrationEvent.ConversationId;
@@ -47,20 +45,17 @@ public sealed class ChatMessageSentHandler(IDisciplineConversationLookup discipl
                 continue;
             }
 
-            var isMention = mentions.Contains(recipientId);
+            if (mentions.Contains(recipientId))
+            {
+                continue;
+            }
+
             NotificationCategory category;
             NotificationSeverity severity;
             string title;
             GroupKey groupKey;
 
-            if (isMention)
-            {
-                category = NotificationCategory.ChatMessageMention;
-                severity = NotificationSeverity.High;
-                title = "Вас упомянули";
-                groupKey = GroupKey.ForChatMention(conversationGuid);
-            }
-            else if (isDisciplineConversation)
+            if (isDisciplineConversation)
             {
                 category = NotificationCategory.ChatMessageDiscipline;
                 severity = NotificationSeverity.Normal;
@@ -88,7 +83,7 @@ public sealed class ChatMessageSentHandler(IDisciplineConversationLookup discipl
                 ["senderId"] = integrationEvent.SenderId.ToString("N", CultureInfo.InvariantCulture),
             });
 
-            drafts.Add(new NotificationDraft(
+            drafts.Add(new NotificationIntent(
                 RecipientUserId: recipientId,
                 Category: category,
                 Severity: severity,
@@ -96,7 +91,11 @@ public sealed class ChatMessageSentHandler(IDisciplineConversationLookup discipl
                 Data: data,
                 GroupKey: groupKey,
                 SourceEventId: integrationEvent.EventId,
-                SourceEventType: integrationEvent.EventType));
+                SourceEventType: integrationEvent.EventType,
+                SourceActionId: NotificationSourceActions.ChatMessage(conversationId, integrationEvent.MessageId),
+                Priority: NotificationPriority.ChatMessage,
+                Actor: new NotificationActor(integrationEvent.SenderId, null, null),
+                SuppressWhenViewingContextKey: NotificationViewingContexts.ChatConversation(conversationId)));
         }
 
         return drafts;

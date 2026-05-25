@@ -4,7 +4,14 @@ import { useGlobalSearchParams, usePathname } from "expo-router";
 
 export const useInboxRouting = () => {
     const pathname = usePathname();
-    const params = useGlobalSearchParams<{ view?: ViewType, id?: string }>();
+    const params = useGlobalSearchParams<{
+        view?: ViewType;
+        id?: string;
+        message?: string;
+        thread?: string;
+        disciplineAction?: string;
+        target?: string;
+    }>();
     
     const currentTab: TabType = pathname.includes("subjects") ? "subjects" : "chats";
     const currentView: ViewType = params.view || "messages";

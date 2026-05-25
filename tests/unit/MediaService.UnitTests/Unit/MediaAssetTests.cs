@@ -1,7 +1,7 @@
 using FluentAssertions;
 using MediaService.Api.Domain;
 using MediaService.Api.Domain.Enums;
-using MediaService.Api.Domain.Events;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Media;
 
 namespace MediaService.UnitTests.Unit;
 

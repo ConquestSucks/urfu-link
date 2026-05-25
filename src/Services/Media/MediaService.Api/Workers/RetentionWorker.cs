@@ -15,7 +15,7 @@ public sealed class RetentionWorkerOptions
 /// <summary>
 /// Hard-deletes assets that have been soft-deleted longer than the retention TTL
 /// (default 30 days). Removes the MinIO object first, then transitions the asset
-/// to HardDeleted, which raises <see cref="Domain.Events.MediaAssetHardDeletedEvent"/>.
+/// to HardDeleted, which raises <see cref="Urfu.Link.BuildingBlocks.Contracts.Integration.Media.MediaAssetHardDeletedEvent"/>.
 /// </summary>
 public sealed class RetentionWorker(
     IServiceScopeFactory scopeFactory,

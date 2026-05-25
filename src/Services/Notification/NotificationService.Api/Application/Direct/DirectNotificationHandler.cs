@@ -5,7 +5,7 @@ namespace Urfu.Link.Services.Notification.Application.Direct;
 
 public sealed class DirectNotificationHandler : INotificationHandler<DirectNotificationCommand>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         DirectNotificationCommand integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -20,7 +20,7 @@ public sealed class DirectNotificationHandler : INotificationHandler<DirectNotif
 
         var data = NotificationData.From(integrationEvent.Data);
 
-        var draft = new NotificationDraft(
+        var draft = new NotificationIntent(
             RecipientUserId: integrationEvent.RecipientUserId,
             Category: integrationEvent.Category,
             Severity: integrationEvent.Severity,
@@ -30,6 +30,6 @@ public sealed class DirectNotificationHandler : INotificationHandler<DirectNotif
             SourceEventId: integrationEvent.EventId,
             SourceEventType: integrationEvent.EventType);
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>([draft]);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>([draft]);
     }
 }

@@ -24,4 +24,16 @@ public sealed class InAppChannel(INotificationBroadcaster broadcaster, BadgeServ
         await broadcaster.NotifyBadgeUpdatedAsync(notification.RecipientUserId, snapshot, cancellationToken)
             .ConfigureAwait(false);
     }
+
+    public async Task UpsertAsync(NotificationAggregate notification, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(notification);
+
+        await broadcaster.NotifyUpsertedAsync(NotificationDtoMapper.Map(notification), cancellationToken)
+            .ConfigureAwait(false);
+        var snapshot = await badgeService.GetSnapshotAsync(notification.RecipientUserId, cancellationToken)
+            .ConfigureAwait(false);
+        await broadcaster.NotifyBadgeUpdatedAsync(notification.RecipientUserId, snapshot, cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

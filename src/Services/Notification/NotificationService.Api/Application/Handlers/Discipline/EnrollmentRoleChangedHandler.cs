@@ -8,7 +8,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Discipline;
 
 public sealed class EnrollmentRoleChangedHandler : INotificationHandler<EnrollmentRoleChangedEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         EnrollmentRoleChangedEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -28,7 +28,7 @@ public sealed class EnrollmentRoleChangedHandler : INotificationHandler<Enrollme
             ["newRole"] = integrationEvent.NewRole.ToString(),
         });
 
-        var draft = new NotificationDraft(
+        var draft = new NotificationIntent(
             RecipientUserId: integrationEvent.UserId,
             Category: NotificationCategory.AdminRoleChanged,
             Severity: NotificationSeverity.Normal,
@@ -36,8 +36,10 @@ public sealed class EnrollmentRoleChangedHandler : INotificationHandler<Enrollme
             Data: data,
             GroupKey: null,
             SourceEventId: integrationEvent.EventId,
-            SourceEventType: integrationEvent.EventType);
+            SourceEventType: integrationEvent.EventType,
+            SourceActionId: NotificationSourceActions.DisciplineUser(integrationEvent.DisciplineId, integrationEvent.UserId, "role"),
+            Priority: NotificationPriority.PinSystemAdmin);
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>([draft]);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>([draft]);
     }
 }

@@ -15,7 +15,8 @@ internal sealed record StoredSession(
     PresenceStatus Status,
     string? CustomActivity,
     DateTimeOffset ConnectedAt,
-    DateTimeOffset LastHeartbeatAt);
+    DateTimeOffset LastHeartbeatAt,
+    IReadOnlyList<string>? ViewingContexts);
 
 public sealed class RedisPresenceSessionStore : IPresenceSessionStore
 {
@@ -89,7 +90,8 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
             session.Status,
             session.CustomActivity,
             session.ConnectedAt,
-            session.LastHeartbeatAt);
+            session.LastHeartbeatAt,
+            NormalizeViewingContexts(session.ViewingContexts));
         var json = JsonSerializer.Serialize(stored, JsonOptions);
         var nowMs = session.LastHeartbeatAt.ToUnixTimeMilliseconds();
         var member = RedisKeys.HeartbeatMember(session.UserId, session.DeviceId);
@@ -203,6 +205,30 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
         await db.KeyExpireAsync(sessionsKey, _sessionKeyTtl).ConfigureAwait(false);
     }
 
+    public async Task UpdateViewingContextsAsync(
+        Guid userId,
+        string deviceId,
+        IReadOnlyList<string> viewingContexts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(deviceId);
+        ArgumentNullException.ThrowIfNull(viewingContexts);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var db = _redis.GetDatabase();
+        var sessionsKey = RedisKeys.UserSessions(userId);
+        var raw = await db.HashGetAsync(sessionsKey, deviceId).ConfigureAwait(false);
+        if (raw.IsNullOrEmpty) return;
+
+        var stored = JsonSerializer.Deserialize<StoredSession>((string)raw!, JsonOptions);
+        if (stored is null) return;
+
+        var updated = stored with { ViewingContexts = NormalizeViewingContexts(viewingContexts) };
+        var json = JsonSerializer.Serialize(updated, JsonOptions);
+        await db.HashSetAsync(sessionsKey, deviceId, json).ConfigureAwait(false);
+        await db.KeyExpireAsync(sessionsKey, _sessionKeyTtl).ConfigureAwait(false);
+    }
+
     public async Task<IReadOnlyList<PresenceSession>> GetSessionsAsync(
         Guid userId, CancellationToken cancellationToken)
     {
@@ -226,7 +252,8 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
                 stored.CustomActivity,
                 stored.ConnectedAt,
                 stored.LastHeartbeatAt,
-                stored.ConnectionId));
+                stored.ConnectionId,
+                NormalizeViewingContexts(stored.ViewingContexts)));
         }
         return sessions;
     }
@@ -272,5 +299,19 @@ public sealed class RedisPresenceSessionStore : IPresenceSessionStore
         // The sweeper needs the hash payload after SessionTtl elapses so it can
         // remove the session and persist last_seen. Redis TTL is only a backstop.
         return options.SessionTtl + grace + TimeSpan.FromSeconds(5);
+    }
+
+    private static string[] NormalizeViewingContexts(IReadOnlyList<string>? viewingContexts)
+    {
+        if (viewingContexts is null || viewingContexts.Count == 0)
+        {
+            return [];
+        }
+
+        return viewingContexts
+            .Where(context => !string.IsNullOrWhiteSpace(context))
+            .Select(context => context.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
     }
 }

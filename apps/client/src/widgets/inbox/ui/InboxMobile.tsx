@@ -8,6 +8,7 @@ import { EmptyState, SearchBar } from "@/shared/ui";
 import { MobileHeader } from "@/widgets/header-mobile";
 import { InboxTabsMobile } from "./InboxTabsMobile";
 import { List } from "./List";
+import { NotificationListToolbar } from "./NotificationListToolbar";
 import { InboxListProps } from "../model/components";
 import { getInboxEmptyState } from "../lib/empty-state-config";
 import {
@@ -20,13 +21,25 @@ interface InboxMobileProps<T> extends InboxListProps<T> {
     data: T[];
     renderItem: (item: T) => React.ReactNode;
     isLoading?: boolean;
+    notificationUnreadCount?: number;
+    isMarkingAllNotificationsRead?: boolean;
+    onMarkAllNotificationsRead?: () => void;
 }
 
-export const InboxMobile = <T,>({ data, renderItem, isLoading }: InboxMobileProps<T>) => {
+export const InboxMobile = <T,>({
+    data,
+    renderItem,
+    isLoading,
+    notificationUnreadCount = 0,
+    isMarkingAllNotificationsRead,
+    onMarkAllNotificationsRead,
+}: InboxMobileProps<T>) => {
     const { currentTab, currentView, createTabHref, createViewHref } = useInboxRouting();
     const globalQuery = useSearchStore((s) => s.globalQuery);
     const { onQueryChange } = useGlobalSearch();
     const isSearchActive = globalQuery.length >= 2;
+    const showNotificationToolbar =
+        currentView === "notifications" && !isSearchActive && data.length > 0;
 
     return (
         <View className="flex-1 bg-app-bg">
@@ -48,6 +61,16 @@ export const InboxMobile = <T,>({ data, renderItem, isLoading }: InboxMobileProp
                     <InboxTabsMobile
                         currentTab={currentTab}
                         createHref={createTabHref}
+                    />
+                </View>
+            )}
+
+            {showNotificationToolbar && (
+                <View className="py-1">
+                    <NotificationListToolbar
+                        unreadCount={notificationUnreadCount}
+                        isMarkingAllRead={isMarkingAllNotificationsRead}
+                        onMarkAllRead={onMarkAllNotificationsRead}
                     />
                 </View>
             )}
