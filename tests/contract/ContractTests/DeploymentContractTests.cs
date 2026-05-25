@@ -139,14 +139,25 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
-    public void PlatformStatefulShouldNotReconcileGeneratedMongoPassword()
+    public void PlatformStatefulShouldSourceMongoPasswordFromVaultExternalSecret()
     {
         var application = ReadRepoFile("deploy", "k8s", "platform", "argocd", "apps", "wave-5", "platform-stateful.yaml");
+        var kustomization = ReadRepoFile("deploy", "k8s", "platform", "stateful", "kustomization.yaml");
+        var externalSecret = ReadRepoFile(
+            "deploy",
+            "k8s",
+            "platform",
+            "stateful",
+            "mongo-app-user-password-external-secret.yaml");
+        var mongo = ReadRepoFile("deploy", "k8s", "platform", "stateful", "mongodb-cluster.yaml");
 
-        Assert.Contains("name: mongo-app-user-password", application, StringComparison.Ordinal);
-        Assert.Contains("/data/password", application, StringComparison.Ordinal);
-        Assert.Contains("/stringData", application, StringComparison.Ordinal);
-        Assert.Contains("RespectIgnoreDifferences=true", application, StringComparison.Ordinal);
+        Assert.DoesNotContain("name: mongo-app-user-password", application, StringComparison.Ordinal);
+        Assert.Contains("mongo-app-user-password-external-secret.yaml", kustomization, StringComparison.Ordinal);
+        Assert.Contains("kind: ExternalSecret", externalSecret, StringComparison.Ordinal);
+        Assert.Contains("name: mongo-app-user-password", externalSecret, StringComparison.Ordinal);
+        Assert.Contains("key: urfu-link/prod/mongo", externalSecret, StringComparison.Ordinal);
+        Assert.Contains("property: app_user_password", externalSecret, StringComparison.Ordinal);
+        Assert.DoesNotContain("PLACEHOLDER_WILL_BE_REPLACED_BY_BOOTSTRAP", mongo, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -155,9 +166,9 @@ public sealed class DeploymentContractTests
         var manifest = ReadRepoFile("deploy", "k8s", "platform", "stateful", "mongodb-cluster.yaml");
 
         Assert.Contains("name: mongo-app-user-password", manifest, StringComparison.Ordinal);
-        Assert.Contains("argocd.argoproj.io/sync-wave: \"-1\"", manifest, StringComparison.Ordinal);
+        Assert.DoesNotContain("kind: Secret", manifest, StringComparison.Ordinal);
         Assert.Contains("name: urfu-mongo", manifest, StringComparison.Ordinal);
-        Assert.Contains("argocd.argoproj.io/sync-wave: \"3\"", manifest, StringComparison.Ordinal);
+        Assert.Contains("argocd.argoproj.io/sync-wave: \"4\"", manifest, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -169,7 +180,7 @@ public sealed class DeploymentContractTests
         Assert.Contains("CREATE ROLE presence LOGIN PASSWORD '$PRESENCE_DB_PASSWORD'", manifest, StringComparison.Ordinal);
         Assert.Contains("CREATE DATABASE presence_db OWNER presence", manifest, StringComparison.Ordinal);
         Assert.Contains(
-            "primary_connection\":\"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s",
+            "primary_connection\":\"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s;GSS Encryption Mode=Disable",
             manifest,
             StringComparison.Ordinal);
         Assert.DoesNotContain(
@@ -188,7 +199,7 @@ public sealed class DeploymentContractTests
         Assert.Contains("CREATE ROLE notification LOGIN PASSWORD '$NOTIFICATION_DB_PASSWORD'", bootstrap, StringComparison.Ordinal);
         Assert.Contains("CREATE DATABASE notification_db OWNER notification", bootstrap, StringComparison.Ordinal);
         Assert.Contains(
-            "primary_connection\":\"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s",
+            "primary_connection\":\"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s;GSS Encryption Mode=Disable",
             bootstrap,
             StringComparison.Ordinal);
 
@@ -199,6 +210,81 @@ public sealed class DeploymentContractTests
         Assert.Contains("secretKey: ConnectionStrings__Primary", notificationSecret, StringComparison.Ordinal);
         Assert.Contains("key: urfu-link/prod/notification-service", notificationSecret, StringComparison.Ordinal);
         Assert.Contains("property: primary_connection", notificationSecret, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PlatformBootstrapShouldPersistMongoPasswordInVaultAndPreflightMongoAuth()
+    {
+        var bootstrap = ReadRepoFile("deploy", "k8s", "platform", "stateful", "platform-bootstrap-job.yaml");
+        var preflight = ReadRepoFile("deploy", "k8s", "platform", "stateful", "mongodb-auth-preflight-job.yaml");
+        var vault = ReadRepoFile("deploy", "k8s", "platform", "vault", "vault-auto-init-job.yaml");
+
+        Assert.Contains("mongo_app_password", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("vault_put urfu-link/prod/mongo", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("app_user_password", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("path \"kv/data/urfu-link/prod/mongo\"", vault, StringComparison.Ordinal);
+        Assert.Contains("kind: Job", preflight, StringComparison.Ordinal);
+        Assert.Contains("name: mongodb-auth-preflight", preflight, StringComparison.Ordinal);
+        Assert.Contains("mongosh \"$MONGO_URI\"", preflight, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MinioShouldUseInternalKeycloakDiscoveryWithExplicitEgress()
+    {
+        var minio = ReadRepoFile("deploy", "k8s", "platform", "stateful", "minio-tenant.yaml");
+        var policies = ReadRepoFile("deploy", "k8s", "platform", "network", "platform-network-policies.yaml");
+        var coredns = ReadRepoFile("deploy", "k8s", "platform", "network", "coredns-custom.yaml");
+
+        Assert.Contains(
+            "MINIO_IDENTITY_OPENID_CONFIG_URL",
+            minio,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/.well-known/openid-configuration",
+            minio,
+            StringComparison.Ordinal);
+        Assert.Contains("name: minio-egress-keycloak", policies, StringComparison.Ordinal);
+        Assert.Contains("app: keycloak", policies, StringComparison.Ordinal);
+        Assert.Contains("port: 8080", policies, StringComparison.Ordinal);
+        Assert.Contains("prefer internal service URLs", coredns, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MongoBackupCronJobShouldUseHardenedSequentialOfficialImages()
+    {
+        var cronJob = ReadRepoFile("deploy", "k8s", "platform", "stateful", "mongodb-backup-cronjob.yaml");
+        var smokeJob = ReadRepoFile("deploy", "k8s", "platform", "stateful", "mongodb-backup-smoke-job.yaml");
+        var bucketsJob = ReadRepoFile("deploy", "k8s", "platform", "stateful", "minio-buckets-job.yaml");
+
+        Assert.Contains("initContainers:", cronJob, StringComparison.Ordinal);
+        Assert.Contains("name: mongodump", cronJob, StringComparison.Ordinal);
+        Assert.Contains("image: mongo:8.0", cronJob, StringComparison.Ordinal);
+        Assert.Contains("name: upload-to-minio", cronJob, StringComparison.Ordinal);
+        Assert.Contains("image: minio/mc:RELEASE.2025-08-13T08-35-41Z", cronJob, StringComparison.Ordinal);
+        Assert.Contains("concurrencyPolicy: Forbid", cronJob, StringComparison.Ordinal);
+        Assert.Contains("activeDeadlineSeconds: 900", cronJob, StringComparison.Ordinal);
+        Assert.Contains("successfulJobsHistoryLimit: 3", cronJob, StringComparison.Ordinal);
+        Assert.Contains("failedJobsHistoryLimit: 3", cronJob, StringComparison.Ordinal);
+        Assert.Contains("readOnlyRootFilesystem: true", cronJob, StringComparison.Ordinal);
+        Assert.Contains("runAsNonRoot: true", cronJob, StringComparison.Ordinal);
+        Assert.Contains("mongodump --uri \"$MONGO_URI\" --archive=\"$ARCHIVE\" --gzip", cronJob, StringComparison.Ordinal);
+        Assert.Contains("OBJECT_PATH=\"urfu-backups/mongo", cronJob, StringComparison.Ordinal);
+        Assert.Contains("mc stat minio/${OBJECT_PATH}", cronJob, StringComparison.Ordinal);
+        Assert.Contains("mc mb -p minio/urfu-backups", bucketsJob, StringComparison.Ordinal);
+        Assert.Contains("name: mongo-backup-smoke", smokeJob, StringComparison.Ordinal);
+        Assert.Contains("initContainers:", smokeJob, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void KeycloakBootstrapShouldVerifyInternalGrpcTokenClaims()
+    {
+        var bootstrap = ReadRepoFile("deploy", "k8s", "platform", "identity", "keycloak-bootstrap-job.yaml");
+
+        Assert.Contains("verify_internal_grpc_token", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("service:discipline-read", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("service:presence-internal", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("urfu-link-api", bootstrap, StringComparison.Ordinal);
+        Assert.Contains("https://id.ghjc.ru/realms/urfu-link", bootstrap, StringComparison.Ordinal);
     }
 
     private static string ReadRepoFile(params string[] pathSegments)

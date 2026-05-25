@@ -39,7 +39,7 @@ spec:
             - name: MINIO_API_CORS_ALLOW_ORIGIN
               value: "https://urfu-link.ghjc.ru"
             - name: MINIO_IDENTITY_OPENID_CONFIG_URL
-              value: "https://id.ghjc.ru/realms/urfu-link/.well-known/openid-configuration"
+              value: "http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/.well-known/openid-configuration"
             - name: MINIO_IDENTITY_OPENID_CLIENT_ID
               valueFrom:
                 secretKeyRef:

@@ -34,6 +34,7 @@ spec:
               mc mb -p minio/media-private || true
               mc mb -p minio/media-public || true
               mc mb -p minio/user-avatars || true
+              mc mb -p minio/urfu-backups || true
               mc anonymous set download minio/media-public
               mc anonymous set download minio/user-avatars
           volumeMounts:
