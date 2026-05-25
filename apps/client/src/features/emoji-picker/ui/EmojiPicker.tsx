@@ -95,12 +95,11 @@ export const EmojiPicker = memo(({ onPick }: { onPick: (emoji: string) => void }
     );
 
     return (
-        <View className="flex-1 bg-app-card">
+        <View className="flex-1 bg-app-card" style={{ minHeight: 0, minWidth: 0 }}>
             <EmojiKeyboard
                 onEmojiSelected={handleEmojiSelected}
                 translation={ru}
                 enableRecentlyUsed
-                enableSearchBar
                 enableCategoryChangeGesture
                 categoryPosition="bottom"
                 emojiSize={28}

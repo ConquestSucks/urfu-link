@@ -26,9 +26,10 @@ export const ReactionPickerModal = ({ messageId, onClose }: ReactionPickerModalP
         <ModalOverlay
             visible={!!messageId}
             onClose={onClose}
-            contentClassName="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-[360px] h-[420px]"
+            backdropClassName="px-4"
+            contentClassName="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-full max-w-[560px] h-[480px] max-h-[82vh]"
         >
-            <View className="flex-1">
+            <View className="flex-1" style={{ minHeight: 0, minWidth: 0 }}>
                 <EmojiPicker onPick={handlePick} />
             </View>
         </ModalOverlay>
