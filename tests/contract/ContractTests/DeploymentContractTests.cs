@@ -232,6 +232,7 @@ public sealed class DeploymentContractTests
     public void MinioShouldUseInternalKeycloakDiscoveryWithExplicitEgress()
     {
         var minio = ReadRepoFile("deploy", "k8s", "platform", "stateful", "minio-tenant.yaml");
+        var keycloak = ReadRepoFile("deploy", "k8s", "platform", "identity", "keycloak.yaml");
         var policies = ReadRepoFile("deploy", "k8s", "platform", "network", "platform-network-policies.yaml");
         var coredns = ReadRepoFile("deploy", "k8s", "platform", "network", "coredns-custom.yaml");
 
@@ -246,6 +247,7 @@ public sealed class DeploymentContractTests
         Assert.Contains("name: minio-egress-keycloak", policies, StringComparison.Ordinal);
         Assert.Contains("app: keycloak", policies, StringComparison.Ordinal);
         Assert.Contains("port: 8080", policies, StringComparison.Ordinal);
+        Assert.Contains("--hostname-backchannel-dynamic=true", keycloak, StringComparison.Ordinal);
         Assert.Contains("prefer internal service URLs", coredns, StringComparison.Ordinal);
     }
 

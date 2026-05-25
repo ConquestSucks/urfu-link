@@ -49,6 +49,7 @@ spec:
             - "start"
             - "--http-enabled=true"
             - "--hostname=https://id.ghjc.ru"
+            - "--hostname-backchannel-dynamic=true"
             - "--proxy-headers=xforwarded"
             - "--cache=local"
             - "--health-enabled=true"
