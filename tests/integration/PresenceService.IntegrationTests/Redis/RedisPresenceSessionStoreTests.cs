@@ -173,6 +173,29 @@ public class RedisPresenceSessionStoreTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UpdateViewingContexts_PersistsContextsWithoutChangingStatus()
+    {
+        var sut = Resolve();
+        var userId = Guid.NewGuid();
+        await sut.AddSessionAsync(Session(userId, "d1"), CancellationToken.None);
+        await sut.UpdateSessionStatusAsync(
+            userId, "d1", PresenceStatus.DoNotDisturb, "Focusing", CancellationToken.None);
+
+        await sut.UpdateViewingContextsAsync(
+            userId,
+            "d1",
+            ["chat:conversation:direct-1", "chat:thread:direct-1:root-1"],
+            CancellationToken.None);
+
+        var session = (await sut.GetSessionsAsync(userId, CancellationToken.None)).Single();
+        session.Status.Should().Be(PresenceStatus.DoNotDisturb);
+        session.CustomActivity.Should().Be("Focusing");
+        session.ViewingContexts.Should().BeEquivalentTo(
+            "chat:conversation:direct-1",
+            "chat:thread:direct-1:root-1");
+    }
+
+    [Fact]
     public async Task GetExpiredSessions_ReturnsOnlyOldOnes()
     {
         var sut = Resolve();

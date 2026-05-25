@@ -10,6 +10,10 @@ export const Header = ({ title }: { title: string }) => {
     const { currentView, createViewHref } = useInboxRouting();
     const globalQuery = useSearchStore((s) => s.globalQuery);
     const { onQueryChange } = useGlobalSearch();
+    const searchPlaceholder =
+        currentView === "notifications"
+            ? "Поиск по уведомлениям..."
+            : "Поиск по чатам, сообщениям и людям...";
 
     return (
         <View className="px-6">
@@ -22,7 +26,7 @@ export const Header = ({ title }: { title: string }) => {
             <SearchBar
                 value={globalQuery}
                 onChange={onQueryChange}
-                placeholder="Поиск по чатам, сообщениям и людям..."
+                placeholder={searchPlaceholder}
             />
         </View>
     );

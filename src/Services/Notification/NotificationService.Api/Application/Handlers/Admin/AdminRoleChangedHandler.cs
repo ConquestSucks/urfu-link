@@ -7,7 +7,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Admin;
 
 public sealed class AdminRoleChangedHandler : INotificationHandler<UserRoleChangedEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         UserRoleChangedEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -26,7 +26,7 @@ public sealed class AdminRoleChangedHandler : INotificationHandler<UserRoleChang
             ["newRole"] = integrationEvent.NewRole,
         });
 
-        var draft = new NotificationDraft(
+        var draft = new NotificationIntent(
             RecipientUserId: integrationEvent.UserId,
             Category: NotificationCategory.AdminRoleChanged,
             Severity: NotificationSeverity.Normal,
@@ -36,6 +36,6 @@ public sealed class AdminRoleChangedHandler : INotificationHandler<UserRoleChang
             SourceEventId: integrationEvent.EventId,
             SourceEventType: integrationEvent.EventType);
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>([draft]);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>([draft]);
     }
 }

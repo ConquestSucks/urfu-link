@@ -60,10 +60,11 @@ public sealed class NotificationServiceFactory : WebApplicationFactory<Program>,
     public async Task ResetDataAsync()
     {
         PresenceClient.OnlineOnWeb = false;
+        PresenceClient.ViewingContexts.Clear();
         await using var scope = Services.CreateAsyncScope();
         var ctx = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
         await ctx.Database.ExecuteSqlRawAsync(
-            "TRUNCATE TABLE notifications.notifications, notifications.deliveries, notifications.push_devices, notifications.outbox_messages RESTART IDENTITY CASCADE")
+            "TRUNCATE TABLE notifications.notifications, notifications.deliveries, notifications.push_devices, notifications.outbox_messages, notifications.notification_dedup_keys, notifications.notification_source_action_keys RESTART IDENTITY CASCADE")
             .ConfigureAwait(false);
 
         var multiplexer = scope.ServiceProvider.GetRequiredService<IConnectionMultiplexer>();

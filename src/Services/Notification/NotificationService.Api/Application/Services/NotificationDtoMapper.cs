@@ -39,6 +39,9 @@ internal static class NotificationDtoMapper
             DoneAtUtc: notification.DoneAtUtc,
             ArchivedAtUtc: notification.ArchivedAtUtc,
             SnoozedUntilUtc: notification.SnoozedUntilUtc,
-            ExpiresAtUtc: notification.ExpiresAtUtc);
+            ExpiresAtUtc: notification.ExpiresAtUtc,
+            SourceActionId: notification.SourceActionId,
+            Priority: notification.Priority,
+            SupersededByNotificationId: notification.SupersededByNotificationId);
     }
 }

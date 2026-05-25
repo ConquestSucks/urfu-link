@@ -10,4 +10,5 @@ public sealed record PresenceSession(
     string? CustomActivity,
     DateTimeOffset ConnectedAt,
     DateTimeOffset LastHeartbeatAt,
-    string? ConnectionId = null);
+    string? ConnectionId = null,
+    IReadOnlyList<string>? ViewingContexts = null);

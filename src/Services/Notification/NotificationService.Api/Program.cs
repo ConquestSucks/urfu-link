@@ -77,9 +77,16 @@ builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.Authenticatio
 builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddNotificationModule(builder.Configuration);
+
+if (await NotificationBackfillCliRunner.TryRunAsync(args, builder.Configuration))
+{
+    return;
+}
+
 builder.Services.AddHostedService<ChatEventsConsumer>();
 builder.Services.AddHostedService<DisciplineEventsConsumer>();
 builder.Services.AddHostedService<CallEventsConsumer>();
+builder.Services.AddHostedService<MediaEventsConsumer>();
 builder.Services.AddHostedService<UserEventsConsumer>();
 builder.Services.AddHostedService<SystemEventsConsumer>();
 builder.Services.AddHostedService<Urfu.Link.Services.Notification.Workers.PushDispatcherWorker>();

@@ -162,6 +162,36 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task IsViewing_TrueWhenAnySessionContainsContext()
+    {
+        var caller = Guid.NewGuid();
+        var target = Guid.NewGuid();
+        const string contextKey = "chat:conversation:direct-1";
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var sessions = scope.ServiceProvider.GetRequiredService<IPresenceSessionStore>();
+            await sessions.AddSessionAsync(new PresenceSession(
+                target,
+                "d1",
+                DomainEnums.Platform.Web,
+                DomainEnums.PresenceStatus.Online,
+                null,
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow,
+                ViewingContexts: [contextKey]), CancellationToken.None);
+        }
+
+        var client = AuthorizedClient(caller);
+        var reply = await client.IsViewingAsync(new IsViewingRequest
+        {
+            UserId = target.ToString(),
+            ContextKey = contextKey,
+        });
+
+        reply.IsViewing.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task IsTyping_TrueAfterStart()
     {
         var caller = Guid.NewGuid();

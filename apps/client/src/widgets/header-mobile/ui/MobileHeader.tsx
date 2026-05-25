@@ -1,10 +1,5 @@
 import { Logo } from "@/shared/ui";
 import { ViewToggle, ViewType } from "@/entities/view";
-import { useNotificationBadge } from "@/features/notifications";
-import { useNotificationStore } from "@/shared/store/notification-store";
-import { NotificationBell } from "@/widgets/notifications";
-import type { Href } from "expo-router";
-import { router } from "expo-router";
 import React from "react";
 import { Text, View } from "react-native";
 
@@ -17,10 +12,6 @@ export const MobileHeader = ({
     currentView = "messages",
     createHref,
 }: MobileHeaderProps) => {
-    const { data } = useNotificationBadge();
-    const liveBadge = useNotificationStore((s) => s.badge);
-    const badge = liveBadge ?? data;
-
     return (
         <View className="flex-row items-center justify-between px-4 py-1.5">
             <View className="flex-row items-center gap-2">
@@ -29,11 +20,6 @@ export const MobileHeader = ({
             </View>
 
             <View className="flex-row items-center gap-2">
-                <NotificationBell
-                    unreadCount={badge?.total ?? 0}
-                    unseenCount={badge?.totalUnseen ?? 0}
-                    onPress={() => router.push("/notifications" as Href)}
-                />
                 <ViewToggle currentView={currentView} createHref={createHref} />
             </View>
         </View>

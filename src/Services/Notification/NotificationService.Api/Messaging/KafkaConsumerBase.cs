@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Confluent.Kafka;
@@ -98,22 +97,16 @@ public abstract class KafkaConsumerBase(
 
     private async Task ProcessAsync(string raw, CancellationToken cancellationToken)
     {
-        var envelope = JsonNode.Parse(raw)
-            ?? throw new JsonException("Envelope is null");
-
-        var messageId = ReadStringOrThrow(envelope, "messageId");
-        var payloadNode = envelope["payload"]
-            ?? throw new JsonException("Envelope payload missing");
-        var eventType = ReadStringOrThrow(payloadNode, "eventType");
+        var envelope = KafkaEnvelopeReader.Read(raw);
 
         await using var scope = _scopeFactory.CreateAsyncScope();
         var idempotency = scope.ServiceProvider.GetRequiredService<IIdempotencyStore>();
-        var dedupKey = $"{DedupKeyPrefix}:{messageId}";
+        var dedupKey = $"{DedupKeyPrefix}:{envelope.MessageId}";
         if (!await idempotency.TryRegisterAsync(dedupKey, cancellationToken).ConfigureAwait(false))
         {
             if (_logger.IsEnabled(LogLevel.Debug))
             {
-                _logger.LogDebug("Duplicate envelope {MessageId} on {Topic} — skipped", messageId, Topic);
+                _logger.LogDebug("Duplicate envelope {MessageId} on {Topic} — skipped", envelope.MessageId, Topic);
             }
 
             return;
@@ -121,11 +114,11 @@ public abstract class KafkaConsumerBase(
 
         try
         {
-            await HandleEventAsync(eventType, payloadNode, scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
+            await HandleEventAsync(envelope.EventType, envelope.Payload, scope.ServiceProvider, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogError(ex, "Handler for {EventType} on {Topic} failed", eventType, Topic);
+            _logger.LogError(ex, "Handler for {EventType} on {Topic} failed", envelope.EventType, Topic);
             throw;
         }
     }
@@ -163,17 +156,5 @@ public abstract class KafkaConsumerBase(
         }
 
         return consumerConfig;
-    }
-
-    private static string ReadStringOrThrow(JsonNode node, string property)
-    {
-        var value = node[property]?.GetValue<string>();
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            throw new JsonException(
-                string.Create(CultureInfo.InvariantCulture, $"Missing or empty '{property}' on Kafka envelope."));
-        }
-
-        return value;
     }
 }

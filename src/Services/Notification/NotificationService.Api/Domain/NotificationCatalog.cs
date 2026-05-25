@@ -35,6 +35,36 @@ public static class NotificationCatalog
                 NotificationSeverity.Normal,
                 "chat-circle-text",
                 groupable: true),
+            [NotificationCategory.ChatThreadReply] = Descriptor(
+                "chat.thread.reply",
+                NotificationCategory.ChatThreadReply,
+                NotificationSeverity.Normal,
+                "chats-circle",
+                groupable: true),
+            [NotificationCategory.ChatReplyToMe] = Descriptor(
+                "chat.reply_to_me",
+                NotificationCategory.ChatReplyToMe,
+                NotificationSeverity.High,
+                "arrow-bend-up-left",
+                groupable: true),
+            [NotificationCategory.ChatReaction] = Descriptor(
+                "chat.reaction.added",
+                NotificationCategory.ChatReaction,
+                NotificationSeverity.Low,
+                "smiley",
+                groupable: true),
+            [NotificationCategory.ChatMessagePinned] = Descriptor(
+                "chat.message.pinned",
+                NotificationCategory.ChatMessagePinned,
+                NotificationSeverity.Normal,
+                "push-pin",
+                groupable: true),
+            [NotificationCategory.ChatParticipantChanged] = Descriptor(
+                "chat.participant.changed",
+                NotificationCategory.ChatParticipantChanged,
+                NotificationSeverity.Normal,
+                "users-three",
+                groupable: true),
             [NotificationCategory.CallIncoming] = Descriptor(
                 "call.incoming",
                 NotificationCategory.CallIncoming,
@@ -65,6 +95,30 @@ public static class NotificationCatalog
                 NotificationSeverity.High,
                 "clock-countdown",
                 groupable: true),
+            [NotificationCategory.DisciplineEnrollment] = Descriptor(
+                "discipline.enrollment",
+                NotificationCategory.DisciplineEnrollment,
+                NotificationSeverity.Normal,
+                "student",
+                groupable: true),
+            [NotificationCategory.DisciplineUnenrollment] = Descriptor(
+                "discipline.unenrollment",
+                NotificationCategory.DisciplineUnenrollment,
+                NotificationSeverity.Normal,
+                "user-minus",
+                groupable: true),
+            [NotificationCategory.DisciplineUpdated] = Descriptor(
+                "discipline.updated",
+                NotificationCategory.DisciplineUpdated,
+                NotificationSeverity.Normal,
+                "pencil-simple",
+                groupable: true),
+            [NotificationCategory.DisciplineDeleted] = Descriptor(
+                "discipline.deleted",
+                NotificationCategory.DisciplineDeleted,
+                NotificationSeverity.High,
+                "trash",
+                groupable: true),
             [NotificationCategory.SystemMaintenance] = Descriptor(
                 "system.maintenance",
                 NotificationCategory.SystemMaintenance,
@@ -88,6 +142,30 @@ public static class NotificationCatalog
                 NotificationCategory.AdminRoleChanged,
                 NotificationSeverity.High,
                 "shield-check",
+                groupable: true),
+            [NotificationCategory.MediaAccessGranted] = Descriptor(
+                "media.access.granted",
+                NotificationCategory.MediaAccessGranted,
+                NotificationSeverity.Normal,
+                "lock-open",
+                groupable: true),
+            [NotificationCategory.MediaAccessRevoked] = Descriptor(
+                "media.access.revoked",
+                NotificationCategory.MediaAccessRevoked,
+                NotificationSeverity.Normal,
+                "lock",
+                groupable: true),
+            [NotificationCategory.MediaUploadProcessed] = Descriptor(
+                "media.upload.processed",
+                NotificationCategory.MediaUploadProcessed,
+                NotificationSeverity.Normal,
+                "cloud-check",
+                groupable: true),
+            [NotificationCategory.MediaAssetDeleted] = Descriptor(
+                "media.asset.deleted",
+                NotificationCategory.MediaAssetDeleted,
+                NotificationSeverity.High,
+                "file-x",
                 groupable: true),
         };
 

@@ -20,6 +20,8 @@ public sealed class NotificationDbContext(DbContextOptions<NotificationDbContext
 
     public DbSet<NotificationDedupKey> NotificationDedupKeys => Set<NotificationDedupKey>();
 
+    public DbSet<NotificationSourceActionKey> NotificationSourceActionKeys => Set<NotificationSourceActionKey>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);

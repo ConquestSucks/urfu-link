@@ -93,6 +93,14 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
             .HasColumnName("source_event_type")
             .HasMaxLength(NotificationAggregate.SourceEventTypeMaxLength)
             .IsRequired();
+        builder.Property(n => n.SourceActionId)
+            .HasColumnName("source_action_id")
+            .HasMaxLength(NotificationAggregate.SourceActionIdMaxLength);
+        builder.Property(n => n.Priority)
+            .HasColumnName("priority")
+            .HasConversion<short>()
+            .HasDefaultValue(NotificationPriority.PinSystemAdmin);
+        builder.Property(n => n.SupersededByNotificationId).HasColumnName("superseded_by_notification_id");
 
         builder.Property(n => n.CreatedAtUtc).HasColumnName("created_at_utc");
         builder.Property(n => n.ReadAtUtc).HasColumnName("read_at_utc");

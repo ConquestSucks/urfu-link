@@ -5,7 +5,8 @@ public sealed record ChatReactionAddedEvent(
     Guid MessageId,
     Guid UserId,
     string Emoji,
-    DateTimeOffset OccurredAtUtc) : IIntegrationEvent
+    DateTimeOffset OccurredAtUtc,
+    Guid? MessageAuthorId = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

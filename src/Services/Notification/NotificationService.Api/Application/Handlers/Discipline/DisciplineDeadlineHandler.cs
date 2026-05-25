@@ -8,7 +8,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Discipline;
 
 public sealed class DisciplineDeadlineHandler : INotificationHandler<DisciplineDeadlineApproachingEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         DisciplineDeadlineApproachingEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -31,10 +31,10 @@ public sealed class DisciplineDeadlineHandler : INotificationHandler<DisciplineD
 
         var groupKey = GroupKey.ForDisciplineDeadline(integrationEvent.DisciplineId, integrationEvent.AssignmentId);
 
-        var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
+        var drafts = new List<NotificationIntent>(integrationEvent.Recipients.Count);
         foreach (var recipientId in integrationEvent.Recipients)
         {
-            drafts.Add(new NotificationDraft(
+            drafts.Add(new NotificationIntent(
                 RecipientUserId: recipientId,
                 Category: NotificationCategory.DisciplineDeadline,
                 Severity: NotificationSeverity.High,
@@ -42,9 +42,14 @@ public sealed class DisciplineDeadlineHandler : INotificationHandler<DisciplineD
                 Data: data,
                 GroupKey: groupKey,
                 SourceEventId: integrationEvent.EventId,
-                SourceEventType: integrationEvent.EventType));
+                SourceEventType: integrationEvent.EventType,
+                SourceActionId: NotificationSourceActions.DisciplineItem(
+                    integrationEvent.DisciplineId,
+                    integrationEvent.AssignmentId,
+                    "deadline"),
+                Priority: NotificationPriority.Mention));
         }
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>(drafts);
     }
 }

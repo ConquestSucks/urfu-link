@@ -8,6 +8,8 @@ namespace Urfu.Link.Services.Notification.Application.Preferences;
 public interface IPresenceClient
 {
     Task<bool> IsOnlineOnWebAsync(Guid userId, CancellationToken cancellationToken);
+
+    Task<bool> IsViewingAsync(Guid userId, string contextKey, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -20,6 +22,14 @@ public sealed class OfflinePresenceClient : IPresenceClient
     public Task<bool> IsOnlineOnWebAsync(Guid userId, CancellationToken cancellationToken)
     {
         _ = userId;
+        _ = cancellationToken;
+        return Task.FromResult(false);
+    }
+
+    public Task<bool> IsViewingAsync(Guid userId, string contextKey, CancellationToken cancellationToken)
+    {
+        _ = userId;
+        _ = contextKey;
         _ = cancellationToken;
         return Task.FromResult(false);
     }

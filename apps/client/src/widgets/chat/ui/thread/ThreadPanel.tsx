@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo } from "react";
-import { FlatList, Pressable, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { ArrowBendUpLeftIcon, XIcon } from "@/shared/ui/phosphor";
 import { EmptyState } from "@/shared/ui";
 import { useThreadStore, useThreadMessages } from "@/entities/conversation/model/thread-store";
@@ -11,10 +11,42 @@ import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 
 interface ThreadPanelProps {
     rootMessageId: string;
+    targetMessageId?: string | null;
     onClose: () => void;
 }
 
-export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
+const HIGHLIGHT_HOLD_MS = 2200;
+
+const styles = StyleSheet.create({
+    highlightOutline: {
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        backgroundColor: "rgba(59, 130, 246, 0.05)",
+        borderColor: "rgba(81, 162, 255, 0.28)",
+        borderRadius: 16,
+        borderWidth: 1,
+        pointerEvents: "none",
+    },
+    highlightRail: {
+        position: "absolute",
+        left: 0,
+        top: 8,
+        bottom: 8,
+        width: 3,
+        borderRadius: 999,
+        backgroundColor: "#51A2FF",
+        pointerEvents: "none",
+    },
+});
+
+export const ThreadPanel = ({
+    rootMessageId,
+    targetMessageId,
+    onClose,
+}: ThreadPanelProps) => {
     const messages = useThreadMessages(rootMessageId);
     const root = useThreadStore((s) => s.rootsById[rootMessageId]);
     const isLoading = useThreadStore((s) => !!s.loadingByThread[rootMessageId]);
@@ -24,6 +56,8 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
     const subscribeThread = useThreadStore((s) => s.subscribeThread);
     const unsubscribeThread = useThreadStore((s) => s.unsubscribeThread);
     const replyInThread = useThreadStore((s) => s.replyInThread);
+    const listRef = useRef<FlatList<MessageDto>>(null);
+    const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
     const conversationRoot = useChatStore((s) => {
         for (const list of Object.values(s.messagesByConversation)) {
@@ -44,6 +78,32 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
         };
     }, [rootMessageId]);
 
+    useEffect(() => {
+        if (!targetMessageId) return;
+
+        const index = messages.findIndex((message) => message.id === targetMessageId);
+        if (index === -1) return;
+
+        setHighlightedMessageId(targetMessageId);
+        const scrollTimer = setTimeout(() => {
+            listRef.current?.scrollToIndex({
+                index,
+                animated: true,
+                viewPosition: 0.5,
+            });
+        }, 50);
+        const clearTimer = setTimeout(() => {
+            setHighlightedMessageId((current) =>
+                current === targetMessageId ? null : current,
+            );
+        }, HIGHLIGHT_HOLD_MS);
+
+        return () => {
+            clearTimeout(scrollTimer);
+            clearTimeout(clearTimer);
+        };
+    }, [messages, targetMessageId]);
+
     const rootMsg = root ?? conversationRoot;
 
     const handleSend = useCallback(async () => {
@@ -61,27 +121,39 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
         () =>
             ({ item }: { item: MessageDto }) => {
                 const view = mapMessageToProps(item, currentUserId);
+                const isHighlighted = highlightedMessageId === item.id;
                 return (
                     <View className="px-4">
-                        <ChatMessage
-                            id={view.id}
-                            text={view.text}
-                            isOwn={view.isOwn}
-                            seen={view.seen}
-                            time={view.time}
-                            avatarUrl={view.avatarUrl}
-                            attachments={view.attachments}
-                            replyTo={item.replyTo ?? null}
-                            reactions={item.reactions}
-                            editedAtUtc={item.editedAtUtc}
-                            forwardedFrom={item.forwardedFrom ?? null}
-                            isDeleted={item.state === "Deleted"}
-                            threadReplyCount={0}
-                        />
+                        <View className="-mx-2 rounded-2xl px-2 py-1 overflow-hidden">
+                            {isHighlighted ? (
+                                <>
+                                    <View
+                                        testID={`thread-message-highlight-${view.id}`}
+                                        style={styles.highlightOutline}
+                                    />
+                                    <View style={styles.highlightRail} />
+                                </>
+                            ) : null}
+                            <ChatMessage
+                                id={view.id}
+                                text={view.text}
+                                isOwn={view.isOwn}
+                                seen={view.seen}
+                                time={view.time}
+                                avatarUrl={view.avatarUrl}
+                                attachments={view.attachments}
+                                replyTo={item.replyTo ?? null}
+                                reactions={item.reactions}
+                                editedAtUtc={item.editedAtUtc}
+                                forwardedFrom={item.forwardedFrom ?? null}
+                                isDeleted={item.state === "Deleted"}
+                                threadReplyCount={0}
+                            />
+                        </View>
                     </View>
                 );
             },
-        [currentUserId],
+        [currentUserId, highlightedMessageId],
     );
 
     return (
@@ -101,12 +173,22 @@ export const ThreadPanel = ({ rootMessageId, onClose }: ThreadPanelProps) => {
             </View>
 
             <FlatList
+                ref={listRef}
                 className="flex-1 py-4"
                 inverted
                 data={messages}
                 keyExtractor={(m) => m.id}
                 renderItem={renderItem}
                 contentContainerStyle={{ gap: 16 }}
+                onScrollToIndexFailed={({ index }) => {
+                    setTimeout(() => {
+                        listRef.current?.scrollToIndex({
+                            index,
+                            animated: true,
+                            viewPosition: 0.5,
+                        });
+                    }, 100);
+                }}
                 onEndReached={() => {
                     if (hasMore) loadMoreThread(rootMessageId);
                 }}

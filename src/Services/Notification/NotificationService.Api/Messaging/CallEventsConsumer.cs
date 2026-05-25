@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Call;
 using Urfu.Link.Services.Notification.Application.Handlers.Call;
+using Urfu.Link.Services.Notification.Application.Routing;
+using Urfu.Link.Services.Notification.Application.Services;
 
 namespace Urfu.Link.Services.Notification.Messaging;
 
@@ -41,6 +43,19 @@ public sealed class CallEventsConsumer(
                     var evt = payload.Deserialize<CallMissedEvent>(JsonOptions)
                         ?? throw new JsonException("CallMissedEvent payload null");
                     await RoutingDispatcher.Route(scope, scope.GetRequiredService<CallMissedHandler>(), evt, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+            case "call.ended.v1":
+                {
+                    var evt = payload.Deserialize<CallEndedEvent>(JsonOptions)
+                        ?? throw new JsonException("CallEndedEvent payload null");
+                    await scope.GetRequiredService<NotificationLifecycleService>()
+                        .ArchiveBySourceActionAsync(
+                            NotificationSourceActions.CallIncoming(evt.CallId),
+                            evt.OccurredAtUtc,
+                            cancellationToken)
+                        .ConfigureAwait(false);
                     break;
                 }
 

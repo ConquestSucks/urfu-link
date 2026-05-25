@@ -43,26 +43,53 @@ public sealed class NotificationRouter(
         }
 
         var created = 0;
+        var updated = 0;
         var skipped = 0;
 
-        foreach (var draft in drafts)
+        foreach (var preparedIntent in drafts)
         {
-            var preferences = await preferencesClient.GetAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(preparedIntent.SuppressWhenViewingContextKey))
+            {
+                var isViewing = await presenceClient
+                    .IsViewingAsync(
+                        preparedIntent.RecipientUserId,
+                        preparedIntent.SuppressWhenViewingContextKey,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (isViewing)
+                {
+                    skipped++;
+                    if (logger.IsEnabled(LogLevel.Debug))
+                    {
+                        logger.LogDebug(
+                            "Skipping notification {SourceActionId} for recipient {RecipientId}; user is viewing {ContextKey}",
+                            preparedIntent.SourceActionId,
+                            preparedIntent.RecipientUserId,
+                            preparedIntent.SuppressWhenViewingContextKey);
+                    }
 
-            var candidates = SeverityRouter.Select(draft.Severity);
-            var channels = PreferenceFilter.Filter(candidates, draft.Category, draft.Severity, preferences, timeProvider.GetUtcNow());
+                    continue;
+                }
+            }
 
-            var notification = factory.FromDraft(draft);
+            var intent = await ResolveActorAsync(preparedIntent, cancellationToken).ConfigureAwait(false);
+
+            var preferences = await preferencesClient.GetAsync(intent.RecipientUserId, cancellationToken).ConfigureAwait(false);
+
+            var candidates = SeverityRouter.Select(intent.Severity);
+            var channels = PreferenceFilter.Filter(candidates, intent.Category, intent.Severity, preferences, timeProvider.GetUtcNow());
+
+            var notification = factory.FromIntent(intent);
 
             foreach (var channel in channels)
             {
                 if (channel == DeliveryChannel.InApp)
                 {
-                    notification.AddDelivery(Delivery.PendingInApp(notification.Id, $"user:{draft.RecipientUserId:N}"));
+                    notification.AddDelivery(Delivery.PendingInApp(notification.Id, $"user:{intent.RecipientUserId:N}"));
                 }
                 else if (channel == DeliveryChannel.Email)
                 {
-                    var contact = await preferencesClient.GetContactAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
+                    var contact = await preferencesClient.GetContactAsync(intent.RecipientUserId, cancellationToken).ConfigureAwait(false);
                     if (!string.IsNullOrWhiteSpace(contact.Email))
                     {
                         notification.AddDelivery(Delivery.PendingEmail(notification.Id, contact.Email));
@@ -70,21 +97,21 @@ public sealed class NotificationRouter(
                 }
                 else if (channel == DeliveryChannel.Push)
                 {
-                    var onlineOnWeb = await presenceClient.IsOnlineOnWebAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
-                    if (PresenceAwareSkipPolicy.ShouldSkipPush(draft.Category, draft.Severity, onlineOnWeb))
+                    var onlineOnWeb = await presenceClient.IsOnlineOnWebAsync(intent.RecipientUserId, cancellationToken).ConfigureAwait(false);
+                    if (PresenceAwareSkipPolicy.ShouldSkipPush(intent.Category, intent.Severity, onlineOnWeb))
                     {
                         if (logger.IsEnabled(LogLevel.Debug))
                         {
                             logger.LogDebug(
                                 "Skipping push for {Category} to {RecipientId} — user is online on web",
-                                draft.Category,
-                                draft.RecipientUserId);
+                                intent.Category,
+                                intent.RecipientUserId);
                         }
 
                         continue;
                     }
 
-                    var devices = await pushDevices.ListActiveByUserAsync(draft.RecipientUserId, cancellationToken).ConfigureAwait(false);
+                    var devices = await pushDevices.ListActiveByUserAsync(intent.RecipientUserId, cancellationToken).ConfigureAwait(false);
                     foreach (var device in devices)
                     {
                         notification.AddDelivery(Delivery.PendingPush(notification.Id, device.Provider, device.Id, device.Token));
@@ -92,44 +119,95 @@ public sealed class NotificationRouter(
                 }
             }
 
-            var inserted = await repository.TryInsertAsync(notification, cancellationToken).ConfigureAwait(false);
-            if (!inserted)
+            var upsert = await repository.UpsertAsync(notification, cancellationToken).ConfigureAwait(false);
+            if (upsert.Status == NotificationUpsertStatus.Skipped)
             {
                 skipped++;
                 if (logger.IsEnabled(LogLevel.Debug))
                 {
                     logger.LogDebug(
-                        "Notification with source_event_id={SourceEventId} for recipient {RecipientId} already exists — skipped",
-                        draft.SourceEventId,
-                        draft.RecipientUserId);
+                        "Notification with source_action_id={SourceActionId}, source_event_id={SourceEventId} for recipient {RecipientId} skipped",
+                        notification.SourceActionId,
+                        intent.SourceEventId,
+                        intent.RecipientUserId);
                 }
 
                 continue;
             }
 
-            // Outbox event: published downstream once SaveChanges commits.
-            outboxEnqueue.Enqueue(new NotificationCreatedEvent(
-                notification.Id,
-                draft.RecipientUserId,
-                (int)draft.Category,
-                draft.SourceEventId,
-                draft.SourceEventType));
+            var routedNotification = upsert.Notification ?? notification;
+            if (upsert.Status == NotificationUpsertStatus.Created)
+            {
+                // Outbox event: published downstream once SaveChanges commits.
+                outboxEnqueue.Enqueue(new NotificationCreatedEvent(
+                    routedNotification.Id,
+                    intent.RecipientUserId,
+                    (int)routedNotification.Category,
+                    intent.SourceEventId,
+                    intent.SourceEventType));
 
-            await repository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            await badgeStore.IncrementAsync(draft.RecipientUserId, draft.Category, cancellationToken).ConfigureAwait(false);
-            created++;
+                await repository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await badgeStore.IncrementAsync(intent.RecipientUserId, routedNotification.Category, cancellationToken)
+                    .ConfigureAwait(false);
+                created++;
 
+                if (channels.Contains(DeliveryChannel.InApp))
+                {
+                    await inAppChannel.DeliverAsync(routedNotification, cancellationToken).ConfigureAwait(false);
+                }
+
+                continue;
+            }
+
+            updated++;
+            await RebuildBadgeAsync(intent.RecipientUserId, cancellationToken).ConfigureAwait(false);
             if (channels.Contains(DeliveryChannel.InApp))
             {
-                await inAppChannel.DeliverAsync(notification, cancellationToken).ConfigureAwait(false);
+                await inAppChannel.UpsertAsync(routedNotification, cancellationToken).ConfigureAwait(false);
             }
         }
 
-        return new RoutingOutcome(created, skipped);
+        return new RoutingOutcome(created, updated, skipped);
+    }
+
+    private async Task RebuildBadgeAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var counts = await repository.CountBadgeAsync(userId, cancellationToken).ConfigureAwait(false);
+        await badgeStore.SetSnapshotAsync(
+            userId,
+            new BadgeSnapshot(counts.TotalUnread, counts.PerCategory),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<NotificationIntent> ResolveActorAsync(
+        NotificationIntent intent,
+        CancellationToken cancellationToken)
+    {
+        var actor = intent.Actor;
+        if (actor?.Id is not { } actorId || actorId == Guid.Empty)
+        {
+            return intent;
+        }
+
+        if (!string.IsNullOrWhiteSpace(actor.DisplayName))
+        {
+            return intent;
+        }
+
+        var contact = await preferencesClient.GetContactAsync(actorId, cancellationToken)
+            .ConfigureAwait(false);
+        var displayName = string.IsNullOrWhiteSpace(contact.DisplayName)
+            ? $"Пользователь {actorId.ToString("N")[..8]}"
+            : contact.DisplayName.Trim();
+
+        return intent with
+        {
+            Actor = actor with { DisplayName = displayName },
+        };
     }
 }
 
-public sealed record RoutingOutcome(int Created, int Skipped)
+public sealed record RoutingOutcome(int Created, int Updated, int Skipped)
 {
-    public static RoutingOutcome NoDrafts { get; } = new(0, 0);
+    public static RoutingOutcome NoDrafts { get; } = new(0, 0, 0);
 }

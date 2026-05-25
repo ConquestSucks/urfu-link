@@ -8,7 +8,7 @@ namespace Urfu.Link.Services.Notification.Application.Handlers.Call;
 
 public sealed class CallIncomingHandler : INotificationHandler<CallIncomingEvent>
 {
-    public Task<IReadOnlyList<NotificationDraft>> PrepareAsync(
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         CallIncomingEvent integrationEvent,
         CancellationToken cancellationToken)
     {
@@ -31,7 +31,7 @@ public sealed class CallIncomingHandler : INotificationHandler<CallIncomingEvent
 
         var groupKey = GroupKey.ForCall(integrationEvent.CallId);
 
-        var drafts = new List<NotificationDraft>(integrationEvent.Recipients.Count);
+        var drafts = new List<NotificationIntent>(integrationEvent.Recipients.Count);
         foreach (var recipientId in integrationEvent.Recipients)
         {
             if (recipientId == integrationEvent.CallerId)
@@ -39,7 +39,7 @@ public sealed class CallIncomingHandler : INotificationHandler<CallIncomingEvent
                 continue;
             }
 
-            drafts.Add(new NotificationDraft(
+            drafts.Add(new NotificationIntent(
                 RecipientUserId: recipientId,
                 Category: NotificationCategory.CallIncoming,
                 Severity: NotificationSeverity.Urgent,
@@ -47,9 +47,12 @@ public sealed class CallIncomingHandler : INotificationHandler<CallIncomingEvent
                 Data: data,
                 GroupKey: groupKey,
                 SourceEventId: integrationEvent.EventId,
-                SourceEventType: integrationEvent.EventType));
+                SourceEventType: integrationEvent.EventType,
+                SourceActionId: NotificationSourceActions.CallIncoming(integrationEvent.CallId),
+                Priority: NotificationPriority.UrgentCall,
+                Actor: new NotificationActor(integrationEvent.CallerId, null, null)));
         }
 
-        return Task.FromResult<IReadOnlyList<NotificationDraft>>(drafts);
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>(drafts);
     }
 }

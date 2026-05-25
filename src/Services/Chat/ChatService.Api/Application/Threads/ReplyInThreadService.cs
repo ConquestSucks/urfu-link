@@ -175,7 +175,8 @@ public sealed class ReplyInThreadService(
                 request.SenderId,
                 subscribers,
                 Mentions: mentions.Count == 0 ? null : mentions,
-                now),
+                now,
+                RootMessageAuthorId: root.SenderId),
             cancellationToken).ConfigureAwait(false);
 
         if (mentions.Count > 0)

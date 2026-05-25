@@ -3,12 +3,13 @@ import { View } from "react-native";
 import { router, useSegments } from "expo-router";
 
 import { InboxChat } from "@/entities/inbox-chat";
-import { InboxNotification } from "@/entities/inbox-notification";
+import { InboxNotification, InboxNotificationProps } from "@/entities/inbox-notification";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { MasterDetailLayout } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useInboxStore } from "@/shared/store/useInboxStore";
+import { resolveNotificationDeepLink } from "@/shared/lib/notificationDeepLink";
 import { useInboxConversations } from "../model/use-inbox-conversations";
 import { Inbox } from "./Inbox";
 import { InboxMobile } from "./InboxMobile";
@@ -21,12 +22,20 @@ export const InboxLayout = () => {
 
     const conversationsLoading = useChatStore((s) => s.isConversationsLoading);
     const loadConversations = useChatStore((s) => s.loadConversations);
+    const setPendingScrollToMessageId = useChatStore(
+        (s) => s.setPendingScrollToMessageId,
+    );
     const chats = useInboxConversations("chats");
     const subjects = useInboxConversations("subjects");
 
     const notifications = useInboxStore((s) => s.notifications);
     const isNotificationsLoading = useInboxStore((s) => s.isNotificationsLoading);
+    const isMarkingAllNotificationsRead = useInboxStore(
+        (s) => s.isMarkingAllNotificationsRead,
+    );
     const fetchNotifications = useInboxStore((s) => s.fetchNotifications);
+    const markNotificationRead = useInboxStore((s) => s.markNotificationRead);
+    const markAllNotificationsRead = useInboxStore((s) => s.markAllNotificationsRead);
 
     const isDetailView = segments.includes("[id]");
 
@@ -53,12 +62,49 @@ export const InboxLayout = () => {
     const isLoading =
         currentView === "notifications" ? isNotificationsLoading : conversationsLoading;
 
+    const unreadNotificationIds = useMemo(() => {
+        if (currentView !== "notifications") return [];
+
+        return (currentData as InboxNotificationProps[])
+            .filter((notification) => notification.isRead === false)
+            .map((notification) => notification.id);
+    }, [currentData, currentView]);
+
+    const markVisibleNotificationsRead = useCallback(() => {
+        void markAllNotificationsRead(unreadNotificationIds);
+    }, [markAllNotificationsRead, unreadNotificationIds]);
+
+    const openNotification = useCallback(
+        (notification: InboxNotificationProps) => {
+            void markNotificationRead(notification.id);
+
+            const target = resolveNotificationDeepLink(
+                notification.deepLink,
+                notification.scope,
+            );
+            if (!target) return;
+
+            setPendingScrollToMessageId(
+                target.threadRootMessageId ?? target.messageId ?? null,
+            );
+            router.push(target.href as never);
+        },
+        [markNotificationRead, setPendingScrollToMessageId],
+    );
+
     const renderItem = useCallback(
         (item: any) => {
             if (currentView === "notifications") {
+                const notification = item as InboxNotificationProps;
                 return (
-                    <View key={item.id}>
-                        <InboxNotification {...item} />
+                    <View key={notification.id}>
+                        <InboxNotification
+                            {...notification}
+                            onMarkRead={(id) => {
+                                void markNotificationRead(id);
+                            }}
+                            onPress={() => openNotification(notification)}
+                        />
                     </View>
                 );
             }
@@ -95,7 +141,7 @@ export const InboxLayout = () => {
                 </View>
             );
         },
-        [currentView, currentTab, params.id]
+        [currentView, currentTab, markNotificationRead, openNotification, params.id]
     );
 
     return (
@@ -103,9 +149,23 @@ export const InboxLayout = () => {
             isDetailView={isDetailView}
             sidebar={
                 isMobile ? (
-                    <InboxMobile data={currentData} isLoading={isLoading} renderItem={renderItem} />
+                    <InboxMobile
+                        data={currentData}
+                        isLoading={isLoading}
+                        renderItem={renderItem}
+                        notificationUnreadCount={unreadNotificationIds.length}
+                        isMarkingAllNotificationsRead={isMarkingAllNotificationsRead}
+                        onMarkAllNotificationsRead={markVisibleNotificationsRead}
+                    />
                 ) : (
-                    <Inbox data={currentData} isLoading={isLoading} renderItem={renderItem} />
+                    <Inbox
+                        data={currentData}
+                        isLoading={isLoading}
+                        renderItem={renderItem}
+                        notificationUnreadCount={unreadNotificationIds.length}
+                        isMarkingAllNotificationsRead={isMarkingAllNotificationsRead}
+                        onMarkAllNotificationsRead={markVisibleNotificationsRead}
+                    />
                 )
             }
         />
