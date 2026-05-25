@@ -48,6 +48,19 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
+    public void ProductionPomeriumShouldWaitForDatabrokerPostgresBeforeStarting()
+    {
+        var deployment = ReadRepoFile("deploy", "k8s", "platform", "identity", "pomerium.yaml");
+
+        Assert.Contains("initContainers:", deployment, StringComparison.Ordinal);
+        Assert.Contains("name: wait-for-databroker-postgres", deployment, StringComparison.Ordinal);
+        Assert.Contains("image: busybox:1.36.1", deployment, StringComparison.Ordinal);
+        Assert.Contains("nc -z urfu-postgres-rw.urfu-platform.svc.cluster.local 5432", deployment, StringComparison.Ordinal);
+        Assert.Contains("runAsNonRoot: true", deployment, StringComparison.Ordinal);
+        Assert.Contains("readOnlyRootFilesystem: true", deployment, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProductionApiHostShouldResolveToGateway()
     {
         var frontendValues = ReadRepoFile("deploy", "helm", "services", "frontend-web", "values-prod.yaml");
