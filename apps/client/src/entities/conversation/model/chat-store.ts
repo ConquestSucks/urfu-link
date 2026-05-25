@@ -9,6 +9,7 @@ import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
 import { apiClient } from "@/shared/lib/api";
 import { resolveCurrentUserId } from "@/shared/lib/current-user";
+import { playMessageSound } from "@/shared/lib/message-sounds";
 import { useAuthStore } from "@/shared/store/auth-store";
 import {
     isDirectDraftConversation,
@@ -415,7 +416,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const newConnection = createHubConnection("/hubs/chat");
 
         newConnection.on("MessageReceived", (message: MessageDto) => {
-            get().addMessage(normalizeMessage(message));
+            const normalized = normalizeMessage(message);
+            const state = get();
+            const existing = state.messagesByConversation[normalized.conversationId] ?? [];
+            const alreadyKnown = existing.some((m) => m.id === normalized.id);
+            const currentUserId = useAuthStore.getState().userId;
+
+            get().addMessage(normalized);
+
+            if (!alreadyKnown && currentUserId && normalized.senderId !== currentUserId) {
+                const conversation = state.conversations.find(
+                    (c) => c.id === normalized.conversationId,
+                );
+                void playMessageSound("receive", {
+                    conversationId: normalized.conversationId,
+                    isDiscipline:
+                        conversation?.groupSubtype === "Discipline" ||
+                        normalized.conversationId.startsWith("discipline:"),
+                });
+            }
         });
 
         newConnection.on("ConversationUpdated", (conversation: ConversationPreview) => {
@@ -825,6 +844,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             // Sender не получает MessageReceived (recipients = participants кроме отправителя),
             // поэтому подменяем оптимистичный экземпляр на серверный сами.
             get().addMessage(normalizeMessage({ ...real, _localStatus: "sent" } as LocalMessageDto));
+            void playMessageSound("send");
         } catch (error) {
             console.error("Failed to send message", error);
             set((state) => {

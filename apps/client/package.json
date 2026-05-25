@@ -24,6 +24,7 @@
     "@urfu-link/api-client": "workspace:*",
     "@urfu-link/ui": "workspace:*",
     "expo": "~56.0.3",
+    "expo-audio": "~56.0.10",
     "expo-auth-session": "^56.0.11",
     "expo-clipboard": "~56.0.3",
     "expo-constants": "~56.0.14",
