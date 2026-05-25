@@ -3,6 +3,14 @@ import { Platform, StyleSheet } from "react-native";
 import type { ReactNode } from "react";
 import { ChatInput } from "../Input";
 import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
+import type { DocumentPickerAsset } from "expo-document-picker";
+
+let mockAttachments: DocumentPickerAsset[] = [];
+const mockSetIsFilesModalVisible = jest.fn();
+const mockAddAttachments = jest.fn();
+const mockHandleAttachFiles = jest.fn();
+const mockRemoveAttachment = jest.fn();
+const mockClearAttachments = jest.fn();
 
 jest.mock("@/entities/conversation/model/chat-store", () => ({
     useChatStore: (selector: (state: { editMessage: jest.Mock }) => unknown) =>
@@ -14,17 +22,36 @@ jest.mock("@/entities/conversation/model/participants-store", () => ({
     useParticipantsStore: jest.fn(),
 }));
 
-jest.mock("@/features/attach-file", () => ({
-    FilesModal: () => null,
-    useAttachments: () => ({
-        attachments: [],
-        isFilesModalVisible: false,
-        setIsFilesModalVisible: jest.fn(),
-        handleAttachFiles: jest.fn(),
-        removeAttachment: jest.fn(),
-        clearAttachments: jest.fn(),
-    }),
-}));
+jest.mock("@/features/attach-file", () => {
+    const { Pressable, Text } = require("react-native");
+
+    return {
+        FilesModal: ({
+            onSubmit,
+            attachments,
+        }: {
+            onSubmit: () => void;
+            attachments: unknown[];
+        }) => (
+            <Pressable
+                testID="files-modal-submit"
+                onPress={onSubmit}
+                disabled={attachments.length === 0}
+            >
+                <Text>modal submit</Text>
+            </Pressable>
+        ),
+        useAttachments: () => ({
+            attachments: mockAttachments,
+            isFilesModalVisible: false,
+            setIsFilesModalVisible: mockSetIsFilesModalVisible,
+            addAttachments: mockAddAttachments,
+            handleAttachFiles: mockHandleAttachFiles,
+            removeAttachment: mockRemoveAttachment,
+            clearAttachments: mockClearAttachments,
+        }),
+    };
+});
 
 jest.mock("@/features/emoji-picker", () => ({
     EmojiPicker: () => null,
@@ -68,6 +95,7 @@ jest.mock("@/shared/ui/phosphor", () => {
     const Icon = ({ children }: { children?: ReactNode }) => <Text>{children}</Text>;
 
     return {
+        FileIcon: Icon,
         PaperPlaneRightIcon: Icon,
         PencilSimpleIcon: Icon,
         PlusCircleIcon: Icon,
@@ -80,6 +108,12 @@ describe("ChatInput", () => {
     beforeEach(() => {
         Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
         (useTypingIndicator as jest.Mock).mockClear();
+        mockAttachments = [];
+        mockSetIsFilesModalVisible.mockClear();
+        mockAddAttachments.mockClear();
+        mockHandleAttachFiles.mockClear();
+        mockRemoveAttachment.mockClear();
+        mockClearAttachments.mockClear();
     });
 
     it("keeps the placeholder vertically centered and removes the browser focus outline", () => {
@@ -202,5 +236,27 @@ describe("ChatInput", () => {
 
         expect(preventDefault).not.toHaveBeenCalled();
         expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it("submits the current composer text and attachments from the files modal", async () => {
+        const attachment: DocumentPickerAsset = {
+            name: "lecture.pdf",
+            uri: "file://lecture.pdf",
+            size: 2048,
+            mimeType: "application/pdf",
+            lastModified: 1,
+        };
+        mockAttachments = [attachment];
+        const onSend = jest.fn();
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+        fireEvent.changeText(screen.getByTestId("chat-input-text"), "materials");
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("files-modal-submit"));
+        });
+
+        expect(onSend).toHaveBeenCalledWith("materials", [attachment], undefined);
+        expect(mockClearAttachments).toHaveBeenCalled();
     });
 });
