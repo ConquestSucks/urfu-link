@@ -6,6 +6,7 @@ WORKDIR /workspace
 
 FROM base AS build
 COPY .npmrc package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY patches patches
 COPY apps/client/package.json apps/client/package.json
 COPY packages/api-client/package.json packages/api-client/package.json
 COPY packages/ui/package.json packages/ui/package.json
