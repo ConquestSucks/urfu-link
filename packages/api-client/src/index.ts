@@ -57,10 +57,26 @@ export type {
   PresenceInfo,
 } from "./presence";
 
+export type {
+  NotificationSeverity,
+  NotificationActorDto,
+  NotificationEntityDto,
+  NotificationActionDto,
+  NotificationDto,
+  NotificationBadgeDto,
+  NotificationListStatus,
+  ListNotificationsParams,
+  ListNotificationsResponse,
+  BulkNotificationFilter,
+  BulkNotificationAction,
+  BulkNotificationActionResponse,
+} from "./notifications";
+
 import { createUsersApi } from "./users";
 import { createChatApi } from "./chat";
 import { createMediaApi } from "./media";
 import { createPresenceApi } from "./presence";
+import { createNotificationsApi } from "./notifications";
 
 type ApiClientConfig = {
   baseUrl: string;
@@ -104,6 +120,7 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
     chat: createChatApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     media: createMediaApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     presence: createPresenceApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    notifications: createNotificationsApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
 
     async health(): Promise<BackendHealth> {
       try {

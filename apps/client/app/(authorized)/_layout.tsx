@@ -9,6 +9,7 @@ import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { usePresenceHub } from "@/shared/lib/usePresenceHub";
 import { useChatHub } from "@/shared/lib/useChatHub";
+import { useNotificationHub } from "@/features/notifications";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -21,6 +22,7 @@ export default function AuthLayout() {
     // Хуки сами обрабатывают AppState (background/foreground) и cleanup при unmount.
     useChatHub();
     usePresenceHub();
+    useNotificationHub();
 
     const safeAreaEdges: Edge[] = isMobile
         ? ["top", "left", "right", "bottom"]

@@ -159,6 +159,72 @@ describe("createApiClient", () => {
     });
   });
 
+  describe("notifications", () => {
+    it("lists notifications with enterprise filters", async () => {
+      const fetchSpy = mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({ items: [], nextCursor: "cursor-2" }),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      const result = await client.notifications.list({
+        status: "unread",
+        type: "chat.mention",
+        severity: 2,
+        query: "teacher",
+        limit: 30,
+      });
+
+      expect(result).toEqual({ items: [], nextCursor: "cursor-2" });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/notifications/me/notifications?limit=30&status=unread&type=chat.mention&severity=2&query=teacher",
+        expect.any(Object),
+      );
+    });
+
+    it("applies notification state actions without a request body", async () => {
+      const fetchSpy = mockFetchWith({ status: 204, ok: true });
+
+      const client = createApiClient({ baseUrl: "" });
+      await client.notifications.markDone("notification-1");
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/notifications/me/notifications/notification-1/done",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const [, init] = fetchSpy.mock.calls[0];
+      const headers = new Headers((init as RequestInit).headers as HeadersInit);
+      expect(headers.get("Content-Type")).toBeNull();
+    });
+
+    it("sends bulk notification actions", async () => {
+      const fetchSpy = mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({ updated: 2 }),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      const result = await client.notifications.bulk({
+        action: "read",
+        filter: { status: "unread", category: 1 },
+      });
+
+      expect(result).toEqual({ updated: 2 });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/notifications/me/notifications/bulk",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            action: "read",
+            filter: { status: "unread", category: 1 },
+          }),
+        }),
+      );
+    });
+  });
+
   describe("media", () => {
     it("does not send JSON content type for bodyless download-url requests", async () => {
       const fetchSpy = mockFetchWith({
