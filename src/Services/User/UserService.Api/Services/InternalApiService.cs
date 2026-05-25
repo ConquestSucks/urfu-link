@@ -243,6 +243,8 @@ public sealed class InternalApiService(
             });
         }
 
+        payload.MutedConversationIds.AddRange(settings.MutedConversationIds);
+
         return payload;
     }
 
@@ -264,6 +266,11 @@ public sealed class InternalApiService(
             quietHours,
             payload.DndEnabled,
             string.IsNullOrWhiteSpace(payload.Locale) ? DomainSettings.DefaultLocale : payload.Locale,
-            payload.Sound);
+            payload.Sound,
+            payload.MutedConversationIds
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray());
     }
 }

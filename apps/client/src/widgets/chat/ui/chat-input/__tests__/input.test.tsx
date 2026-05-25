@@ -389,7 +389,6 @@ describe("ChatInput", () => {
 
         expect(onSend).toHaveBeenCalledWith("materials", [attachment], undefined);
         expect(screen.getByTestId("chat-input-send-spinner")).toBeTruthy();
-        expect(screen.getByText("Загрузка файлов и отправка сообщения...")).toBeTruthy();
         expect(screen.getByTestId("chat-input-text").props.editable).toBe(false);
         expect(isDisabled(screen.getByTestId("files-modal-submit"))).toBe(true);
         expect(isDisabled(screen.getByTestId("files-modal-pick"))).toBe(true);

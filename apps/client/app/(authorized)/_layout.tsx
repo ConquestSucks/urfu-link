@@ -12,6 +12,7 @@ import { useChatHub } from "@/shared/lib/useChatHub";
 import { useNotificationHub } from "@/features/notifications";
 import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
+import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -34,6 +35,7 @@ export default function AuthLayout() {
 
     useEffect(() => {
         configureMessageSounds(profile?.notifications);
+        configureBrowserNotifications(profile?.notifications);
     }, [profile?.notifications]);
 
     useEffect(() => {

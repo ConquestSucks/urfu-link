@@ -35,6 +35,7 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
         Assert.True(profile.Notifications.NotificationSound);
         Assert.True(profile.Notifications.DisciplineChatMessages);
         Assert.True(profile.Notifications.Mentions);
+        Assert.Empty(profile.Notifications.MutedConversationIds);
     }
 
     [Fact]
@@ -115,6 +116,11 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
     public async Task UpdateNotificationsShouldPersistSettings()
     {
         var client = CreateAuthenticatedClient();
+        const string mutedConversationId = "direct:legacy-preserve";
+        var muteResponse = await client.PostAsync(
+            new Uri($"/api/v1/me/notifications/muted-conversations/{Uri.EscapeDataString(mutedConversationId)}", UriKind.Relative),
+            content: null);
+        Assert.Equal(HttpStatusCode.NoContent, muteResponse.StatusCode);
 
         var updateResponse = await client.PutAsJsonAsync(
             new Uri("/api/v1/me/notifications", UriKind.Relative),
@@ -134,6 +140,34 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
         Assert.True(profile?.Notifications.NotificationSound);
         Assert.False(profile?.Notifications.DisciplineChatMessages);
         Assert.True(profile?.Notifications.Mentions);
+        Assert.Contains(mutedConversationId, profile?.Notifications.MutedConversationIds ?? []);
+    }
+
+    [Fact]
+    public async Task MuteConversationNotificationsShouldPersistSettings()
+    {
+        var userId = Guid.NewGuid();
+        var client = CreateAuthenticatedClient();
+        client.DefaultRequestHeaders.Add("X-Test-UserId", userId.ToString());
+        const string conversationId = "discipline:math";
+
+        var muteResponse = await client.PostAsync(
+            new Uri($"/api/v1/me/notifications/muted-conversations/{Uri.EscapeDataString(conversationId)}", UriKind.Relative),
+            content: null);
+
+        Assert.Equal(HttpStatusCode.NoContent, muteResponse.StatusCode);
+        var mutedProfile = await (await client.GetAsync(new Uri("/api/v1/me", UriKind.Relative)))
+            .Content.ReadFromJsonAsync<UserProfileResponse>();
+        Assert.Contains(conversationId, mutedProfile?.Notifications.MutedConversationIds ?? []);
+        Assert.Contains(conversationId, mutedProfile?.Preferences.MutedConversationIds ?? []);
+
+        var unmuteResponse = await client.DeleteAsync(
+            new Uri($"/api/v1/me/notifications/muted-conversations/{Uri.EscapeDataString(conversationId)}", UriKind.Relative));
+
+        Assert.Equal(HttpStatusCode.NoContent, unmuteResponse.StatusCode);
+        var unmutedProfile = await (await client.GetAsync(new Uri("/api/v1/me", UriKind.Relative)))
+            .Content.ReadFromJsonAsync<UserProfileResponse>();
+        Assert.DoesNotContain(conversationId, unmutedProfile?.Notifications.MutedConversationIds ?? []);
     }
 
     [Fact]
