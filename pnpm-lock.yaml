@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 patchedDependencies:
-  rn-emoji-keyboard@1.7.0: b408aa3628e8e2683c79142959bf7b8ee17d027e3e05c3615f888598ab76ae8f
+  rn-emoji-keyboard@1.7.0: 181d3c2f0e8f8f209302e7af50cae3f7896170e09bfc89470e6a707798fa4feb
 
 importers:
 
@@ -120,7 +120,7 @@ importers:
         version: 0.8.3(@babel/core@7.29.0)(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       rn-emoji-keyboard:
         specifier: ^1.7.0
-        version: 1.7.0(patch_hash=b408aa3628e8e2683c79142959bf7b8ee17d027e3e05c3615f888598ab76ae8f)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
+        version: 1.7.0(patch_hash=181d3c2f0e8f8f209302e7af50cae3f7896170e09bfc89470e6a707798fa4feb)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3)
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
@@ -10456,7 +10456,7 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  rn-emoji-keyboard@1.7.0(patch_hash=b408aa3628e8e2683c79142959bf7b8ee17d027e3e05c3615f888598ab76ae8f)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
+  rn-emoji-keyboard@1.7.0(patch_hash=181d3c2f0e8f8f209302e7af50cae3f7896170e09bfc89470e6a707798fa4feb)(react-native@0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-native: 0.85.3(@babel/core@7.29.0)(@react-native/jest-preset@0.85.3(@babel/core@7.29.0)(react@19.2.3))(@react-native/metro-config@0.85.3(@babel/core@7.29.0))(@types/react@19.2.14)(react@19.2.3)

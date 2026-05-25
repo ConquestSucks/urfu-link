@@ -12,36 +12,115 @@ index 330cd5c1203cac29e8be1ef56381caee63a79567..0fbd7d2d0a32c1a0a2957340873a38eb
        icon: _types.CATEGORIES_NAVIGATION.find(cat => cat.category === category.title)?.icon || 'QuestionMark'
      }));
 diff --git a/lib/commonjs/components/EmojiCategory.js b/lib/commonjs/components/EmojiCategory.js
-index 2c01afda5264a8fb0f8687856ea5f7d71c644bef..e109d1f1f8fe3ed97c1f04d0a90985676107c359 100644
+index 2c01afda5264a8fb0f8687856ea5f7d71c644bef..ce93ed738f03d07a8f83a24af3e88a042183a9a6 100644
 --- a/lib/commonjs/components/EmojiCategory.js
 +++ b/lib/commonjs/components/EmojiCategory.js
-@@ -142,6 +142,7 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+@@ -6,7 +6,6 @@ Object.defineProperty(exports, "__esModule", {
+ exports.EmojiCategory = void 0;
+ var React = _interopRequireWildcard(require("react"));
+ var _reactNative = require("react-native");
+-var _types = require("../types");
+ var _SingleEmoji = require("./SingleEmoji");
+ var _KeyboardContext = require("../contexts/KeyboardContext");
+ var _useKeyboardStore = require("../store/useKeyboardStore");
+@@ -52,7 +51,8 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+     theme,
+     styles: themeStyles,
+     selectedEmojis,
+-    minimalEmojisAmountToDisplay
++    minimalEmojisAmountToDisplay,
++    renderList
+   } = React.useContext(_KeyboardContext.KeyboardContext);
+   const {
+     keyboardHeight
+@@ -69,7 +69,9 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+     if (data.length % numberOfColumns) {
+       const fillWithEmpty = new Array(numberOfColumns - data.length % numberOfColumns).fill(emptyEmoji);
+       setEmpty(fillWithEmpty);
++      return;
+     }
++    setEmpty([]);
+   }, [numberOfColumns, data]);
+   const handleEmojiPress = React.useCallback(emoji => {
+     if (emoji.name === 'blank emoji') return;
+@@ -112,26 +114,30 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+     setKeyboardScrollOffsetY(ev.nativeEvent.contentOffset.y);
+     clearEmojiTonesData();
+   };
+-  const keyExtractor = React.useCallback(item => item.name, []);
++  const keyExtractor = React.useCallback((item, index) => item.name === emptyEmoji.name ? `${item.name}-${index}` : item.name, []);
+   const [maxIndex, setMaxIndex] = React.useState(0);
+ 
+-  // with InteractionManager we can show emojis after interaction is finished
+-  // It helps with delay during category change animation
+-  _reactNative.InteractionManager.runAfterInteractions(() => {
+-    if (maxIndex === 0 && data.length) {
+-      setMaxIndex(minimalEmojisAmountToDisplay);
+-    }
+-  });
++  React.useEffect(() => {
++    if (maxIndex !== 0 || !data.length) return;
++    let cancelled = false;
++    const task = _reactNative.InteractionManager.runAfterInteractions(() => {
++      if (!cancelled) setMaxIndex(minimalEmojisAmountToDisplay);
++    });
++    return () => {
++      cancelled = true;
++      task.cancel?.();
++    };
++  }, [data.length, maxIndex, minimalEmojisAmountToDisplay]);
+   const onEndReached = () => {
+     if (maxIndex <= data.length) {
+       setMaxIndex(data.length);
+     }
+   };
+   React.useEffect(() => {
+-    if (_types.CATEGORIES[activeCategoryIndex] !== title) {
++    if (renderList[activeCategoryIndex]?.title !== title) {
+       setMaxIndex(0);
+     }
+-  }, [activeCategoryIndex, title]);
++  }, [activeCategoryIndex, renderList, title]);
+   const flatListData = data.slice(0, maxIndex);
+   return /*#__PURE__*/React.createElement(_reactNative.View, {
+     style: [styles.container, {
+@@ -142,6 +148,8 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
        color: theme.header
      }]
    }, translation[title]), flatListData.length === 0 ? null : /*#__PURE__*/React.createElement(_reactNative.FlatList, {
++    key: `emoji-grid-${numberOfColumns}`,
 +    style: styles.flex,
      data: [...flatListData, ...empty],
      onEndReached: onEndReached,
      onEndReachedThreshold: 0.3,
-@@ -167,6 +168,9 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+@@ -167,8 +175,13 @@ const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
  });
  exports.EmojiCategory = EmojiCategory;
  const styles = _reactNative.StyleSheet.create({
 +  flex: {
-+    flex: 1
++    flex: 1,
++    minHeight: 0
 +  },
    container: {
      flex: 1,
++    minHeight: 0,
      paddingHorizontal: 10,
+     marginTop: 6
+   },
 diff --git a/lib/commonjs/components/EmojiStaticKeyboard.js b/lib/commonjs/components/EmojiStaticKeyboard.js
-index 7e954a45a5eaf05a146a0249b52f22d8baf8f5f5..974df14ff612906842746a0e018e9854eca6cf5a 100644
+index 7e954a45a5eaf05a146a0249b52f22d8baf8f5f5..79d2c7ccd26fb08f4b2ffca9df895efdc460f53f 100644
 --- a/lib/commonjs/components/EmojiStaticKeyboard.js
 +++ b/lib/commonjs/components/EmojiStaticKeyboard.js
-@@ -83,15 +83,18 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+@@ -80,23 +80,31 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+   const keyExtractor = React.useCallback(item => item.title, []);
+   const scrollNav = React.useRef(new _reactNative.Animated.Value(0)).current;
+   const handleScroll = React.useCallback(el => {
++    if (width <= 0) return;
      const index = el.nativeEvent.contentOffset.x / width;
      scrollNav.setValue(index * _Categories.CATEGORY_ELEMENT_WIDTH);
    }, [scrollNav, width]);
 +  const updateActiveCategoryIndex = React.useCallback(el => {
++    if (width <= 0) return;
 +    const index = el.nativeEvent.contentOffset.x / width;
 +    setActiveCategoryIndex(Math.round(index));
 +  }, [setActiveCategoryIndex, width]);
@@ -59,15 +138,28 @@ index 7e954a45a5eaf05a146a0249b52f22d8baf8f5f5..974df14ff612906842746a0e018e9854
    return /*#__PURE__*/React.createElement(_reactNative.View, {
      style: [styles.container, styles.containerShadow, categoryPosition === 'top' && disableSafeArea && styles.containerReverse, themeStyles.container, {
        backgroundColor: theme.container
-@@ -109,6 +112,7 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+     }],
+-    onLayout: e => setWidth(e.nativeEvent.layout.width)
++    onLayout: e => {
++      const nextWidth = e.nativeEvent.layout.width;
++      if (nextWidth > 0) setWidth(nextWidth);
++    }
+   }, /*#__PURE__*/React.createElement(_ConditionalContainer.ConditionalContainer, {
+     condition: !disableSafeArea,
+     container: children => /*#__PURE__*/React.createElement(_reactNative.SafeAreaView, {
+@@ -108,8 +116,9 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+     }] : styles.searchContainer
    }, enableSearchBar && /*#__PURE__*/React.createElement(_SearchBar.SearchBar, {
      scrollEmojiCategoryListToIndex: scrollEmojiCategoryListToIndex
-   }), customButtons), /*#__PURE__*/React.createElement(_reactNative.Animated.FlatList, {
+-  }), customButtons), /*#__PURE__*/React.createElement(_reactNative.Animated.FlatList, {
+-    extraData: [keyboardState.recentlyUsed.length, searchPhrase],
++  }), customButtons), width > 0 && /*#__PURE__*/React.createElement(_reactNative.Animated.FlatList, {
 +    style: styles.flex,
-     extraData: [keyboardState.recentlyUsed.length, searchPhrase],
++    extraData: [keyboardState.recentlyUsed.length, searchPhrase, width],
      data: renderList,
      keyExtractor: keyExtractor,
-@@ -127,7 +131,8 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+     renderItem: renderItem,
+@@ -127,7 +136,8 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
      onScroll: handleScroll,
      keyboardShouldPersistTaps: "handled",
      onMomentumScrollBegin: onMomentumScrollBegin,
@@ -77,6 +169,122 @@ index 7e954a45a5eaf05a146a0249b52f22d8baf8f5f5..974df14ff612906842746a0e018e9854
    }), /*#__PURE__*/React.createElement(_Categories.Categories, {
      scrollEmojiCategoryListToIndex: scrollEmojiCategoryListToIndex,
      scrollNav: enableCategoryChangeGesture ? scrollNav : undefined
+@@ -138,10 +148,12 @@ const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+ exports.EmojiStaticKeyboard = EmojiStaticKeyboard;
+ const styles = _reactNative.StyleSheet.create({
+   flex: {
+-    flex: 1
++    flex: 1,
++    minHeight: 0
+   },
+   container: {
+     flex: 1,
++    minHeight: 0,
+     borderRadius: 16
+   },
+   searchContainer: {
+diff --git a/lib/commonjs/components/SearchBar.js b/lib/commonjs/components/SearchBar.js
+index 3b065841cadc8b8f02aa567717c981a45ca36bab..f20ee7760baf87e47a41dc1e817a7b28d1049bec 100644
+--- a/lib/commonjs/components/SearchBar.js
++++ b/lib/commonjs/components/SearchBar.js
+@@ -37,13 +37,16 @@ const SearchBar = _ref => {
+       setShouldAnimateScroll(enableCategoryChangeAnimation);
+       return;
+     }
++  };
++  React.useEffect(() => {
++    if (searchPhrase === '') return;
+     const searchIndex = renderList.findIndex(cat => cat.title === 'search');
+     if (searchIndex !== -1) {
+       setActiveCategoryIndex(searchIndex);
+       scrollEmojiCategoryListToIndex(searchIndex);
+       setShouldAnimateScroll(enableSearchAnimation);
+     }
+-  };
++  }, [enableSearchAnimation, renderList, scrollEmojiCategoryListToIndex, searchPhrase, setActiveCategoryIndex, setShouldAnimateScroll]);
+   const clearPhrase = () => {
+     setSearchPhrase('');
+     clearEmojiTonesData();
+diff --git a/lib/commonjs/contexts/KeyboardProvider.js b/lib/commonjs/contexts/KeyboardProvider.js
+index 39fac06208c0d0322fe5ebc22994b5eac14be56f..65760392e6293e9efd71a0789db8038ea5eeef68 100644
+--- a/lib/commonjs/contexts/KeyboardProvider.js
++++ b/lib/commonjs/contexts/KeyboardProvider.js
+@@ -13,7 +13,7 @@ var _deepMerge = require("../utils/deepMerge");
+ function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
+ function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+ const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+-  const [width, setWidth] = React.useState((0, _reactNative.useWindowDimensions)().width);
++  const [width, setWidth] = React.useState(0);
+   const [activeCategoryIndex, setActiveCategoryIndex] = React.useState(0);
+   const [shouldAnimateScroll, setShouldAnimateScroll] = React.useState(true);
+   const [searchPhrase, setSearchPhrase] = React.useState('');
+@@ -24,17 +24,17 @@ const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+     height
+   } = (0, _reactNative.useWindowDimensions)();
+   const [emojiTonesData, setEmojiTonesData] = React.useState(null);
+-  const numberOfColumns = React.useRef(Math.floor(width / ((props.emojiSize ? props.emojiSize : _KeyboardContext.defaultKeyboardContext.emojiSize) * 2)));
++  const emojiSize = props.emojiSize || _KeyboardContext.defaultKeyboardContext.emojiSize;
++  const numberOfColumns = React.useMemo(() => Math.max(1, Math.floor(width / (emojiSize * 2))), [emojiSize, width]);
+ 
+   // On initial render we want to display only emojis that are visible right away after keyboard open
+   // Rest of emojis are loaded after user interaction with keyboard
+   const calculateMinimalEmojisAmountToDisplay = () => {
+     const defaultHeight = props.defaultHeight || _KeyboardContext.defaultKeyboardContext.defaultHeight;
+-    const emojiSize = props.emojiSize || _KeyboardContext.defaultKeyboardContext.emojiSize;
+     const keyboardHeightPercentage = typeof defaultHeight === 'string' ? defaultHeight.substring(0, defaultHeight.length - 1) : defaultHeight;
+     const keyboardHeight = height * (Number(keyboardHeightPercentage) / 100);
+-    const minimalEmojisAmount = Math.ceil(keyboardHeight / (emojiSize * 2) * numberOfColumns.current);
+-    return minimalEmojisAmount + minimalEmojisAmount / numberOfColumns.current;
++    const minimalEmojisAmount = Math.ceil(keyboardHeight / (emojiSize * 2) * numberOfColumns);
++    return Math.ceil(minimalEmojisAmount + minimalEmojisAmount / numberOfColumns);
+   };
+   const minimalEmojisAmountToDisplay = calculateMinimalEmojisAmountToDisplay();
+   const generateEmojiTones = React.useCallback((emoji, emojiIndex, emojiSizes) => {
+@@ -69,14 +69,14 @@ const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+           };
+       }
+     });
+-    const skinTonePosition = (0, _skinToneSelectorUtils.generateToneSelectorPosition)(numberOfColumns.current, emojiIndex, width, emojiSizes.width, emojiSizes.height, EXTRA_SEARCH_TOP);
+-    const funnelXPosition = (0, _skinToneSelectorUtils.generateToneSelectorFunnelPosition)(numberOfColumns.current, emojiIndex, emojiSizes.width);
++    const skinTonePosition = (0, _skinToneSelectorUtils.generateToneSelectorPosition)(numberOfColumns, emojiIndex, width, emojiSizes.width, emojiSizes.height, EXTRA_SEARCH_TOP);
++    const funnelXPosition = (0, _skinToneSelectorUtils.generateToneSelectorFunnelPosition)(numberOfColumns, emojiIndex, emojiSizes.width);
+     setEmojiTonesData({
+       emojis: modifiedEmojis,
+       position: skinTonePosition,
+       funnelXPosition
+     });
+-  }, [props.categoryPosition, props.enableSearchBar, width]);
++  }, [numberOfColumns, props.categoryPosition, props.enableSearchBar, width]);
+   const clearEmojiTonesData = () => setEmojiTonesData(null);
+   React.useEffect(() => {
+     clearEmojiTonesData();
+@@ -99,7 +99,7 @@ const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+         data: keyboardState.recentlyUsed
+       });
+     }
+-    if (props.enableSearchBar) {
++    if (props.enableSearchBar && searchPhrase.length > 0) {
+       data.push({
+         title: 'search',
+         data: emojisByCategory.map(group => group.data).flat().filter(emoji => {
+@@ -124,7 +124,7 @@ const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+     styles: props.styles ? (0, _deepMerge.deepMerge)(_KeyboardContext.emptyStyles, props.styles) : _KeyboardContext.emptyStyles,
+     activeCategoryIndex,
+     setActiveCategoryIndex,
+-    numberOfColumns: numberOfColumns.current,
++    numberOfColumns,
+     width,
+     setWidth,
+     searchPhrase,
+@@ -136,7 +136,7 @@ const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+     shouldAnimateScroll,
+     setShouldAnimateScroll,
+     minimalEmojisAmountToDisplay
+-  }), [activeCategoryIndex, emojiTonesData, generateEmojiTones, props, renderList, searchPhrase, shouldAnimateScroll, width, minimalEmojisAmountToDisplay]);
++  }), [activeCategoryIndex, emojiTonesData, generateEmojiTones, numberOfColumns, props, renderList, searchPhrase, shouldAnimateScroll, width, minimalEmojisAmountToDisplay]);
+   return /*#__PURE__*/React.createElement(_KeyboardContext.KeyboardContext.Provider, {
+     value: value
+   }, props.children);
 diff --git a/lib/module/components/Categories.js b/lib/module/components/Categories.js
 index 9076d946aa938c7c737ffba18e48a0bc809afb87..5292baa55c41db7a01c49e03ac50d9f807940fd7 100644
 --- a/lib/module/components/Categories.js
@@ -91,36 +299,115 @@ index 9076d946aa938c7c737ffba18e48a0bc809afb87..5292baa55c41db7a01c49e03ac50d9f8
        icon: CATEGORIES_NAVIGATION.find(cat => cat.category === category.title)?.icon || 'QuestionMark'
      }));
 diff --git a/lib/module/components/EmojiCategory.js b/lib/module/components/EmojiCategory.js
-index a858fed2c99eeb3fe0ff9e399ff4da1b2822e3da..d95ed763695d6eb937e629583d09e88f4363adb2 100644
+index a858fed2c99eeb3fe0ff9e399ff4da1b2822e3da..f0a05fea9169fd9c5af8615be9bf58a28a63fda4 100644
 --- a/lib/module/components/EmojiCategory.js
 +++ b/lib/module/components/EmojiCategory.js
-@@ -135,6 +135,7 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+@@ -1,7 +1,6 @@
+ function _extends() { _extends = Object.assign ? Object.assign.bind() : function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; }; return _extends.apply(this, arguments); }
+ import * as React from 'react';
+ import { StyleSheet, View, Text, FlatList } from 'react-native';
+-import { CATEGORIES } from '../types';
+ import { SingleEmoji } from './SingleEmoji';
+ import { KeyboardContext } from '../contexts/KeyboardContext';
+ import { useKeyboardStore } from '../store/useKeyboardStore';
+@@ -45,7 +44,8 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+     theme,
+     styles: themeStyles,
+     selectedEmojis,
+-    minimalEmojisAmountToDisplay
++    minimalEmojisAmountToDisplay,
++    renderList
+   } = React.useContext(KeyboardContext);
+   const {
+     keyboardHeight
+@@ -62,7 +62,9 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+     if (data.length % numberOfColumns) {
+       const fillWithEmpty = new Array(numberOfColumns - data.length % numberOfColumns).fill(emptyEmoji);
+       setEmpty(fillWithEmpty);
++      return;
+     }
++    setEmpty([]);
+   }, [numberOfColumns, data]);
+   const handleEmojiPress = React.useCallback(emoji => {
+     if (emoji.name === 'blank emoji') return;
+@@ -105,26 +107,30 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+     setKeyboardScrollOffsetY(ev.nativeEvent.contentOffset.y);
+     clearEmojiTonesData();
+   };
+-  const keyExtractor = React.useCallback(item => item.name, []);
++  const keyExtractor = React.useCallback((item, index) => item.name === emptyEmoji.name ? `${item.name}-${index}` : item.name, []);
+   const [maxIndex, setMaxIndex] = React.useState(0);
+ 
+-  // with InteractionManager we can show emojis after interaction is finished
+-  // It helps with delay during category change animation
+-  InteractionManager.runAfterInteractions(() => {
+-    if (maxIndex === 0 && data.length) {
+-      setMaxIndex(minimalEmojisAmountToDisplay);
+-    }
+-  });
++  React.useEffect(() => {
++    if (maxIndex !== 0 || !data.length) return;
++    let cancelled = false;
++    const task = InteractionManager.runAfterInteractions(() => {
++      if (!cancelled) setMaxIndex(minimalEmojisAmountToDisplay);
++    });
++    return () => {
++      cancelled = true;
++      task.cancel?.();
++    };
++  }, [data.length, maxIndex, minimalEmojisAmountToDisplay]);
+   const onEndReached = () => {
+     if (maxIndex <= data.length) {
+       setMaxIndex(data.length);
+     }
+   };
+   React.useEffect(() => {
+-    if (CATEGORIES[activeCategoryIndex] !== title) {
++    if (renderList[activeCategoryIndex]?.title !== title) {
+       setMaxIndex(0);
+     }
+-  }, [activeCategoryIndex, title]);
++  }, [activeCategoryIndex, renderList, title]);
+   const flatListData = data.slice(0, maxIndex);
+   return /*#__PURE__*/React.createElement(View, {
+     style: [styles.container, {
+@@ -135,6 +141,8 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
        color: theme.header
      }]
    }, translation[title]), flatListData.length === 0 ? null : /*#__PURE__*/React.createElement(FlatList, {
++    key: `emoji-grid-${numberOfColumns}`,
 +    style: styles.flex,
      data: [...flatListData, ...empty],
      onEndReached: onEndReached,
      onEndReachedThreshold: 0.3,
-@@ -159,6 +160,9 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
+@@ -159,8 +167,13 @@ export const EmojiCategory = /*#__PURE__*/React.memo(_ref2 => {
    return prevProps.item.data.map(d => d.name).join() === nextProps.item.data.map(d => d.name).join();
  });
  const styles = StyleSheet.create({
 +  flex: {
-+    flex: 1
++    flex: 1,
++    minHeight: 0
 +  },
    container: {
      flex: 1,
++    minHeight: 0,
      paddingHorizontal: 10,
+     marginTop: 6
+   },
 diff --git a/lib/module/components/EmojiStaticKeyboard.js b/lib/module/components/EmojiStaticKeyboard.js
-index 505c21710929b163b5fdff09d04d315ee456db55..4b0ad5103c6a2b04569650b21436dc65188c1447 100644
+index 505c21710929b163b5fdff09d04d315ee456db55..3121f717f2cf7246538c52f4f0963a840c4e04d2 100644
 --- a/lib/module/components/EmojiStaticKeyboard.js
 +++ b/lib/module/components/EmojiStaticKeyboard.js
-@@ -75,15 +75,18 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+@@ -72,23 +72,31 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+   const keyExtractor = React.useCallback(item => item.title, []);
+   const scrollNav = React.useRef(new Animated.Value(0)).current;
+   const handleScroll = React.useCallback(el => {
++    if (width <= 0) return;
      const index = el.nativeEvent.contentOffset.x / width;
      scrollNav.setValue(index * CATEGORY_ELEMENT_WIDTH);
    }, [scrollNav, width]);
 +  const updateActiveCategoryIndex = React.useCallback(el => {
++    if (width <= 0) return;
 +    const index = el.nativeEvent.contentOffset.x / width;
 +    setActiveCategoryIndex(Math.round(index));
 +  }, [setActiveCategoryIndex, width]);
@@ -138,15 +425,28 @@ index 505c21710929b163b5fdff09d04d315ee456db55..4b0ad5103c6a2b04569650b21436dc65
    return /*#__PURE__*/React.createElement(View, {
      style: [styles.container, styles.containerShadow, categoryPosition === 'top' && disableSafeArea && styles.containerReverse, themeStyles.container, {
        backgroundColor: theme.container
-@@ -101,6 +104,7 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+     }],
+-    onLayout: e => setWidth(e.nativeEvent.layout.width)
++    onLayout: e => {
++      const nextWidth = e.nativeEvent.layout.width;
++      if (nextWidth > 0) setWidth(nextWidth);
++    }
+   }, /*#__PURE__*/React.createElement(ConditionalContainer, {
+     condition: !disableSafeArea,
+     container: children => /*#__PURE__*/React.createElement(SafeAreaView, {
+@@ -100,8 +108,9 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+     }] : styles.searchContainer
    }, enableSearchBar && /*#__PURE__*/React.createElement(SearchBar, {
      scrollEmojiCategoryListToIndex: scrollEmojiCategoryListToIndex
-   }), customButtons), /*#__PURE__*/React.createElement(Animated.FlatList, {
+-  }), customButtons), /*#__PURE__*/React.createElement(Animated.FlatList, {
+-    extraData: [keyboardState.recentlyUsed.length, searchPhrase],
++  }), customButtons), width > 0 && /*#__PURE__*/React.createElement(Animated.FlatList, {
 +    style: styles.flex,
-     extraData: [keyboardState.recentlyUsed.length, searchPhrase],
++    extraData: [keyboardState.recentlyUsed.length, searchPhrase, width],
      data: renderList,
      keyExtractor: keyExtractor,
-@@ -119,7 +123,8 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+     renderItem: renderItem,
+@@ -119,7 +128,8 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
      onScroll: handleScroll,
      keyboardShouldPersistTaps: "handled",
      onMomentumScrollBegin: onMomentumScrollBegin,
@@ -156,6 +456,122 @@ index 505c21710929b163b5fdff09d04d315ee456db55..4b0ad5103c6a2b04569650b21436dc65
    }), /*#__PURE__*/React.createElement(Categories, {
      scrollEmojiCategoryListToIndex: scrollEmojiCategoryListToIndex,
      scrollNav: enableCategoryChangeGesture ? scrollNav : undefined
+@@ -129,10 +139,12 @@ export const EmojiStaticKeyboard = /*#__PURE__*/React.memo(() => {
+ }, () => true);
+ const styles = StyleSheet.create({
+   flex: {
+-    flex: 1
++    flex: 1,
++    minHeight: 0
+   },
+   container: {
+     flex: 1,
++    minHeight: 0,
+     borderRadius: 16
+   },
+   searchContainer: {
+diff --git a/lib/module/components/SearchBar.js b/lib/module/components/SearchBar.js
+index db3fbcb8486f5fa813d9e24e0798207554ce42ff..ec40a5823c210bafdcfd70c86e48a6d1e98fc8c0 100644
+--- a/lib/module/components/SearchBar.js
++++ b/lib/module/components/SearchBar.js
+@@ -29,13 +29,16 @@ export const SearchBar = _ref => {
+       setShouldAnimateScroll(enableCategoryChangeAnimation);
+       return;
+     }
++  };
++  React.useEffect(() => {
++    if (searchPhrase === '') return;
+     const searchIndex = renderList.findIndex(cat => cat.title === 'search');
+     if (searchIndex !== -1) {
+       setActiveCategoryIndex(searchIndex);
+       scrollEmojiCategoryListToIndex(searchIndex);
+       setShouldAnimateScroll(enableSearchAnimation);
+     }
+-  };
++  }, [enableSearchAnimation, renderList, scrollEmojiCategoryListToIndex, searchPhrase, setActiveCategoryIndex, setShouldAnimateScroll]);
+   const clearPhrase = () => {
+     setSearchPhrase('');
+     clearEmojiTonesData();
+diff --git a/lib/module/contexts/KeyboardProvider.js b/lib/module/contexts/KeyboardProvider.js
+index 643831fe9138b6ecddda0e17caec18bf83d9000e..f7dfee716f32dcd7be809d224dd05e2a78063ebd 100644
+--- a/lib/module/contexts/KeyboardProvider.js
++++ b/lib/module/contexts/KeyboardProvider.js
+@@ -5,7 +5,7 @@ import { useKeyboardStore } from '../store/useKeyboardStore';
+ import { skinTones, generateToneSelectorFunnelPosition, generateToneSelectorPosition, insertAtCertainIndex, variantSelector, zeroWidthJoiner } from '../utils/skinToneSelectorUtils';
+ import { deepMerge } from '../utils/deepMerge';
+ export const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+-  const [width, setWidth] = React.useState(useWindowDimensions().width);
++  const [width, setWidth] = React.useState(0);
+   const [activeCategoryIndex, setActiveCategoryIndex] = React.useState(0);
+   const [shouldAnimateScroll, setShouldAnimateScroll] = React.useState(true);
+   const [searchPhrase, setSearchPhrase] = React.useState('');
+@@ -16,17 +16,17 @@ export const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+     height
+   } = useWindowDimensions();
+   const [emojiTonesData, setEmojiTonesData] = React.useState(null);
+-  const numberOfColumns = React.useRef(Math.floor(width / ((props.emojiSize ? props.emojiSize : defaultKeyboardContext.emojiSize) * 2)));
++  const emojiSize = props.emojiSize || defaultKeyboardContext.emojiSize;
++  const numberOfColumns = React.useMemo(() => Math.max(1, Math.floor(width / (emojiSize * 2))), [emojiSize, width]);
+ 
+   // On initial render we want to display only emojis that are visible right away after keyboard open
+   // Rest of emojis are loaded after user interaction with keyboard
+   const calculateMinimalEmojisAmountToDisplay = () => {
+     const defaultHeight = props.defaultHeight || defaultKeyboardContext.defaultHeight;
+-    const emojiSize = props.emojiSize || defaultKeyboardContext.emojiSize;
+     const keyboardHeightPercentage = typeof defaultHeight === 'string' ? defaultHeight.substring(0, defaultHeight.length - 1) : defaultHeight;
+     const keyboardHeight = height * (Number(keyboardHeightPercentage) / 100);
+-    const minimalEmojisAmount = Math.ceil(keyboardHeight / (emojiSize * 2) * numberOfColumns.current);
+-    return minimalEmojisAmount + minimalEmojisAmount / numberOfColumns.current;
++    const minimalEmojisAmount = Math.ceil(keyboardHeight / (emojiSize * 2) * numberOfColumns);
++    return Math.ceil(minimalEmojisAmount + minimalEmojisAmount / numberOfColumns);
+   };
+   const minimalEmojisAmountToDisplay = calculateMinimalEmojisAmountToDisplay();
+   const generateEmojiTones = React.useCallback((emoji, emojiIndex, emojiSizes) => {
+@@ -61,14 +61,14 @@ export const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+           };
+       }
+     });
+-    const skinTonePosition = generateToneSelectorPosition(numberOfColumns.current, emojiIndex, width, emojiSizes.width, emojiSizes.height, EXTRA_SEARCH_TOP);
+-    const funnelXPosition = generateToneSelectorFunnelPosition(numberOfColumns.current, emojiIndex, emojiSizes.width);
++    const skinTonePosition = generateToneSelectorPosition(numberOfColumns, emojiIndex, width, emojiSizes.width, emojiSizes.height, EXTRA_SEARCH_TOP);
++    const funnelXPosition = generateToneSelectorFunnelPosition(numberOfColumns, emojiIndex, emojiSizes.width);
+     setEmojiTonesData({
+       emojis: modifiedEmojis,
+       position: skinTonePosition,
+       funnelXPosition
+     });
+-  }, [props.categoryPosition, props.enableSearchBar, width]);
++  }, [numberOfColumns, props.categoryPosition, props.enableSearchBar, width]);
+   const clearEmojiTonesData = () => setEmojiTonesData(null);
+   React.useEffect(() => {
+     clearEmojiTonesData();
+@@ -91,7 +91,7 @@ export const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+         data: keyboardState.recentlyUsed
+       });
+     }
+-    if (props.enableSearchBar) {
++    if (props.enableSearchBar && searchPhrase.length > 0) {
+       data.push({
+         title: 'search',
+         data: emojisByCategory.map(group => group.data).flat().filter(emoji => {
+@@ -116,7 +116,7 @@ export const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+     styles: props.styles ? deepMerge(emptyStyles, props.styles) : emptyStyles,
+     activeCategoryIndex,
+     setActiveCategoryIndex,
+-    numberOfColumns: numberOfColumns.current,
++    numberOfColumns,
+     width,
+     setWidth,
+     searchPhrase,
+@@ -128,7 +128,7 @@ export const KeyboardProvider = /*#__PURE__*/React.memo(props => {
+     shouldAnimateScroll,
+     setShouldAnimateScroll,
+     minimalEmojisAmountToDisplay
+-  }), [activeCategoryIndex, emojiTonesData, generateEmojiTones, props, renderList, searchPhrase, shouldAnimateScroll, width, minimalEmojisAmountToDisplay]);
++  }), [activeCategoryIndex, emojiTonesData, generateEmojiTones, numberOfColumns, props, renderList, searchPhrase, shouldAnimateScroll, width, minimalEmojisAmountToDisplay]);
+   return /*#__PURE__*/React.createElement(KeyboardContext.Provider, {
+     value: value
+   }, props.children);
 diff --git a/src/components/Categories.tsx b/src/components/Categories.tsx
 index f6f5df8bc6eb8d7ce63c821f8b661904fc0a2945..d18d7f98e30e32b7f1ae3954d6e841842bcffbc7 100644
 --- a/src/components/Categories.tsx
@@ -182,30 +598,116 @@ index f6f5df8bc6eb8d7ce63c821f8b661904fc0a2945..d18d7f98e30e32b7f1ae3954d6e84184
  
    return (
 diff --git a/src/components/EmojiCategory.tsx b/src/components/EmojiCategory.tsx
-index 6869a04f4b41d5f3fc168171f11b3c87d49448e0..99bee3d2c7cf1f645698bfaba33e862218c1cac2 100644
+index 6869a04f4b41d5f3fc168171f11b3c87d49448e0..15d10beea3d9e9194576b9ec34a4da042c95d961 100644
 --- a/src/components/EmojiCategory.tsx
 +++ b/src/components/EmojiCategory.tsx
-@@ -178,6 +178,7 @@ export const EmojiCategory = React.memo(
+@@ -2,7 +2,6 @@ import * as React from 'react'
+ 
+ import { StyleSheet, View, Text, FlatList, type ListRenderItemInfo } from 'react-native'
+ import {
+-  CATEGORIES,
+   type CategoryPosition,
+   type EmojisByCategory,
+   type EmojiSizes,
+@@ -51,6 +50,7 @@ export const EmojiCategory = React.memo(
+       styles: themeStyles,
+       selectedEmojis,
+       minimalEmojisAmountToDisplay,
++      renderList,
+     } = React.useContext(KeyboardContext)
+ 
+     const { keyboardHeight } = useKeyboard(true)
+@@ -67,7 +67,9 @@ export const EmojiCategory = React.memo(
+           emptyEmoji,
+         )
+         setEmpty(fillWithEmpty)
++        return
+       }
++      setEmpty([])
+     }, [numberOfColumns, data])
+ 
+     const handleEmojiPress = React.useCallback(
+@@ -143,17 +145,27 @@ export const EmojiCategory = React.memo(
+       clearEmojiTonesData()
+     }
+ 
+-    const keyExtractor = React.useCallback((item: JsonEmoji) => item.name, [])
++    const keyExtractor = React.useCallback(
++      (item: JsonEmoji, index: number) =>
++        item.name === emptyEmoji.name ? `${item.name}-${index}` : item.name,
++      [],
++    )
+ 
+     const [maxIndex, setMaxIndex] = React.useState(0)
+ 
+-    // with InteractionManager we can show emojis after interaction is finished
+-    // It helps with delay during category change animation
+-    InteractionManager.runAfterInteractions(() => {
+-      if (maxIndex === 0 && data.length) {
+-        setMaxIndex(minimalEmojisAmountToDisplay)
++    React.useEffect(() => {
++      if (maxIndex !== 0 || !data.length) return
++
++      let cancelled = false
++      const task = InteractionManager.runAfterInteractions(() => {
++        if (!cancelled) setMaxIndex(minimalEmojisAmountToDisplay)
++      })
++
++      return () => {
++        cancelled = true
++        task.cancel?.()
+       }
+-    })
++    }, [data.length, maxIndex, minimalEmojisAmountToDisplay])
+ 
+     const onEndReached = () => {
+       if (maxIndex <= data.length) {
+@@ -162,10 +174,10 @@ export const EmojiCategory = React.memo(
+     }
+ 
+     React.useEffect(() => {
+-      if (CATEGORIES[activeCategoryIndex] !== title) {
++      if (renderList[activeCategoryIndex]?.title !== title) {
+         setMaxIndex(0)
+       }
+-    }, [activeCategoryIndex, title])
++    }, [activeCategoryIndex, renderList, title])
+ 
+     const flatListData = data.slice(0, maxIndex)
+ 
+@@ -178,6 +190,8 @@ export const EmojiCategory = React.memo(
          )}
          {flatListData.length === 0 ? null : (
            <FlatList
++            key={`emoji-grid-${numberOfColumns}`}
 +            style={styles.flex}
              data={[...flatListData, ...empty]}
              onEndReached={onEndReached}
              onEndReachedThreshold={0.3}
-@@ -211,6 +212,7 @@ export const EmojiCategory = React.memo(
+@@ -211,8 +225,10 @@ export const EmojiCategory = React.memo(
  )
  
  const styles = StyleSheet.create({
-+  flex: { flex: 1 },
++  flex: { flex: 1, minHeight: 0 },
    container: {
      flex: 1,
++    minHeight: 0,
      paddingHorizontal: 10,
+     marginTop: 6,
+   },
 diff --git a/src/components/EmojiStaticKeyboard.tsx b/src/components/EmojiStaticKeyboard.tsx
-index ff00d44a76820dd32211264dbb9d1846d275a87f..78792cd691cedf56bf8c2bcc5c86d8003368a174 100644
+index ff00d44a76820dd32211264dbb9d1846d275a87f..4007295012beb5174af09d458ed02d33327e7058 100644
 --- a/src/components/EmojiStaticKeyboard.tsx
 +++ b/src/components/EmojiStaticKeyboard.tsx
-@@ -114,16 +114,22 @@ export const EmojiStaticKeyboard = React.memo(
+@@ -104,6 +104,7 @@ export const EmojiStaticKeyboard = React.memo(
+ 
+     const handleScroll = React.useCallback(
+       (el: NativeSyntheticEvent<NativeScrollEvent>) => {
++        if (width <= 0) return
+         const index = el.nativeEvent.contentOffset.x / width
+         scrollNav.setValue(index * CATEGORY_ELEMENT_WIDTH)
+       },
+@@ -114,16 +115,23 @@ export const EmojiStaticKeyboard = React.memo(
        hasMomentumBegan.current = true
      }, [])
  
@@ -214,6 +716,7 @@ index ff00d44a76820dd32211264dbb9d1846d275a87f..78792cd691cedf56bf8c2bcc5c86d800
        (el: NativeSyntheticEvent<NativeScrollEvent>) => {
 -        if (!hasMomentumBegan.current) return
 -
++        if (width <= 0) return
          const index = el.nativeEvent.contentOffset.x / width
          setActiveCategoryIndex(Math.round(index))
 +      },
@@ -232,19 +735,212 @@ index ff00d44a76820dd32211264dbb9d1846d275a87f..78792cd691cedf56bf8c2bcc5c86d800
      )
  
      return (
-@@ -161,6 +167,7 @@ export const EmojiStaticKeyboard = React.memo(
+@@ -135,7 +143,10 @@ export const EmojiStaticKeyboard = React.memo(
+           themeStyles.container,
+           { backgroundColor: theme.container },
+         ]}
+-        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
++        onLayout={(e) => {
++          const nextWidth = e.nativeEvent.layout.width
++          if (nextWidth > 0) setWidth(nextWidth)
++        }}
+       >
+         <ConditionalContainer
+           condition={!disableSafeArea}
+@@ -160,27 +171,31 @@ export const EmojiStaticKeyboard = React.memo(
+               )}
                {customButtons}
              </View>
-             <Animated.FlatList<EmojisByCategory>
-+              style={styles.flex}
-               extraData={[keyboardState.recentlyUsed.length, searchPhrase]}
-               data={renderList}
-               keyExtractor={keyExtractor}
-@@ -180,6 +187,7 @@ export const EmojiStaticKeyboard = React.memo(
-               keyboardShouldPersistTaps="handled"
-               onMomentumScrollBegin={onMomentumScrollBegin}
-               onMomentumScrollEnd={onMomentumScrollEnd}
-+              onScrollEndDrag={updateActiveCategoryIndex}
-             />
+-            <Animated.FlatList<EmojisByCategory>
+-              extraData={[keyboardState.recentlyUsed.length, searchPhrase]}
+-              data={renderList}
+-              keyExtractor={keyExtractor}
+-              renderItem={renderItem}
+-              removeClippedSubviews={isAndroid}
+-              ref={flatListRef}
+-              onScrollToIndexFailed={onCategoryChangeFailed}
+-              horizontal
+-              showsHorizontalScrollIndicator={false}
+-              pagingEnabled
+-              scrollEventThrottle={16}
+-              getItemLayout={getItemLayout}
+-              scrollEnabled={enableCategoryChangeGesture}
+-              initialNumToRender={1}
+-              maxToRenderPerBatch={1}
+-              onScroll={handleScroll}
+-              keyboardShouldPersistTaps="handled"
+-              onMomentumScrollBegin={onMomentumScrollBegin}
+-              onMomentumScrollEnd={onMomentumScrollEnd}
+-            />
++            {width > 0 && (
++              <Animated.FlatList<EmojisByCategory>
++                style={styles.flex}
++                extraData={[keyboardState.recentlyUsed.length, searchPhrase, width]}
++                data={renderList}
++                keyExtractor={keyExtractor}
++                renderItem={renderItem}
++                removeClippedSubviews={isAndroid}
++                ref={flatListRef}
++                onScrollToIndexFailed={onCategoryChangeFailed}
++                horizontal
++                showsHorizontalScrollIndicator={false}
++                pagingEnabled
++                scrollEventThrottle={16}
++                getItemLayout={getItemLayout}
++                scrollEnabled={enableCategoryChangeGesture}
++                initialNumToRender={1}
++                maxToRenderPerBatch={1}
++                onScroll={handleScroll}
++                keyboardShouldPersistTaps="handled"
++                onMomentumScrollBegin={onMomentumScrollBegin}
++                onMomentumScrollEnd={onMomentumScrollEnd}
++                onScrollEndDrag={updateActiveCategoryIndex}
++              />
++            )}
              <Categories
                scrollEmojiCategoryListToIndex={scrollEmojiCategoryListToIndex}
+               scrollNav={enableCategoryChangeGesture ? scrollNav : undefined}
+@@ -195,9 +210,10 @@ export const EmojiStaticKeyboard = React.memo(
+ )
+ 
+ const styles = StyleSheet.create({
+-  flex: { flex: 1 },
++  flex: { flex: 1, minHeight: 0 },
+   container: {
+     flex: 1,
++    minHeight: 0,
+     borderRadius: 16,
+   },
+   searchContainer: {
+diff --git a/src/components/SearchBar.tsx b/src/components/SearchBar.tsx
+index 4a62562d9d957a1725f92f49b01624ecebd3f82b..6545c4c57c4224b88704ac4dab9aa92794514dcb 100644
+--- a/src/components/SearchBar.tsx
++++ b/src/components/SearchBar.tsx
+@@ -34,14 +34,24 @@ export const SearchBar = ({ scrollEmojiCategoryListToIndex }: SearchBarProps) =>
+ 
+       return
+     }
++  }
+ 
++  React.useEffect(() => {
++    if (searchPhrase === '') return
+     const searchIndex = renderList.findIndex((cat) => cat.title === 'search')
+     if (searchIndex !== -1) {
+       setActiveCategoryIndex(searchIndex)
+       scrollEmojiCategoryListToIndex(searchIndex)
+       setShouldAnimateScroll(enableSearchAnimation)
+     }
+-  }
++  }, [
++    enableSearchAnimation,
++    renderList,
++    scrollEmojiCategoryListToIndex,
++    searchPhrase,
++    setActiveCategoryIndex,
++    setShouldAnimateScroll,
++  ])
+ 
+   const clearPhrase = () => {
+     setSearchPhrase('')
+diff --git a/src/contexts/KeyboardProvider.tsx b/src/contexts/KeyboardProvider.tsx
+index d3e8c49109802b6400b5b749b7da8436e544a579..bb16ffc54259e3a09d271f8f5823957a9bdf5293 100644
+--- a/src/contexts/KeyboardProvider.tsx
++++ b/src/contexts/KeyboardProvider.tsx
+@@ -27,7 +27,7 @@ type ProviderProps = Partial<KeyboardProps> &
+   }
+ 
+ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+-  const [width, setWidth] = React.useState(useWindowDimensions().width)
++  const [width, setWidth] = React.useState(0)
+   const [activeCategoryIndex, setActiveCategoryIndex] = React.useState(0)
+   const [shouldAnimateScroll, setShouldAnimateScroll] = React.useState(true)
+   const [searchPhrase, setSearchPhrase] = React.useState('')
+@@ -37,17 +37,17 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+ 
+   const [emojiTonesData, setEmojiTonesData] = React.useState<EmojiTonesData>(null)
+ 
+-  const numberOfColumns = React.useRef<number>(
+-    Math.floor(
+-      width / ((props.emojiSize ? props.emojiSize : defaultKeyboardContext.emojiSize) * 2),
+-    ),
++  const emojiSize = props.emojiSize || defaultKeyboardContext.emojiSize
++
++  const numberOfColumns = React.useMemo(
++    () => Math.max(1, Math.floor(width / (emojiSize * 2))),
++    [emojiSize, width],
+   )
+ 
+   // On initial render we want to display only emojis that are visible right away after keyboard open
+   // Rest of emojis are loaded after user interaction with keyboard
+   const calculateMinimalEmojisAmountToDisplay = () => {
+     const defaultHeight = props.defaultHeight || defaultKeyboardContext.defaultHeight
+-    const emojiSize = props.emojiSize || defaultKeyboardContext.emojiSize
+ 
+     const keyboardHeightPercentage =
+       typeof defaultHeight === 'string'
+@@ -57,10 +57,10 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+     const keyboardHeight = height * (Number(keyboardHeightPercentage) / 100)
+ 
+     const minimalEmojisAmount = Math.ceil(
+-      (keyboardHeight / (emojiSize * 2)) * numberOfColumns.current,
++      (keyboardHeight / (emojiSize * 2)) * numberOfColumns,
+     )
+ 
+-    return minimalEmojisAmount + minimalEmojisAmount / numberOfColumns.current
++    return Math.ceil(minimalEmojisAmount + minimalEmojisAmount / numberOfColumns)
+   }
+ 
+   const minimalEmojisAmountToDisplay = calculateMinimalEmojisAmountToDisplay()
+@@ -102,7 +102,7 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+       })
+ 
+       const skinTonePosition = generateToneSelectorPosition(
+-        numberOfColumns.current,
++        numberOfColumns,
+         emojiIndex,
+         width,
+         emojiSizes.width,
+@@ -111,7 +111,7 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+       )
+ 
+       const funnelXPosition = generateToneSelectorFunnelPosition(
+-        numberOfColumns.current,
++        numberOfColumns,
+         emojiIndex,
+         emojiSizes.width,
+       )
+@@ -122,7 +122,7 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+         funnelXPosition,
+       })
+     },
+-    [props.categoryPosition, props.enableSearchBar, width],
++    [numberOfColumns, props.categoryPosition, props.enableSearchBar, width],
+   )
+ 
+   const clearEmojiTonesData = () => setEmojiTonesData(null)
+@@ -152,7 +152,7 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+         data: keyboardState.recentlyUsed,
+       })
+     }
+-    if (props.enableSearchBar) {
++    if (props.enableSearchBar && searchPhrase.length > 0) {
+       data.push({
+         title: 'search' as CategoryTypes,
+         data: emojisByCategory
+@@ -205,7 +205,7 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+       styles: props.styles ? deepMerge(emptyStyles, props.styles) : emptyStyles,
+       activeCategoryIndex,
+       setActiveCategoryIndex,
+-      numberOfColumns: numberOfColumns.current,
++      numberOfColumns,
+       width,
+       setWidth,
+       searchPhrase,
+@@ -222,6 +222,7 @@ export const KeyboardProvider: React.FC<ProviderProps> = React.memo((props) => {
+       activeCategoryIndex,
+       emojiTonesData,
+       generateEmojiTones,
++      numberOfColumns,
+       props,
+       renderList,
+       searchPhrase,
