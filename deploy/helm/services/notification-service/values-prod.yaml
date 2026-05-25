@@ -3,7 +3,7 @@ fullnameOverride: notification-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/notification-service
   pullPolicy: IfNotPresent
-  tag: sha-308025f
+  tag: sha-43dcbd2
 
 imagePullSecrets:
   - name: ghcr-pull-secret
