@@ -5,27 +5,83 @@ metadata:
   namespace: urfu-platform
 spec:
   schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 900
+      backoffLimit: 2
       template:
         spec:
           restartPolicy: OnFailure
-          containers:
-            - name: mongo-backup
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            fsGroupChangePolicy: OnRootMismatch
+            seccompProfile:
+              type: RuntimeDefault
+          initContainers:
+            - name: mongodump
               image: mongo:8.0
+              imagePullPolicy: IfNotPresent
               command:
                 - /bin/sh
                 - -c
-                - >-
-                  mongodump --uri "$MONGO_URI" --archive=/tmp/backup.archive &&
-                  mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY" &&
-                  mc cp /tmp/backup.archive minio/urfu-backups/mongo/backup-$(date +%F-%H%M).archive
+                - |
+                  set -eu
+
+                  BACKUP_DATE="$(date -u +%Y/%m/%d)"
+                  BACKUP_NAME="backup-$(date -u +%Y%m%dT%H%M%SZ).archive.gz"
+                  ARCHIVE="/backup/${BACKUP_NAME}"
+                  OBJECT_PATH="urfu-backups/mongo/${BACKUP_DATE}/${BACKUP_NAME}"
+
+                  mongodump --uri "$MONGO_URI" --archive="$ARCHIVE" --gzip
+                  printf "%s" "$ARCHIVE" > /backup/archive_path
+                  printf "%s" "$OBJECT_PATH" > /backup/object_path
               env:
                 - name: MONGO_URI
                   valueFrom:
                     secretKeyRef:
                       name: mongo-backup-secret
                       key: mongo_uri
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          containers:
+            - name: upload-to-minio
+              image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+              imagePullPolicy: IfNotPresent
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  set -eu
+
+                  export MC_CONFIG_DIR=/backup/.mc
+                  ARCHIVE="$(cat /backup/archive_path)"
+                  OBJECT_PATH="$(cat /backup/object_path)"
+
+                  mc alias set minio "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
+                  mc cp "$ARCHIVE" minio/${OBJECT_PATH}
+                  mc stat minio/${OBJECT_PATH}
+              env:
                 - name: MINIO_ENDPOINT
                   valueFrom:
                     secretKeyRef:
@@ -41,3 +97,22 @@ spec:
                     secretKeyRef:
                       name: mongo-backup-secret
                       key: minio_secret_key
+              resources:
+                requests:
+                  cpu: 25m
+                  memory: 64Mi
+                limits:
+                  cpu: 250m
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+              volumeMounts:
+                - name: backup
+                  mountPath: /backup
+          volumes:
+            - name: backup
+              emptyDir: {}

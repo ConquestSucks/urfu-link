@@ -5,4 +5,6 @@ metadata:
   namespace: kube-system
 data:
   id.ghjc.ru.override: |
+    # Compatibility override for components that must validate the public issuer.
+    # New in-cluster integrations should prefer internal service URLs for OIDC discovery.
     rewrite name id.ghjc.ru ingress-nginx-controller.ingress-nginx.svc.cluster.local

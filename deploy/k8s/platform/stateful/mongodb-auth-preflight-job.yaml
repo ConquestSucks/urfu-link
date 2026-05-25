@@ -1,0 +1,33 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-auth-preflight
+  namespace: urfu-platform
+  annotations:
+    argocd.argoproj.io/sync-options: Force=true,Replace=true
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  activeDeadlineSeconds: 300
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mongodb-auth-preflight
+          image: mongo:8.0
+          env:
+            - name: MONGO_APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-app-user-password
+                  key: password
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+
+              MONGO_URI="mongodb://app-user:${MONGO_APP_PASSWORD}@urfu-mongo-svc.urfu-platform.svc.cluster.local:27017/admin?authSource=admin"
+              until mongosh "$MONGO_URI" --quiet --eval 'if (db.runCommand({ ping: 1 }).ok !== 1) quit(9)' >/dev/null; do
+                sleep 5
+              done

@@ -165,6 +165,9 @@ spec:
               path "kv/data/urfu-link/prod/linkerd-viz" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/mongo" {
+                capabilities = ["create", "update", "read"]
+              }
               path "kv/data/urfu-link/prod/mongo-backup" {
                 capabilities = ["create", "update", "read"]
               }
