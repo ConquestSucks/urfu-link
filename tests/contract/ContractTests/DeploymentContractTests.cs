@@ -33,10 +33,16 @@ public sealed class DeploymentContractTests
     public void ProductionPomeriumRoutesShouldProxyApiAndSignalRHubsToGateway()
     {
         var config = ReadRepoFile("deploy", "k8s", "platform", "identity", "pomerium-config.yaml");
+        var ingress = ReadRepoFile("deploy", "k8s", "platform", "ingress", "frontend-web-ingress.yaml");
 
         Assert.Contains("prefix: /api", config, StringComparison.Ordinal);
         Assert.Contains("prefix: /hubs", config, StringComparison.Ordinal);
         Assert.Contains("allow_websockets: true", config, StringComparison.Ordinal);
+        Assert.Contains("timeout: 12h", config, StringComparison.Ordinal);
+        Assert.Contains("idle_timeout: 75s", config, StringComparison.Ordinal);
+        Assert.Contains("nginx.ingress.kubernetes.io/proxy-read-timeout: \"3600\"", ingress, StringComparison.Ordinal);
+        Assert.Contains("nginx.ingress.kubernetes.io/proxy-send-timeout: \"3600\"", ingress, StringComparison.Ordinal);
+        Assert.Contains("nginx.ingress.kubernetes.io/proxy-http-version: \"1.1\"", ingress, StringComparison.Ordinal);
     }
 
     [Fact]
