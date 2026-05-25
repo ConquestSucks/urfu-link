@@ -7,9 +7,10 @@ interface Props {
     attachments: DocumentPicker.DocumentPickerAsset[];
     onRemove: (index: number) => void;
     onOpenModal: () => void;
+    disabled?: boolean;
 }
 
-export const AttachmentsPreview = ({ attachments, onRemove, onOpenModal }: Props) => {
+export const AttachmentsPreview = ({ attachments, onRemove, onOpenModal, disabled = false }: Props) => {
     if (attachments.length === 0) return null;
 
     return (
@@ -21,13 +22,21 @@ export const AttachmentsPreview = ({ attachments, onRemove, onOpenModal }: Props
                         <Text className="text-white text-xs font-medium flex-1" numberOfLines={1}>
                             {file.name}
                         </Text>
-                        <Pressable onPress={() => onRemove(index)} className="p-1 active:opacity-60">
+                        <Pressable
+                            onPress={() => onRemove(index)}
+                            disabled={disabled}
+                            className={`p-1 ${disabled ? "opacity-40" : "active:opacity-60"}`}
+                        >
                             <XIcon size={14} className="text-text-subtle" />
                         </Pressable>
                     </View>
                 ))
             ) : (
-                <Pressable onPress={onOpenModal} className="flex-row items-center bg-white/10 px-4 py-2 rounded-xl gap-2 active:opacity-80">
+                <Pressable
+                    onPress={onOpenModal}
+                    disabled={disabled}
+                    className={`flex-row items-center bg-white/10 px-4 py-2 rounded-xl gap-2 ${disabled ? "opacity-60" : "active:opacity-80"}`}
+                >
                     <FileIcon size={16} className="text-brand-400" />
                     <Text className="text-white text-xs font-medium">
                         Прикреплено {attachments.length} файлов

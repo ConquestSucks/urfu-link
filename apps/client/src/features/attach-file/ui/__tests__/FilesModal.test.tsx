@@ -5,8 +5,29 @@ import type { DocumentPickerAsset } from "expo-document-picker";
 
 import { FilesModal } from "../FilesModal";
 
+let mockDropHandler: ((files: File[]) => void) | null = null;
+let mockIsDragging = false;
+
 jest.mock("@/shared/lib/useWindowSize", () => ({
     useWindowSize: () => ({ width: 1024, isDesktop: true, isMobile: false }),
+}));
+
+jest.mock("@/shared/lib/useWebFileDrop", () => ({
+    useWebFileDrop: ({
+        onFiles,
+    }: {
+        onFiles: (files: File[]) => void;
+    }) => {
+        mockDropHandler = onFiles;
+        return { dropRef: jest.fn(), isDragging: mockIsDragging };
+    },
+}));
+
+jest.mock("@/shared/ui/activity-indicator", () => ({
+    ActivityIndicator: () => {
+        const { Text } = require("react-native");
+        return <Text testID="files-modal-submit-spinner">loading</Text>;
+    },
 }));
 
 jest.mock("@/shared/ui/phosphor", () => {
@@ -38,9 +59,14 @@ const attachment: DocumentPickerAsset = {
     lastModified: 1,
 };
 
+const isDisabled = (node: ReturnType<typeof screen.getByTestId>) =>
+    node.props.accessibilityState?.disabled ?? node.props.disabled;
+
 describe("FilesModal", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockDropHandler = null;
+        mockIsDragging = false;
         Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
     });
 
@@ -55,6 +81,18 @@ describe("FilesModal", () => {
         expect(screen.getByText("185.0 KB")).toBeTruthy();
     });
 
+    it("uses compact desktop dimensions", () => {
+        render(<FilesModal {...baseProps} attachments={[attachment]} />);
+
+        const panel = screen.getByTestId("files-modal-panel");
+        const panelStyle = Array.isArray(panel?.props.style)
+            ? Object.assign({}, ...panel!.props.style)
+            : panel?.props.style;
+
+        expect(panelStyle.width).toBe(660);
+        expect(panelStyle.maxHeight).toBe("80%");
+    });
+
     it("opens the document picker from the drop zone", () => {
         render(<FilesModal {...baseProps} attachments={[]} />);
 
@@ -67,11 +105,7 @@ describe("FilesModal", () => {
         const dropped = { name: "dropped.pdf" } as File;
         render(<FilesModal {...baseProps} attachments={[]} />);
 
-        fireEvent(screen.getByTestId("files-modal-drop-zone"), "drop", {
-            dataTransfer: { files: [dropped] },
-            preventDefault: jest.fn(),
-            stopPropagation: jest.fn(),
-        });
+        mockDropHandler?.([dropped]);
 
         expect(baseProps.onAddDroppedFiles).toHaveBeenCalledWith([dropped]);
     });
@@ -91,7 +125,25 @@ describe("FilesModal", () => {
 
         const submit = screen.getByTestId("files-modal-submit");
 
-        expect(submit.props.accessibilityState?.disabled ?? submit.props.disabled).toBe(true);
+        expect(isDisabled(submit)).toBe(true);
         expect(baseProps.onSubmit).not.toHaveBeenCalled();
+    });
+
+    it("blocks controls and shows sending feedback while submitting", () => {
+        render(
+            <FilesModal
+                {...baseProps}
+                attachments={[attachment]}
+                isSubmitting
+                submitError="Не удалось отправить. Попробуйте ещё раз."
+            />,
+        );
+
+        expect(screen.getByText("Загрузка файлов и отправка сообщения...")).toBeTruthy();
+        expect(screen.getByText("Отправка...")).toBeTruthy();
+        expect(screen.getByTestId("files-modal-submit-spinner")).toBeTruthy();
+        expect(screen.getByText("Не удалось отправить. Попробуйте ещё раз.")).toBeTruthy();
+        expect(isDisabled(screen.getByTestId("files-modal-submit"))).toBe(true);
+        expect(isDisabled(screen.getByTestId("files-modal-remove-0"))).toBe(true);
     });
 });

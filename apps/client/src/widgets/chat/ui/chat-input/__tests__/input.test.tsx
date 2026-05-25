@@ -27,6 +27,9 @@ let mockMentionSuggestions = ({
     onSelect: (item: { userId: string; displayName: string }) => void;
 }) => null as ReactElement | null;
 
+const isDisabled = (node: ReturnType<typeof screen.getByTestId>) =>
+    node.props.accessibilityState?.disabled ?? node.props.disabled;
+
 jest.mock("@/entities/conversation/model/chat-store", () => ({
     useChatStore: (selector: (state: { editMessage: jest.Mock }) => unknown) =>
         selector({ editMessage: jest.fn() }),
@@ -44,17 +47,42 @@ jest.mock("@/features/attach-file", () => {
         FilesModal: ({
             onSubmit,
             attachments,
+            isSubmitting,
+            submitError,
+            onPickFiles,
+            onRemove,
         }: {
             onSubmit: () => void;
             attachments: unknown[];
+            isSubmitting?: boolean;
+            submitError?: string | null;
+            onPickFiles?: () => void;
+            onRemove?: (index: number) => void;
         }) => (
-            <Pressable
-                testID="files-modal-submit"
-                onPress={onSubmit}
-                disabled={attachments.length === 0}
-            >
-                <Text>modal submit</Text>
-            </Pressable>
+            <>
+                <Pressable
+                    testID="files-modal-submit"
+                    onPress={onSubmit}
+                    disabled={attachments.length === 0 || isSubmitting}
+                >
+                    <Text>{isSubmitting ? "Отправка..." : "modal submit"}</Text>
+                </Pressable>
+                <Pressable
+                    testID="files-modal-pick"
+                    onPress={onPickFiles}
+                    disabled={isSubmitting}
+                >
+                    <Text>pick</Text>
+                </Pressable>
+                <Pressable
+                    testID="files-modal-remove"
+                    onPress={() => onRemove?.(0)}
+                    disabled={isSubmitting}
+                >
+                    <Text>remove</Text>
+                </Pressable>
+                {submitError ? <Text>{submitError}</Text> : null}
+            </>
         ),
         useAttachments: () => ({
             attachments: mockAttachments,
@@ -70,6 +98,13 @@ jest.mock("@/features/attach-file", () => {
 
 jest.mock("@/features/emoji-picker", () => ({
     EmojiPicker: () => null,
+}));
+
+jest.mock("@/shared/ui/activity-indicator", () => ({
+    ActivityIndicator: ({ testID }: { testID?: string }) => {
+        const { Text } = require("react-native");
+        return <Text testID={testID ?? "activity-indicator"}>loading</Text>;
+    },
 }));
 
 jest.mock("@/features/message-actions", () => ({
@@ -326,5 +361,72 @@ describe("ChatInput", () => {
 
         expect(onSend).toHaveBeenCalledWith("materials", [attachment], undefined);
         expect(mockClearAttachments).toHaveBeenCalled();
+    });
+
+    it("blocks composer controls and shows progress while sending", async () => {
+        const attachment: DocumentPickerAsset = {
+            name: "lecture.pdf",
+            uri: "file://lecture.pdf",
+            size: 2048,
+            mimeType: "application/pdf",
+            lastModified: 1,
+        };
+        mockAttachments = [attachment];
+        let resolveSend!: () => void;
+        const onSend = jest.fn(
+            () =>
+                new Promise<void>((resolve) => {
+                    resolveSend = resolve;
+                }),
+        );
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+        fireEvent.changeText(screen.getByTestId("chat-input-text"), "materials");
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("chat-input-send-button"));
+        });
+
+        expect(onSend).toHaveBeenCalledWith("materials", [attachment], undefined);
+        expect(screen.getByTestId("chat-input-send-spinner")).toBeTruthy();
+        expect(screen.getByText("Загрузка файлов и отправка сообщения...")).toBeTruthy();
+        expect(screen.getByTestId("chat-input-text").props.editable).toBe(false);
+        expect(isDisabled(screen.getByTestId("files-modal-submit"))).toBe(true);
+        expect(isDisabled(screen.getByTestId("files-modal-pick"))).toBe(true);
+        expect(isDisabled(screen.getByTestId("files-modal-remove"))).toBe(true);
+
+        await act(async () => {
+            resolveSend();
+        });
+
+        expect(mockClearAttachments).toHaveBeenCalled();
+    });
+
+    it("keeps text and attachments visible after a send failure", async () => {
+        const attachment: DocumentPickerAsset = {
+            name: "lecture.pdf",
+            uri: "file://lecture.pdf",
+            size: 2048,
+            mimeType: "application/pdf",
+            lastModified: 1,
+        };
+        mockAttachments = [attachment];
+        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const onSend = jest.fn(async () => {
+            throw new Error("network");
+        });
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+        fireEvent.changeText(screen.getByTestId("chat-input-text"), "materials");
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("chat-input-send-button"));
+        });
+
+        expect(screen.getByTestId("chat-input-text").props.value).toBe("materials");
+        expect(screen.getByText("lecture.pdf")).toBeTruthy();
+        expect(mockClearAttachments).not.toHaveBeenCalled();
+        expect(screen.getAllByText("Не удалось отправить. Попробуйте ещё раз.").length).toBeGreaterThan(0);
+        consoleErrorSpy.mockRestore();
     });
 });
