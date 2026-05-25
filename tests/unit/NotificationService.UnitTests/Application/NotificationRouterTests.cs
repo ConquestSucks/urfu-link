@@ -70,7 +70,7 @@ public sealed class NotificationRouterTests
             false,
             DateTimeOffset.UtcNow);
 
-        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
+        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(), default);
 
         outcome.Should().Be(RoutingOutcome.NoDrafts);
         await _repository.DidNotReceive().UpsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>());
@@ -81,24 +81,22 @@ public sealed class NotificationRouterTests
     {
         var sender = Guid.NewGuid();
         var bob = Guid.NewGuid();
-        var evt = new ChatMessageSentEvent(
+        var evt = new ChatMentionCreatedEvent(
             Guid.NewGuid().ToString(),
             Guid.NewGuid(),
             sender,
-            Recipients: [bob],
-            "Hi",
-            false,
+            [bob],
             DateTimeOffset.UtcNow);
 
-        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
+        var outcome = await _router.RouteAsync(evt, new ChatMentionCreatedHandler(), default);
 
         outcome.Created.Should().Be(1);
         outcome.Skipped.Should().Be(0);
 
         await _repository.Received(1).UpsertAsync(
-            Arg.Is<NotificationAggregate>(n => n.RecipientUserId == bob && n.Category == NotificationCategory.ChatMessageDirect),
+            Arg.Is<NotificationAggregate>(n => n.RecipientUserId == bob && n.Category == NotificationCategory.ChatMessageMention),
             Arg.Any<CancellationToken>());
-        await _badgeStore.Received(1).IncrementAsync(bob, NotificationCategory.ChatMessageDirect, Arg.Any<CancellationToken>());
+        await _badgeStore.Received(1).IncrementAsync(bob, NotificationCategory.ChatMessageMention, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -108,16 +106,14 @@ public sealed class NotificationRouterTests
         var bob = Guid.NewGuid();
         _prefs.GetContactAsync(sender, Arg.Any<CancellationToken>())
             .Returns(new UserContact(string.Empty, "Иван Петров", "ru-RU"));
-        var evt = new ChatMessageSentEvent(
+        var evt = new ChatMentionCreatedEvent(
             Guid.NewGuid().ToString(),
             Guid.NewGuid(),
             sender,
-            Recipients: [bob],
-            "Привет",
-            false,
+            [bob],
             DateTimeOffset.UtcNow);
 
-        await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
+        await _router.RouteAsync(evt, new ChatMentionCreatedHandler(), default);
 
         await _repository.Received(1).UpsertAsync(
             Arg.Is<NotificationAggregate>(n =>
@@ -133,16 +129,14 @@ public sealed class NotificationRouterTests
         _repository.UpsertAsync(Arg.Any<NotificationAggregate>(), Arg.Any<CancellationToken>())
             .Returns(NotificationUpsertResult.Skipped());
 
-        var evt = new ChatMessageSentEvent(
+        var evt = new ChatMentionCreatedEvent(
             Guid.NewGuid().ToString(),
             Guid.NewGuid(),
             Guid.NewGuid(),
-            Recipients: [Guid.NewGuid()],
-            "Hi",
-            false,
+            [Guid.NewGuid()],
             DateTimeOffset.UtcNow);
 
-        var outcome = await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
+        var outcome = await _router.RouteAsync(evt, new ChatMentionCreatedHandler(), default);
 
         outcome.Created.Should().Be(0);
         outcome.Skipped.Should().Be(1);
@@ -195,7 +189,7 @@ public sealed class NotificationRouterTests
             {
                 Categories = new Dictionary<NotificationCategory, ChannelToggle>
                 {
-                    [NotificationCategory.ChatMessageDirect] = new(false, false, false),
+                    [NotificationCategory.ChatMessageMention] = new(false, false, false),
                 },
             });
 
@@ -203,16 +197,14 @@ public sealed class NotificationRouterTests
         _repository.UpsertAsync(Arg.Do<NotificationAggregate>(n => captured = n), Arg.Any<CancellationToken>())
             .Returns(call => NotificationUpsertResult.Created(call.Arg<NotificationAggregate>()));
 
-        var evt = new ChatMessageSentEvent(
+        var evt = new ChatMentionCreatedEvent(
             Guid.NewGuid().ToString(),
             Guid.NewGuid(),
             Guid.NewGuid(),
-            Recipients: [Guid.NewGuid()],
-            "Hi",
-            false,
+            [Guid.NewGuid()],
             DateTimeOffset.UtcNow);
 
-        await _router.RouteAsync(evt, new ChatMessageSentHandler(Substitute.For<IDisciplineConversationLookup>()), default);
+        await _router.RouteAsync(evt, new ChatMentionCreatedHandler(), default);
 
         captured.Should().NotBeNull();
         captured!.Deliveries.Should().BeEmpty();

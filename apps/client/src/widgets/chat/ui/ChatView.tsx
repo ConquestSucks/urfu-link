@@ -67,7 +67,12 @@ export const ChatView = () => {
     const shouldSkipRemoteConversationLoads = isDirectDraft || isUnknownDirectDraft;
 
     const handleSend = useCallback(
-        async (text: string, files: DocumentPickerAsset[], replyToMessageId?: string) => {
+        async (
+            text: string,
+            files: DocumentPickerAsset[],
+            replyToMessageId?: string,
+            mentionUserIds?: string[],
+        ) => {
             try {
                 const assetIds: string[] = [];
 
@@ -89,7 +94,7 @@ export const ChatView = () => {
                     assetIds.push(initRes.assetId);
                 }
 
-                await sendMessage(chatId, text, assetIds, replyToMessageId);
+                await sendMessage(chatId, text, assetIds, replyToMessageId, mentionUserIds);
             } catch (error) {
                 console.error("Failed to send message", error);
                 throw error;
