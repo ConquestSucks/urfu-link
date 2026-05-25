@@ -38,6 +38,8 @@ public sealed class DeploymentContractTests
         Assert.Contains("prefix: /api", config, StringComparison.Ordinal);
         Assert.Contains("prefix: /hubs", config, StringComparison.Ordinal);
         Assert.Contains("allow_websockets: true", config, StringComparison.Ordinal);
+        Assert.Contains("jwt_claims_headers:\n      X-Session-Id: sid\n\n    routes:", config, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(config, "jwt_claims_headers:"));
         Assert.Contains("timeout: 12h", config, StringComparison.Ordinal);
         Assert.Contains("idle_timeout: 75s", config, StringComparison.Ordinal);
         Assert.Contains("nginx.ingress.kubernetes.io/proxy-read-timeout: \"3600\"", ingress, StringComparison.Ordinal);
@@ -312,5 +314,18 @@ public sealed class DeploymentContractTests
 
         var documentEnd = manifest.IndexOf("---", documentStart, StringComparison.Ordinal);
         return documentEnd < 0 ? manifest[documentStart..] : manifest[documentStart..documentEnd];
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }

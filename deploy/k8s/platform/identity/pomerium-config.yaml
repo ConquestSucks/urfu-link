@@ -5,6 +5,9 @@ metadata:
   namespace: urfu-platform
 data:
   config.yaml: |
+    jwt_claims_headers:
+      X-Session-Id: sid
+
     routes:
       # Frontend API — Pomerium passes X-Pomerium-Jwt-Assertion to upstream
       - from: https://urfu-link.ghjc.ru
@@ -15,8 +18,6 @@ data:
               or:
                 - authenticated_user: true
         pass_identity_headers: true
-        jwt_claims_headers:
-          X-Session-Id: sid
 
       # SignalR hubs: authenticated traffic goes through the same gateway as REST.
       - from: https://urfu-link.ghjc.ru
@@ -32,8 +33,6 @@ data:
               or:
                 - authenticated_user: true
         pass_identity_headers: true
-        jwt_claims_headers:
-          X-Session-Id: sid
 
       # Static assets: allow unauthenticated access so app-config.js is loaded
       # before the auth flow starts. Without this Pomerium intercepts app-config.js
