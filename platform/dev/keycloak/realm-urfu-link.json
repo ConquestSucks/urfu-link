@@ -67,6 +67,9 @@
       "protocol": "openid-connect",
       "redirectUris": ["http://localhost:3000/*", "http://localhost:8081/*"],
       "webOrigins": ["http://localhost:3000", "http://localhost:8081"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:3000/##http://localhost:8081/"
+      },
       "protocolMappers": [
         {
           "name": "urfu-link-api audience",
