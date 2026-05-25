@@ -35,6 +35,10 @@ securityContext:
     drop:
       - ALL
 
+extraVolumeMounts: []
+
+extraVolumes: []
+
 service:
   type: ClusterIP
   port: 8080
