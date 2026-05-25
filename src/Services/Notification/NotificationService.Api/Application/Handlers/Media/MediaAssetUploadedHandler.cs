@@ -15,9 +15,21 @@ public sealed class MediaAssetUploadedHandler : INotificationHandler<MediaAssetU
         ArgumentNullException.ThrowIfNull(integrationEvent);
         _ = cancellationToken;
 
+        if (integrationEvent.OwnerId == Guid.Empty || integrationEvent.AssetId == Guid.Empty)
+        {
+            return Task.FromResult<IReadOnlyList<NotificationIntent>>([]);
+        }
+
+        var fileName = FirstNonBlank(
+            integrationEvent.OriginalFileName,
+            Path.GetFileName(integrationEvent.ObjectKey),
+            integrationEvent.ObjectKey,
+            "Файл");
+        var mimeType = FirstNonBlank(integrationEvent.MimeType, "application/octet-stream");
+
         var content = NotificationContent.Create(
             "Файл загружен",
-            integrationEvent.OriginalFileName,
+            fileName,
             imageUrl: null,
             deepLink: $"urfulink://media/{integrationEvent.AssetId:N}");
 
@@ -26,8 +38,8 @@ public sealed class MediaAssetUploadedHandler : INotificationHandler<MediaAssetU
             ["assetId"] = integrationEvent.AssetId.ToString("N", CultureInfo.InvariantCulture),
             ["kind"] = integrationEvent.Kind.ToString(),
             ["size"] = integrationEvent.Size.ToString(CultureInfo.InvariantCulture),
-            ["mimeType"] = integrationEvent.MimeType,
-            ["fileName"] = integrationEvent.OriginalFileName,
+            ["mimeType"] = mimeType,
+            ["fileName"] = fileName,
         });
 
         var intent = new NotificationIntent(
@@ -43,5 +55,18 @@ public sealed class MediaAssetUploadedHandler : INotificationHandler<MediaAssetU
             Priority: NotificationPriority.PinSystemAdmin);
 
         return Task.FromResult<IReadOnlyList<NotificationIntent>>([intent]);
+    }
+
+    private static string FirstNonBlank(params string?[] values)
+    {
+        foreach (var value in values)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                return value.Trim();
+            }
+        }
+
+        return "Файл";
     }
 }
