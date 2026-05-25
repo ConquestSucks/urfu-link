@@ -23,6 +23,10 @@ data:
         to: http://api-gateway.urfu-prod.svc.cluster.local:8080
         prefix: /hubs
         allow_websockets: true
+        # Pomerium defaults route timeout to 30s; SignalR WebSockets must outlive
+        # normal browser sessions and rely on idle timeout plus application keepalive.
+        timeout: 12h
+        idle_timeout: 75s
         policy:
           - allow:
               or:
