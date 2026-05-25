@@ -81,6 +81,7 @@ type ChatState = {
         text: string,
         attachments?: string[],
         replyToMessageId?: string,
+        mentionUserIds?: string[],
     ) => Promise<void>;
     markRead: (chatId: string, messageId: string) => Promise<void>;
 
@@ -778,7 +779,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 
-    sendMessage: async (chatId, text, attachments = [], replyToMessageId) => {
+    sendMessage: async (chatId, text, attachments = [], replyToMessageId, mentionUserIds = []) => {
         const { connection } = get();
         if (connection?.state !== HubConnectionState.Connected) {
             throw new Error("ChatHub is not connected");
@@ -819,7 +820,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             editedAtUtc: null,
             replyTo,
             reactions: {},
-            mentions: [],
+            mentions: mentionUserIds,
             forwardedFrom: null,
             _localStatus: "sending",
         };
@@ -836,6 +837,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 attachmentAssetIds: attachments,
                 clientMessageId,
                 replyToMessageId: replyToMessageId ?? null,
+                mentionUserIds,
                 peerUserId:
                     get().conversations
                         .find((c) => c.id === chatId && c.type === "Direct")

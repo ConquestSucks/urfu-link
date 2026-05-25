@@ -38,6 +38,39 @@ public sealed class MentionResolverTests
     }
 
     [Fact]
+    public async Task Direct_chat_accepts_explicit_mention_ids_from_client_selection()
+    {
+        var direct = Conversation.OpenDirect(TeacherA, StudentA, DateTimeOffset.UtcNow);
+        var resolver = new MentionResolver(_discipline);
+
+        var mentions = await resolver.ResolveAsync(
+            "@Student One please review",
+            direct,
+            maxMentions: 50,
+            cancellationToken: CancellationToken.None,
+            explicitMentionUserIds: [StudentA]);
+
+        mentions.Should().Equal(StudentA);
+    }
+
+    [Fact]
+    public async Task Explicit_mention_ids_are_validated_against_participants()
+    {
+        var direct = Conversation.OpenDirect(TeacherA, StudentA, DateTimeOffset.UtcNow);
+        var outsider = Guid.NewGuid();
+        var resolver = new MentionResolver(_discipline);
+
+        var mentions = await resolver.ResolveAsync(
+            "@Outsider",
+            direct,
+            maxMentions: 50,
+            cancellationToken: CancellationToken.None,
+            explicitMentionUserIds: [outsider]);
+
+        mentions.Should().BeEmpty();
+    }
+
+    [Fact]
     public async Task Discipline_chat_expands_teachers_token_via_grpc()
     {
         var conv = OpenDisciplineConversation(TeacherA, [TeacherA, TeacherB, StudentA]);

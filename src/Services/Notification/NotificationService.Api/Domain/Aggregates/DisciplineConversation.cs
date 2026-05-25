@@ -2,8 +2,8 @@ namespace Urfu.Link.Services.Notification.Domain.Aggregates;
 
 /// <summary>
 /// Read model that maps a chat conversation id (string) to its parent discipline.
-/// Populated from <c>chat.discipline_conversation_created.v1</c> events. Used by
-/// ChatMessageSentHandler to classify direct vs discipline-group messages.
+/// Populated from <c>chat.discipline_conversation_created.v1</c> events for handlers
+/// that need discipline context.
 /// </summary>
 public sealed class DisciplineConversation
 {

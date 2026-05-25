@@ -30,30 +30,36 @@ public sealed partial class MentionResolver(IDisciplineServiceClient disciplineS
         string? body,
         Conversation conversation,
         int maxMentions,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<Guid>? explicitMentionUserIds = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxMentions);
 
         // Step 1: explicit user ids and @everyone — purely synchronous, no gRPC.
-        var explicitMentions = MentionsParser.Parse(body, conversation.Participants, maxMentions);
+        var mentions = MentionsParser.Parse(body, conversation.Participants, maxMentions).ToList();
+        AddExplicitMentionIds(
+            mentions,
+            explicitMentionUserIds ?? Array.Empty<Guid>(),
+            conversation.Participants,
+            maxMentions);
 
-        if (explicitMentions.Count >= maxMentions || string.IsNullOrEmpty(body))
+        if (mentions.Count >= maxMentions || string.IsNullOrEmpty(body))
         {
-            return explicitMentions;
+            return mentions;
         }
 
         // Step 2: @teachers / @students — discipline-only, requires gRPC.
         if (conversation.GroupSubtype != GroupSubtype.Discipline ||
             conversation.DisciplineId is not Guid disciplineId)
         {
-            return explicitMentions;
+            return mentions;
         }
 
         var (mentionsTeachers, mentionsStudents) = ScanSpecialTokens(body);
         if (!mentionsTeachers && !mentionsStudents)
         {
-            return explicitMentions;
+            return mentions;
         }
 
         var members = await disciplineServiceClient
@@ -61,12 +67,11 @@ public sealed partial class MentionResolver(IDisciplineServiceClient disciplineS
             .ConfigureAwait(false);
 
         var participantSet = new HashSet<Guid>(conversation.Participants);
-        var combined = new List<Guid>(explicitMentions);
-        var seen = new HashSet<Guid>(combined);
+        var seen = new HashSet<Guid>(mentions);
 
         foreach (var member in members)
         {
-            if (combined.Count >= maxMentions)
+            if (mentions.Count >= maxMentions)
             {
                 break;
             }
@@ -83,11 +88,38 @@ public sealed partial class MentionResolver(IDisciplineServiceClient disciplineS
 
             if (roleMatches && seen.Add(member.UserId))
             {
-                combined.Add(member.UserId);
+                mentions.Add(member.UserId);
             }
         }
 
-        return combined;
+        return mentions;
+    }
+
+    private static void AddExplicitMentionIds(
+        List<Guid> mentions,
+        IReadOnlyList<Guid> explicitMentionUserIds,
+        IReadOnlyList<Guid> participants,
+        int maxMentions)
+    {
+        if (explicitMentionUserIds.Count == 0 || mentions.Count >= maxMentions)
+        {
+            return;
+        }
+
+        var participantSet = new HashSet<Guid>(participants);
+        var seen = new HashSet<Guid>(mentions);
+        foreach (var userId in explicitMentionUserIds)
+        {
+            if (mentions.Count >= maxMentions)
+            {
+                return;
+            }
+
+            if (participantSet.Contains(userId) && seen.Add(userId))
+            {
+                mentions.Add(userId);
+            }
+        }
     }
 
     /// <summary>Walks the body once to detect whether teachers/students tokens are present.</summary>

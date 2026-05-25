@@ -26,6 +26,7 @@ import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore, useConversationParticipants } from "@/entities/conversation/model/participants-store";
 import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import type { ConversationParticipantDto } from "@urfu-link/api-client";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MIN_INPUT_CONTENT_HEIGHT = 24;
@@ -74,6 +75,7 @@ interface ChatInputProps {
         text: string,
         files: DocumentPickerAsset[],
         replyToMessageId?: string,
+        mentionUserIds?: string[],
     ) => void | Promise<void>;
     typingEnabled?: boolean;
 }
@@ -81,6 +83,16 @@ interface ChatInputProps {
 export type ChatInputHandle = {
     addFilesAndOpenModal: (files: File[]) => void;
 };
+
+type SelectedMention = {
+    userId: string;
+    label: string;
+};
+
+const normalizeMentionLabel = (displayName: string | null | undefined) =>
+    displayName?.replace(/\s+/g, " ").trim() || "Пользователь";
+
+const mentionTextFor = (label: string) => `@${label}`;
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     ({ conversationId, onSend, typingEnabled = true }, ref) => {
@@ -92,6 +104,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isEmojiVisible, setIsEmojiVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [inputHeight, setInputHeight] = useState(MIN_INPUT_CONTENT_HEIGHT);
+    const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
     // Курсор: позиция точки вставки в тексте. Нужен для детекта @-токена.
     const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
     // Программно проставляемая selection после вставки @mention. RN сбрасывает
@@ -129,12 +142,18 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     }, [mentionToken, participants, currentUserId]);
 
     const handleSelectMention = useCallback(
-        (item: { displayName: string }) => {
+        (item: ConversationParticipantDto) => {
             if (!mentionToken) return;
-            const insertion = `@${item.displayName.replace(/\s+/g, " ").trim()} `;
+            const label = normalizeMentionLabel(item.displayName);
+            const insertion = `${mentionTextFor(label)} `;
             const next = query.slice(0, mentionToken.start) + insertion + query.slice(mentionToken.end);
             const cursor = mentionToken.start + insertion.length;
             setQuery(next);
+            setSelectedMentions((prev) =>
+                prev.some((mention) => mention.userId === item.userId)
+                    ? prev
+                    : [...prev, { userId: item.userId, label }],
+            );
             previousLineCountRef.current = getExplicitLineCount(next);
             setPendingSelection({ start: cursor, end: cursor });
             // notifyTyping не дёргаем — это всё ещё ввод, useTypingIndicator
@@ -146,6 +165,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     useEffect(() => {
         if (editing) {
             setQuery(editing.body);
+            setSelectedMentions([]);
             previousLineCountRef.current = getExplicitLineCount(editing.body);
             setInputHeight(getExplicitLineContentHeight(editing.body));
         }
@@ -196,6 +216,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
     const resetInput = useCallback(() => {
         setQuery("");
+        setSelectedMentions([]);
         clearAttachments();
         if (replyTo) setReply(null);
         previousLineCountRef.current = 1;
@@ -234,6 +255,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             }
 
             setQuery(text);
+            setSelectedMentions((prev) =>
+                prev.filter((mention) => text.includes(mentionTextFor(mention.label))),
+            );
             if (!editing) notifyTyping(text);
         },
         [editing, notifyTyping],
@@ -287,6 +311,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 console.error("Failed to edit", e);
             }
             setQuery("");
+            setSelectedMentions([]);
             resetComposer();
             previousLineCountRef.current = 1;
             pendingLineChangeContentHeightRef.current = null;
@@ -295,9 +320,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             return;
         }
 
+        const mentionUserIds = selectedMentions
+            .filter((mention) => trimmed.includes(mentionTextFor(mention.label)))
+            .map((mention) => mention.userId);
+
         setIsSubmitting(true);
         try {
-            await onSend(trimmed, attachments, replyTo?.id);
+            if (mentionUserIds.length > 0) {
+                await onSend(trimmed, attachments, replyTo?.id, mentionUserIds);
+            } else {
+                await onSend(trimmed, attachments, replyTo?.id);
+            }
             resetInput();
         } catch (error) {
             console.error("Failed to submit composer", error);
@@ -315,6 +348,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         replyTo?.id,
         resetComposer,
         resetInput,
+        selectedMentions,
     ]);
 
     const handleInputKeyPress = (event: {
