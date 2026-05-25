@@ -27,6 +27,7 @@ import { useParticipantsStore, useConversationParticipants } from "@/entities/co
 import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { ConversationParticipantDto } from "@urfu-link/api-client";
+import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MIN_INPUT_CONTENT_HEIGHT = 24;
@@ -103,6 +104,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     );
     const [isEmojiVisible, setIsEmojiVisible] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const [inputHeight, setInputHeight] = useState(MIN_INPUT_CONTENT_HEIGHT);
     const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
     // Курсор: позиция точки вставки в тексте. Нужен для детекта @-токена.
@@ -230,6 +232,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         () => ({
             addFilesAndOpenModal: (files: File[]) => {
                 if (files.length === 0 || editing) return;
+                setSubmitError(null);
                 animate(false);
                 addAttachments(files, { openModal: true });
             },
@@ -255,12 +258,13 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             }
 
             setQuery(text);
+            if (submitError) setSubmitError(null);
             setSelectedMentions((prev) =>
                 prev.filter((mention) => text.includes(mentionTextFor(mention.label))),
             );
             if (!editing) notifyTyping(text);
         },
-        [editing, notifyTyping],
+        [editing, notifyTyping, submitError],
     );
 
     const handleInputContentSizeChange = useCallback(
@@ -324,6 +328,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             .filter((mention) => trimmed.includes(mentionTextFor(mention.label)))
             .map((mention) => mention.userId);
 
+        setSubmitError(null);
         setIsSubmitting(true);
         try {
             if (mentionUserIds.length > 0) {
@@ -334,6 +339,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             resetInput();
         } catch (error) {
             console.error("Failed to submit composer", error);
+            setSubmitError("Не удалось отправить. Попробуйте ещё раз.");
         } finally {
             setIsSubmitting(false);
         }
@@ -379,6 +385,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         if (editing) {
             resetComposer();
             setQuery("");
+            setSubmitError(null);
         } else {
             setReply(null);
         }
@@ -411,9 +418,25 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
 
             <AttachmentsPreview
                 attachments={attachments}
-                onRemove={removeAttachment}
+                onRemove={(index) => {
+                    setSubmitError(null);
+                    removeAttachment(index);
+                }}
                 onOpenModal={() => setIsFilesModalVisible(true)}
+                disabled={isSubmitting}
             />
+
+            {submitError ? (
+                <Text className="text-danger-300 text-xs font-medium mb-2 pl-1">
+                    {submitError}
+                </Text>
+            ) : null}
+
+            {isSubmitting ? (
+                <Text className="text-brand-400 text-xs font-medium mb-2 pl-1">
+                    Загрузка файлов и отправка сообщения...
+                </Text>
+            ) : null}
 
             <View className="flex-row items-end gap-3">
                 <Pressable
@@ -421,8 +444,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         animate(false);
                         setIsFilesModalVisible(true);
                     }}
-                    className={`active:opacity-60 mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing ? "opacity-30" : ""}`}
-                    disabled={attachments.length >= MAX_FILES_LIMIT || !!editing}
+                    className={`mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting ? "opacity-30" : "active:opacity-60"}`}
+                    disabled={attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting}
                 >
                     <PlusCircleIcon size={28} className="text-text-subtle" />
                 </Pressable>
@@ -437,6 +460,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         value={query}
                         onChangeText={handleQueryChange}
                         onKeyPress={handleInputKeyPress}
+                        editable={!isSubmitting}
                         selection={pendingSelection ?? undefined}
                         onSelectionChange={(e) => {
                             const next = e.nativeEvent.selection;
@@ -464,13 +488,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     />
                     <Pressable
                         testID="chat-input-emoji-button"
+                        disabled={isSubmitting}
                         onPress={() => {
                             Keyboard.dismiss();
                             const willShow = !isEmojiVisible;
                             setIsEmojiVisible(willShow);
                             animate(willShow);
                         }}
-                        className="py-2.5 ml-2"
+                        className={`py-2.5 ml-2 ${isSubmitting ? "opacity-40" : ""}`}
                         style={{ alignSelf: "flex-end" }}
                     >
                         <SmileyIcon
@@ -482,15 +507,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 </View>
 
                 <Pressable
+                    testID="chat-input-send-button"
                     onPress={submitComposer}
                     disabled={!canSend}
-                    className={`w-11 h-11 rounded-full items-center justify-center ${canSend ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"}`}
+                    className={`w-11 h-11 rounded-full items-center justify-center ${isSubmitting ? "bg-brand-600/70" : canSend ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"}`}
                 >
-                    <PaperPlaneRightIcon
-                        size={22}
-                        className={canSend ? "text-white" : "text-white/40"}
-                        weight="fill"
-                    />
+                    {isSubmitting ? (
+                        <ActivityIndicator testID="chat-input-send-spinner" size="small" className="text-white" />
+                    ) : (
+                        <PaperPlaneRightIcon
+                            size={22}
+                            className={canSend ? "text-white" : "text-white/40"}
+                            weight="fill"
+                        />
+                    )}
                 </Pressable>
             </View>
 
@@ -508,11 +538,21 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 visible={isFilesModalVisible}
                 onClose={() => setIsFilesModalVisible(false)}
                 attachments={attachments}
-                onPickFiles={handleAttachFiles}
-                onAddDroppedFiles={(files) => addAttachments(files, { openModal: true })}
-                onRemove={removeAttachment}
+                onPickFiles={() => {
+                    setSubmitError(null);
+                    void handleAttachFiles();
+                }}
+                onAddDroppedFiles={(files) => {
+                    setSubmitError(null);
+                    addAttachments(files, { openModal: true });
+                }}
+                onRemove={(index) => {
+                    setSubmitError(null);
+                    removeAttachment(index);
+                }}
                 onSubmit={submitComposer}
                 isSubmitting={isSubmitting}
+                submitError={submitError}
             />
         </View>
     );
