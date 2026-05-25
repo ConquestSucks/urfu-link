@@ -10,6 +10,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { usePresenceHub } from "@/shared/lib/usePresenceHub";
 import { useChatHub } from "@/shared/lib/useChatHub";
 import { useNotificationHub } from "@/features/notifications";
+import { useCurrentUser } from "@/entities/user";
+import { configureMessageSounds } from "@/shared/lib/message-sounds";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -24,9 +26,15 @@ export default function AuthLayout() {
     usePresenceHub();
     useNotificationHub();
 
+    const { data: profile } = useCurrentUser();
+
     const safeAreaEdges: Edge[] = isMobile
         ? ["top", "left", "right", "bottom"]
         : ["top", "left", "right"];
+
+    useEffect(() => {
+        configureMessageSounds(profile?.notifications);
+    }, [profile?.notifications]);
 
     useEffect(() => {
         if (isMobile && isSettingsOpen) setIsSettingsOpen(false);

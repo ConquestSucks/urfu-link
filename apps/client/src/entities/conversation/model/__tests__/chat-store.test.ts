@@ -1,6 +1,7 @@
 import { mapMessageToProps, useChatStore } from "../chat-store";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { apiClient } from "@/shared/lib/api";
+import { playMessageSound } from "@/shared/lib/message-sounds";
 
 const mockAuthState: { userId: string | null; setUserId: jest.Mock } = {
     userId: "user-1",
@@ -36,6 +37,10 @@ const hubConnection = {
 
 jest.mock("@/shared/lib/signalr", () => ({
     createHubConnection: jest.fn(),
+}));
+
+jest.mock("@/shared/lib/message-sounds", () => ({
+    playMessageSound: jest.fn(),
 }));
 
 jest.mock("@/shared/store/auth-store", () => ({
@@ -288,6 +293,150 @@ describe("chat store direct draft sending", () => {
                 peerUserId: "peer-1",
             }),
         );
+    });
+
+    it("plays the send sound after a successful message send", async () => {
+        const invoke = jest.fn(async (_method: string, payload: { clientMessageId: string }) => ({
+            id: "message-1",
+            conversationId: "direct-1",
+            senderId: "user-1",
+            body: "hello",
+            attachments: [],
+            state: "Sent",
+            createdAtUtc: "2026-05-24T10:00:00.000Z",
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            clientMessageId: payload.clientMessageId,
+            editedAtUtc: null,
+            replyTo: null,
+            reactionsSummary: {},
+            mentions: [],
+            forwardedFrom: null,
+        }));
+
+        useChatStore.setState({
+            connection: { state: "Connected", invoke } as never,
+            isConnected: true,
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().sendMessage("direct-1", "hello");
+
+        expect(playMessageSound).toHaveBeenCalledWith("send");
+    });
+
+    it("does not play the send sound when sending fails", async () => {
+        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const invoke = jest.fn(async () => {
+            throw new Error("send failed");
+        });
+
+        useChatStore.setState({
+            connection: { state: "Connected", invoke } as never,
+            isConnected: true,
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        try {
+            await expect(useChatStore.getState().sendMessage("direct-1", "hello")).rejects.toThrow(
+                "send failed",
+            );
+
+            expect(playMessageSound).not.toHaveBeenCalled();
+            const stored = useChatStore.getState().messagesByConversation["direct-1"][0] as {
+                _localStatus?: string;
+            };
+            expect(stored._localStatus).toBe("failed");
+        } finally {
+            consoleErrorSpy.mockRestore();
+        }
+    });
+
+    it("plays the receive sound for a new realtime incoming message only once", async () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().connect();
+
+        const incoming = {
+            id: "message-2",
+            conversationId: "direct-1",
+            senderId: "peer-1",
+            body: "new incoming",
+            attachments: [],
+            state: "Sent",
+            createdAt: "2026-05-24T10:03:00.000Z",
+            deliveredAt: null,
+            readAt: null,
+        };
+
+        hubHandlers.MessageReceived(incoming);
+        hubHandlers.MessageReceived(incoming);
+
+        expect(playMessageSound).toHaveBeenCalledTimes(1);
+        expect(playMessageSound).toHaveBeenCalledWith("receive", {
+            conversationId: "direct-1",
+            isDiscipline: false,
+        });
+    });
+
+    it("does not play the receive sound for own realtime messages", async () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().connect();
+
+        hubHandlers.MessageReceived({
+            id: "message-own",
+            conversationId: "direct-1",
+            senderId: "user-1",
+            body: "own echo",
+            attachments: [],
+            state: "Sent",
+            createdAt: "2026-05-24T10:03:00.000Z",
+            deliveredAt: null,
+            readAt: null,
+        });
+
+        expect(playMessageSound).not.toHaveBeenCalled();
     });
 
     it("keeps media asset ids in mapped message attachments", () => {

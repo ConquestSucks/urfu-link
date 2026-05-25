@@ -60,6 +60,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             "expo-web-browser",
             "expo-image-picker",
             "expo-font",
+            [
+                "expo-audio",
+                {
+                    microphonePermission: false,
+                    recordAudioAndroid: false,
+                    enableBackgroundRecording: false,
+                    enableBackgroundPlayback: false,
+                },
+            ],
         ],
         extra: {
             appEnv,
