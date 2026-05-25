@@ -11,6 +11,7 @@ const mockAddReaction = jest.fn();
 const mockRemoveReaction = jest.fn();
 const mockTypingIndicator = jest.fn();
 const originalPlatformOS = Platform.OS;
+let mockDropHandler: ((files: File[]) => void) | null = null;
 
 let mockChatState = {
     messagesByConversation: {},
@@ -109,9 +110,21 @@ jest.mock("@/entities/presence", () => ({
     },
 }));
 
+jest.mock("@/shared/lib/useWebFileDrop", () => ({
+    useWebFileDrop: ({
+        onFiles,
+    }: {
+        onFiles: (files: File[]) => void;
+    }) => {
+        mockDropHandler = onFiles;
+        return { dropRef: jest.fn(), isDragging: false };
+    },
+}));
+
 describe("MessagesList loading state", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockDropHandler = null;
         Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatformOS });
         mockChatState = {
             messagesByConversation: {},
@@ -167,8 +180,6 @@ describe("MessagesList loading state", () => {
         Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
         const file = { name: "materials.pdf" } as File;
         const onFilesDropped = jest.fn();
-        const preventDefault = jest.fn();
-        const stopPropagation = jest.fn();
 
         render(
             <MessagesList
@@ -178,14 +189,8 @@ describe("MessagesList loading state", () => {
             />,
         );
 
-        fireEvent(screen.getByTestId("messages-list-drop-target"), "drop", {
-            dataTransfer: { files: [file] },
-            preventDefault,
-            stopPropagation,
-        });
+        mockDropHandler?.([file]);
 
-        expect(preventDefault).toHaveBeenCalled();
-        expect(stopPropagation).toHaveBeenCalled();
         expect(onFilesDropped).toHaveBeenCalledWith([file]);
     });
 

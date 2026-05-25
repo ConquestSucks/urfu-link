@@ -31,6 +31,7 @@ import type { MessageDto } from "@urfu-link/api-client";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { TypingIndicator } from "@/entities/presence";
 import { formatMessageDateLabel, getMessageDayKey } from "../lib/message-date-labels";
+import { useWebFileDrop } from "@/shared/lib/useWebFileDrop";
 
 interface MessagesListProps {
     chatId: string;
@@ -68,15 +69,6 @@ type MessageListDateItem = {
 };
 
 type MessageListItem = MessageListMessageItem | MessageListDateItem;
-
-type WebDragEvent = {
-    preventDefault?: () => void;
-    stopPropagation?: () => void;
-    dataTransfer?: DataTransfer;
-    nativeEvent?: {
-        dataTransfer?: DataTransfer;
-    };
-};
 
 const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] => {
     const items: MessageListItem[] = [];
@@ -149,6 +141,9 @@ const styles = StyleSheet.create({
     messageAfterMessage: {
         marginTop: 12,
     },
+    fileDropActive: {
+        backgroundColor: "rgba(43, 127, 255, 0.08)",
+    },
 });
 
 export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
@@ -193,6 +188,16 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         const currentUserId = useCurrentUserId();
         const readContextRef = useRef({ chatId, currentUserId, markRead });
+        const handleFilesDropped = useCallback(
+            (files: File[]) => {
+                onFilesDropped?.(files);
+            },
+            [onFilesDropped],
+        );
+        const { dropRef, isDragging: isFileDragging } = useWebFileDrop({
+            enabled: !!onFilesDropped,
+            onFiles: handleFilesDropped,
+        });
 
         useEffect(() => {
             readContextRef.current = { chatId, currentUserId, markRead };
@@ -372,30 +377,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             loadMore(chatId, type);
         }, [chatId, loadMore, type]);
 
-        const preventDefaultDrag = useCallback((event: WebDragEvent) => {
-            event.preventDefault?.();
-            event.stopPropagation?.();
-        }, []);
-
-        const handleDrop = useCallback(
-            (event: WebDragEvent) => {
-                preventDefaultDrag(event);
-                const transfer = event.nativeEvent?.dataTransfer ?? event.dataTransfer;
-                const files = transfer?.files ? Array.from(transfer.files) : [];
-                if (files.length > 0) onFilesDropped?.(files);
-            },
-            [onFilesDropped, preventDefaultDrag],
-        );
-
-        const dropTargetProps =
-            Platform.OS === "web" && onFilesDropped
-                ? ({
-                      onDragEnter: preventDefaultDrag,
-                      onDragOver: preventDefaultDrag,
-                      onDrop: handleDrop,
-                  } as Record<string, unknown>)
-                : {};
-
         const renderItem = useMemo(
             () =>
                 ({ item, index }: { item: MessageListItem; index: number }) => {
@@ -518,10 +499,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         if (isInitialLoading) {
             return (
                 <View
+                    ref={dropRef}
                     testID="messages-list-drop-target"
                     className="flex-1 px-6 py-6 justify-end overflow-hidden"
-                    style={{ gap: 24 }}
-                    {...dropTargetProps}
+                    style={[{ gap: 24 }, isFileDragging ? styles.fileDropActive : null]}
                 >
                     <ChatMessageSkeleton isOwn={false} showAvatar={shouldShowAvatars} />
                     <ChatMessageSkeleton isOwn={true} />
@@ -535,9 +516,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         if (messages.length === 0) {
             return (
                 <View
+                    ref={dropRef}
                     testID="messages-list-drop-target"
                     className="flex-1 px-6 py-6 justify-end overflow-hidden"
-                    {...dropTargetProps}
+                    style={isFileDragging ? styles.fileDropActive : null}
                 >
                     <EmptyState
                         size="full"
@@ -550,7 +532,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         }
 
         return (
-            <View testID="messages-list-drop-target" className="flex-1" {...dropTargetProps}>
+            <View
+                ref={dropRef}
+                testID="messages-list-drop-target"
+                className="flex-1"
+                style={isFileDragging ? styles.fileDropActive : null}
+            >
                 <FlatList
                     ref={listRef}
                     className="flex-1 px-6 py-6"
