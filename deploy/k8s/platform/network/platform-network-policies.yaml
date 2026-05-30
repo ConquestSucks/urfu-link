@@ -239,6 +239,9 @@ spec:
         - protocol: UDP
           port: 50000
           endPort: 50100
+        - protocol: UDP
+          port: 50101
+          endPort: 50200
 ---
 # Bootstrap jobs: allow egress to Vault, Kubernetes API, and external HTTPS (apk packages)
 apiVersion: networking.k8s.io/v1
