@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import {
     LiveKitRoom,
     useLocalParticipant,
@@ -19,6 +19,7 @@ import {
 } from "./CallRoomControls";
 import {
     pickActiveScreenShare,
+    SCREEN_SHARE_CAPTURE_OPTIONS,
     shouldDisableLocalScreenShareForRemoteOwner,
     type ScreenShareCandidate,
 } from "./CallRoomMedia";
@@ -26,6 +27,9 @@ import {
 type TrackRef = Parameters<typeof VideoTrack>[0]["trackRef"];
 type DefinedTrackRef = Exclude<TrackRef, null | undefined>;
 type CameraFacingMode = "user" | "environment";
+
+const getNativeTrackKey = (track: DefinedTrackRef) =>
+    `${track.source}:${track.participant.identity}:${track.publication?.trackSid ?? track.source}`;
 
 const getNativeScreenShareKey = (track: DefinedTrackRef) =>
     `${track.participant.identity}:${track.publication?.trackSid ?? track.source}`;
@@ -35,11 +39,13 @@ const NativeVideoPanel = ({
     mainTrack,
     thumbnailTracks,
     mainPlaceholderLabel,
+    onSelectTrack,
 }: {
     isVideoAvailable: boolean;
     mainTrack: DefinedTrackRef | null;
     thumbnailTracks: DefinedTrackRef[];
     mainPlaceholderLabel: string;
+    onSelectTrack: (track: DefinedTrackRef) => void;
 }) => {
     return (
         <View className="relative flex-1 bg-black/30">
@@ -58,12 +64,13 @@ const NativeVideoPanel = ({
             {isVideoAvailable && mainTrack && thumbnailTracks.length > 0 ? (
                 <View className="absolute top-3 right-3 w-48 gap-2">
                     {thumbnailTracks.map((thumbnailTrack) => (
-                        <View
+                        <Pressable
                             key={`${thumbnailTrack.publication?.trackSid ?? "thumb"}-${thumbnailTrack.source}`}
+                            onPress={() => onSelectTrack(thumbnailTrack)}
                             className="w-full h-28 rounded-lg overflow-hidden border border-white/20"
                         >
                             <VideoTrack trackRef={thumbnailTrack} />
-                        </View>
+                        </Pressable>
                     ))}
                 </View>
             ) : null}
@@ -88,6 +95,7 @@ const NativeRoomContent = ({
     const [panel, setPanel] = useState<CallPanel>("none");
     const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
     const [activeScreenShareOwnerId, setActiveScreenShareOwnerId] = useState<string | null>(null);
+    const [selectedStageTrackKey, setSelectedStageTrackKey] = useState<string | null>(null);
     const isVideoCall = call.callType === "Video";
     const isConnectedToCall = call.status === "Active";
 
@@ -190,25 +198,50 @@ const NativeRoomContent = ({
         }
     }, [isScreenShareEnabled, localParticipant, localUserId, remoteScreenShareTracks]);
 
-    const mainCameraTrack = activeScreenShareTrack ?? remoteCameraTracks[0] ?? localCameraTrack;
-    const thumbnailCameraTracks = useMemo(() => {
-        if (!mainCameraTrack) {
-            return [];
-        }
+    const stageTracks = useMemo(
+        () => [
+            ...(activeScreenShareTrack ? [activeScreenShareTrack] : []),
+            ...remoteCameraTracks,
+            ...(localCameraTrack ? [localCameraTrack] : []),
+        ],
+        [activeScreenShareTrack, localCameraTrack, remoteCameraTracks],
+    );
 
-        if (mainCameraTrack === activeScreenShareTrack) {
-            return [
-                ...remoteCameraTracks,
-                ...(localCameraTrack ? [localCameraTrack] : []),
-            ];
-        }
+    const mainCameraTrack = useMemo(
+        () =>
+            (selectedStageTrackKey
+                ? stageTracks.find((track) => getNativeTrackKey(track) === selectedStageTrackKey)
+                : null) ??
+            activeScreenShareTrack ??
+            remoteCameraTracks[0] ??
+            localCameraTrack,
+        [
+            activeScreenShareTrack,
+            localCameraTrack,
+            remoteCameraTracks,
+            selectedStageTrackKey,
+            stageTracks,
+        ],
+    );
 
-        if (mainCameraTrack === localCameraTrack) {
-            return remoteCameraTracks;
+    useEffect(() => {
+        if (
+            selectedStageTrackKey &&
+            !stageTracks.some((track) => getNativeTrackKey(track) === selectedStageTrackKey)
+        ) {
+            setSelectedStageTrackKey(null);
         }
+    }, [selectedStageTrackKey, stageTracks]);
 
-        return localCameraTrack ? [...remoteCameraTracks.slice(1), localCameraTrack] : remoteCameraTracks.slice(1);
-    }, [activeScreenShareTrack, remoteCameraTracks, localCameraTrack, mainCameraTrack]);
+    const thumbnailCameraTracks = useMemo(
+        () =>
+            mainCameraTrack
+                ? stageTracks.filter(
+                    (track) => getNativeTrackKey(track) !== getNativeTrackKey(mainCameraTrack),
+                )
+                : [],
+        [mainCameraTrack, stageTracks],
+    );
 
     const toggleMicrophone = useCallback(async () => {
         if (!localParticipant) return;
@@ -226,7 +259,6 @@ const NativeRoomContent = ({
         try {
             const next = !isCameraEnabled;
             await localParticipant.setCameraEnabled(next, { facingMode });
-            await playCallSound(next ? "cameraOn" : "cameraOff");
         } catch (error) {
             console.error("Failed to toggle camera", error);
         }
@@ -248,7 +280,6 @@ const NativeRoomContent = ({
             }
 
             setFacingMode(nextFacingMode);
-            await playCallSound("cameraOn");
         } catch (error) {
             console.error("Failed to switch camera", error);
         }
@@ -259,7 +290,10 @@ const NativeRoomContent = ({
 
         try {
             const next = !isScreenShareEnabled;
-            await localParticipant.setScreenShareEnabled(next);
+            await localParticipant.setScreenShareEnabled(
+                next,
+                next ? SCREEN_SHARE_CAPTURE_OPTIONS : undefined,
+            );
             if (next) {
                 setActiveScreenShareOwnerId(localUserId);
             } else if (activeScreenShareOwnerId === localUserId) {
@@ -293,6 +327,7 @@ const NativeRoomContent = ({
                         mainTrack={mainCameraTrack}
                         thumbnailTracks={thumbnailCameraTracks}
                         mainPlaceholderLabel={callTitle}
+                        onSelectTrack={(track) => setSelectedStageTrackKey(getNativeTrackKey(track))}
                     />
                 )}
             </View>

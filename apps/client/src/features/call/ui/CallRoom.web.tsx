@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import {
     ConnectionState,
     isBrowserSupported,
     LocalVideoTrack,
+    RemoteAudioTrack,
     RemoteVideoTrack,
     Room,
     RoomEvent,
@@ -11,19 +12,26 @@ import {
 } from "livekit-client";
 import { Avatar } from "@/shared/ui";
 import { playCallSound } from "@/shared/lib/call-sounds";
+import { SpeakerHighIcon } from "@/shared/ui/phosphor";
 import type { CallRoomProps, ParticipantInfo } from "./CallRoom.types";
 import {
     CallControls,
     CallDrawer,
     CallErrorOverlay,
     CallLoadingOverlay,
+    ParticipantStatusIcons,
     SpeakingFrame,
     type CallPanel,
 } from "./CallRoomControls";
 import {
+    buildScreenShareAudioKey,
+    isActiveScreenShareAudio,
+    normalizeSelectedStageItem,
     pickActiveScreenShare,
+    SCREEN_SHARE_CAPTURE_OPTIONS,
     shouldDisableLocalScreenShareForRemoteOwner,
     type ScreenShareCandidate,
+    type StageMediaItem,
 } from "./CallRoomMedia";
 
 type CameraFacingMode = "user" | "environment";
@@ -33,6 +41,14 @@ type WebVideoTrackRef = {
     ownerId: string;
     source: Track.Source;
     track: LocalVideoTrack | RemoteVideoTrack;
+    isLocal: boolean;
+};
+
+type WebAudioTrackRef = {
+    key: string;
+    ownerId: string;
+    source: Track.Source;
+    track: RemoteAudioTrack;
     isLocal: boolean;
 };
 
@@ -92,6 +108,36 @@ const collectVideoTracks = (room: Room, participantInfos: ParticipantInfo[]) => 
     return tracks;
 };
 
+const collectRemoteAudioTracks = (room: Room) => {
+    const tracks: WebAudioTrackRef[] = [];
+
+    room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((publication) => {
+            const track = publication.audioTrack;
+            if (!track || publication.isMuted) return;
+            if (
+                publication.source !== Track.Source.Microphone &&
+                publication.source !== Track.Source.ScreenShareAudio
+            ) {
+                return;
+            }
+
+            tracks.push({
+                key:
+                    publication.source === Track.Source.ScreenShareAudio
+                        ? buildScreenShareAudioKey(participant.identity, publication.trackSid)
+                        : `${participant.sid}-${publication.trackSid}`,
+                ownerId: participant.identity,
+                source: publication.source,
+                track: track as RemoteAudioTrack,
+                isLocal: false,
+            });
+        });
+    });
+
+    return tracks;
+};
+
 const disposeAudioElement = (element: HTMLMediaElement) => {
     element.pause();
     element.srcObject = null;
@@ -99,33 +145,29 @@ const disposeAudioElement = (element: HTMLMediaElement) => {
 };
 
 const syncRemoteAudioTracks = (
-    room: Room,
+    tracks: WebAudioTrackRef[],
     audioElements: React.MutableRefObject<Map<string, HTMLMediaElement>>,
+    volume = 1,
 ) => {
     const activeKeys = new Set<string>();
 
-    room.remoteParticipants.forEach((participant) => {
-        participant.audioTrackPublications.forEach((publication) => {
-            const track = publication.audioTrack;
-            if (!track || publication.isMuted) {
-                return;
-            }
+    tracks.forEach((trackRef) => {
+        const key = trackRef.key;
+        activeKeys.add(key);
 
-            const key = `${participant.sid}-${publication.trackSid}`;
-            activeKeys.add(key);
-
-            if (audioElements.current.has(key)) {
-                return;
-            }
-
-            const element = track.attach();
+        let element = audioElements.current.get(key);
+        if (!element) {
+            element = trackRef.track.attach();
             element.autoplay = true;
             element.hidden = true;
             document.body.appendChild(element);
             audioElements.current.set(key, element);
-            void element.play().catch((error) => {
-                console.warn("LiveKit remote audio playback was blocked", error);
-            });
+        }
+
+        element.volume = Math.max(0, Math.min(1, volume));
+        element.muted = volume <= 0;
+        void element.play().catch((error) => {
+            console.warn("LiveKit remote audio playback was blocked", error);
         });
     });
 
@@ -188,16 +230,82 @@ const VideoElement = ({
     });
 };
 
+type RenderedStageItem = StageMediaItem & {
+    participant?: ParticipantMediaInfo;
+    screenTrack?: WebVideoTrackRef;
+};
+
+const ScreenShareVolumeControl = ({
+    available,
+    volume,
+    onVolumeChange,
+}: {
+    available: boolean;
+    volume: number;
+    onVolumeChange: (volume: number) => void;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    if (!available) return null;
+
+    const percent = Math.round(volume * 100);
+
+    return (
+        <View className="relative">
+            <Pressable
+                testID="call-screen-audio-toggle"
+                accessibilityLabel={volume <= 0 ? "Включить звук демонстрации" : "Настроить звук демонстрации"}
+                onPress={() => setIsOpen((value) => !value)}
+                className="h-9 w-9 rounded-full bg-white/12 items-center justify-center active:scale-95"
+            >
+                <SpeakerHighIcon size={16} className={volume <= 0 ? "text-white/45" : "text-white"} />
+            </Pressable>
+            {isOpen ? (
+                <View className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-black/85 p-3 gap-3">
+                    <View className="flex-row items-center justify-between">
+                        <Text className="text-white text-xs font-semibold">Звук экрана</Text>
+                        <Text className="text-white/70 text-xs">{percent}%</Text>
+                    </View>
+                    {React.createElement("input", {
+                        type: "range",
+                        min: 0,
+                        max: 100,
+                        value: percent,
+                        "aria-label": "Громкость демонстрации",
+                        onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                            onVolumeChange(Number(event.currentTarget.value) / 100);
+                        },
+                        style: {
+                            width: "100%",
+                            accentColor: "#2563eb",
+                        },
+                    })}
+                    <Pressable
+                        accessibilityLabel={volume <= 0 ? "Включить звук демонстрации" : "Выключить звук демонстрации"}
+                        onPress={() => onVolumeChange(volume <= 0 ? 1 : 0)}
+                        className="h-8 rounded-lg bg-white/10 items-center justify-center"
+                    >
+                        <Text className="text-white text-xs font-semibold">
+                            {volume <= 0 ? "Включить" : "Выключить"}
+                        </Text>
+                    </Pressable>
+                </View>
+            ) : null}
+        </View>
+    );
+};
+
 const ParticipantTile = ({
     participant,
     isVideoCall,
     localFacingMode,
     compact = false,
+    onPress,
 }: {
     participant: ParticipantMediaInfo;
     isVideoCall: boolean;
     localFacingMode: CameraFacingMode;
     compact?: boolean;
+    onPress: () => void;
 }) => {
     const visibleTrack = participant.cameraTrack;
     const shouldMirror =
@@ -206,200 +314,277 @@ const ParticipantTile = ({
         localFacingMode === "user";
 
     return (
-        <SpeakingFrame isSpeaking={participant.isSpeaking}>
-            <View testID="call-participant-tile" className="flex-1 min-h-0">
-                <View className="flex-1 items-center justify-center bg-black/30">
-                    {isVideoCall && visibleTrack ? (
-                        <VideoElement
-                            track={visibleTrack.track}
-                            muted={visibleTrack.isLocal}
-                            mirrored={shouldMirror}
-                        />
-                    ) : (
-                        <View className="items-center gap-3">
-                            <Avatar
-                                size={compact ? 48 : 96}
-                                src={participant.avatarUrl}
-                                name={participant.displayName}
+        <Pressable
+            testID="call-participant-tile"
+            accessibilityLabel={`Сделать главным: ${participant.displayName}`}
+            onPress={onPress}
+            className="flex-1 min-h-0 active:scale-[0.99]"
+        >
+            <SpeakingFrame isSpeaking={participant.isSpeaking}>
+                <View className="flex-1 min-h-0">
+                    <View className="flex-1 items-center justify-center bg-black/30">
+                        {isVideoCall && visibleTrack ? (
+                            <VideoElement
+                                track={visibleTrack.track}
+                                muted={visibleTrack.isLocal}
+                                mirrored={shouldMirror}
                             />
-                            <Text className={`${compact ? "text-xs" : "text-base"} text-white font-semibold`}>
+                        ) : (
+                            <View className="items-center gap-3 px-3">
+                                <Avatar
+                                    size={compact ? 54 : 104}
+                                    src={participant.avatarUrl}
+                                    name={participant.displayName}
+                                />
+                                <Text
+                                    numberOfLines={1}
+                                    className={`${compact ? "text-xs" : "text-base"} text-white font-semibold text-center`}
+                                >
+                                    {participant.displayName}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <View className="absolute left-3 right-3 bottom-3 gap-2">
+                        <View className="self-start max-w-full rounded-full bg-black/65 px-3 py-1">
+                            <Text numberOfLines={1} className="text-white text-xs font-semibold">
                                 {participant.displayName}
                             </Text>
                         </View>
-                    )}
-                </View>
-
-                <View className="absolute left-3 right-3 bottom-3 gap-2">
-                    <View className="self-start rounded-full bg-black/65 px-3 py-1">
-                        <Text className="text-white text-xs font-semibold">
-                            {participant.displayName}
-                        </Text>
-                    </View>
-                    <View className="flex-row flex-wrap gap-1">
-                        {!participant.isConnected ? (
-                            <View className="rounded-full bg-white/10 px-2 py-1">
-                                <Text className="text-white/80 text-[11px]">Подключается</Text>
-                            </View>
-                        ) : null}
-                        {!participant.isMicrophoneEnabled ? (
-                            <View className="rounded-full bg-white/10 px-2 py-1">
-                                <Text className="text-white/80 text-[11px]">
-                                    Микрофон выключен
-                                </Text>
-                            </View>
-                        ) : null}
-                        {isVideoCall && !participant.isCameraEnabled ? (
-                            <View className="rounded-full bg-white/10 px-2 py-1">
-                                <Text className="text-white/80 text-[11px]">
-                                    Камера выключена
-                                </Text>
-                            </View>
-                        ) : null}
-                        {participant.isScreenShareEnabled ? (
-                            <View className="rounded-full bg-brand-600/90 px-2 py-1">
-                                <Text className="text-white text-[11px]">
-                                    Демонстрация экрана
-                                </Text>
-                            </View>
-                        ) : null}
+                        <ParticipantStatusIcons
+                            isConnected={participant.isConnected}
+                            isMicrophoneEnabled={participant.isMicrophoneEnabled}
+                            isCameraEnabled={participant.isCameraEnabled}
+                            isScreenShareEnabled={participant.isScreenShareEnabled}
+                            showCamera={isVideoCall}
+                        />
                     </View>
                 </View>
-            </View>
-        </SpeakingFrame>
+            </SpeakingFrame>
+        </Pressable>
     );
 };
 
-const CallStage = ({
-    participants,
-    isVideoCall,
-    isMobile,
-    localFacingMode,
-    activeScreenShare,
+const ScreenShareTile = ({
+    item,
+    owner,
+    isMain,
+    onPress,
     onOpenScreenShareFullscreen,
+    screenShareAudioAvailable,
+    screenShareVolume,
+    onScreenShareVolumeChange,
 }: {
-    participants: ParticipantMediaInfo[];
-    isVideoCall: boolean;
-    isMobile: boolean;
-    localFacingMode: CameraFacingMode;
-    activeScreenShare: WebVideoTrackRef | null;
+    item: RenderedStageItem;
+    owner: ParticipantMediaInfo | undefined;
+    isMain: boolean;
+    onPress: () => void;
     onOpenScreenShareFullscreen: () => void;
+    screenShareAudioAvailable: boolean;
+    screenShareVolume: number;
+    onScreenShareVolumeChange: (volume: number) => void;
 }) => {
-    const screenOwner = activeScreenShare
-        ? participants.find((participant) => participant.userId === activeScreenShare.ownerId) ?? null
-        : null;
-
-    if (activeScreenShare && screenOwner) {
-        return (
-            <View className={`flex-1 gap-3 p-3 ${isMobile ? "" : "flex-row"}`}>
-                <View className="flex-1 rounded-[28px] overflow-hidden border border-white/10 bg-black">
-                    <View className="flex-1">
-                        <VideoElement
-                            track={activeScreenShare.track}
-                            muted={activeScreenShare.isLocal}
-                            objectFit="contain"
-                        />
-                        <View className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1.5">
-                            <Text className="text-white text-xs font-semibold">
-                                {screenOwner.displayName} показывает экран
-                            </Text>
-                        </View>
-                        <Pressable
-                            testID="call-screen-fullscreen"
-                            accessibilityLabel="Открыть демонстрацию на весь экран"
-                            onPress={onOpenScreenShareFullscreen}
-                            className="absolute right-4 top-4 rounded-full bg-white/12 px-3 py-2"
-                        >
-                            <Text className="text-white text-xs font-semibold">Во весь экран</Text>
-                        </Pressable>
-                    </View>
-                </View>
-                <ParticipantRail
-                    participants={participants}
-                    isVideoCall={isVideoCall}
-                    isMobile={isMobile}
-                    localFacingMode={localFacingMode}
-                />
-            </View>
-        );
-    }
-
-    if (!isMobile && participants.length > 2) {
-        const primary =
-            participants.find((participant) => participant.isSpeaking) ??
-            participants.find((participant) => participant.cameraTrack) ??
-            participants[0];
-        const railParticipants = participants.filter(
-            (participant) => participant.userId !== primary.userId,
-        );
-
-        return (
-            <View className="flex-1 flex-row gap-3 p-3">
-                <ParticipantTile
-                    participant={primary}
-                    isVideoCall={isVideoCall}
-                    localFacingMode={localFacingMode}
-                />
-                <ParticipantRail
-                    participants={railParticipants}
-                    isVideoCall={isVideoCall}
-                    isMobile={isMobile}
-                    localFacingMode={localFacingMode}
-                />
-            </View>
-        );
-    }
+    const track = item.screenTrack;
+    const ownerName = owner?.displayName ?? "Пользователь";
 
     return (
-        <View className={`flex-1 p-3 gap-3 ${isMobile ? "" : "flex-row"}`}>
-            {participants.map((participant) => (
-                <ParticipantTile
-                    key={participant.userId}
-                    participant={participant}
-                    isVideoCall={isVideoCall}
-                    localFacingMode={localFacingMode}
+        <Pressable
+            testID="call-screen-share-tile"
+            accessibilityLabel={`Сделать главной демонстрацию: ${ownerName}`}
+            onPress={onPress}
+            className="flex-1 min-h-0 rounded-[28px] overflow-hidden border border-white/10 bg-black active:scale-[0.99]"
+        >
+            {track ? (
+                <VideoElement
+                    track={track.track}
+                    muted={track.isLocal}
+                    objectFit="contain"
                 />
-            ))}
-        </View>
+            ) : null}
+            <View className="absolute left-4 top-4 max-w-[55%] rounded-full bg-black/70 px-3 py-1.5">
+                <Text numberOfLines={1} className="text-white text-xs font-semibold">
+                    {ownerName} показывает экран
+                </Text>
+            </View>
+            {isMain ? (
+                <View className="absolute right-4 top-4 flex-row gap-2">
+                    <ScreenShareVolumeControl
+                        available={screenShareAudioAvailable}
+                        volume={screenShareVolume}
+                        onVolumeChange={onScreenShareVolumeChange}
+                    />
+                    <Pressable
+                        testID="call-screen-fullscreen"
+                        accessibilityLabel="Открыть демонстрацию на весь экран"
+                        onPress={onOpenScreenShareFullscreen}
+                        className="rounded-full bg-white/12 px-3 py-2 active:scale-95"
+                    >
+                        <Text className="text-white text-xs font-semibold">Во весь экран</Text>
+                    </Pressable>
+                </View>
+            ) : null}
+        </Pressable>
+    );
+};
+
+const StageItemTile = ({
+    item,
+    participants,
+    isMain,
+    isVideoCall,
+    localFacingMode,
+    onSelect,
+    onOpenScreenShareFullscreen,
+    screenShareAudioAvailable,
+    screenShareVolume,
+    onScreenShareVolumeChange,
+}: {
+    item: RenderedStageItem;
+    participants: ParticipantMediaInfo[];
+    isMain: boolean;
+    isVideoCall: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelect: (itemId: string) => void;
+    onOpenScreenShareFullscreen: () => void;
+    screenShareAudioAvailable: boolean;
+    screenShareVolume: number;
+    onScreenShareVolumeChange: (volume: number) => void;
+}) => {
+    if (item.kind === "screen") {
+        return (
+            <ScreenShareTile
+                item={item}
+                owner={participants.find((participant) => participant.userId === item.ownerId)}
+                isMain={isMain}
+                onPress={() => onSelect(item.id)}
+                onOpenScreenShareFullscreen={onOpenScreenShareFullscreen}
+                screenShareAudioAvailable={screenShareAudioAvailable}
+                screenShareVolume={screenShareVolume}
+                onScreenShareVolumeChange={onScreenShareVolumeChange}
+            />
+        );
+    }
+
+    if (!item.participant) return null;
+
+    return (
+        <ParticipantTile
+            participant={item.participant}
+            isVideoCall={isVideoCall}
+            localFacingMode={localFacingMode}
+            compact={!isMain}
+            onPress={() => onSelect(item.id)}
+        />
     );
 };
 
 const ParticipantRail = ({
+    items,
     participants,
     isVideoCall,
     isMobile,
     localFacingMode,
+    onSelectItem,
 }: {
+    items: RenderedStageItem[];
     participants: ParticipantMediaInfo[];
     isVideoCall: boolean;
     isMobile: boolean;
     localFacingMode: CameraFacingMode;
+    onSelectItem: (itemId: string) => void;
 }) => {
-    const visibleParticipants = participants.slice(0, isMobile ? 4 : 6);
-    const overflow = Math.max(0, participants.length - visibleParticipants.length);
+    if (items.length === 0) return null;
 
     return (
-        <View
-            className={`gap-2 ${isMobile ? "flex-row h-28" : "w-24"}`}
+        <ScrollView
             testID="call-participant-rail"
+            horizontal={isMobile}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            className={isMobile ? "max-h-28" : "w-40"}
+            contentContainerStyle={isMobile ? { gap: 8 } : { gap: 8 }}
         >
-            {visibleParticipants.map((participant) => (
-                <View
-                    key={participant.userId}
-                    className={`${isMobile ? "w-24" : "h-20"} rounded-2xl overflow-hidden`}
-                >
-                    <ParticipantTile
-                        participant={participant}
-                        isVideoCall={isVideoCall}
-                        localFacingMode={localFacingMode}
-                        compact
-                    />
-                </View>
-            ))}
-            {overflow > 0 ? (
-                <View className={`${isMobile ? "w-20" : "h-14"} rounded-2xl bg-white/10 items-center justify-center`}>
-                    <Text className="text-white text-sm font-semibold">+{overflow}</Text>
-                </View>
-            ) : null}
+            <View className={`gap-2 ${isMobile ? "flex-row" : ""}`}>
+                {items.map((item) => (
+                    <View
+                        key={item.id}
+                        testID={item.kind === "screen" ? "call-screen-share-rail-card" : undefined}
+                        className={`${isMobile ? "w-28 h-24" : "w-40 h-28"} rounded-2xl overflow-hidden`}
+                    >
+                        <StageItemTile
+                            item={item}
+                            participants={participants}
+                            isMain={false}
+                            isVideoCall={isVideoCall}
+                            localFacingMode={localFacingMode}
+                            onSelect={onSelectItem}
+                            onOpenScreenShareFullscreen={() => undefined}
+                            screenShareAudioAvailable={false}
+                            screenShareVolume={1}
+                            onScreenShareVolumeChange={() => undefined}
+                        />
+                    </View>
+                ))}
+            </View>
+        </ScrollView>
+    );
+};
+
+const CallStage = ({
+    items,
+    participants,
+    selectedItem,
+    isVideoCall,
+    isMobile,
+    localFacingMode,
+    onSelectStageItem,
+    onOpenScreenShareFullscreen,
+    screenShareAudioAvailable,
+    screenShareVolume,
+    onScreenShareVolumeChange,
+}: {
+    items: RenderedStageItem[];
+    participants: ParticipantMediaInfo[];
+    selectedItem: RenderedStageItem | null;
+    isVideoCall: boolean;
+    isMobile: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelectStageItem: (itemId: string) => void;
+    onOpenScreenShareFullscreen: () => void;
+    screenShareAudioAvailable: boolean;
+    screenShareVolume: number;
+    onScreenShareVolumeChange: (volume: number) => void;
+}) => {
+    const mainItem = selectedItem ?? items[0] ?? null;
+    if (!mainItem) return <View className="flex-1" />;
+
+    const railItems = items.filter((item) => item.id !== mainItem.id);
+
+    return (
+        <View className={`flex-1 gap-3 p-3 ${isMobile ? "" : "flex-row"}`}>
+            <View className="flex-1 min-h-0">
+                <StageItemTile
+                    item={mainItem}
+                    participants={participants}
+                    isMain
+                    isVideoCall={isVideoCall}
+                    localFacingMode={localFacingMode}
+                    onSelect={onSelectStageItem}
+                    onOpenScreenShareFullscreen={onOpenScreenShareFullscreen}
+                    screenShareAudioAvailable={mainItem.kind === "screen" && screenShareAudioAvailable}
+                    screenShareVolume={screenShareVolume}
+                    onScreenShareVolumeChange={onScreenShareVolumeChange}
+                />
+            </View>
+            <ParticipantRail
+                items={railItems}
+                participants={participants}
+                isVideoCall={isVideoCall}
+                isMobile={isMobile}
+                localFacingMode={localFacingMode}
+                onSelectItem={onSelectStageItem}
+            />
         </View>
     );
 };
@@ -418,7 +603,8 @@ export const CallRoom = ({
     onCloseError,
 }: CallRoomProps) => {
     const roomRef = useRef<Room | null>(null);
-    const remoteAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
+    const remoteMicrophoneAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
+    const screenShareAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
     const [panel, setPanel] = useState<CallPanel>("none");
     const [connectionState, setConnectionState] = useState<ConnectionState>(
         ConnectionState.Disconnected,
@@ -428,8 +614,11 @@ export const CallRoom = ({
     const [isCameraEnabled, setIsCameraEnabled] = useState(false);
     const [isScreenShareEnabled, setIsScreenShareEnabled] = useState(false);
     const [videoTracks, setVideoTracks] = useState<WebVideoTrackRef[]>([]);
+    const [audioTracks, setAudioTracks] = useState<WebAudioTrackRef[]>([]);
     const [activeSpeakerIds, setActiveSpeakerIds] = useState<Set<string>>(() => new Set());
     const [activeScreenShareOwnerId, setActiveScreenShareOwnerId] = useState<string | null>(null);
+    const [selectedStageItemId, setSelectedStageItemId] = useState<string | null>(null);
+    const [screenShareVolume, setScreenShareVolume] = useState(1);
     const [isScreenShareFullscreen, setIsScreenShareFullscreen] = useState(false);
     const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
     const [videoInputCount, setVideoInputCount] = useState(0);
@@ -490,6 +679,7 @@ export const CallRoom = ({
             setIsCameraEnabled(false);
             setIsScreenShareEnabled(false);
             setVideoTracks([]);
+            setAudioTracks([]);
             setActiveSpeakerIds(new Set());
             return;
         }
@@ -499,12 +689,17 @@ export const CallRoom = ({
         setIsCameraEnabled(room.localParticipant.isCameraEnabled);
         setIsScreenShareEnabled(room.localParticipant.isScreenShareEnabled);
         setVideoTracks(collectVideoTracks(room, participantInfos));
+        const nextAudioTracks = collectRemoteAudioTracks(room);
+        setAudioTracks(nextAudioTracks);
         if (syncActiveSpeakers) {
             setActiveSpeakerIds(
                 new Set(room.activeSpeakers.map((speaker) => speaker.identity)),
             );
         }
-        syncRemoteAudioTracks(room, remoteAudioElementsRef);
+        syncRemoteAudioTracks(
+            nextAudioTracks.filter((track) => track.source === Track.Source.Microphone),
+            remoteMicrophoneAudioElementsRef,
+        );
     }, [participantInfos]);
 
     useEffect(() => {
@@ -602,7 +797,8 @@ export const CallRoom = ({
             room.off(RoomEvent.LocalTrackUnpublished, onRoomChanged);
             room.off(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged);
             room.off(RoomEvent.Disconnected, onRoomChanged);
-            detachRemoteAudioTracks(remoteAudioElementsRef);
+            detachRemoteAudioTracks(remoteMicrophoneAudioElementsRef);
+            detachRemoteAudioTracks(screenShareAudioElementsRef);
             void room.disconnect();
             if (roomRef.current === room) {
                 roomRef.current = null;
@@ -695,6 +891,79 @@ export const CallRoom = ({
         [activeScreenShareCandidate, videoTracks],
     );
 
+    const activeScreenShareAudioTracks = useMemo(
+        () =>
+            audioTracks.filter(
+                (track) =>
+                    track.source === Track.Source.ScreenShareAudio &&
+                    isActiveScreenShareAudio(
+                        track.ownerId,
+                        activeScreenShareTrack?.ownerId ?? null,
+                        track.isLocal,
+                    ),
+            ),
+        [activeScreenShareTrack?.ownerId, audioTracks],
+    );
+
+    const hasActiveScreenShareAudio = activeScreenShareAudioTracks.length > 0;
+
+    useEffect(() => {
+        syncRemoteAudioTracks(
+            activeScreenShareAudioTracks,
+            screenShareAudioElementsRef,
+            screenShareVolume,
+        );
+    }, [activeScreenShareAudioTracks, screenShareVolume]);
+
+    const stageItems = useMemo<RenderedStageItem[]>(() => {
+        const participantItems = participantMediaInfos.map((participant) => ({
+            id: `participant:${participant.userId}`,
+            kind: "participant" as const,
+            ownerId: participant.userId,
+            hasCamera: Boolean(participant.cameraTrack),
+            isSpeaking: participant.isSpeaking,
+            isConnected: participant.isConnected,
+            participant,
+        }));
+
+        if (!activeScreenShareTrack) {
+            return participantItems;
+        }
+
+        return [
+            {
+                id: `screen:${activeScreenShareTrack.ownerId}:${activeScreenShareTrack.key}`,
+                kind: "screen" as const,
+                ownerId: activeScreenShareTrack.ownerId,
+                trackKey: activeScreenShareTrack.key,
+                hasCamera: false,
+                isSpeaking: false,
+                isConnected: true,
+                screenTrack: activeScreenShareTrack,
+            },
+            ...participantItems,
+        ];
+    }, [activeScreenShareTrack, participantMediaInfos]);
+
+    const selectedStageItem = useMemo(
+        () =>
+            normalizeSelectedStageItem(
+                selectedStageItemId,
+                stageItems,
+                activeSpeakerIds,
+            ) as RenderedStageItem | null,
+        [activeSpeakerIds, selectedStageItemId, stageItems],
+    );
+
+    useEffect(() => {
+        if (
+            selectedStageItemId &&
+            !stageItems.some((item) => item.id === selectedStageItemId)
+        ) {
+            setSelectedStageItemId(null);
+        }
+    }, [selectedStageItemId, stageItems]);
+
     useEffect(() => {
         const nextOwnerId = activeScreenShareCandidate?.ownerId ?? null;
         if (nextOwnerId !== activeScreenShareOwnerId) {
@@ -754,7 +1023,6 @@ export const CallRoom = ({
         const next = !room.localParticipant.isCameraEnabled;
         try {
             await room.localParticipant.setCameraEnabled(next, { facingMode });
-            await playCallSound(next ? "cameraOn" : "cameraOff");
             if (next) {
                 void refreshVideoInputs();
             }
@@ -790,7 +1058,6 @@ export const CallRoom = ({
             }
 
             setFacingMode(nextFacingMode);
-            await playCallSound("cameraOn");
             syncRoomState();
         } catch (error) {
             console.error("Failed to switch camera", error);
@@ -805,6 +1072,7 @@ export const CallRoom = ({
             const next = !room.localParticipant.isScreenShareEnabled;
             await room.localParticipant.setScreenShareEnabled(
                 next,
+                next ? SCREEN_SHARE_CAPTURE_OPTIONS : undefined,
             );
             if (next) {
                 setActiveScreenShareOwnerId(localUserId);
@@ -892,12 +1160,17 @@ export const CallRoom = ({
                 />
 
                 <CallStage
+                    items={stageItems}
                     participants={participantMediaInfos}
+                    selectedItem={selectedStageItem}
                     isVideoCall={isConnectedToCall}
                     isMobile={isMobile}
                     localFacingMode={facingMode}
-                    activeScreenShare={activeScreenShareTrack}
+                    onSelectStageItem={setSelectedStageItemId}
                     onOpenScreenShareFullscreen={openScreenShareFullscreen}
+                    screenShareAudioAvailable={hasActiveScreenShareAudio}
+                    screenShareVolume={screenShareVolume}
+                    onScreenShareVolumeChange={setScreenShareVolume}
                 />
 
                 {isConnecting ? <CallLoadingOverlay /> : null}
@@ -950,6 +1223,13 @@ export const CallRoom = ({
                     >
                         <Text className="text-white text-sm font-semibold">Закрыть</Text>
                     </Pressable>
+                    <View className="absolute right-4 top-16">
+                        <ScreenShareVolumeControl
+                            available={hasActiveScreenShareAudio}
+                            volume={screenShareVolume}
+                            onVolumeChange={setScreenShareVolume}
+                        />
+                    </View>
                 </View>
             ) : null}
         </View>
