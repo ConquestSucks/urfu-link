@@ -6,6 +6,8 @@ export {
   useDeleteAvatar,
   useUpdatePrivacy,
   useUpdateNotifications,
+  useMuteConversationNotifications,
+  useUnmuteConversationNotifications,
   useUpdateSoundVideo,
   useTerminateDevice,
   useTerminateAllDevices,

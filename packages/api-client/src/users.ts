@@ -19,6 +19,7 @@ export type UserNotifications = {
   notificationSound: boolean;
   disciplineChatMessages: boolean;
   mentions: boolean;
+  mutedConversationIds: string[];
 };
 
 export type UserSoundVideo = {
@@ -126,6 +127,20 @@ export function createUsersApi(
         method: "PUT",
         body: JSON.stringify(dto),
       });
+    },
+
+    muteConversationNotifications(conversationId: string): Promise<void> {
+      return request<void>(
+        `/api/users/me/notifications/muted-conversations/${encodeURIComponent(conversationId)}`,
+        { method: "POST" }
+      );
+    },
+
+    unmuteConversationNotifications(conversationId: string): Promise<void> {
+      return request<void>(
+        `/api/users/me/notifications/muted-conversations/${encodeURIComponent(conversationId)}`,
+        { method: "DELETE" }
+      );
     },
 
     updateSoundVideo(dto: UpdateSoundVideoDto): Promise<void> {

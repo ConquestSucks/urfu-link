@@ -14,6 +14,7 @@ import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
 import { useCallHub } from "@/shared/lib/useCallHub";
 import { IncomingCallModal } from "@/features/call";
+import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -38,6 +39,7 @@ export default function AuthLayout() {
 
     useEffect(() => {
         configureMessageSounds(profile?.notifications);
+        configureBrowserNotifications(profile?.notifications);
     }, [profile?.notifications]);
 
     useEffect(() => {

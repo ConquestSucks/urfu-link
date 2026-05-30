@@ -15,6 +15,9 @@ interface ChatHeaderActionsProps {
     onSearchPress: () => void;
     onStartAudioCall?: () => void;
     onStartVideoCall?: () => void;
+    notificationsMuted: boolean;
+    notificationsPending?: boolean;
+    onToggleNotifications: () => void;
 }
 
 export const ChatHeaderActions = ({
@@ -23,6 +26,9 @@ export const ChatHeaderActions = ({
     onSearchPress,
     onStartAudioCall,
     onStartVideoCall,
+    notificationsMuted,
+    notificationsPending,
+    onToggleNotifications,
 }: ChatHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getChatHeaderActions({
@@ -34,6 +40,12 @@ export const ChatHeaderActions = ({
             menuRef.current?.close();
             onOpenPinned();
         },
+        onToggleNotifications: () => {
+            menuRef.current?.close();
+            onToggleNotifications();
+        },
+        notificationsMuted,
+        notificationsPending,
     });
     return (
         <View className="flex-row gap-1 items-center">

@@ -432,12 +432,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 </Text>
             ) : null}
 
-            {isSubmitting ? (
-                <Text className="text-brand-400 text-xs font-medium mb-2 pl-1">
-                    Загрузка файлов и отправка сообщения...
-                </Text>
-            ) : null}
-
             <View className="flex-row items-end gap-3">
                 <Pressable
                     onPress={() => {

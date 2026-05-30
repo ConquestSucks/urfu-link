@@ -75,6 +75,21 @@ public sealed class NotificationRouter(
             var intent = await ResolveActorAsync(preparedIntent, cancellationToken).ConfigureAwait(false);
 
             var preferences = await preferencesClient.GetAsync(intent.RecipientUserId, cancellationToken).ConfigureAwait(false);
+            var conversationId = TryGetConversationId(intent);
+            if (preferences.IsConversationMuted(conversationId))
+            {
+                skipped++;
+                if (logger.IsEnabled(LogLevel.Debug))
+                {
+                    logger.LogDebug(
+                        "Skipping notification {SourceActionId} for recipient {RecipientId}; conversation {ConversationId} is muted",
+                        intent.SourceActionId,
+                        intent.RecipientUserId,
+                        conversationId);
+                }
+
+                continue;
+            }
 
             var candidates = SeverityRouter.Select(intent.Severity);
             var channels = PreferenceFilter.Filter(candidates, intent.Category, intent.Severity, preferences, timeProvider.GetUtcNow());
@@ -205,6 +220,11 @@ public sealed class NotificationRouter(
             Actor = actor with { DisplayName = displayName },
         };
     }
+
+    private static string? TryGetConversationId(NotificationIntent intent)
+        => intent.Data.Values.TryGetValue("conversationId", out var conversationId)
+            ? conversationId
+            : null;
 }
 
 public sealed record RoutingOutcome(int Created, int Updated, int Skipped)

@@ -60,6 +60,16 @@ public sealed class UpdateNotificationPreferencesEndpoint(IUserRepository userRe
             quietHours,
             request.DndEnabled,
             string.IsNullOrWhiteSpace(request.Locale) ? NotificationSettings.DefaultLocale : request.Locale,
-            request.Sound);
+            request.Sound,
+            NormalizeMutedConversationIds(request.MutedConversationIds));
     }
+
+    private static string[] NormalizeMutedConversationIds(IReadOnlyList<string>? ids)
+        => ids is null
+            ? Array.Empty<string>()
+            : ids
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
 }

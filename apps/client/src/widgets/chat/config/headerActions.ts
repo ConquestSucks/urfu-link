@@ -1,8 +1,11 @@
-import { BellSlashIcon, PushPinIcon, UserCircleIcon } from "@/shared/ui/phosphor";
+import { BellIcon, BellSlashIcon, PushPinIcon, UserCircleIcon } from "@/shared/ui/phosphor";
 
 export const getChatHeaderActions = (callbacks: {
     onOpenProfile: () => void;
     onOpenPinned?: () => void;
+    onToggleNotifications: () => void;
+    notificationsMuted: boolean;
+    notificationsPending?: boolean;
 }) => [
     {
         icon: UserCircleIcon,
@@ -18,16 +21,20 @@ export const getChatHeaderActions = (callbacks: {
     },
     { separator: true },
     {
-        icon: BellSlashIcon,
+        icon: callbacks.notificationsMuted ? BellIcon : BellSlashIcon,
         iconClassName: "text-text-muted",
-        label: "Отключить уведомления",
-        command: () => console.log("Уведомления..."),
+        label: callbacks.notificationsMuted ? "Включить уведомления" : "Отключить уведомления",
+        command: callbacks.onToggleNotifications,
+        disabled: callbacks.notificationsPending,
     },
 ];
 
 export const getSubjectHeaderActions = (callbacks: {
     onOpenMembers: () => void;
     onOpenPinned?: () => void;
+    onToggleNotifications: () => void;
+    notificationsMuted: boolean;
+    notificationsPending?: boolean;
 }) => [
     {
         icon: UserCircleIcon,
@@ -43,9 +50,10 @@ export const getSubjectHeaderActions = (callbacks: {
     },
     { separator: true },
     {
-        icon: BellSlashIcon,
+        icon: callbacks.notificationsMuted ? BellIcon : BellSlashIcon,
         iconClassName: "text-text-muted",
-        label: "Отключить уведомления",
-        command: () => console.log("Уведомления..."),
+        label: callbacks.notificationsMuted ? "Включить уведомления" : "Отключить уведомления",
+        command: callbacks.onToggleNotifications,
+        disabled: callbacks.notificationsPending,
     },
 ];

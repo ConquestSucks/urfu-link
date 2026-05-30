@@ -71,7 +71,25 @@ public sealed class UserProfile
         bool disciplineChatMessages,
         bool mentions)
     {
-        Notifications = NotificationSettings.FromLegacy(newMessages, notificationSound, disciplineChatMessages, mentions);
+        Notifications = Notifications.WithLegacyToggles(
+            newMessages,
+            notificationSound,
+            disciplineChatMessages,
+            mentions);
+        Touch();
+        _domainEvents.Add(BuildSettingsChangedEvent());
+    }
+
+    public void MuteConversationNotifications(string conversationId)
+    {
+        Notifications = Notifications.WithMutedConversation(conversationId);
+        Touch();
+        _domainEvents.Add(BuildSettingsChangedEvent());
+    }
+
+    public void UnmuteConversationNotifications(string conversationId)
+    {
+        Notifications = Notifications.WithoutMutedConversation(conversationId);
         Touch();
         _domainEvents.Add(BuildSettingsChangedEvent());
     }
@@ -111,7 +129,8 @@ public sealed class UserProfile
             categories,
             quietHours,
             Notifications.DndEnabled,
-            Notifications.Locale);
+            Notifications.Locale,
+            Notifications.MutedConversationIds);
 
         return new UserNotificationSettingsChangedEvent(Id, preferences);
     }
