@@ -94,6 +94,12 @@ public interface IConversationRepository
         ParticipantRole role,
         CancellationToken cancellationToken);
 
+    Task<bool> EnsureParticipantAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken);
+
     Task<bool> RemoveParticipantAsync(
         string conversationId,
         Guid userId,
@@ -112,6 +118,10 @@ public interface IConversationRepository
     Task<bool> ArchiveAsync(
         string conversationId,
         DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken);
+
+    Task<bool> UnarchiveAsync(
+        string conversationId,
         CancellationToken cancellationToken);
 
     /// <summary>

@@ -163,6 +163,59 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ListDisciplineSnapshots_ReturnsSubgroupsAndEnrollmentSubgroupIds()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var disc = await CreateDisciplineAsync(teacherId);
+        await EnrollAsync(disc.Id, teacherId, [(studentId, DisciplineRole.Student)]);
+
+        var reply = await CreateClient().ListDisciplineSnapshotsAsync(new ListDisciplineSnapshotsRequest
+        {
+            IncludeArchived = true,
+            PageSize = 10,
+        });
+
+        var snapshot = reply.Disciplines.Should().ContainSingle(d => d.DisciplineId == disc.Id.ToString("D")).Subject;
+        snapshot.Subgroups.Should().ContainSingle(s => s.SubgroupId == disc.Subgroups[0].Id.ToString("D"));
+        snapshot.Members.Should().Contain(m =>
+            m.UserId == teacherId.ToString("D")
+            && m.Role == MembershipRole.Teacher
+            && string.IsNullOrEmpty(m.SubgroupId));
+        snapshot.Members.Should().Contain(m =>
+            m.UserId == studentId.ToString("D")
+            && m.Role == MembershipRole.Student
+            && m.SubgroupId == disc.Subgroups[0].Id.ToString("D"));
+    }
+
+    [Fact]
+    public async Task ListDisciplineSnapshots_PaginatesWithKeysetToken()
+    {
+        var first = await CreateDisciplineAsync(Guid.NewGuid());
+        var second = await CreateDisciplineAsync(Guid.NewGuid());
+
+        var page1 = await CreateClient().ListDisciplineSnapshotsAsync(new ListDisciplineSnapshotsRequest
+        {
+            IncludeArchived = true,
+            PageSize = 1,
+        });
+        page1.Disciplines.Should().ContainSingle();
+        page1.NextPageToken.Should().NotBeNullOrWhiteSpace();
+
+        var page2 = await CreateClient().ListDisciplineSnapshotsAsync(new ListDisciplineSnapshotsRequest
+        {
+            IncludeArchived = true,
+            PageSize = 1,
+            PageToken = page1.NextPageToken,
+        });
+
+        page2.Disciplines.Should().ContainSingle();
+        page2.Disciplines[0].DisciplineId.Should().NotBe(page1.Disciplines[0].DisciplineId);
+        var returnedIds = new[] { page1.Disciplines[0].DisciplineId, page2.Disciplines[0].DisciplineId };
+        returnedIds.Should().BeEquivalentTo(new[] { first.Id.ToString("D"), second.Id.ToString("D") });
+    }
+
+    [Fact]
     public async Task GetDiscipline_ReturnsExistingMetadata()
     {
         var teacherId = Guid.NewGuid();

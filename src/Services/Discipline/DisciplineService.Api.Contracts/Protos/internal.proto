@@ -8,6 +8,7 @@ service InternalApi {
   rpc CheckMembership (CheckMembershipRequest) returns (CheckMembershipReply);
   rpc ListMembers (ListMembersRequest) returns (ListMembersReply);
   rpc ListUserDisciplines (ListUserDisciplinesRequest) returns (ListUserDisciplinesReply);
+  rpc ListDisciplineSnapshots (ListDisciplineSnapshotsRequest) returns (ListDisciplineSnapshotsReply);
   rpc GetDiscipline (GetDisciplineRequest) returns (GetDisciplineReply);
 }
 
@@ -68,6 +69,41 @@ message ListUserDisciplinesRequest {
 
 message ListUserDisciplinesReply {
   repeated UserDisciplineInfo disciplines = 1;
+}
+
+message DisciplineSubgroupSnapshotInfo {
+  string subgroup_id = 1;
+  string name = 2;
+  string created_at_utc = 3;
+  string updated_at_utc = 4;
+  string archived_at_utc = 5;
+  bool is_archived = 6;
+}
+
+message DisciplineSnapshotInfo {
+  string discipline_id = 1;
+  string code = 2;
+  string title = 3;
+  string semester = 4;
+  string owner_teacher_id = 5;
+  string cover_asset_id = 6;
+  string created_at_utc = 7;
+  string updated_at_utc = 8;
+  string archived_at_utc = 9;
+  bool is_archived = 10;
+  repeated DisciplineSubgroupSnapshotInfo subgroups = 11;
+  repeated MemberInfo members = 12;
+}
+
+message ListDisciplineSnapshotsRequest {
+  bool include_archived = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListDisciplineSnapshotsReply {
+  repeated DisciplineSnapshotInfo disciplines = 1;
+  string next_page_token = 2;
 }
 
 message GetDisciplineRequest {

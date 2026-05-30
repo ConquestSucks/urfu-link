@@ -276,6 +276,42 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         return addResult.ModifiedCount > 0;
     }
 
+    public async Task<bool> EnsureParticipantAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken)
+    {
+        var roleString = role.ToString();
+        var existingRoleFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Eq("participantRoles.userId", userId));
+        var repairExistingRole = Builders<ConversationDocument>.Update.Combine(
+            Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
+            Builders<ConversationDocument>.Update.Set("participantRoles.$.role", roleString));
+        var existingRoleResult = await context.Conversations
+            .UpdateOneAsync(existingRoleFilter, repairExistingRole, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existingRoleResult.MatchedCount > 0)
+        {
+            return existingRoleResult.ModifiedCount > 0;
+        }
+
+        var missingRoleFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Ne("participantRoles.userId", userId));
+        var repairMissingRole = Builders<ConversationDocument>.Update.Combine(
+            Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
+            Builders<ConversationDocument>.Update.Push(
+                "participantRoles",
+                new ParticipantRoleEntry(userId, role)));
+        var missingRoleResult = await context.Conversations
+            .UpdateOneAsync(missingRoleFilter, repairMissingRole, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return missingRoleResult.ModifiedCount > 0;
+    }
+
     public async Task<bool> RemoveParticipantAsync(
         string conversationId,
         Guid userId,
@@ -342,6 +378,20 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
             Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
             Builders<ConversationDocument>.Filter.Eq(c => c.ArchivedAtUtc, (DateTime?)null));
         var update = Builders<ConversationDocument>.Update.Set(c => c.ArchivedAtUtc, archivedAtUtc.UtcDateTime);
+        var result = await context.Conversations
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> UnarchiveAsync(
+        string conversationId,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Ne(c => c.ArchivedAtUtc, (DateTime?)null));
+        var update = Builders<ConversationDocument>.Update.Set(c => c.ArchivedAtUtc, null);
         var result = await context.Conversations
             .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
             .ConfigureAwait(false);

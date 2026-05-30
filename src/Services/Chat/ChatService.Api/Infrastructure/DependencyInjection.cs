@@ -237,6 +237,7 @@ public static class ModuleRegistration
         services.AddScoped<GetUserActiveThreadsQuery>();
         services.AddScoped<SearchMessagesQuery>();
         services.AddScoped<DisciplineConversationService>();
+        services.AddScoped<DisciplineConversationReconciliationService>();
         services.AddScoped<Urfu.Link.Services.Chat.Application.Mentions.MentionResolver>();
         services.AddHostedService<DisciplineEventConsumer>();
 

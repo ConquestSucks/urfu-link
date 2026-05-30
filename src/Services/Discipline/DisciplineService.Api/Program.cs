@@ -28,7 +28,11 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<DisciplineDbContext>(
 }
 
 builder.Services.AddGrpc();
-builder.Services.AddFastEndpoints();
+builder.Services.AddFastEndpoints(o =>
+{
+    o.Assemblies = [typeof(Program).Assembly];
+    o.DisableAutoDiscovery = true;
+});
 builder.Services.SwaggerDocument(o =>
 {
     o.DocumentSettings = s =>

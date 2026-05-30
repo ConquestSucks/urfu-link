@@ -62,6 +62,9 @@
     <Project Path="tests/integration/PresenceService.IntegrationTests/PresenceService.IntegrationTests.csproj" />
     <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
   </Folder>
+  <Folder Name="/tests/e2e/">
+    <Project Path="tests/e2e/DisciplineChatE2ETests/DisciplineChatE2ETests.csproj" />
+  </Folder>
   <Folder Name="/tests/smoke/">
     <Project Path="tests/smoke/SmokeTests/SmokeTests.csproj" />
   </Folder>

@@ -123,6 +123,15 @@ public sealed class DisciplineConversationService(
                     cancellationToken)
                 .ConfigureAwait(false);
         }
+
+        await dispatcher.PublishAsync(
+            new ChatDisciplineConversationCreatedEvent(
+                conversation.Id,
+                evt.DisciplineId,
+                evt.TeacherUserIds.Count > 0 ? evt.TeacherUserIds[0] : Guid.Empty,
+                evt.DisciplineTitle,
+                evt.DisciplineCoverAssetId),
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleSubgroupUpdatedAsync(
