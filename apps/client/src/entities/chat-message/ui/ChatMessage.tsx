@@ -10,6 +10,8 @@ import {
     ClockIcon,
     FileIcon,
     PencilSimpleIcon,
+    PhoneIcon,
+    VideoCameraIcon,
     TrashIcon,
     WarningCircleIcon,
 } from "@/shared/ui/phosphor";
@@ -57,9 +59,66 @@ const openAttachmentUrl = async (url: string, fileName: string) => {
     await Linking.openURL(url);
 };
 
+const parseDuration = (raw: string | null | undefined): number | null => {
+    if (!raw) return null;
+
+    const direct = /^\s*(\d+):(\d{2})(?::(\d{2}))?\s*$/;
+    const directMatch = direct.exec(raw);
+    if (directMatch) {
+        const hours = Number(directMatch[3] ? directMatch[1] : 0);
+        const minutes = Number(directMatch[3] ? directMatch[2] : directMatch[1]);
+        const seconds = Number(directMatch[3] ?? 0);
+        return hours * 3600 + minutes * 60 + seconds;
+    }
+
+    const iso = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?$/i.exec(raw);
+    if (!iso) return null;
+
+    const hours = Number(iso[1] ?? 0);
+    const minutes = Number(iso[2] ?? 0);
+    const seconds = Number(iso[3] ?? 0);
+    return hours * 3600 + minutes * 60 + Math.floor(seconds);
+};
+
+const formatDuration = (value: string | null | undefined): string | null => {
+    const total = parseDuration(value);
+    if (total == null) return null;
+
+    const minutes = Math.floor(total / 60);
+    const seconds = total % 60;
+    if (minutes >= 60) {
+        const hours = Math.floor(minutes / 60);
+        const rest = minutes % 60;
+        return `${hours.toString().padStart(2, "0")}:${rest.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    }
+
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+};
+
+const buildSystemCallLabel = (systemCall?: ChatMessageProps["systemCall"]) => {
+    const callLabel = systemCall?.callType === "Video" ? "Видеозвонок" : "Звонок";
+
+    switch (systemCall?.status) {
+        case "Missed":
+        case "Declined":
+        case "Cancelled":
+        case "Failed":
+            return "Пропущенный звонок";
+        case "Completed": {
+            const duration = formatDuration(systemCall.duration);
+            return duration ? `${callLabel} завершён • ${duration}` : `${callLabel} завершён`;
+        }
+        case "Started":
+        default:
+            return callLabel;
+    }
+};
+
 export const ChatMessage = ({
     id,
     text,
+    kind,
+    systemCall,
     isOwn,
     time,
     avatarUrl,
@@ -82,6 +141,27 @@ export const ChatMessage = ({
     const currentUserId = useCurrentUserId();
     const isOptimistic = localStatus === "sending";
     const isFailed = localStatus === "failed";
+
+    if (kind === "SystemCall") {
+        const systemText = buildSystemCallLabel(systemCall);
+        return (
+            <View className="px-2 items-center">
+                <View className="px-3 py-2 rounded-full bg-white/5 border border-white/10">
+                    <View className="flex-row items-center gap-2">
+                        {systemCall?.callType === "Video" ? (
+                            <VideoCameraIcon size={12} className="text-text-muted" />
+                        ) : (
+                            <PhoneIcon size={12} className="text-text-muted" />
+                        )}
+                        <Text className="text-[13px] text-text-subtle font-medium">
+                            {systemText}
+                        </Text>
+                    </View>
+                </View>
+            </View>
+        );
+    }
+
     const openAttachment = async (file: AttachmentFile) => {
         try {
             if (file.mediaAssetId) {
@@ -285,3 +365,4 @@ export const ChatMessage = ({
         </View>
     );
 };
+

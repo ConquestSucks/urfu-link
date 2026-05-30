@@ -69,6 +69,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                     enableBackgroundPlayback: false,
                 },
             ],
+            "@livekit/react-native-expo-plugin",
+            "@config-plugins/react-native-webrtc",
         ],
         extra: {
             appEnv,

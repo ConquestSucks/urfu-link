@@ -490,6 +490,10 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      GrpcClients__ChatService__Address: http://chat-service:8081
+      LiveKit__ServerUrl: ws://localhost:7880
+      LiveKit__ApiKey: devkey
+      LiveKit__ApiSecret: devsecret0123456789abcdef0123456789
     depends_on:
       redis:
         condition: service_healthy

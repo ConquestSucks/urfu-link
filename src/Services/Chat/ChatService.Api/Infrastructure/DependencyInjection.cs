@@ -12,6 +12,7 @@ using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.Services.Chat.Application;
 using Urfu.Link.Services.Chat.Application.Authorization;
+using Urfu.Link.Services.Chat.Application.Calls;
 using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Application.Messages;
@@ -236,9 +237,11 @@ public static class ModuleRegistration
         services.AddScoped<GetThreadMessagesQuery>();
         services.AddScoped<GetUserActiveThreadsQuery>();
         services.AddScoped<SearchMessagesQuery>();
+        services.AddScoped<CallSystemMessageService>();
         services.AddScoped<DisciplineConversationService>();
         services.AddScoped<Urfu.Link.Services.Chat.Application.Mentions.MentionResolver>();
         services.AddHostedService<DisciplineEventConsumer>();
+        services.AddHostedService<CallEventConsumer>();
 
         // Per-user fixed window for /chat/search (issue #213 — 30 req/min per user).
         // ChatSearchRateLimitFilter resolves this limiter via [FromKeyedServices(name)].
@@ -252,5 +255,4 @@ public static class ModuleRegistration
         return services;
     }
 }
-
 
