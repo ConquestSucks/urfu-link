@@ -139,7 +139,7 @@ const mapConversation = (
             disciplineRowName ??
             c.title ??
             peerName ??
-            (c.type === "Direct" ? "Личный чат" : "Чат предмета"),
+            (c.type === "Direct" ? "Личный чат" : "Чат дисциплины"),
         message: typingPreview ?? formatLastMessagePreview(latestMessage, preview),
         time: formatInboxTime(lastAt),
         unreadCount,

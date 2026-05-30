@@ -9,7 +9,7 @@ export const getInboxEmptyState = (tab: TabType, view: ViewType) => {
             title:
                 tab === "chats"
                     ? "Уведомлений по чатам нет"
-                    : "Уведомлений по предметам нет",
+                    : "Уведомлений по дисциплинам нет",
             description: "Здесь появятся новые упоминания и важные события",
         };
     }
@@ -22,7 +22,6 @@ export const getInboxEmptyState = (tab: TabType, view: ViewType) => {
           }
         : {
               icon: BookOpenIcon,
-              title: "Предметов пока нет",
-              description: "Курсы появятся, когда вас добавят в группы",
+              title: "Дисциплин нет",
           };
 };
