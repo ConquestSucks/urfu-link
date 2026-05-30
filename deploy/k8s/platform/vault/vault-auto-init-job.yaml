@@ -210,6 +210,9 @@ spec:
               path "kv/data/urfu-link/prod/chat-service" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/call-service" {
+                capabilities = ["create", "update", "read"]
+              }
               path "kv/metadata/urfu-link/prod/*" {
                 capabilities = ["read", "list"]
               }
