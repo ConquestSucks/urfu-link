@@ -117,6 +117,29 @@ const buildSystemCallLabel = (systemCall?: ChatMessageProps["systemCall"]) => {
     }
 };
 
+const buildSystemCallTimeLabel = (
+    status: NonNullable<ChatMessageProps["systemCall"]>["status"] | undefined,
+    time: string,
+) => {
+    if (!time) return null;
+
+    switch (status) {
+        case "Started":
+            return time;
+        case "Missed":
+            return `Пропущен: ${time}`;
+        case "Declined":
+            return `Отклонён: ${time}`;
+        case "Cancelled":
+            return `Отменён: ${time}`;
+        case "Failed":
+        case "Completed":
+            return `Завершён: ${time}`;
+        default:
+            return time;
+    }
+};
+
 export const ChatMessage = ({
     id,
     text,
@@ -147,6 +170,7 @@ export const ChatMessage = ({
 
     if (kind === "SystemCall") {
         const systemText = buildSystemCallLabel(systemCall);
+        const timeLabel = buildSystemCallTimeLabel(systemCall?.status, time);
         const duration = formatDuration(systemCall?.duration);
         return (
             <View className="px-2 items-center">
@@ -162,9 +186,9 @@ export const ChatMessage = ({
                         </Text>
                     </View>
                     <View className="mt-1 flex-row flex-wrap gap-2 justify-center">
-                        {time ? (
+                        {timeLabel ? (
                             <Text className="text-[11px] text-text-placeholder">
-                                Начало: {time}
+                                {timeLabel}
                             </Text>
                         ) : null}
                         {duration ? (
