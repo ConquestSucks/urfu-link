@@ -17,4 +17,6 @@ public interface ICallBroadcaster
     Task NotifyParticipantLeftAsync(IReadOnlyList<Guid> participantUserIds, Guid callId, Guid userId, CancellationToken cancellationToken);
 
     Task NotifyEndedAsync(IReadOnlyList<Guid> participantUserIds, CallSessionDto call, CancellationToken cancellationToken);
+
+    Task NotifyDeviceReplacedAsync(Guid userId, Guid callId, string clientInstanceId, CancellationToken cancellationToken);
 }

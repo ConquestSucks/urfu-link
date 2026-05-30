@@ -10,11 +10,18 @@ public class MediaLimitsTests
     [InlineData("image/jpeg", AssetKind.Image)]
     [InlineData("image/png", AssetKind.Image)]
     [InlineData("image/webp", AssetKind.Image)]
+    [InlineData("image/bmp", AssetKind.Image)]
     [InlineData("video/mp4", AssetKind.Video)]
+    [InlineData("video/x-matroska", AssetKind.Video)]
     [InlineData("audio/ogg", AssetKind.Voice)]
     [InlineData("audio/opus", AssetKind.Voice)]
     [InlineData("audio/mpeg", AssetKind.Audio)]
+    [InlineData("audio/wav", AssetKind.Audio)]
     [InlineData("application/pdf", AssetKind.Document)]
+    [InlineData("application/vnd.oasis.opendocument.text", AssetKind.Document)]
+    [InlineData("application/x-yaml", AssetKind.Document)]
+    [InlineData("application/typescript", AssetKind.Document)]
+    [InlineData("application/x-7z-compressed", AssetKind.Document)]
     [InlineData("text/plain", AssetKind.Document)]
     public void Whitelisted_MimeTypes_ResolveToExpectedKind(string mime, AssetKind expected)
     {

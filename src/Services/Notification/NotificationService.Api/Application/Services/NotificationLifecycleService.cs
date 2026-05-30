@@ -37,7 +37,8 @@ public sealed class NotificationLifecycleService(
                     snapshot.PerCategory.ToDictionary(kv => (int)kv.Key, kv => kv.Value),
                     counts.TotalUnseen,
                     counts.UrgentUnread,
-                    counts.PerType),
+                    counts.PerType,
+                    counts.Scopes),
                 cancellationToken).ConfigureAwait(false);
         }
 

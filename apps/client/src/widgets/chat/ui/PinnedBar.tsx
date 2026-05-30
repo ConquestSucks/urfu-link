@@ -7,9 +7,10 @@ import type { MessagesListHandle } from "./MessagesList";
 interface PinnedBarProps {
     conversationId: string;
     listRef: React.RefObject<MessagesListHandle | null>;
+    canManagePins?: boolean;
 }
 
-export const PinnedBar = ({ conversationId, listRef }: PinnedBarProps) => {
+export const PinnedBar = ({ conversationId, listRef, canManagePins = true }: PinnedBarProps) => {
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === conversationId),
     );
@@ -62,9 +63,11 @@ export const PinnedBar = ({ conversationId, listRef }: PinnedBarProps) => {
                     {lastPinned?.body ?? "Загрузка…"}
                 </Text>
             </View>
-            <Pressable onPress={handleUnpin} hitSlop={6} className="p-1">
-                <XIcon size={14} className="text-text-muted" />
-            </Pressable>
+            {canManagePins ? (
+                <Pressable onPress={handleUnpin} hitSlop={6} className="p-1">
+                    <XIcon size={14} className="text-text-muted" />
+                </Pressable>
+            ) : null}
         </Pressable>
     );
 };

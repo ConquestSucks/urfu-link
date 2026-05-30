@@ -165,7 +165,7 @@ const ControlButton = ({
                 : danger
                   ? "bg-red-600"
                   : isActive
-                    ? "bg-brand-600"
+                    ? "bg-brand-650"
                     : "bg-white/10"
         }`}
     >
@@ -200,7 +200,7 @@ const StatusIconBadge = ({
         layout={LinearTransition.duration(160)}
         className={`h-7 w-7 rounded-full items-center justify-center border ${
             active
-                ? "border-brand-300/60 bg-brand-600/90"
+                ? "border-brand-300/60 bg-brand-650/90"
                 : "border-white/10 bg-black/65"
         }`}
     >

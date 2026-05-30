@@ -63,25 +63,25 @@ export const ChatView = () => {
     const chatId = params.id as string;
     const handleSend = useConversationSend(chatId);
 
-    const handleStartAudioCall = useCallback(async () => {
-        if (!conversation || conversation.type !== "Direct" || isStartingCall) return;
+    const handleStartConversationCall = useCallback(async (callType: "Audio" | "Video") => {
+        if (!conversation || isStartingCall) return;
         try {
             setIsStartingCall(true);
-            await startCall(conversation.id, "Audio");
+            await startCall(conversation.id, callType);
         } finally {
             setIsStartingCall(false);
         }
     }, [conversation, isStartingCall, startCall]);
 
-    const handleStartVideoCall = useCallback(async () => {
-        if (!conversation || conversation.type !== "Direct" || isStartingCall) return;
-        try {
-            setIsStartingCall(true);
-            await startCall(conversation.id, "Video");
-        } finally {
-            setIsStartingCall(false);
-        }
-    }, [conversation, isStartingCall, startCall]);
+    const handleStartAudioCall = useCallback(
+        () => void handleStartConversationCall("Audio"),
+        [handleStartConversationCall],
+    );
+
+    const handleStartVideoCall = useCallback(
+        () => void handleStartConversationCall("Video"),
+        [handleStartConversationCall],
+    );
 
     const routeMessageId = typeof params.message === "string" ? params.message : null;
     const routeThreadRootId = typeof params.thread === "string" ? params.thread : null;
@@ -193,6 +193,11 @@ export const ChatView = () => {
     ]);
 
     const pinnedIds = conversation?.pinnedMessageIds ?? [];
+    const currentRole = currentUserId && conversation ? conversation.participantRoles?.[currentUserId] : undefined;
+    const canManagePins =
+        conversation?.capabilities?.canManagePins ??
+        (conversation?.type === "Direct" ||
+            (conversation?.groupSubtype === "Discipline" && currentRole === "Teacher"));
     const isActionsTargetPinned = !!(
         actionsTarget && pinnedIds.includes(actionsTarget.id)
     );
@@ -283,14 +288,13 @@ export const ChatView = () => {
 
     const mainColumn = (
         <View className="bg-app-card flex-1">
-            {type === "chat" ? (
-                isSearching ? (
-                    <LocalSearchPanel
-                        conversationId={chatId}
-                        onResultPress={handleSearchResultPress}
-                        onClose={() => setIsSearching(false)}
-                    />
-                ) : (
+            {isSearching ? (
+                <LocalSearchPanel
+                    conversationId={chatId}
+                    onResultPress={handleSearchResultPress}
+                    onClose={() => setIsSearching(false)}
+                />
+            ) : type === "chat" ? (
                     <ChatHeader
                         chatId={chatId}
                         onOpenSearch={() => setIsSearching(true)}
@@ -298,16 +302,22 @@ export const ChatView = () => {
                         onStartAudioCall={handleStartAudioCall}
                         onStartVideoCall={handleStartVideoCall}
                     />
-                )
             ) : (
                 <SubjectHeader
                     subjectId={chatId}
+                    onOpenSearch={() => setIsSearching(true)}
                     onOpenPinned={() => setIsPinnedModalOpen(true)}
+                    onStartGroupAudioCall={handleStartAudioCall}
+                    onStartGroupVideoCall={handleStartVideoCall}
                 />
             )}
 
-            {type === "chat" && pinnedIds.length > 0 && (
-                <PinnedBar conversationId={chatId} listRef={listRef} />
+            {pinnedIds.length > 0 && (
+                <PinnedBar
+                    conversationId={chatId}
+                    listRef={listRef}
+                    canManagePins={canManagePins}
+                />
             )}
 
             <MessagesList
@@ -381,6 +391,7 @@ export const ChatView = () => {
                     if (actionsTarget) setReactionTargetId(actionsTarget.id);
                     closeActionsMenu();
                 }}
+                canManagePins={canManagePins}
             />
             <ReactionPickerModal
                 messageId={reactionTargetId}
@@ -395,6 +406,7 @@ export const ChatView = () => {
                 conversationId={chatId}
                 onClose={() => setIsPinnedModalOpen(false)}
                 onJumpToMessage={jumpToMessage}
+                canManagePins={canManagePins}
             />
         </View>
     );

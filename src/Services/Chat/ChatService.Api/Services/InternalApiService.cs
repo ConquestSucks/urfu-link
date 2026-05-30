@@ -73,8 +73,15 @@ public sealed class InternalApiService(IConversationRepository conversations) : 
             Type = conv.Type == ConversationType.Group
                 ? ConversationKind.Group
                 : ConversationKind.Direct,
+            GroupSubtype = conv.GroupSubtype?.ToString() ?? string.Empty,
+            DisciplineChatKind = conv.DisciplineChatKind?.ToString() ?? string.Empty,
         };
         reply.Participants.AddRange(conv.Participants.Select(p => p.ToString("D", CultureInfo.InvariantCulture)));
+        foreach (var (userId, role) in conv.ParticipantRoles)
+        {
+            reply.ParticipantRoles[userId.ToString("D", CultureInfo.InvariantCulture)] = role.ToString();
+        }
+
         return reply;
     }
 }

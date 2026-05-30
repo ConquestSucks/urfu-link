@@ -79,7 +79,11 @@ public sealed record ConversationDto(
     }
 }
 
-public sealed record ConversationCapabilitiesDto(bool CanStartGroupCall)
+public sealed record ConversationCapabilitiesDto(
+    bool CanStartGroupCall,
+    bool CanStartGroupAudioCall,
+    bool CanStartGroupVideoCall,
+    bool CanManagePins)
 {
     public static ConversationCapabilitiesDto FromDomain(Conversation conversation, Guid? callerUserId)
     {
@@ -87,9 +91,15 @@ public sealed record ConversationCapabilitiesDto(bool CanStartGroupCall)
         var canStartGroupCall = callerUserId.HasValue
             && conversation.Type == ConversationType.Group
             && conversation.GroupSubtype == GroupSubtype.Discipline
-            && conversation.DisciplineChatKind == DisciplineChatKind.Subgroup
             && conversation.RoleOf(callerUserId.Value) == ParticipantRole.Teacher;
-        return new ConversationCapabilitiesDto(canStartGroupCall);
+        var canManagePins = conversation.Type == ConversationType.Direct
+            ? callerUserId.HasValue && conversation.IsParticipant(callerUserId.Value)
+            : canStartGroupCall;
+        return new ConversationCapabilitiesDto(
+            canStartGroupCall,
+            canStartGroupCall,
+            canStartGroupCall,
+            canManagePins);
     }
 }
 

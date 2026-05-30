@@ -40,6 +40,7 @@ interface MessageActionsMenuProps {
     anchor?: ContextMenuAnchor | null;
     readStatusLabel?: string | null;
     isReadStatusLoading?: boolean;
+    canManagePins?: boolean;
     onForwardRequest: () => void;
     onReactRequest: () => void;
 }
@@ -59,6 +60,7 @@ export const MessageActionsMenu = ({
     anchor,
     readStatusLabel,
     isReadStatusLoading = false,
+    canManagePins = true,
     onForwardRequest,
     onReactRequest,
 }: MessageActionsMenuProps) => {
@@ -91,6 +93,9 @@ export const MessageActionsMenu = ({
               ] as MenuItemConfig[])
             : []),
     ];
+    const visibleItems = canManagePins
+        ? items
+        : items.filter((item) => item.id !== "pin" && item.id !== "unpin");
 
     const handle = async (action: Action) => {
         switch (action) {
@@ -132,7 +137,7 @@ export const MessageActionsMenu = ({
                     </Text>
                 </View>
             )}
-            {items.map((item) => (
+            {visibleItems.map((item) => (
                 <Pressable
                     key={item.id}
                     testID={`message-action-${item.id}`}

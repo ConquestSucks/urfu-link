@@ -23,6 +23,7 @@ import { Avatar } from "@/shared/ui";
 import { playCallSound } from "@/shared/lib/call-sounds";
 import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
 import { SpeakerHighIcon } from "@/shared/ui/phosphor";
+import { useCurrentUser } from "@/entities/user";
 import type { CallRoomProps, ParticipantInfo } from "./CallRoom.types";
 import {
     CallControls,
@@ -156,10 +157,20 @@ const disposeAudioElement = (element: HTMLMediaElement) => {
     element.remove();
 };
 
+const applyAudioOutputDevice = (element: HTMLMediaElement, deviceId?: string | null) => {
+    if (!deviceId || !("setSinkId" in element)) return;
+    void (element as HTMLMediaElement & { setSinkId: (sinkId: string) => Promise<void> })
+        .setSinkId(deviceId)
+        .catch((error) => {
+            console.warn("Failed to apply preferred audio output device", error);
+        });
+};
+
 const syncRemoteAudioTracks = (
     tracks: WebAudioTrackRef[],
     audioElements: React.MutableRefObject<Map<string, HTMLMediaElement>>,
     volume = 1,
+    outputDeviceId?: string | null,
 ) => {
     const activeKeys = new Set<string>();
 
@@ -176,6 +187,7 @@ const syncRemoteAudioTracks = (
             audioElements.current.set(key, element);
         }
 
+        applyAudioOutputDevice(element, outputDeviceId);
         element.volume = Math.max(0, Math.min(1, volume));
         element.muted = volume <= 0;
         void element.play().catch((error) => {
@@ -660,6 +672,10 @@ export const CallRoom = ({
     onLeave,
     onCloseError,
 }: CallRoomProps) => {
+    const { data: profile } = useCurrentUser();
+    const recordingDeviceId = profile?.soundVideo.recordingDeviceId;
+    const webcamDeviceId = profile?.soundVideo.webcamDeviceId;
+    const playbackDeviceId = profile?.soundVideo.playbackDeviceId;
     const roomRef = useRef<Room | null>(null);
     const remoteMicrophoneAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
     const screenShareAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
@@ -757,8 +773,10 @@ export const CallRoom = ({
         syncRemoteAudioTracks(
             nextAudioTracks.filter((track) => track.source === Track.Source.Microphone),
             remoteMicrophoneAudioElementsRef,
+            1,
+            playbackDeviceId,
         );
-    }, [participantInfos]);
+    }, [participantInfos, playbackDeviceId]);
 
     useEffect(() => {
         if (!callToken?.serverUrl || !callToken.token || call.status !== "Active") {
@@ -815,13 +833,20 @@ export const CallRoom = ({
                 await room.startAudio().catch((error) => {
                     console.warn("LiveKit audio start was blocked", error);
                 });
-                await room.localParticipant.setMicrophoneEnabled(true).catch((error) => {
+                const audioCaptureOptions = recordingDeviceId
+                    ? { deviceId: recordingDeviceId }
+                    : undefined;
+                const videoCaptureOptions = webcamDeviceId
+                    ? { deviceId: webcamDeviceId }
+                    : { facingMode };
+
+                await room.localParticipant.setMicrophoneEnabled(true, audioCaptureOptions).catch((error) => {
                     console.error("Failed to enable microphone", error);
                     setRoomError("Не удалось включить микрофон. Проверьте разрешения браузера.");
                 });
 
                 if (call.callType === "Video") {
-                    await room.localParticipant.setCameraEnabled(true, { facingMode }).catch((error) => {
+                    await room.localParticipant.setCameraEnabled(true, videoCaptureOptions).catch((error) => {
                         console.error("Failed to enable camera", error);
                         setRoomError("Не удалось включить камеру. Проверьте разрешения браузера.");
                     });
@@ -870,8 +895,10 @@ export const CallRoom = ({
         callToken?.serverUrl,
         callToken?.token,
         facingMode,
+        recordingDeviceId,
         refreshVideoInputs,
         syncRoomState,
+        webcamDeviceId,
     ]);
 
     const participantMediaInfos = useMemo<ParticipantMediaInfo[]>(() => {
@@ -970,8 +997,9 @@ export const CallRoom = ({
             activeScreenShareAudioTracks,
             screenShareAudioElementsRef,
             screenShareVolume,
+            playbackDeviceId,
         );
-    }, [activeScreenShareAudioTracks, screenShareVolume]);
+    }, [activeScreenShareAudioTracks, playbackDeviceId, screenShareVolume]);
 
     const stageItems = useMemo<RenderedStageItem[]>(() => {
         const participantItems = participantMediaInfos.map((participant) => ({
@@ -1066,13 +1094,16 @@ export const CallRoom = ({
 
         const next = !room.localParticipant.isMicrophoneEnabled;
         try {
-            await room.localParticipant.setMicrophoneEnabled(next);
+            await room.localParticipant.setMicrophoneEnabled(
+                next,
+                recordingDeviceId ? { deviceId: recordingDeviceId } : undefined,
+            );
             await playCallSound(next ? "micOn" : "micOff");
             syncRoomState();
         } catch (error) {
             console.error("Failed to toggle microphone", error);
         }
-    }, [syncRoomState]);
+    }, [recordingDeviceId, syncRoomState]);
 
     const toggleCamera = useCallback(async () => {
         const room = roomRef.current;
@@ -1080,7 +1111,10 @@ export const CallRoom = ({
 
         const next = !room.localParticipant.isCameraEnabled;
         try {
-            await room.localParticipant.setCameraEnabled(next, { facingMode });
+            await room.localParticipant.setCameraEnabled(
+                next,
+                webcamDeviceId ? { deviceId: webcamDeviceId } : { facingMode },
+            );
             if (next) {
                 void refreshVideoInputs();
             }
@@ -1088,7 +1122,7 @@ export const CallRoom = ({
         } catch (error) {
             console.error("Failed to toggle camera", error);
         }
-    }, [facingMode, isConnectedToCall, refreshVideoInputs, syncRoomState]);
+    }, [facingMode, isConnectedToCall, refreshVideoInputs, syncRoomState, webcamDeviceId]);
 
     const switchCamera = useCallback(async () => {
         const room = roomRef.current;

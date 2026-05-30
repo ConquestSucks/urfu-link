@@ -158,7 +158,8 @@ public sealed class CallNotificationHandlerTests
                 TotalUnseen: 0,
                 UrgentUnread: 0,
                 PerCategory: new Dictionary<NotificationCategory, int>(),
-                PerType: new Dictionary<string, int>())));
+                PerType: new Dictionary<string, int>(),
+                Scopes: new Dictionary<string, int>())));
         badgeStore.SetSnapshotAsync(CalleeId, Arg.Any<BadgeSnapshot>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(0));
         broadcaster.NotifyRemovedAsync(CalleeId, archived.Id, Arg.Any<CancellationToken>())

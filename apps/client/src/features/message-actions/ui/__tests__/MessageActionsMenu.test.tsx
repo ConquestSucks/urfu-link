@@ -142,4 +142,21 @@ describe("MessageActionsMenu", () => {
             "hover:bg-danger-500/10",
         );
     });
+
+    it("hides pin actions when the conversation cannot manage pins", () => {
+        render(
+            <MessageActionsMenu
+                message={message}
+                isOwn
+                isPinned={false}
+                canManagePins={false}
+                onClose={jest.fn()}
+                onForwardRequest={jest.fn()}
+                onReactRequest={jest.fn()}
+            />,
+        );
+
+        expect(screen.queryByTestId("message-action-pin")).toBeNull();
+        expect(screen.queryByTestId("message-action-unpin")).toBeNull();
+    });
 });

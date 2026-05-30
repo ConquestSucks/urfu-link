@@ -65,7 +65,8 @@ public sealed record NotificationBadgeCounts(
     int TotalUnseen,
     int UrgentUnread,
     IReadOnlyDictionary<NotificationCategory, int> PerCategory,
-    IReadOnlyDictionary<string, int> PerType);
+    IReadOnlyDictionary<string, int> PerType,
+    IReadOnlyDictionary<string, int> Scopes);
 
 public enum NotificationUpsertStatus
 {

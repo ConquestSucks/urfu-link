@@ -67,4 +67,19 @@ describe("createCallsApi", () => {
       expect.objectContaining({ method: "POST" }),
     );
   });
+
+  it("sends client instance id when creating a call token", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(makeMockResponse({ token: "jwt" }));
+    const api = createCallsApi("", () => ({}), vi.fn());
+
+    await api.token("call-1", "tab-1");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/calls/call-1/token",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ clientInstanceId: "tab-1" }),
+      }),
+    );
+  });
 });

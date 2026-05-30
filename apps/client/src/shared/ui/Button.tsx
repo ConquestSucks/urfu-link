@@ -30,7 +30,7 @@ export const Button = ({
 
     const variantStyles = {
         primary:
-            "bg-brand-600 hover:bg-brand-400 active:bg-brand-700 active:scale-[0.98] active:opacity-90",
+            "bg-brand-650 hover:bg-brand-500 active:bg-brand-700 active:scale-[0.98] active:opacity-90",
         secondary:
             "bg-zinc-900 hover:bg-zinc-900/60 active:bg-zinc-900/80 active:scale-[0.98] active:opacity-90",
         danger: "bg-danger-500/10 hover:bg-danger-500/20 active:bg-red-500/20  active:scale-[0.98] active:opacity-90",

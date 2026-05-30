@@ -7,7 +7,7 @@ import { useSearchStore } from "@/features/chat-search";
 import { useGlobalSearch } from "@/features/chat-search";
 
 export const Header = ({ title }: { title: string }) => {
-    const { currentView, createViewHref } = useInboxRouting();
+    const { currentTab, currentView, createViewHref } = useInboxRouting();
     const globalQuery = useSearchStore((s) => s.globalQuery);
     const { onQueryChange } = useGlobalSearch();
     const searchPlaceholder =
@@ -21,7 +21,11 @@ export const Header = ({ title }: { title: string }) => {
                 <Text numberOfLines={1} className="text-xl text-white font-bold">
                     {title}
                 </Text>
-                <ViewToggle currentView={currentView} createHref={createViewHref} />
+                <ViewToggle
+                    currentView={currentView}
+                    createHref={createViewHref}
+                    notificationScope={currentTab === "subjects" ? "disciplines" : "chats"}
+                />
             </View>
             <SearchBar
                 value={globalQuery}

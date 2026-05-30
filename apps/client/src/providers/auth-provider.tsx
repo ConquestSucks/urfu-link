@@ -1,6 +1,8 @@
 import { appConfig } from "@/shared/lib/config";
-import { resolveCurrentUserId } from "@/shared/lib/current-user";
+import { resolveCurrentUser } from "@/shared/lib/current-user";
 import { useAuthStore } from "@/shared/store/auth-store";
+import { userKeys } from "@/entities/user/model/queries";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef } from "react";
 import type { PropsWithChildren } from "react";
 import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "@/features/auth/keycloak-constants";
@@ -36,6 +38,7 @@ async function refreshAccessToken(
 }
 
 export default function AuthProvider({ children }: PropsWithChildren) {
+    const queryClient = useQueryClient();
     const { accessToken, setTokens, clearTokens } = useAuthStore();
     const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isDev = appConfig.appEnv === "dev";
@@ -91,10 +94,14 @@ export default function AuthProvider({ children }: PropsWithChildren) {
     useEffect(() => {
         if (isDev) return;
 
-        void resolveCurrentUserId({ forceRefresh: true }).catch(() => {
-            useAuthStore.getState().setUserId(null);
-        });
-    }, [isDev]);
+        void resolveCurrentUser({ forceRefresh: true })
+            .then((profile) => {
+                queryClient.setQueryData(userKeys.me, profile);
+            })
+            .catch(() => {
+                useAuthStore.getState().setUserId(null);
+            });
+    }, [isDev, queryClient]);
 
     // Dev-only: schedule refresh when AuthGate sets a new token.
     useEffect(() => {

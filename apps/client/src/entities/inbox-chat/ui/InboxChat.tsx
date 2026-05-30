@@ -107,7 +107,7 @@ export const InboxChat = ({
                             )}
                         </View>
                         {hasUnread && (
-                            <View className="bg-brand-600 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0">
+                            <View className="bg-brand-650 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0">
                                 <Text className="text-white text-[10px] font-bold">
                                     {unreadCount > 99 ? "99+" : String(unreadCount)}
                                 </Text>

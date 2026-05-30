@@ -26,6 +26,7 @@ export const useCallHub = () => {
     const handleCallEnded = useCallStore((s) => s.handleCallEnded);
     const handleCallParticipantJoined = useCallStore((s) => s.handleCallParticipantJoined);
     const handleCallParticipantLeft = useCallStore((s) => s.handleCallParticipantLeft);
+    const handleCallDeviceReplaced = useCallStore((s) => s.handleCallDeviceReplaced);
 
     useEffect(() => {
         const connection = createHubConnection("/hubs/calls");
@@ -61,6 +62,10 @@ export const useCallHub = () => {
             handleCallParticipantLeft(callId, userId);
         });
 
+        connection.on("CallDeviceReplaced", (callId: string, clientInstanceId: string) => {
+            handleCallDeviceReplaced(callId, clientInstanceId);
+        });
+
         void connectHub(connection);
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
@@ -77,6 +82,7 @@ export const useCallHub = () => {
             connection.off("CallEnded");
             connection.off("CallParticipantJoined");
             connection.off("CallParticipantLeft");
+            connection.off("CallDeviceReplaced");
             subscription.remove();
             void connection.stop();
         };
@@ -85,6 +91,7 @@ export const useCallHub = () => {
         handleCallCancelled,
         handleCallDeclined,
         handleCallEnded,
+        handleCallDeviceReplaced,
         handleIncomingCall,
         handleCallParticipantJoined,
         handleCallParticipantLeft,

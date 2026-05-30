@@ -63,6 +63,13 @@ export const ChatHeader = ({
         profile?.notifications.mutedConversationIds?.includes(chatId) ?? false;
     const notificationsPending =
         muteNotifications.isPending || unmuteNotifications.isPending;
+    const handleToggleNotifications = React.useCallback(() => {
+        if (notificationsMuted) {
+            unmuteNotifications.mutate(chatId);
+        } else {
+            muteNotifications.mutate(chatId);
+        }
+    }, [chatId, muteNotifications, notificationsMuted, unmuteNotifications]);
 
     // Для direct-чата peerUserId — тот, кто не равен currentUserId.
     // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
@@ -231,13 +238,7 @@ export const ChatHeader = ({
                     }
                     notificationsMuted={notificationsMuted}
                     notificationsPending={notificationsPending}
-                    onToggleNotifications={() => {
-                        if (notificationsMuted) {
-                            unmuteNotifications.mutate(chatId);
-                        } else {
-                            muteNotifications.mutate(chatId);
-                        }
-                    }}
+                    onToggleNotifications={handleToggleNotifications}
                 />
             </View>
 
@@ -250,6 +251,10 @@ export const ChatHeader = ({
                     status: peerPresence?.status,
                     lastSeenAt: peerPresence?.lastSeenAt,
                 }}
+                onStartAudioCall={conversation.type === "Direct" ? onStartAudioCall : undefined}
+                onStartVideoCall={conversation.type === "Direct" ? onStartVideoCall : undefined}
+                onToggleNotifications={handleToggleNotifications}
+                notificationsPending={notificationsPending}
             />
         </>
     );
