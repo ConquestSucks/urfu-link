@@ -5,8 +5,6 @@ export type CallSoundKind =
     | "incoming"
     | "micOn"
     | "micOff"
-    | "cameraOn"
-    | "cameraOff"
     | "leave";
 
 type RingtoneKind = Extract<CallSoundKind, "outgoing" | "incoming">;
@@ -41,8 +39,6 @@ const SOUND_SOURCES: Record<CallSoundKind, AudioSource> = {
     incoming: require("../../../assets/sounds/call-incoming.wav"),
     micOn: require("../../../assets/sounds/call-mic-on.wav"),
     micOff: require("../../../assets/sounds/call-mic-off.wav"),
-    cameraOn: require("../../../assets/sounds/call-camera-on.wav"),
-    cameraOff: require("../../../assets/sounds/call-camera-off.wav"),
     leave: require("../../../assets/sounds/call-leave.wav"),
 };
 
