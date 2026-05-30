@@ -16,4 +16,8 @@ export type InboxChatProps = {
     lastMessageRead?: boolean;
     /** В превью сейчас показывается typing-состояние, а не последнее сообщение */
     isTyping?: boolean;
+    disciplineId?: string | null;
+    disciplineTitle?: string | null;
+    disciplineChatKind?: "General" | "Subgroup" | null;
+    disciplineSubgroupName?: string | null;
 };

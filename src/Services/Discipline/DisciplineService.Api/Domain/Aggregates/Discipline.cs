@@ -6,8 +6,11 @@ namespace DisciplineService.Api.Domain.Aggregates;
 
 public sealed class Discipline
 {
+    public const string DefaultSubgroupName = "Подгруппа 1";
+
     private readonly List<IIntegrationEvent> _domainEvents = [];
     private readonly List<Enrollment> _enrollments = [];
+    private readonly List<DisciplineSubgroup> _subgroups = [];
 
     public Guid Id { get; private set; }
 
@@ -32,6 +35,8 @@ public sealed class Discipline
     public bool IsArchived => ArchivedAtUtc.HasValue;
 
     public IReadOnlyList<Enrollment> Enrollments => _enrollments;
+
+    public IReadOnlyList<DisciplineSubgroup> Subgroups => _subgroups;
 
     public IReadOnlyList<IIntegrationEvent> DomainEvents => _domainEvents;
 
@@ -74,9 +79,12 @@ public sealed class Discipline
             discipline.Id,
             ownerTeacherId,
             DisciplineRole.Teacher,
+            subgroupId: null,
             initiatedBy == Guid.Empty ? ownerTeacherId : initiatedBy,
             now);
         discipline._enrollments.Add(ownerEnrollment);
+        var defaultSubgroup = DisciplineSubgroup.Create(discipline.Id, DefaultSubgroupName, now);
+        discipline._subgroups.Add(defaultSubgroup);
 
         discipline._domainEvents.Add(new DisciplineCreatedEvent(
             discipline.Id,
@@ -91,6 +99,14 @@ public sealed class Discipline
             ownerTeacherId,
             DisciplineRole.Teacher,
             ownerEnrollment.EnrolledBy));
+        discipline._domainEvents.Add(new DisciplineSubgroupCreatedEvent(
+            discipline.Id,
+            defaultSubgroup.Id,
+            discipline.Title,
+            discipline.CoverAssetId,
+            defaultSubgroup.Name,
+            [ownerTeacherId],
+            []));
 
         return discipline;
     }
@@ -136,7 +152,48 @@ public sealed class Discipline
         _domainEvents.Add(new DisciplineDeletedEvent(Id));
     }
 
-    public Enrollment Enroll(Guid userId, DisciplineRole role, Guid enrolledBy)
+    public DisciplineSubgroup CreateSubgroup(string name)
+    {
+        EnsureNotArchived();
+        var now = DateTimeOffset.UtcNow;
+        var subgroup = DisciplineSubgroup.Create(Id, name, now);
+        _subgroups.Add(subgroup);
+        Touch();
+        _domainEvents.Add(new DisciplineSubgroupCreatedEvent(
+            Id,
+            subgroup.Id,
+            Title,
+            CoverAssetId,
+            subgroup.Name,
+            _enrollments.Where(e => e.Role == DisciplineRole.Teacher).Select(e => e.UserId).ToList(),
+            []));
+        return subgroup;
+    }
+
+    public void RenameSubgroup(Guid subgroupId, string name)
+    {
+        EnsureNotArchived();
+        var subgroup = GetActiveSubgroupOrThrow(subgroupId);
+        subgroup.Rename(name);
+        Touch();
+        _domainEvents.Add(new DisciplineSubgroupUpdatedEvent(Id, subgroup.Id, subgroup.Name));
+    }
+
+    public void ArchiveSubgroup(Guid subgroupId)
+    {
+        EnsureNotArchived();
+        var subgroup = GetActiveSubgroupOrThrow(subgroupId);
+        if (_enrollments.Any(e => e.Role == DisciplineRole.Student && e.SubgroupId == subgroupId))
+        {
+            throw new DisciplineSubgroupNotEmptyException(Id, subgroupId);
+        }
+
+        subgroup.Archive();
+        Touch();
+        _domainEvents.Add(new DisciplineSubgroupArchivedEvent(Id, subgroup.Id));
+    }
+
+    public Enrollment Enroll(Guid userId, DisciplineRole role, Guid? subgroupId, Guid enrolledBy)
     {
         EnsureNotArchived();
         if (userId == Guid.Empty)
@@ -149,10 +206,11 @@ public sealed class Discipline
             throw new EnrollmentExistsException(Id, userId);
         }
 
-        var enrollment = Enrollment.Create(Id, userId, role, enrolledBy, DateTimeOffset.UtcNow);
+        ValidateRoleSubgroup(userId, role, subgroupId);
+        var enrollment = Enrollment.Create(Id, userId, role, subgroupId, enrolledBy, DateTimeOffset.UtcNow);
         _enrollments.Add(enrollment);
         Touch();
-        _domainEvents.Add(new UserEnrolledEvent(Id, userId, role, enrolledBy));
+        _domainEvents.Add(new UserEnrolledEvent(Id, userId, role, enrolledBy, subgroupId));
         return enrollment;
     }
 
@@ -173,12 +231,14 @@ public sealed class Discipline
             throw new LastTeacherRemovalException(Id, userId);
         }
 
+        var role = enrollment.Role;
+        var subgroupId = enrollment.SubgroupId;
         _enrollments.Remove(enrollment);
         Touch();
-        _domainEvents.Add(new UserUnenrolledEvent(Id, userId));
+        _domainEvents.Add(new UserUnenrolledEvent(Id, userId, role, subgroupId));
     }
 
-    public void ChangeRole(Guid userId, DisciplineRole newRole)
+    public void ChangeRole(Guid userId, DisciplineRole newRole, Guid? subgroupId)
     {
         EnsureNotArchived();
         var enrollment = _enrollments.FirstOrDefault(e => e.UserId == userId)
@@ -189,8 +249,15 @@ public sealed class Discipline
             throw new OwnerRoleChangeException(Id, userId);
         }
 
+        ValidateRoleSubgroup(userId, newRole, subgroupId);
+
         if (enrollment.Role == newRole)
         {
+            if (newRole == DisciplineRole.Student && subgroupId.HasValue && enrollment.SubgroupId != subgroupId)
+            {
+                AssignStudentSubgroup(userId, subgroupId.Value);
+            }
+
             return;
         }
 
@@ -202,9 +269,38 @@ public sealed class Discipline
         }
 
         var oldRole = enrollment.Role;
-        enrollment.SetRole(newRole);
+        var oldSubgroupId = enrollment.SubgroupId;
+        enrollment.SetRole(newRole, newRole == DisciplineRole.Student ? subgroupId : null);
         Touch();
-        _domainEvents.Add(new EnrollmentRoleChangedEvent(Id, userId, oldRole, newRole));
+        _domainEvents.Add(new EnrollmentRoleChangedEvent(
+            Id,
+            userId,
+            oldRole,
+            newRole,
+            oldSubgroupId,
+            enrollment.SubgroupId));
+    }
+
+    public void AssignStudentSubgroup(Guid userId, Guid subgroupId)
+    {
+        EnsureNotArchived();
+        var enrollment = _enrollments.FirstOrDefault(e => e.UserId == userId)
+            ?? throw new EnrollmentNotFoundException(Id, userId);
+        if (enrollment.Role != DisciplineRole.Student)
+        {
+            throw new TeacherSubgroupNotAllowedException(Id, userId);
+        }
+
+        GetActiveSubgroupOrThrow(subgroupId);
+        if (enrollment.SubgroupId == subgroupId)
+        {
+            return;
+        }
+
+        var oldSubgroupId = enrollment.SubgroupId;
+        enrollment.SetSubgroup(subgroupId);
+        Touch();
+        _domainEvents.Add(new EnrollmentSubgroupChangedEvent(Id, userId, oldSubgroupId, subgroupId));
     }
 
     public bool IsTeacher(Guid userId)
@@ -223,6 +319,32 @@ public sealed class Discipline
         {
             throw new DisciplineArchivedException(Id);
         }
+    }
+
+    private DisciplineSubgroup GetActiveSubgroupOrThrow(Guid subgroupId)
+    {
+        var subgroup = _subgroups.FirstOrDefault(s => s.Id == subgroupId && !s.IsArchived);
+        return subgroup ?? throw new DisciplineSubgroupNotFoundException(Id, subgroupId);
+    }
+
+    private void ValidateRoleSubgroup(Guid userId, DisciplineRole role, Guid? subgroupId)
+    {
+        if (role == DisciplineRole.Teacher)
+        {
+            if (subgroupId.HasValue)
+            {
+                throw new TeacherSubgroupNotAllowedException(Id, userId);
+            }
+
+            return;
+        }
+
+        if (!subgroupId.HasValue)
+        {
+            throw new StudentSubgroupRequiredException(Id, userId);
+        }
+
+        GetActiveSubgroupOrThrow(subgroupId.Value);
     }
 
     private static string? NormalizeOptionalText(string? value)

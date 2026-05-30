@@ -19,6 +19,11 @@ internal sealed class MongoIndexInitializer(
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         var conversations = context.Conversations;
+        await DropIndexIfExistsAsync(
+            conversations,
+            "ux_conversations_disciplineId",
+            cancellationToken).ConfigureAwait(false);
+
         await conversations.Indexes.CreateManyAsync(
             new[]
             {
@@ -28,18 +33,18 @@ internal sealed class MongoIndexInitializer(
                 new CreateIndexModel<ConversationDocument>(
                     Builders<ConversationDocument>.IndexKeys.Descending(c => c.LastMessageAtUtc),
                     new CreateIndexOptions { Name = "ix_conversations_lastMessageAtUtc_desc", Background = true }),
-                // Sparse + unique: only conversations sourced from a discipline carry this
-                // field, and there is at most one conversation per discipline. The discipline
-                // event consumer looks up this index on every projected event — without it
-                // the lookup degrades linearly with the conversation count.
+                // Unique discipline chat scope: one general row per discipline
+                // (disciplineSubgroupId=null) plus one row per subgroup.
                 new CreateIndexModel<ConversationDocument>(
-                    Builders<ConversationDocument>.IndexKeys.Ascending(c => c.DisciplineId),
-                    new CreateIndexOptions
+                    Builders<ConversationDocument>.IndexKeys
+                        .Ascending(c => c.DisciplineId)
+                        .Ascending(c => c.DisciplineSubgroupId),
+                    new CreateIndexOptions<ConversationDocument>
                     {
-                        Name = "ux_conversations_disciplineId",
+                        Name = "ux_conversations_discipline_scope",
                         Background = true,
-                        Sparse = true,
                         Unique = true,
+                        PartialFilterExpression = Builders<ConversationDocument>.Filter.Exists(c => c.DisciplineId),
                     }),
             },
             cancellationToken).ConfigureAwait(false);
@@ -191,6 +196,21 @@ internal sealed class MongoIndexInitializer(
             .ConfigureAwait(false);
         var documents = await cursor.ToListAsync(cancellationToken).ConfigureAwait(false);
         return documents.Any(d => d.TryGetValue("name", out var value) && value.IsString && value.AsString == indexName);
+    }
+
+    private static async Task DropIndexIfExistsAsync(
+        IMongoCollection<ConversationDocument> collection,
+        string indexName,
+        CancellationToken cancellationToken)
+    {
+        using var cursor = await collection.Indexes
+            .ListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var documents = await cursor.ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (documents.Any(d => d.TryGetValue("name", out var value) && value.IsString && value.AsString == indexName))
+        {
+            await collection.Indexes.DropOneAsync(indexName, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private static bool IsUnsupportedLanguage(MongoCommandException ex)

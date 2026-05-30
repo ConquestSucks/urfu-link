@@ -41,6 +41,7 @@ message MemberInfo {
   string user_id = 1;
   MembershipRole role = 2;
   string enrolled_at_utc = 3;
+  string subgroup_id = 4;
 }
 
 message ListMembersRequest {
@@ -57,6 +58,8 @@ message UserDisciplineInfo {
   string code = 2;
   string title = 3;
   MembershipRole role = 4;
+  string subgroup_id = 5;
+  repeated string visible_subgroup_ids = 6;
 }
 
 message ListUserDisciplinesRequest {

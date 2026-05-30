@@ -72,6 +72,17 @@ public interface IConversationRepository
     /// </summary>
     Task<Conversation?> GetByDisciplineIdAsync(Guid disciplineId, CancellationToken cancellationToken);
 
+    Task<Conversation?> GetGeneralDisciplineAsync(Guid disciplineId, CancellationToken cancellationToken);
+
+    Task<Conversation?> GetByDisciplineSubgroupIdAsync(
+        Guid disciplineId,
+        Guid subgroupId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Conversation>> ListByDisciplineIdAsync(
+        Guid disciplineId,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Adds <paramref name="userId"/> with <paramref name="role"/> to the conversation. Returns
     /// <see langword="true"/> when the user was added (so the caller knows when to publish a
@@ -112,5 +123,16 @@ public interface IConversationRepository
         string conversationId,
         string? title,
         Guid? coverAssetId,
+        CancellationToken cancellationToken);
+
+    Task<bool> UpdateDisciplineMetadataAsync(
+        Guid disciplineId,
+        string? disciplineTitle,
+        Guid? coverAssetId,
+        CancellationToken cancellationToken);
+
+    Task<bool> UpdateSubgroupMetadataAsync(
+        string conversationId,
+        string subgroupName,
         CancellationToken cancellationToken);
 }

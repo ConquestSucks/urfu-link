@@ -46,6 +46,12 @@ public sealed class UnenrollUserEndpoint(
         {
             discipline.Unenroll(req.UserId);
         }
+        catch (EnrollmentNotFoundException ex)
+        {
+            AddError("UserId", ex.Message);
+            await Send.ErrorsAsync(statusCode: (int)HttpStatusCode.NotFound, cancellation: ct).ConfigureAwait(false);
+            return;
+        }
         catch (OwnerEnrollmentRemovalException ex)
         {
             AddError("UserId", ex.Message);

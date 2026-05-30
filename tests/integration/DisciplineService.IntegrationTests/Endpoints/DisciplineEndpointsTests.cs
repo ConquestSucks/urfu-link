@@ -360,6 +360,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         var teacherId = Guid.NewGuid();
         var disc = await CreateDisciplineAsync(teacherId);
         _factory.OutboxWriter.Clear();
+        var subgroupId = disc.Subgroups[0].Id;
 
         var s1 = Guid.NewGuid();
         var s2 = Guid.NewGuid();
@@ -370,8 +371,8 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
             {
                 Enrollments = new[]
                 {
-                    new EnrollmentInput(s1, DisciplineRole.Student),
-                    new EnrollmentInput(s2, DisciplineRole.Student),
+                    new EnrollmentInput(s1, DisciplineRole.Student, subgroupId),
+                    new EnrollmentInput(s2, DisciplineRole.Student, subgroupId),
                 },
             });
 
@@ -454,7 +455,7 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
         var response = await CreateClient().PatchAsJsonAsync(
             $"/api/v1/disciplines/{disc.Id}/enrollments/{teacherId}/role",
-            new { Role = DisciplineRole.Student });
+            new { Role = DisciplineRole.Student, SubgroupId = disc.Subgroups[0].Id });
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
@@ -472,12 +473,26 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
+        var discipline = await GetDisciplineById(disciplineId);
+        var defaultSubgroupId = discipline.Subgroups[0].Id;
         var resp = await CreateIdempotentClient().PostAsJsonAsync(
             $"/api/v1/disciplines/{disciplineId}/enrollments",
             new
             {
-                Enrollments = users.Select(u => new EnrollmentInput(u.UserId, u.Role)).ToList(),
+                Enrollments = users
+                    .Select(u => new EnrollmentInput(
+                        u.UserId,
+                        u.Role,
+                        u.Role == DisciplineRole.Student ? defaultSubgroupId : null))
+                    .ToList(),
             });
         resp.EnsureSuccessStatusCode();
+    }
+
+    private async Task<DisciplineResponse> GetDisciplineById(Guid disciplineId)
+    {
+        var response = await CreateClient().GetAsync($"/api/v1/disciplines/{disciplineId}");
+        response.EnsureSuccessStatusCode();
+        return (await response.Content.ReadFromJsonAsync<DisciplineResponse>())!;
     }
 }

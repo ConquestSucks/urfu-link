@@ -4,10 +4,12 @@ import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getSubjectHeaderActions } from "../../config/headerActions";
 interface SubjectHeaderActionsProps {
+    canStartGroupCall?: boolean;
+    onStartGroupCall?: () => void;
     onOpenMembers: () => void;
     onOpenPinned: () => void;
 }
-export const SubjectHeaderActions = ({ onOpenMembers, onOpenPinned }: SubjectHeaderActionsProps) => {
+export const SubjectHeaderActions = ({ canStartGroupCall = false, onStartGroupCall, onOpenMembers, onOpenPinned }: SubjectHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getSubjectHeaderActions({
         onOpenMembers: () => {
@@ -20,9 +22,11 @@ export const SubjectHeaderActions = ({ onOpenMembers, onOpenPinned }: SubjectHea
         },
     });
     return (<View className="flex-row gap-1 items-center">
-      <Pressable className="p-2 rounded-xl active:bg-white/10">
-        <PhoneIcon size={24} className="text-text-muted" weight="regular"/>
-      </Pressable>
+      {canStartGroupCall && (
+        <Pressable className="p-2 rounded-xl active:bg-white/10" onPress={onStartGroupCall}>
+          <PhoneIcon size={24} className="text-text-muted" weight="regular"/>
+        </Pressable>
+      )}
       <Pressable className="p-2 rounded-xl active:bg-white/10">
         <MagnifyingGlassIcon size={24} className="text-text-muted" weight="regular"/>
       </Pressable>

@@ -14,6 +14,8 @@ public sealed class ChangeEnrollmentRoleRouteRequest
     public Guid UserId { get; set; }
 
     public DisciplineRole Role { get; set; }
+
+    public Guid? SubgroupId { get; set; }
 }
 
 public sealed class ChangeEnrollmentRoleEndpoint(
@@ -47,7 +49,13 @@ public sealed class ChangeEnrollmentRoleEndpoint(
 
         try
         {
-            discipline.ChangeRole(req.UserId, req.Role);
+            discipline.ChangeRole(req.UserId, req.Role, req.SubgroupId);
+        }
+        catch (EnrollmentNotFoundException ex)
+        {
+            AddError("UserId", ex.Message);
+            await Send.ErrorsAsync(statusCode: (int)HttpStatusCode.NotFound, cancellation: ct).ConfigureAwait(false);
+            return;
         }
         catch (OwnerRoleChangeException ex)
         {
@@ -58,6 +66,24 @@ public sealed class ChangeEnrollmentRoleEndpoint(
         catch (LastTeacherRemovalException ex)
         {
             AddError("UserId", ex.Message);
+            await Send.ErrorsAsync(statusCode: (int)HttpStatusCode.Conflict, cancellation: ct).ConfigureAwait(false);
+            return;
+        }
+        catch (StudentSubgroupRequiredException ex)
+        {
+            AddError("SubgroupId", ex.Message);
+            await Send.ErrorsAsync(statusCode: (int)HttpStatusCode.Conflict, cancellation: ct).ConfigureAwait(false);
+            return;
+        }
+        catch (TeacherSubgroupNotAllowedException ex)
+        {
+            AddError("SubgroupId", ex.Message);
+            await Send.ErrorsAsync(statusCode: (int)HttpStatusCode.Conflict, cancellation: ct).ConfigureAwait(false);
+            return;
+        }
+        catch (DisciplineSubgroupNotFoundException ex)
+        {
+            AddError("SubgroupId", ex.Message);
             await Send.ErrorsAsync(statusCode: (int)HttpStatusCode.Conflict, cancellation: ct).ConfigureAwait(false);
             return;
         }

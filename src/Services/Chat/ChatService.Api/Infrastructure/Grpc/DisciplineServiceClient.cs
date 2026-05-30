@@ -35,7 +35,13 @@ internal sealed class DisciplineServiceClient(
                 DisciplineId: Guid.Parse(d.DisciplineId),
                 Code: d.Code,
                 Title: d.Title,
-                Role: MapRole(d.Role)))
+                Role: MapRole(d.Role),
+                SubgroupId: TryParseGuid(d.SubgroupId),
+                VisibleSubgroupIds: d.VisibleSubgroupIds
+                    .Select(TryParseGuid)
+                    .Where(id => id.HasValue)
+                    .Select(id => id!.Value)
+                    .ToList()))
             .ToList();
     }
 
@@ -72,4 +78,7 @@ internal sealed class DisciplineServiceClient(
         DisciplineGrpc.MembershipRole.Student => ParticipantRole.Student,
         _ => ParticipantRole.Member,
     };
+
+    private static Guid? TryParseGuid(string? raw)
+        => Guid.TryParse(raw, out var id) ? id : null;
 }

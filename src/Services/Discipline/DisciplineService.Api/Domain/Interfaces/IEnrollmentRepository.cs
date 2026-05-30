@@ -13,7 +13,8 @@ public sealed record DisciplineMembership(
     string Semester,
     Guid OwnerTeacherId,
     Guid? CoverAssetId,
-    Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineRole Role);
+    Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineRole Role,
+    Guid? SubgroupId);
 
 /// <summary>
 /// Cursor for keyset-paginated enrollment listings: a tuple of the last seen

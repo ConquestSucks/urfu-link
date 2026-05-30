@@ -2,7 +2,9 @@ namespace Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 
 public sealed record UserUnenrolledEvent(
     Guid DisciplineId,
-    Guid UserId) : IIntegrationEvent
+    Guid UserId,
+    DisciplineRole? Role = null,
+    Guid? SubgroupId = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

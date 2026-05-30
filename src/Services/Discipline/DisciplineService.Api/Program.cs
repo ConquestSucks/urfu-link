@@ -67,6 +67,8 @@ app.MapServiceDefaults();
 app.UseFastEndpoints(c =>
 {
     c.Endpoints.RoutePrefix = "api/v1";
+    c.Serializer.Options.Converters.Add(
+        new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 app.UseSwaggerGen();
 app.MapScalarApiReference(o =>

@@ -189,3 +189,115 @@ public sealed class OwnerRoleChangeException : InvalidOperationException
 
     public Guid OwnerTeacherId { get; }
 }
+
+public sealed class DisciplineSubgroupNotFoundException : InvalidOperationException
+{
+    public DisciplineSubgroupNotFoundException()
+    {
+    }
+
+    public DisciplineSubgroupNotFoundException(string message)
+        : base(message)
+    {
+    }
+
+    public DisciplineSubgroupNotFoundException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public DisciplineSubgroupNotFoundException(Guid disciplineId, Guid subgroupId)
+        : base($"Subgroup '{subgroupId}' was not found in discipline '{disciplineId}'.")
+    {
+        DisciplineId = disciplineId;
+        SubgroupId = subgroupId;
+    }
+
+    public Guid DisciplineId { get; }
+
+    public Guid SubgroupId { get; }
+}
+
+public sealed class DisciplineSubgroupNotEmptyException : InvalidOperationException
+{
+    public DisciplineSubgroupNotEmptyException()
+    {
+    }
+
+    public DisciplineSubgroupNotEmptyException(string message)
+        : base(message)
+    {
+    }
+
+    public DisciplineSubgroupNotEmptyException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public DisciplineSubgroupNotEmptyException(Guid disciplineId, Guid subgroupId)
+        : base($"Subgroup '{subgroupId}' in discipline '{disciplineId}' still has students; move or remove them first.")
+    {
+        DisciplineId = disciplineId;
+        SubgroupId = subgroupId;
+    }
+
+    public Guid DisciplineId { get; }
+
+    public Guid SubgroupId { get; }
+}
+
+public sealed class StudentSubgroupRequiredException : InvalidOperationException
+{
+    public StudentSubgroupRequiredException()
+    {
+    }
+
+    public StudentSubgroupRequiredException(string message)
+        : base(message)
+    {
+    }
+
+    public StudentSubgroupRequiredException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public StudentSubgroupRequiredException(Guid disciplineId, Guid userId)
+        : base($"Student '{userId}' in discipline '{disciplineId}' must belong to exactly one active subgroup.")
+    {
+        DisciplineId = disciplineId;
+        UserId = userId;
+    }
+
+    public Guid DisciplineId { get; }
+
+    public Guid UserId { get; }
+}
+
+public sealed class TeacherSubgroupNotAllowedException : InvalidOperationException
+{
+    public TeacherSubgroupNotAllowedException()
+    {
+    }
+
+    public TeacherSubgroupNotAllowedException(string message)
+        : base(message)
+    {
+    }
+
+    public TeacherSubgroupNotAllowedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    public TeacherSubgroupNotAllowedException(Guid disciplineId, Guid userId)
+        : base($"Teacher '{userId}' in discipline '{disciplineId}' cannot be assigned to a student subgroup.")
+    {
+        DisciplineId = disciplineId;
+        UserId = userId;
+    }
+
+    public Guid DisciplineId { get; }
+
+    public Guid UserId { get; }
+}

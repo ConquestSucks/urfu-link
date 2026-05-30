@@ -213,14 +213,29 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
         IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
+        var discipline = await CreateDisciplineByIdAsync(disciplineId);
+        var defaultSubgroupId = discipline.Subgroups[0].Id;
         var http = _factory.CreateClient();
         http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
         var resp = await http.PostAsJsonAsync(
             $"/api/v1/disciplines/{disciplineId}/enrollments",
             new
             {
-                Enrollments = users.Select(u => new EnrollmentInput(u.UserId, u.Role)).ToList(),
+                Enrollments = users
+                    .Select(u => new EnrollmentInput(
+                        u.UserId,
+                        u.Role,
+                        u.Role == DisciplineRole.Student ? defaultSubgroupId : null))
+                    .ToList(),
             });
         resp.EnsureSuccessStatusCode();
+    }
+
+    private async Task<DisciplineResponse> CreateDisciplineByIdAsync(Guid disciplineId)
+    {
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+        var resp = await _factory.CreateClient().GetAsync($"/api/v1/disciplines/{disciplineId}");
+        resp.EnsureSuccessStatusCode();
+        return (await resp.Content.ReadFromJsonAsync<DisciplineResponse>())!;
     }
 }

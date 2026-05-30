@@ -75,6 +75,7 @@ public sealed class InternalApiService(
                 UserId = enrollment.UserId.ToString("D"),
                 Role = ToProto(enrollment.Role),
                 EnrolledAtUtc = enrollment.EnrolledAtUtc.ToString("O"),
+                SubgroupId = enrollment.SubgroupId?.ToString("D") ?? string.Empty,
             });
         }
 
@@ -100,13 +101,27 @@ public sealed class InternalApiService(
         var reply = new ListUserDisciplinesReply();
         foreach (var m in memberships)
         {
-            reply.Disciplines.Add(new UserDisciplineInfo
+            var info = new UserDisciplineInfo
             {
                 DisciplineId = m.DisciplineId.ToString("D"),
                 Code = m.Code,
                 Title = m.Title,
                 Role = ToProto(m.Role),
-            });
+                SubgroupId = m.SubgroupId?.ToString("D") ?? string.Empty,
+            };
+
+            var discipline = await disciplines.GetByIdAsync(m.DisciplineId, context.CancellationToken).ConfigureAwait(false);
+            if (discipline is not null)
+            {
+                var visibleSubgroups = m.Role == DisciplineRole.Teacher
+                    ? discipline.Subgroups.Where(s => !s.IsArchived).Select(s => s.Id)
+                    : m.SubgroupId.HasValue
+                        ? new[] { m.SubgroupId.Value }
+                        : Enumerable.Empty<Guid>();
+                info.VisibleSubgroupIds.AddRange(visibleSubgroups.Select(id => id.ToString("D")));
+            }
+
+            reply.Disciplines.Add(info);
         }
 
         return reply;

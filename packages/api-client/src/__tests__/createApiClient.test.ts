@@ -159,6 +159,51 @@ describe("createApiClient", () => {
     });
   });
 
+  describe("disciplines", () => {
+    it("sends subgroup-aware enrollment payloads with idempotency key", async () => {
+      const fetchSpy = mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve({ enrollments: [] }),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+      await client.disciplines.enrollUsers(
+        "discipline-1",
+        [{ userId: "user-1", role: "Student", subgroupId: "subgroup-1" }],
+        "idem-1",
+      );
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/disciplines/discipline-1/enrollments",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            enrollments: [{ userId: "user-1", role: "Student", subgroupId: "subgroup-1" }],
+          }),
+        }),
+      );
+      const [, init] = fetchSpy.mock.calls[0];
+      const headers = new Headers((init as RequestInit).headers as HeadersInit);
+      expect(headers.get("Idempotency-Key")).toBe("idem-1");
+    });
+
+    it("moves students between subgroups", async () => {
+      const fetchSpy = mockFetchWith({ status: 204, ok: true });
+
+      const client = createApiClient({ baseUrl: "" });
+      await client.disciplines.assignEnrollmentSubgroup("discipline-1", "user-1", "subgroup-2");
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/disciplines/discipline-1/enrollments/user-1/subgroup",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ subgroupId: "subgroup-2" }),
+        }),
+      );
+    });
+  });
+
   describe("notifications", () => {
     it("lists notifications with enterprise filters", async () => {
       const fetchSpy = mockFetchWith({

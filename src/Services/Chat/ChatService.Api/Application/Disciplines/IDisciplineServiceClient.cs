@@ -11,7 +11,9 @@ public sealed record UserDisciplineSnapshot(
     Guid DisciplineId,
     string Code,
     string Title,
-    ParticipantRole Role);
+    ParticipantRole Role,
+    Guid? SubgroupId = null,
+    IReadOnlyList<Guid>? VisibleSubgroupIds = null);
 
 /// <summary>
 /// One member of a discipline (teacher or student). Returned by

@@ -18,7 +18,7 @@ public sealed class EnrollUsersValidatorTests
             Id = Guid.NewGuid(),
             Enrollments =
             [
-                new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Student),
+                new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Student, Guid.NewGuid()),
                 new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Teacher),
             ],
         };
@@ -44,7 +44,7 @@ public sealed class EnrollUsersValidatorTests
             Id = Guid.NewGuid(),
             Enrollments =
             [
-                new EnrollmentInput(dupId, DisciplineRole.Student),
+                new EnrollmentInput(dupId, DisciplineRole.Student, Guid.NewGuid()),
                 new EnrollmentInput(dupId, DisciplineRole.Teacher),
             ],
         };
@@ -59,7 +59,7 @@ public sealed class EnrollUsersValidatorTests
         var req = new EnrollUsersRouteRequest
         {
             Id = Guid.NewGuid(),
-            Enrollments = [new EnrollmentInput(Guid.Empty, DisciplineRole.Student)],
+            Enrollments = [new EnrollmentInput(Guid.Empty, DisciplineRole.Student, Guid.NewGuid())],
         };
         var result = _validator.TestValidate(req);
         result.ShouldHaveValidationErrorFor("Enrollments[0].UserId");
@@ -69,10 +69,36 @@ public sealed class EnrollUsersValidatorTests
     public void TooManyEnrollments_Fails()
     {
         var items = Enumerable.Range(0, 501)
-            .Select(_ => new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Student))
+            .Select(_ => new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Student, Guid.NewGuid()))
             .ToList();
         var req = new EnrollUsersRouteRequest { Id = Guid.NewGuid(), Enrollments = items };
         var result = _validator.TestValidate(req);
         result.ShouldHaveValidationErrorFor(r => r.Enrollments);
+    }
+
+    [Fact]
+    public void StudentWithoutSubgroup_Fails()
+    {
+        var req = new EnrollUsersRouteRequest
+        {
+            Id = Guid.NewGuid(),
+            Enrollments = [new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Student)],
+        };
+
+        var result = _validator.TestValidate(req);
+        result.ShouldHaveValidationErrorFor("Enrollments[0].SubgroupId");
+    }
+
+    [Fact]
+    public void TeacherWithSubgroup_Fails()
+    {
+        var req = new EnrollUsersRouteRequest
+        {
+            Id = Guid.NewGuid(),
+            Enrollments = [new EnrollmentInput(Guid.NewGuid(), DisciplineRole.Teacher, Guid.NewGuid())],
+        };
+
+        var result = _validator.TestValidate(req);
+        result.ShouldHaveValidationErrorFor("Enrollments[0].SubgroupId");
     }
 }
