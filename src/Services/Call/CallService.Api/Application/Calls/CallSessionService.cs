@@ -107,17 +107,23 @@ public sealed class CallSessionService(
         }
 
         var now = timeProvider.GetUtcNow();
-        session = session with
+        var active = session with
         {
             Status = CallStatus.Active,
             AcceptedAtUtc = now,
             ConnectedParticipantIds = AddConnected(session, callerId),
         };
-        await sessions.SaveAsync(session, options.Value.SessionTtl, cancellationToken).ConfigureAwait(false);
+        var saved = await sessions.TrySaveAsync(session, active, options.Value.SessionTtl, cancellationToken)
+            .ConfigureAwait(false);
+        if (!saved)
+        {
+            var current = await RequireSessionAsync(callId, cancellationToken).ConfigureAwait(false);
+            return CallSessionDto.FromDomain(current);
+        }
 
-        var dto = CallSessionDto.FromDomain(session);
-        await broadcaster.NotifyAcceptedAsync(session.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
-        await broadcaster.NotifyParticipantJoinedAsync(session.ParticipantIds, session.Id, callerId, cancellationToken).ConfigureAwait(false);
+        var dto = CallSessionDto.FromDomain(active);
+        await broadcaster.NotifyAcceptedAsync(active.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        await broadcaster.NotifyParticipantJoinedAsync(active.ParticipantIds, active.Id, callerId, cancellationToken).ConfigureAwait(false);
         return dto;
     }
 
@@ -130,10 +136,25 @@ public sealed class CallSessionService(
             throw new CallProblemException(StatusCodes.Status409Conflict, "Caller cannot decline their own call.");
         }
 
-        var ended = await EndAsync(session, CallEndReason.DeclinedByCallee, cancellationToken).ConfigureAwait(false);
+        if (session.Status == CallStatus.Ended)
+        {
+            return CallSessionDto.FromDomain(session);
+        }
+
+        if (session.Status != CallStatus.Ringing)
+        {
+            throw new CallProblemException(StatusCodes.Status409Conflict, "Only a ringing call can be declined.");
+        }
+
+        var (ended, changed) = await TryEndAsync(session, CallEndReason.DeclinedByCallee, cancellationToken)
+            .ConfigureAwait(false);
         var dto = CallSessionDto.FromDomain(ended);
-        await broadcaster.NotifyDeclinedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
-        await broadcaster.NotifyEndedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        if (changed)
+        {
+            await broadcaster.NotifyDeclinedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+            await broadcaster.NotifyEndedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        }
+
         return dto;
     }
 
@@ -146,10 +167,25 @@ public sealed class CallSessionService(
             throw new CallProblemException(StatusCodes.Status403Forbidden, "Only the caller can cancel a ringing call.");
         }
 
-        var ended = await EndAsync(session, CallEndReason.CancelledByCaller, cancellationToken).ConfigureAwait(false);
+        if (session.Status == CallStatus.Ended)
+        {
+            return CallSessionDto.FromDomain(session);
+        }
+
+        if (session.Status != CallStatus.Ringing)
+        {
+            throw new CallProblemException(StatusCodes.Status409Conflict, "Only a ringing call can be cancelled.");
+        }
+
+        var (ended, changed) = await TryEndAsync(session, CallEndReason.CancelledByCaller, cancellationToken)
+            .ConfigureAwait(false);
         var dto = CallSessionDto.FromDomain(ended);
-        await broadcaster.NotifyCancelledAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
-        await broadcaster.NotifyEndedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        if (changed)
+        {
+            await broadcaster.NotifyCancelledAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+            await broadcaster.NotifyEndedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        }
+
         return dto;
     }
 
@@ -171,28 +207,48 @@ public sealed class CallSessionService(
         }
 
         await broadcaster.NotifyParticipantLeftAsync(session.ParticipantIds, session.Id, callerId, cancellationToken).ConfigureAwait(false);
-        var ended = await EndAsync(session, CallEndReason.Completed, cancellationToken).ConfigureAwait(false);
+        var (ended, changed) = await TryEndAsync(session, CallEndReason.Completed, cancellationToken)
+            .ConfigureAwait(false);
         var dto = CallSessionDto.FromDomain(ended);
-        await broadcaster.NotifyEndedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        if (changed)
+        {
+            await broadcaster.NotifyEndedAsync(ended.ParticipantIds, dto, cancellationToken).ConfigureAwait(false);
+        }
+
         return dto;
     }
 
     public async Task ProcessExpiredRingingAsync(CallSession session, CancellationToken cancellationToken)
     {
-        if (session.Status != CallStatus.Ringing)
+        ArgumentNullException.ThrowIfNull(session);
+
+        var current = await sessions.GetAsync(session.Id, cancellationToken).ConfigureAwait(false);
+        if (current is null)
         {
             await sessions.RemoveFromExpiryIndexAsync(session.Id, cancellationToken).ConfigureAwait(false);
             return;
         }
 
+        if (current.Status != CallStatus.Ringing)
+        {
+            await sessions.RemoveFromExpiryIndexAsync(current.Id, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         var now = timeProvider.GetUtcNow();
-        if (session.RingExpiresAtUtc > now)
+        if (current.RingExpiresAtUtc > now)
         {
             return;
         }
 
-        var recipientId = session.ParticipantIds.FirstOrDefault(id => id != session.CallerId);
-        var ended = await EndAsync(session, CallEndReason.Missed, cancellationToken).ConfigureAwait(false);
+        var recipientId = current.ParticipantIds.FirstOrDefault(id => id != current.CallerId);
+        var (ended, changed) = await TryEndAsync(current, CallEndReason.Missed, cancellationToken)
+            .ConfigureAwait(false);
+        if (!changed)
+        {
+            return;
+        }
+
         if (recipientId != Guid.Empty)
         {
             await events.PublishAsync(
@@ -209,17 +265,20 @@ public sealed class CallSessionService(
         }
 
         await broadcaster.NotifyEndedAsync(ended.ParticipantIds, CallSessionDto.FromDomain(ended), cancellationToken).ConfigureAwait(false);
-        logger.LogInformation("Call {CallId} expired as missed.", ended.Id);
+        if (logger.IsEnabled(LogLevel.Information))
+        {
+            logger.LogInformation("Call {CallId} expired as missed.", ended.Id);
+        }
     }
 
-    private async Task<CallSession> EndAsync(
+    private async Task<(CallSession Session, bool Changed)> TryEndAsync(
         CallSession session,
         CallEndReason reason,
         CancellationToken cancellationToken)
     {
         if (session.Status == CallStatus.Ended)
         {
-            return session;
+            return (session, false);
         }
 
         var now = timeProvider.GetUtcNow();
@@ -229,7 +288,13 @@ public sealed class CallSessionService(
             EndedAtUtc = now,
             EndReason = reason,
         };
-        await sessions.SaveAsync(ended, options.Value.EndedSessionTtl, cancellationToken).ConfigureAwait(false);
+        var saved = await sessions.TrySaveAsync(session, ended, options.Value.EndedSessionTtl, cancellationToken)
+            .ConfigureAwait(false);
+        if (!saved)
+        {
+            var current = await RequireSessionAsync(session.Id, cancellationToken).ConfigureAwait(false);
+            return (current, false);
+        }
 
         await events.PublishAsync(
             new CallEndedV2Event(
@@ -243,7 +308,7 @@ public sealed class CallSessionService(
                 now),
             cancellationToken).ConfigureAwait(false);
 
-        return ended;
+        return (ended, true);
     }
 
     private async Task<CallSession> RequireSessionAsync(Guid callId, CancellationToken cancellationToken)

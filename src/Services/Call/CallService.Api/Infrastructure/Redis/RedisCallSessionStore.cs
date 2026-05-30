@@ -1,16 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
 using StackExchange.Redis;
-using Urfu.Link.Services.Call.Application;
 using Urfu.Link.Services.Call.Application.Calls;
 using Urfu.Link.Services.Call.Domain;
 
 namespace Urfu.Link.Services.Call.Infrastructure.Redis;
 
 public sealed class RedisCallSessionStore(
-    IConnectionMultiplexer redis,
-    IOptions<CallOptions> options) : ICallSessionStore
+    IConnectionMultiplexer redis) : ICallSessionStore
 {
     private const string KeyPrefix = "call:session:";
     private const string ExpiryIndexKey = "call:ring-expiry";
@@ -81,6 +78,56 @@ public sealed class RedisCallSessionStore(
         {
             await RemoveFromExpiryIndexAsync(session.Id, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    public async Task<bool> TrySaveAsync(
+        CallSession expectedSession,
+        CallSession session,
+        TimeSpan ttl,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(expectedSession);
+        ArgumentNullException.ThrowIfNull(session);
+        if (expectedSession.Id != session.Id)
+        {
+            throw new ArgumentException("Expected and updated call sessions must have the same id.", nameof(session));
+        }
+
+        var db = redis.GetDatabase();
+        var key = SessionKey(session.Id);
+        var transaction = db.CreateTransaction();
+        transaction.AddCondition(Condition.StringEqual(
+            key,
+            JsonSerializer.Serialize(expectedSession, JsonOptions)));
+
+        _ = transaction.StringSetAsync(
+            key,
+            JsonSerializer.Serialize(session, JsonOptions),
+            ttl);
+
+        var saved = await transaction.ExecuteAsync()
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (!saved)
+        {
+            return false;
+        }
+
+        if (session.Status == CallStatus.Ringing)
+        {
+            await db.SortedSetAddAsync(
+                    ExpiryIndexKey,
+                    session.Id.ToString("N"),
+                    session.RingExpiresAtUtc.ToUnixTimeMilliseconds())
+                .WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            await RemoveFromExpiryIndexAsync(session.Id, cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     public Task RemoveFromExpiryIndexAsync(Guid callId, CancellationToken cancellationToken)

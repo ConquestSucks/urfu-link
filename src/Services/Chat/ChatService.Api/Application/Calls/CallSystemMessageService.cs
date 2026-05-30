@@ -1,3 +1,4 @@
+using System.Globalization;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Call;
 using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
@@ -15,6 +16,8 @@ public sealed class CallSystemMessageService(
 {
     public Task HandleIncomingAsync(CallIncomingV2Event evt, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(evt);
+
         var body = evt.CallType == CallType.Video ? "Видеозвонок" : "Звонок";
         return CreateSystemMessageAsync(
             evt.ConversationId,
@@ -32,7 +35,10 @@ public sealed class CallSystemMessageService(
     }
 
     public Task HandleMissedAsync(CallMissedV2Event evt, CancellationToken cancellationToken)
-        => CreateSystemMessageAsync(
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        return CreateSystemMessageAsync(
             evt.ConversationId,
             evt.CallerId,
             "Пропущенный звонок",
@@ -45,9 +51,12 @@ public sealed class CallSystemMessageService(
             evt.RingDuration,
             CallEndReason.Missed,
             cancellationToken);
+    }
 
     public Task HandleEndedAsync(CallEndedV2Event evt, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(evt);
+
         if (evt.Reason is CallEndReason.Missed or CallEndReason.NoAnswer)
         {
             return Task.CompletedTask;
@@ -104,7 +113,7 @@ public sealed class CallSystemMessageService(
             return;
         }
 
-        var message = Message.SystemCall(
+        var message = Message.CreateSystemCall(
             Guid.NewGuid(),
             conversationId,
             senderId,
@@ -145,6 +154,6 @@ public sealed class CallSystemMessageService(
 
     private static string FormatDuration(TimeSpan duration)
         => duration.TotalHours >= 1
-            ? duration.ToString(@"h\:mm\:ss")
-            : duration.ToString(@"m\:ss");
+            ? duration.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : duration.ToString(@"m\:ss", CultureInfo.InvariantCulture);
 }

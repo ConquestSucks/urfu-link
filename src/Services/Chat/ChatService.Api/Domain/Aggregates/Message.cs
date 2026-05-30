@@ -268,7 +268,7 @@ public sealed class Message
             systemCall: null);
     }
 
-    public static Message SystemCall(
+    public static Message CreateSystemCall(
         Guid id,
         string conversationId,
         Guid senderId,

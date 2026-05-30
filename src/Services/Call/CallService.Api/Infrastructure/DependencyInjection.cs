@@ -9,26 +9,32 @@ using Urfu.Link.Services.Call.Realtime;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Configuration;
 using Grpc.Core;
+using ApplicationCallOptions = Urfu.Link.Services.Call.Application.CallOptions;
 
 namespace Urfu.Link.Services.Call.Infrastructure;
 
 public static class ModuleRegistration
 {
-    public static IServiceCollection AddCallModule(this IServiceCollection services)
+    public static IServiceCollection AddCallModule(this IServiceCollection services, IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddSingleton(new ServiceProfile(
             "call-service",
             "signaling",
             KafkaTopicNames.CallEvents,
             "call.sample.v1"));
-        services.AddOptions<CallOptions>()
-            .Bind(configuration.GetSection(CallOptions.SectionName));
+        services.AddOptions<ApplicationCallOptions>()
+            .Bind(configuration.GetSection(ApplicationCallOptions.SectionName));
         services.AddOptions<LiveKitOptions>()
             .Bind(configuration.GetSection(LiveKitOptions.SectionName));
         services.AddOptions<ChatConversationClientOptions>()
             .Bind(configuration.GetSection(ChatConversationClientOptions.SectionName));
+        services.AddOptions<InternalGrpcAuthOptions>()
+            .Bind(configuration.GetSection(InternalGrpcAuthOptions.SectionName));
+        services.AddHttpClient(KeycloakClientCredentialsGrpcBearerTokenProvider.HttpClientName);
+        services.AddSingleton<IGrpcBearerTokenProvider, KeycloakClientCredentialsGrpcBearerTokenProvider>();
         services.AddSingleton(sp =>
         {
             var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<ChatConversationClientOptions>>().Value;

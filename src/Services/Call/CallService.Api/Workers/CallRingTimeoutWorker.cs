@@ -29,7 +29,7 @@ public sealed class CallRingTimeoutWorker(
             {
                 break;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 logger.LogWarning(ex, "Failed to process expired ringing calls.");
             }

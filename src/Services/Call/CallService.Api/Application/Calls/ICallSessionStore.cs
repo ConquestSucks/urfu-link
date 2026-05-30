@@ -10,6 +10,12 @@ public interface ICallSessionStore
 
     Task SaveAsync(CallSession session, TimeSpan ttl, CancellationToken cancellationToken);
 
+    Task<bool> TrySaveAsync(
+        CallSession expectedSession,
+        CallSession session,
+        TimeSpan ttl,
+        CancellationToken cancellationToken);
+
     Task RemoveFromExpiryIndexAsync(Guid callId, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<CallSession>> ListExpiredRingingAsync(

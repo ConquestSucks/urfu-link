@@ -558,6 +558,19 @@ spec:
                 "$(printf '{"data":{"primary_connection":"%s","internal_auth_client_secret":"%s"}}' \
                   "$CHAT_SVC_CONN" "$CHAT_SERVICE_INTERNAL_SECRET")"
 
+              # CallService uses ChatService.InternalApi over gRPC to verify direct-chat membership.
+              # It authenticates with the same internal client because ChatService accepts the
+              # shared Keycloak internal JWT scheme for machine-to-machine calls.
+              echo "Merging internal gRPC secret into call-service Vault path..."
+              EXISTING_CALL_SVC="$(vault_read urfu-link/prod/call-service || true)"
+              CALL_SVC_KAFKA="$(echo "$EXISTING_CALL_SVC" | jq -r '.data.data.kafka_bootstrap_servers // empty' 2>/dev/null || true)"
+              if [ -z "$CALL_SVC_KAFKA" ]; then
+                CALL_SVC_KAFKA="urfu-kafka.urfu-platform.svc.cluster.local:9092"
+              fi
+              vault_put urfu-link/prod/call-service \
+                "$(printf '{"data":{"kafka_bootstrap_servers":"%s","internal_auth_client_secret":"%s"}}' \
+                  "$CALL_SVC_KAFKA" "$CHAT_SERVICE_INTERNAL_SECRET")"
+
               # --- Update Vault OIDC config with real client secret ---
               echo "Updating Vault OIDC auth config..."
               curl --fail --silent --show-error \

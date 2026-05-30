@@ -3,14 +3,18 @@ using Urfu.Link.Services.Chat.Grpc;
 
 namespace Urfu.Link.Services.Call.Infrastructure.Grpc;
 
-public sealed class ChatConversationClient(InternalApi.InternalApiClient client) : IChatConversationClient
+internal sealed class ChatConversationClient(
+    InternalApi.InternalApiClient client,
+    IGrpcBearerTokenProvider tokenProvider) : IChatConversationClient
 {
     public async Task<CallConversationMetadata> GetConversationAsync(
         string conversationId,
         CancellationToken cancellationToken)
     {
+        var metadata = await tokenProvider.GetAuthorizationMetadataAsync(cancellationToken).ConfigureAwait(false);
         var reply = await client.GetConversationAsync(
             new GetConversationRequest { ConversationId = conversationId },
+            headers: metadata,
             cancellationToken: cancellationToken).ConfigureAwait(false);
 
         return new CallConversationMetadata(

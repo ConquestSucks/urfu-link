@@ -70,7 +70,7 @@ builder.Services.AddOutbox(builder.Configuration);
 builder.Services.AddKafkaPublisher(builder.Configuration);
 builder.Services.AddHostedService<KafkaConsumerWorker>();
 builder.Services.AddHostedService<CallRingTimeoutWorker>();
-builder.Services.AddCallModule();
+builder.Services.AddCallModule(builder.Configuration);
 
 var app = builder.Build();
 

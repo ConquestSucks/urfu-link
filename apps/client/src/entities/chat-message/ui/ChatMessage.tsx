@@ -89,10 +89,10 @@ const formatDuration = (value: string | null | undefined): string | null => {
     if (minutes >= 60) {
         const hours = Math.floor(minutes / 60);
         const rest = minutes % 60;
-        return `${hours.toString().padStart(2, "0")}:${rest.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+        return `${hours}:${rest.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
     }
 
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
 const buildSystemCallLabel = (systemCall?: ChatMessageProps["systemCall"]) => {
@@ -100,13 +100,16 @@ const buildSystemCallLabel = (systemCall?: ChatMessageProps["systemCall"]) => {
 
     switch (systemCall?.status) {
         case "Missed":
-        case "Declined":
-        case "Cancelled":
-        case "Failed":
             return "Пропущенный звонок";
+        case "Declined":
+            return "Звонок отклонён";
+        case "Cancelled":
+            return "Звонок отменён";
+        case "Failed":
+            return "Звонок завершён";
         case "Completed": {
             const duration = formatDuration(systemCall.duration);
-            return duration ? `${callLabel} завершён • ${duration}` : `${callLabel} завершён`;
+            return duration ? `Звонок завершён • ${duration}` : "Звонок завершён";
         }
         case "Started":
         default:
