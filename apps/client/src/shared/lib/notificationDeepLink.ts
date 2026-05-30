@@ -143,9 +143,20 @@ const resolveMediaLink = (segments: string[]): NotificationNavigationTarget => (
     }),
 });
 
-const resolveCallLink = (segments: string[]): NotificationNavigationTarget => ({
-    href: segments[0] ? `/call/${toHyphenatedGuidIfCompact(segments[0])}` as Href : "/call" as Href,
-});
+const resolveCallLink = (
+    scope: InboxScope,
+    data?: Record<string, string> | null,
+): NotificationNavigationTarget | null => {
+    const conversationId = data?.conversationId;
+    if (!conversationId) return null;
+
+    const messageId = data.messageId ? toHyphenatedGuidIfCompact(data.messageId) : undefined;
+
+    return {
+        href: resolveConversationHref(conversationId, scope, { message: messageId }),
+        messageId,
+    };
+};
 
 const resolveSystemLink = (segments: string[]): NotificationNavigationTarget => ({
     href: buildHref("/profile/notifications", {
@@ -157,6 +168,7 @@ const resolveSystemLink = (segments: string[]): NotificationNavigationTarget => 
 export const resolveNotificationDeepLink = (
     deepLink: string | null | undefined,
     scope: InboxScope,
+    data?: Record<string, string> | null,
 ): NotificationNavigationTarget | null => {
     const parsed = parseDeepLink(deepLink);
     if (!parsed) return null;
@@ -169,7 +181,7 @@ export const resolveNotificationDeepLink = (
         case "media":
             return resolveMediaLink(parsed.segments);
         case "call":
-            return resolveCallLink(parsed.segments);
+            return resolveCallLink(scope, data);
         case "account":
             return { href: "/profile" as Href };
         case "system":
@@ -182,11 +194,15 @@ export const resolveNotificationDeepLink = (
 };
 
 export const inferNotificationScope = (
-    notification: Pick<NotificationDto, "category" | "deepLink" | "type">,
+    notification: Pick<NotificationDto, "category" | "deepLink" | "type"> & {
+        data?: Record<string, string> | null;
+    },
 ): InboxScope => {
     const parsed = parseDeepLink(notification.deepLink);
+    const dataConversationId = notification.data?.conversationId;
 
     if (parsed?.host === "discipline") return "subjects";
+    if (dataConversationId && isDisciplineConversationId(dataConversationId)) return "subjects";
     if (
         parsed?.host === "chat" &&
         parsed.segments[0] === "conv" &&

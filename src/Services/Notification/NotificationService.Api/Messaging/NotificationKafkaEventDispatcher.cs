@@ -95,7 +95,8 @@ public sealed class NotificationKafkaEventDispatcher
                 dryRun,
                 cancellationToken).ConfigureAwait(false),
             "call.incoming.v2" => await RouteAsync(
-                MapIncomingV2(payload),
+                payload.Deserialize<CallIncomingV2Event>(JsonOptions)
+                    ?? throw new JsonException("CallIncomingV2Event payload null"),
                 scope.GetRequiredService<CallIncomingHandler>(),
                 scope,
                 dryRun,
@@ -107,7 +108,8 @@ public sealed class NotificationKafkaEventDispatcher
                 dryRun,
                 cancellationToken).ConfigureAwait(false),
             "call.missed.v2" => await RouteAsync(
-                MapMissedV2(payload),
+                payload.Deserialize<CallMissedV2Event>(JsonOptions)
+                    ?? throw new JsonException("CallMissedV2Event payload null"),
                 scope.GetRequiredService<CallMissedHandler>(),
                 scope,
                 dryRun,
@@ -338,31 +340,6 @@ public sealed class NotificationKafkaEventDispatcher
             scope,
             dryRun,
             cancellationToken).ConfigureAwait(false);
-    }
-
-    private static CallIncomingEvent MapIncomingV2(JsonNode payload)
-    {
-        var evt = payload.Deserialize<CallIncomingV2Event>(JsonOptions)
-            ?? throw new JsonException("CallIncomingV2Event payload null");
-        return new CallIncomingEvent(
-            evt.CallId,
-            evt.CallerId,
-            evt.ParticipantIds,
-            evt.CallType,
-            evt.OccurredAtUtc);
-    }
-
-    private static CallMissedEvent MapMissedV2(JsonNode payload)
-    {
-        var evt = payload.Deserialize<CallMissedV2Event>(JsonOptions)
-            ?? throw new JsonException("CallMissedV2Event payload null");
-        return new CallMissedEvent(
-            evt.CallId,
-            evt.CallerId,
-            evt.RecipientId,
-            evt.CallType,
-            evt.RingDuration,
-            evt.OccurredAtUtc);
     }
 
     private static async Task<NotificationKafkaDispatchResult> ArchiveAsync(

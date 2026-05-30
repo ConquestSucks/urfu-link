@@ -127,7 +127,7 @@ export const showMessageBrowserNotification = (
 
 export const showServerBrowserNotification = (notification: NotificationDto) => {
     const scope = inferNotificationScope(notification);
-    const target = resolveNotificationDeepLink(notification.deepLink, scope);
+    const target = resolveNotificationDeepLink(notification.deepLink, scope, notification.data);
     const conversationId = notification.data.conversationId;
     const messageId = notification.data.messageId;
     const conversationMessageKey = buildConversationMessageKey(conversationId, messageId);

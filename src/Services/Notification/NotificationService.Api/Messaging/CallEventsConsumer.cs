@@ -45,12 +45,7 @@ public sealed class CallEventsConsumer(
                     await RoutingDispatcher.Route(
                         scope,
                         scope.GetRequiredService<CallIncomingHandler>(),
-                        new CallIncomingEvent(
-                            evt.CallId,
-                            evt.CallerId,
-                            evt.ParticipantIds,
-                            evt.CallType,
-                            evt.OccurredAtUtc),
+                        evt,
                         cancellationToken).ConfigureAwait(false);
                     break;
                 }
@@ -70,13 +65,7 @@ public sealed class CallEventsConsumer(
                     await RoutingDispatcher.Route(
                         scope,
                         scope.GetRequiredService<CallMissedHandler>(),
-                        new CallMissedEvent(
-                            evt.CallId,
-                            evt.CallerId,
-                            evt.RecipientId,
-                            evt.CallType,
-                            evt.RingDuration,
-                            evt.OccurredAtUtc),
+                        evt,
                         cancellationToken).ConfigureAwait(false);
                     break;
                 }

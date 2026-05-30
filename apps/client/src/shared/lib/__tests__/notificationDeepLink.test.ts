@@ -8,7 +8,6 @@ const hyphenatedGuid = "3f7d3e57-b4f5-481e-93a1-c8e9b4d70a11";
 const compactRootId = "11111111222233334444555555555555";
 const compactReplyId = "aaaaaaaa111122223333bbbbbbbbbbbb";
 const compactCallId = "abcd1234abcdabcdabcdabcdabcdabcd";
-const hyphenatedCallId = "abcd1234-abcd-abcd-abcd-abcdabcdabcd";
 
 describe("resolveNotificationDeepLink", () => {
     it("routes direct chat message notifications to the message in the chat", () => {
@@ -72,15 +71,39 @@ describe("resolveNotificationDeepLink", () => {
             });
     });
 
-    it("routes call links directly to the call screen", () => {
+    it("does not route stale call links without a source conversation", () => {
         expect(resolveNotificationDeepLink(`urfulink://call/${compactCallId}`, "chats"))
-            .toEqual({
-                href: `/call/${hyphenatedCallId}`,
-            });
+            .toBeNull();
 
         expect(resolveNotificationDeepLink(`urfulink://call/${compactCallId}/ended`, "chats"))
+            .toBeNull();
+    });
+
+    it("routes call links with source conversation data to the chat instead of the call screen", () => {
+        expect(
+            resolveNotificationDeepLink(
+                `urfulink://call/${compactCallId}/missed`,
+                "chats",
+                { conversationId: "direct-1" },
+            ),
+        )
             .toEqual({
-                href: `/call/${hyphenatedCallId}`,
+                href: "/chats/direct-1",
+            });
+
+        expect(
+            resolveNotificationDeepLink(
+                `urfulink://call/${compactCallId}/missed`,
+                "chats",
+                {
+                    conversationId: "direct-1",
+                    messageId: compactGuid,
+                },
+            ),
+        )
+            .toEqual({
+                href: `/chats/direct-1?message=${hyphenatedGuid}`,
+                messageId: hyphenatedGuid,
             });
     });
 
