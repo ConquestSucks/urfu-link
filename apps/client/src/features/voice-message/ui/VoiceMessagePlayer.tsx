@@ -42,8 +42,13 @@ export const VoiceMessagePlayer = ({
     }, [player, playbackUri, sourceUri]);
 
     const totalSeconds = useMemo(() => {
-        if (durationSeconds && durationSeconds > 0) return durationSeconds;
-        return status.duration && status.duration > 0 ? status.duration : 0;
+        const metadataDuration = durationSeconds && durationSeconds > 0 ? durationSeconds : 0;
+        const playerDuration = status.duration && status.duration > 0 ? status.duration : 0;
+
+        if (metadataDuration > 0 && playerDuration > 0) {
+            return Math.min(metadataDuration, playerDuration);
+        }
+        return metadataDuration || playerDuration;
     }, [durationSeconds, status.duration]);
     const currentSeconds = Math.max(0, Math.min(status.currentTime ?? 0, totalSeconds || Number.MAX_SAFE_INTEGER));
     const progress = totalSeconds > 0 ? Math.min(currentSeconds / totalSeconds, 1) : 0;
