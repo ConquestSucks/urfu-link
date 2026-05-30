@@ -12,3 +12,8 @@ allowBuilds:
 
 patchedDependencies:
   rn-emoji-keyboard@1.7.0: patches/rn-emoji-keyboard@1.7.0.patch
+
+packageExtensions:
+  "@livekit/react-native-expo-plugin@*":
+    dependencies:
+      "@expo/config-plugins": "~56.0.7"

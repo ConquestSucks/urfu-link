@@ -13,8 +13,9 @@ import { useNotificationHub } from "@/features/notifications";
 import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
 import { useCallHub } from "@/shared/lib/useCallHub";
-import { IncomingCallModal } from "@/features/call";
+import { IncomingCallModal, OutgoingCallModal } from "@/features/call";
 import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
+import { configureCallSounds } from "@/shared/lib/call-sounds";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -39,6 +40,7 @@ export default function AuthLayout() {
 
     useEffect(() => {
         configureMessageSounds(profile?.notifications);
+        configureCallSounds(profile?.notifications);
         configureBrowserNotifications(profile?.notifications);
     }, [profile?.notifications]);
 
@@ -85,6 +87,7 @@ export default function AuthLayout() {
             )}
 
             <IncomingCallModal />
+            <OutgoingCallModal />
         </SafeAreaView>
     );
 }

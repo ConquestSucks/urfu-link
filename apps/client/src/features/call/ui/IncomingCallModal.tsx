@@ -8,6 +8,7 @@ import { useConversationParticipants, useParticipantsStore } from "@/entities/co
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useCallStore } from "@/entities/call";
 import type { CallSessionDto } from "@urfu-link/api-client";
+import { startCallRingtone, stopCallRingtone } from "@/shared/lib/call-sounds";
 
 export const IncomingCallModal = () => {
     const router = useRouter();
@@ -34,6 +35,18 @@ export const IncomingCallModal = () => {
         });
     }, [conversationId, participants.length]);
 
+    useEffect(() => {
+        if (!incomingCall) {
+            void stopCallRingtone("incoming");
+            return;
+        }
+
+        void startCallRingtone("incoming");
+        return () => {
+            void stopCallRingtone("incoming");
+        };
+    }, [incomingCall?.id]);
+
     const caller = useMemo(() => {
         if (!incomingCall || !conversationId) {
             return null;
@@ -57,6 +70,7 @@ export const IncomingCallModal = () => {
         setIsAccepting(true);
         try {
             await acceptIncoming();
+            await stopCallRingtone("incoming");
             router.push(`/call/${incomingCall.id}` as never);
         } finally {
             setIsAccepting(false);
@@ -71,6 +85,7 @@ export const IncomingCallModal = () => {
         setIsDeclining(true);
         try {
             await declineIncoming();
+            await stopCallRingtone("incoming");
         } finally {
             setIsDeclining(false);
         }

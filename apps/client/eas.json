@@ -10,7 +10,8 @@
       "channel": "preview",
       "env": {
         "APP_ENV": "dev",
-        "EXPO_PUBLIC_API_URL": "https://api.dev.127.0.0.1.nip.io"
+        "EXPO_PUBLIC_API_URL": "https://api.dev.127.0.0.1.nip.io",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://id.ghjc.ru"
       }
     },
     "preview": {
@@ -18,7 +19,8 @@
       "channel": "staging",
       "env": {
         "APP_ENV": "dev",
-        "EXPO_PUBLIC_API_URL": "https://api.dev.127.0.0.1.nip.io"
+        "EXPO_PUBLIC_API_URL": "https://api.dev.127.0.0.1.nip.io",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://id.ghjc.ru"
       }
     },
     "production": {
@@ -26,7 +28,8 @@
       "channel": "production",
       "env": {
         "APP_ENV": "prod",
-        "EXPO_PUBLIC_API_URL": "https://api.urfu-link.ghjc.ru"
+        "EXPO_PUBLIC_API_URL": "https://api.urfu-link.ghjc.ru",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://id.ghjc.ru"
       }
     }
   },

@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { Text, View } from "react-native";
+import * as ScreenOrientation from "expo-screen-orientation";
+import { ActivityIndicator, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
@@ -11,6 +12,7 @@ import {
     useParticipantsStore,
 } from "@/entities/conversation/model/participants-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import { playCallSound } from "@/shared/lib/call-sounds";
 import { CallRoom } from "./CallRoom";
 import type { ParticipantInfo } from "./CallRoom.types";
 
@@ -48,14 +50,16 @@ export const CallScreen = () => {
     const leaveCall = useCallStore((state) => state.leaveCall);
     const cancelCall = useCallStore((state) => state.cancelCall);
     const incomingCall = useCallStore((state) => state.incomingCall);
+    const outgoingCall = useCallStore((state) => state.outgoingCall);
     const activeCall = useCallStore((state) => state.activeCall);
 
     const callFromStore = useMemo(() => {
         if (!callId) return null;
         if (activeCall?.id === callId) return activeCall;
         if (incomingCall?.id === callId) return incomingCall;
+        if (outgoingCall?.id === callId) return outgoingCall;
         return null;
-    }, [activeCall, callId, incomingCall]);
+    }, [activeCall, callId, incomingCall, outgoingCall]);
 
     const [callFromApi, setCallFromApi] = useState<CallSessionDto | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
@@ -80,8 +84,8 @@ export const CallScreen = () => {
         if (conversation?.title) return conversation.title;
 
         const peer = conversationParticipants.find((p) => p.userId !== currentUserId);
-        return peer?.displayName || "Видеозвонок";
-    }, [conversation?.title, conversationParticipants, currentUserId]);
+        return peer?.displayName || (call?.callType === "Video" ? "Видеозвонок" : "Звонок");
+    }, [call?.callType, conversation?.title, conversationParticipants, currentUserId]);
 
     const participantInfos = useMemo<ParticipantInfo[]>(() => {
         if (!call?.participantIds) return [];
@@ -94,14 +98,15 @@ export const CallScreen = () => {
             const conversationParticipant = conversationParticipants.find(
                 (entry) => entry.userId === userId,
             );
+            const isSelf = userId === currentUserId;
 
             return {
                 userId,
-                displayName:
-                    userId === currentUserId
-                        ? "Вы"
-                        : conversationParticipant?.displayName || "Участник",
-                isSelf: userId === currentUserId,
+                displayName: isSelf
+                    ? "Вы"
+                    : conversationParticipant?.displayName || "Участник",
+                avatarUrl: conversationParticipant?.avatarUrl ?? null,
+                isSelf,
                 isConnected: Boolean(connectedByUserId.get(userId)),
             };
         });
@@ -113,7 +118,9 @@ export const CallScreen = () => {
         }
 
         if (call.status === "Ringing") {
-            return "Ожидание собеседника";
+            return call.callerId === currentUserId
+                ? "Ожидание ответа"
+                : "Подключение к звонку";
         }
 
         if (isConnectedToCall) {
@@ -122,13 +129,8 @@ export const CallScreen = () => {
             )}`;
         }
 
-        return "Вызов завершён";
-    }, [call, isConnectedToCall, timerSeconds]);
-
-    const connectedParticipantsCount = useMemo(() => {
-        if (!call?.participants.length) return 0;
-        return call.participants.filter((participant) => participant.isConnected).length;
-    }, [call?.participants]);
+        return "Звонок завершён";
+    }, [call, currentUserId, isConnectedToCall, timerSeconds]);
 
     const returnToConversation = useCallback(() => {
         if (!callConversationId) {
@@ -145,6 +147,7 @@ export const CallScreen = () => {
         setIsLeaving(true);
 
         try {
+            await playCallSound("leave");
             if (call.status === "Ringing" && call.callerId === currentUserId) {
                 await cancelCall(call.id);
             } else {
@@ -160,6 +163,16 @@ export const CallScreen = () => {
     }, [cancelCall, call, currentUserId, leaveCall, returnToConversation]);
 
     useEffect(() => {
+        void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.ALL).catch(() => undefined);
+
+        return () => {
+            void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(
+                () => undefined,
+            );
+        };
+    }, []);
+
+    useEffect(() => {
         if (!callId) return;
 
         let isActive = true;
@@ -172,7 +185,9 @@ export const CallScreen = () => {
 
             try {
                 const loaded = await loadCall(callId);
-                setActiveCall(loaded);
+                if (loaded.status === "Active") {
+                    setActiveCall(loaded);
+                }
                 if (isActive) {
                     setCallFromApi(loaded);
                     setLoadError(null);
@@ -197,11 +212,9 @@ export const CallScreen = () => {
     }, [callId, clearToken]);
 
     useEffect(() => {
-        if (!call) return;
+        if (!call || call.status !== "Active") return;
 
         void (async () => {
-            if (call.status === "Ended") return;
-
             if (!callToken && !isTokenLoading) {
                 await loadToken(call.id).catch(() => {
                     // Token error is stored and rendered by CallRoom.
@@ -228,7 +241,7 @@ export const CallScreen = () => {
     }, [callConversationId, conversationParticipants.length]);
 
     useEffect(() => {
-        if (!isConnectedToCall || !call?.acceptedAtUtc || isMobile) return;
+        if (!isConnectedToCall || !call?.acceptedAtUtc) return;
 
         const timeout = setInterval(() => {
             const acceptedAt = Date.parse(call.acceptedAtUtc ?? "");
@@ -242,7 +255,7 @@ export const CallScreen = () => {
         return () => {
             clearInterval(timeout);
         };
-    }, [call?.acceptedAtUtc, isConnectedToCall, isMobile]);
+    }, [call?.acceptedAtUtc, isConnectedToCall]);
 
     if (!callId) {
         return null;
@@ -252,13 +265,17 @@ export const CallScreen = () => {
         <SafeAreaView edges={["top", "left", "right", "bottom"]} className="flex-1 bg-black">
             <View className="flex-1 bg-app-bg">
                 <View className="h-14 border-b border-white/10 px-4 flex-row items-center justify-between">
-                    <View>
-                        <Text className="text-white font-semibold">{callTitle}</Text>
-                        <Text className="text-white/70 text-xs">{statusText}</Text>
+                    <View className="flex-1 min-w-0">
+                        <Text className="text-white font-semibold" numberOfLines={1}>
+                            {callTitle}
+                        </Text>
+                        <Text className="text-white/70 text-xs" numberOfLines={1}>
+                            {statusText}
+                        </Text>
                     </View>
                     <View className="flex-row items-center gap-2">
                         <Text className="text-white/70 text-xs">
-                            {connectedParticipantsCount} участн.
+                            {call?.participantIds.length ?? 0} участн.
                         </Text>
                     </View>
                 </View>
@@ -273,11 +290,17 @@ export const CallScreen = () => {
                         isLeaving={isLeaving}
                         isMobile={isMobile}
                         callTitle={callTitle}
+                        conversationId={call.conversationId}
                         participantInfos={participantInfos}
                         onLeave={handleLeave}
                         onCloseError={returnToConversation}
                     />
-                ) : null}
+                ) : (
+                    <View className="flex-1 items-center justify-center">
+                        <ActivityIndicator size="large" color="#fff" />
+                        <Text className="text-white mt-3">Подключение...</Text>
+                    </View>
+                )}
             </View>
         </SafeAreaView>
     );

@@ -40,13 +40,25 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         });
     }
     const projectId = process.env.EXPO_EAS_PROJECT_ID;
+    const iosBundleIdentifier =
+        process.env.EXPO_IOS_BUNDLE_IDENTIFIER ??
+        (appEnv === "prod" ? "ru.urfu.link" : "ru.urfu.link.dev");
+    const androidPackage =
+        process.env.EXPO_ANDROID_PACKAGE ??
+        (appEnv === "prod" ? "ru.urfu.link" : "ru.urfu.link.dev");
+    const iosScreenShareExtensionBundleIdentifier =
+        process.env.EXPO_IOS_SCREEN_SHARE_EXTENSION_BUNDLE_IDENTIFIER ??
+        `${iosBundleIdentifier}.screenshare`;
+    const iosAppGroupIdentifier =
+        process.env.EXPO_IOS_APP_GROUP_IDENTIFIER ??
+        `group.${iosBundleIdentifier}.screenshare`;
     return {
         ...config,
         name: appEnv === "prod" ? "URFU Link" : "URFU Link Dev",
         slug: "urfu-link-client",
         version: "1.0.0",
         scheme: "urfulink",
-        orientation: "portrait",
+        orientation: "default",
         userInterfaceStyle: "automatic",
         platforms: ["ios", "android", "web"],
         runtimeVersion: {
@@ -60,6 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             "expo-web-browser",
             "expo-image-picker",
             "expo-font",
+            "expo-asset",
             [
                 "expo-audio",
                 {
@@ -69,9 +82,58 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                     enableBackgroundPlayback: false,
                 },
             ],
-            "@livekit/react-native-expo-plugin",
+            [
+                "@livekit/react-native-expo-plugin",
+                {
+                    android: {
+                        audioType: "communication",
+                        enableScreenShareService: true,
+                    },
+                    ios: {
+                        enableMultitaskingCameraAccess: true,
+                    },
+                },
+            ],
             "@config-plugins/react-native-webrtc",
+            "expo-screen-orientation",
+            [
+                "./plugins/withLiveKitBroadcastExtension",
+                {
+                    appGroupIdentifier: iosAppGroupIdentifier,
+                    extensionBundleIdentifier: iosScreenShareExtensionBundleIdentifier,
+                    extensionName: "URFULinkScreenShare",
+                    iosBundleIdentifier,
+                },
+            ],
         ],
+        ios: {
+            ...(config.ios ?? {}),
+            bundleIdentifier: iosBundleIdentifier,
+            entitlements: {
+                ...(config.ios?.entitlements ?? {}),
+                "com.apple.security.application-groups": [iosAppGroupIdentifier],
+            },
+            infoPlist: {
+                ...(config.ios?.infoPlist ?? {}),
+                RTCAppGroupIdentifier: iosAppGroupIdentifier,
+                RTCScreenSharingExtension: iosScreenShareExtensionBundleIdentifier,
+                UIBackgroundModes: Array.from(
+                    new Set([...(config.ios?.infoPlist?.UIBackgroundModes ?? []), "voip"]),
+                ),
+            },
+        },
+        android: {
+            ...(config.android ?? {}),
+            package: androidPackage,
+            permissions: Array.from(
+                new Set([
+                    ...(config.android?.permissions ?? []),
+                    "android.permission.FOREGROUND_SERVICE",
+                    "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+                    "android.permission.POST_NOTIFICATIONS",
+                ]),
+            ),
+        },
         extra: {
             appEnv,
             apiUrl,
