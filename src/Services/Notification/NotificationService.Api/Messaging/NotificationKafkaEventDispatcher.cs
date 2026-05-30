@@ -94,13 +94,27 @@ public sealed class NotificationKafkaEventDispatcher
                 scope,
                 dryRun,
                 cancellationToken).ConfigureAwait(false),
+            "call.incoming.v2" => await RouteAsync(
+                MapIncomingV2(payload),
+                scope.GetRequiredService<CallIncomingHandler>(),
+                scope,
+                dryRun,
+                cancellationToken).ConfigureAwait(false),
             "call.missed.v1" => await RouteAsync(
                 payload.Deserialize<CallMissedEvent>(JsonOptions),
                 scope.GetRequiredService<CallMissedHandler>(),
                 scope,
                 dryRun,
                 cancellationToken).ConfigureAwait(false),
+            "call.missed.v2" => await RouteAsync(
+                MapMissedV2(payload),
+                scope.GetRequiredService<CallMissedHandler>(),
+                scope,
+                dryRun,
+                cancellationToken).ConfigureAwait(false),
             "call.ended.v1" => await ArchiveCallAsync(payload, scope, dryRun, cancellationToken)
+                .ConfigureAwait(false),
+            "call.ended.v2" => await ArchiveCallV2Async(payload, scope, dryRun, cancellationToken)
                 .ConfigureAwait(false),
             "discipline.user_enrolled.v1" => await RouteAsync(
                 payload.Deserialize<UserEnrolledEvent>(JsonOptions),
@@ -307,6 +321,48 @@ public sealed class NotificationKafkaEventDispatcher
             scope,
             dryRun,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task<NotificationKafkaDispatchResult> ArchiveCallV2Async(
+        JsonNode payload,
+        IServiceProvider scope,
+        bool dryRun,
+        CancellationToken cancellationToken)
+    {
+        var evt = payload.Deserialize<CallEndedV2Event>(JsonOptions)
+            ?? throw new JsonException("CallEndedV2Event payload null");
+        return await ArchiveAsync(
+            evt.EventType,
+            NotificationSourceActions.CallIncoming(evt.CallId),
+            evt.OccurredAtUtc,
+            scope,
+            dryRun,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private static CallIncomingEvent MapIncomingV2(JsonNode payload)
+    {
+        var evt = payload.Deserialize<CallIncomingV2Event>(JsonOptions)
+            ?? throw new JsonException("CallIncomingV2Event payload null");
+        return new CallIncomingEvent(
+            evt.CallId,
+            evt.CallerId,
+            evt.ParticipantIds,
+            evt.CallType,
+            evt.OccurredAtUtc);
+    }
+
+    private static CallMissedEvent MapMissedV2(JsonNode payload)
+    {
+        var evt = payload.Deserialize<CallMissedV2Event>(JsonOptions)
+            ?? throw new JsonException("CallMissedV2Event payload null");
+        return new CallMissedEvent(
+            evt.CallId,
+            evt.CallerId,
+            evt.RecipientId,
+            evt.CallType,
+            evt.RingDuration,
+            evt.OccurredAtUtc);
     }
 
     private static async Task<NotificationKafkaDispatchResult> ArchiveAsync(

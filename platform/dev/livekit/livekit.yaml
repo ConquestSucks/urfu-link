@@ -1,5 +1,7 @@
 port: 7880
 rtc:
+  use_external_ip: false
+  node_ip: 127.0.0.1
   tcp_port: 7881
   port_range_start: 60100
   port_range_end: 60150

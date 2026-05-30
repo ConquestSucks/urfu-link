@@ -1,7 +1,10 @@
+import { registerGlobals } from "@livekit/react-native";
 import { AppProviders } from "@/providers";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "../global.css";
+
+registerGlobals();
 
 export default function RootLayout() {
     return (<AppProviders>

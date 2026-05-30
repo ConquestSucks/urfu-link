@@ -121,7 +121,7 @@ public sealed class DisciplineEventConsumer(
         using var doc = JsonDocument.Parse(payload);
         var root = doc.RootElement;
 
-        var messageId = root.TryGetProperty("messageId", out var midProp) && midProp.TryGetGuid(out var mid)
+        var messageId = root.TryGetPropertyIgnoreCase("messageId", out var midProp) && midProp.TryGetGuid(out var mid)
             ? mid
             : Guid.Empty;
         if (messageId != Guid.Empty && !await TryRegisterAsync(messageId, cancellationToken).ConfigureAwait(false))
@@ -130,12 +130,12 @@ public sealed class DisciplineEventConsumer(
             return;
         }
 
-        if (!root.TryGetProperty("payload", out var payloadElement))
+        if (!root.TryGetPropertyIgnoreCase("payload", out var payloadElement))
         {
             return;
         }
 
-        var eventType = payloadElement.TryGetProperty("eventType", out var etProp)
+        var eventType = payloadElement.TryGetPropertyIgnoreCase("eventType", out var etProp)
             ? etProp.GetString()
             : null;
         if (string.IsNullOrEmpty(eventType))
