@@ -54,8 +54,15 @@ spec:
           port: 9000
         - protocol: TCP
           port: 7880
+        - protocol: TCP
+          port: 7881
         - protocol: UDP
           port: 3478
+        - protocol: TCP
+          port: 5349
+        - protocol: UDP
+          port: 60100
+          endPort: 60150
     - to:
         - namespaceSelector:
             matchLabels:

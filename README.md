@@ -6,7 +6,7 @@
 
 Монорепозиторий под on-prem Kubernetes. Бэкенд — ASP.NET 10, шлюз YARP, идентичность через Keycloak, очереди Kafka, данные в PostgreSQL/MongoDB/Redis/MinIO. Фронт — Expo Router (web + mobile). Доставка: GitHub Actions + Argo CD, деплой Blue/Green.
 
-**Стек зафиксирован:** один регион, self-hosted Kafka (KRaft), LiveKit + Coturn для медиа, Linkerd + Viz как service mesh.
+**Стек зафиксирован:** один регион, self-hosted Kafka (KRaft), LiveKit with embedded TURN для медиа, Linkerd + Viz как service mesh.
 
 ## Структура репо
 

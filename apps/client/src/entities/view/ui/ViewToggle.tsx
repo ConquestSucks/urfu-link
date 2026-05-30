@@ -34,7 +34,7 @@ export const ViewToggle = ({ currentView, createHref }: ViewToggleProps) => {
 
                 const buttonClasses = isMobile
                     ? "p-2.5"
-                    : `p-2 rounded-xl transition-colors duration-300 ${isActive ? "bg-brand-600 shadow-brand-soft" : "hover:bg-white/5"}`;
+                    : `p-2 rounded-xl transition-colors duration-300 ${isActive ? "bg-brand-600" : "hover:bg-white/5"}`;
                 const iconSize = isMobile ? 24 : 18;
                 const iconWeight = isMobile && isActive ? "fill" : "regular";
                 const iconColor = isActive

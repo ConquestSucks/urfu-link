@@ -153,6 +153,9 @@ spec:
               path "kv/data/urfu-link/prod/call-service" {
                 capabilities = ["create", "update", "read"]
               }
+              path "kv/data/urfu-link/prod/livekit" {
+                capabilities = ["create", "update", "read"]
+              }
               path "kv/data/urfu-link/prod/api-gateway" {
                 capabilities = ["create", "update", "read"]
               }

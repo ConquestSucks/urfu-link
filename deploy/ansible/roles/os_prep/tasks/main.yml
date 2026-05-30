@@ -82,6 +82,27 @@
     - '443'
     - '6443'
 
+- name: Configure UFW - allow LiveKit media TCP ports
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - '7881'
+    - '5349'
+
+- name: Configure UFW - allow LiveKit TURN UDP
+  ufw:
+    rule: allow
+    port: '3478'
+    proto: udp
+
+- name: Configure UFW - allow LiveKit UDP media range
+  ufw:
+    rule: allow
+    port: '50000:50100'
+    proto: udp
+
 - name: Configure UFW - allow internal k3s pod network traffic
   ufw:
     rule: allow

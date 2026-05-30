@@ -10,3 +10,162 @@ nodes:
       - containerPort: 443
         hostPort: 443
         protocol: TCP
+      - containerPort: 7881
+        hostPort: 7881
+        protocol: TCP
+      - containerPort: 3478
+        hostPort: 3478
+        protocol: UDP
+      - containerPort: 60100
+        hostPort: 60100
+        protocol: UDP
+      - containerPort: 60101
+        hostPort: 60101
+        protocol: UDP
+      - containerPort: 60102
+        hostPort: 60102
+        protocol: UDP
+      - containerPort: 60103
+        hostPort: 60103
+        protocol: UDP
+      - containerPort: 60104
+        hostPort: 60104
+        protocol: UDP
+      - containerPort: 60105
+        hostPort: 60105
+        protocol: UDP
+      - containerPort: 60106
+        hostPort: 60106
+        protocol: UDP
+      - containerPort: 60107
+        hostPort: 60107
+        protocol: UDP
+      - containerPort: 60108
+        hostPort: 60108
+        protocol: UDP
+      - containerPort: 60109
+        hostPort: 60109
+        protocol: UDP
+      - containerPort: 60110
+        hostPort: 60110
+        protocol: UDP
+      - containerPort: 60111
+        hostPort: 60111
+        protocol: UDP
+      - containerPort: 60112
+        hostPort: 60112
+        protocol: UDP
+      - containerPort: 60113
+        hostPort: 60113
+        protocol: UDP
+      - containerPort: 60114
+        hostPort: 60114
+        protocol: UDP
+      - containerPort: 60115
+        hostPort: 60115
+        protocol: UDP
+      - containerPort: 60116
+        hostPort: 60116
+        protocol: UDP
+      - containerPort: 60117
+        hostPort: 60117
+        protocol: UDP
+      - containerPort: 60118
+        hostPort: 60118
+        protocol: UDP
+      - containerPort: 60119
+        hostPort: 60119
+        protocol: UDP
+      - containerPort: 60120
+        hostPort: 60120
+        protocol: UDP
+      - containerPort: 60121
+        hostPort: 60121
+        protocol: UDP
+      - containerPort: 60122
+        hostPort: 60122
+        protocol: UDP
+      - containerPort: 60123
+        hostPort: 60123
+        protocol: UDP
+      - containerPort: 60124
+        hostPort: 60124
+        protocol: UDP
+      - containerPort: 60125
+        hostPort: 60125
+        protocol: UDP
+      - containerPort: 60126
+        hostPort: 60126
+        protocol: UDP
+      - containerPort: 60127
+        hostPort: 60127
+        protocol: UDP
+      - containerPort: 60128
+        hostPort: 60128
+        protocol: UDP
+      - containerPort: 60129
+        hostPort: 60129
+        protocol: UDP
+      - containerPort: 60130
+        hostPort: 60130
+        protocol: UDP
+      - containerPort: 60131
+        hostPort: 60131
+        protocol: UDP
+      - containerPort: 60132
+        hostPort: 60132
+        protocol: UDP
+      - containerPort: 60133
+        hostPort: 60133
+        protocol: UDP
+      - containerPort: 60134
+        hostPort: 60134
+        protocol: UDP
+      - containerPort: 60135
+        hostPort: 60135
+        protocol: UDP
+      - containerPort: 60136
+        hostPort: 60136
+        protocol: UDP
+      - containerPort: 60137
+        hostPort: 60137
+        protocol: UDP
+      - containerPort: 60138
+        hostPort: 60138
+        protocol: UDP
+      - containerPort: 60139
+        hostPort: 60139
+        protocol: UDP
+      - containerPort: 60140
+        hostPort: 60140
+        protocol: UDP
+      - containerPort: 60141
+        hostPort: 60141
+        protocol: UDP
+      - containerPort: 60142
+        hostPort: 60142
+        protocol: UDP
+      - containerPort: 60143
+        hostPort: 60143
+        protocol: UDP
+      - containerPort: 60144
+        hostPort: 60144
+        protocol: UDP
+      - containerPort: 60145
+        hostPort: 60145
+        protocol: UDP
+      - containerPort: 60146
+        hostPort: 60146
+        protocol: UDP
+      - containerPort: 60147
+        hostPort: 60147
+        protocol: UDP
+      - containerPort: 60148
+        hostPort: 60148
+        protocol: UDP
+      - containerPort: 60149
+        hostPort: 60149
+        protocol: UDP
+      - containerPort: 60150
+        hostPort: 60150
+        protocol: UDP

@@ -37,7 +37,6 @@ resources:
   - identity/keycloak-bootstrap-job.yaml
   - stateful/minio-oidc-policy-job.yaml
   - media/livekit.yaml
-  - media/coturn.yaml
   - observability/grafana-admin-secret.yaml
   - observability/otel-collector-config.yaml
   - observability/otel-collector.yaml
