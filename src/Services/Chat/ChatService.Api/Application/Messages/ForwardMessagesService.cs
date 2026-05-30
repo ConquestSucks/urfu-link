@@ -183,5 +183,6 @@ public sealed class ForwardMessagesService(
         message.Body,
         message.CreatedAtUtc,
         message.HasAttachments,
-        message.Attachments.Select(a => a.FileName).ToList());
+        message.Attachments.Select(a => a.FileName).ToList(),
+        message.Attachments.Select(a => a.Type).ToList());
 }

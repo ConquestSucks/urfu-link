@@ -1,9 +1,12 @@
-import type { ForwardedFromDto, ReactionsSummary, ReplyToDto } from "@urfu-link/api-client";
+import type { AttachmentType, ForwardedFromDto, ReactionsSummary, ReplyToDto } from "@urfu-link/api-client";
 
 export interface Attachment {
     name: string;
     url: string;
     mediaAssetId?: string;
+    type?: AttachmentType;
+    mimeType?: string;
+    durationSeconds?: number | null;
 }
 
 /** Локальный статус для optimistic UI: undefined для серверных, остальные — клиентские. */

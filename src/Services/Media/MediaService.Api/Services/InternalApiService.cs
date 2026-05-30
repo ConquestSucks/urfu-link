@@ -57,7 +57,7 @@ public sealed class InternalApiService(
         var reply = new BatchGetMetadataReply();
         foreach (var asset in assets)
         {
-            reply.Items.Add(new AssetMetadata
+            var metadata = new AssetMetadata
             {
                 AssetId = asset.Id.ToString(),
                 OwnerId = asset.OwnerId.ToString(),
@@ -68,7 +68,12 @@ public sealed class InternalApiService(
                 OriginalFileName = asset.OriginalFileName,
                 State = MapAssetState(asset.State),
                 CreatedAtUtc = asset.CreatedAtUtc.ToString("O"),
-            });
+            };
+            if (asset.DurationSeconds is { } durationSeconds)
+            {
+                metadata.DurationSeconds = durationSeconds;
+            }
+            reply.Items.Add(metadata);
         }
         return reply;
     }

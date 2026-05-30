@@ -316,6 +316,39 @@ describe("useInboxConversations", () => {
         );
     });
 
+    it("uses the voice label for backend voice-only previews", () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-voice",
+                    type: "Direct",
+                    participants: ["user-1", "peer-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T10:03:00.000Z",
+                    lastMessagePreview: {
+                        messageId: "message-1",
+                        senderId: "peer-1",
+                        body: "",
+                        sentAtUtc: "2026-05-24T10:03:00.000Z",
+                        hasAttachments: true,
+                        attachmentFileNames: ["voice.m4a"],
+                        attachmentTypes: ["Voice"],
+                    },
+                },
+            ],
+        });
+
+        const { result } = renderHook(() => useInboxConversations("chats"));
+
+        expect(result.current).toHaveLength(1);
+        expect(result.current[0]).toEqual(
+            expect.objectContaining({
+                id: "direct-voice",
+                message: "Голосовое сообщение",
+            }),
+        );
+    });
+
     it("summarizes multiple file-only attachments in the preview", () => {
         useChatStore.setState({
             conversations: [
@@ -375,6 +408,55 @@ describe("useInboxConversations", () => {
                 id: "direct-files",
                 message: "report.pdf и еще 2 файла",
                 lastMessageFromSelf: true,
+            }),
+        );
+    });
+
+    it("uses the voice label for loaded local voice messages", () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-local-voice",
+                    type: "Direct",
+                    participants: ["user-1", "peer-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+            messagesByConversation: {
+                "direct-local-voice": [
+                    {
+                        id: "message-1",
+                        conversationId: "direct-local-voice",
+                        senderId: "peer-1",
+                        body: "",
+                        attachments: [
+                            {
+                                mediaAssetId: "asset-1",
+                                type: "Voice",
+                                fileName: "voice.m4a",
+                                size: 2048,
+                                mimeType: "audio/m4a",
+                                durationSeconds: 17,
+                            },
+                        ],
+                        state: "Sent",
+                        createdAt: "2026-05-24T10:03:00.000Z",
+                        deliveredAt: null,
+                        readAt: null,
+                    },
+                ],
+            },
+        });
+
+        const { result } = renderHook(() => useInboxConversations("chats"));
+
+        expect(result.current).toHaveLength(1);
+        expect(result.current[0]).toEqual(
+            expect.objectContaining({
+                id: "direct-local-voice",
+                message: "Голосовое сообщение",
             }),
         );
     });

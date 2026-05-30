@@ -7,7 +7,7 @@ import {
 } from "@/entities/presence/model/presence-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { InboxChatProps } from "@/entities/inbox-chat";
-import type { ConversationPreview, MessageDto } from "@urfu-link/api-client";
+import type { AttachmentType, ConversationPreview, MessageDto } from "@urfu-link/api-client";
 
 const formatInboxTime = (value: string | null | undefined) => {
     if (!value) return "";
@@ -65,7 +65,10 @@ const formatFileCount = (count: number) => `${count} ${fileWord(count)}`;
 const formatAttachmentPreview = (
     fileNames: string[] | undefined,
     hasAttachments: boolean | undefined,
+    attachmentTypes?: AttachmentType[],
 ) => {
+    if (attachmentTypes?.includes("Voice")) return "Голосовое сообщение";
+
     const names = (fileNames ?? [])
         .map((name) => name.trim())
         .filter((name) => name.length > 0);
@@ -90,6 +93,7 @@ const formatLastMessagePreview = (
         return formatAttachmentPreview(
             attachments.map((a) => a.fileName),
             attachments.length > 0,
+            attachments.map((a) => a.type),
         );
     }
 
@@ -101,6 +105,7 @@ const formatLastMessagePreview = (
     return formatAttachmentPreview(
         preview.attachmentFileNames,
         preview.hasAttachments,
+        preview.attachmentTypes,
     );
 };
 

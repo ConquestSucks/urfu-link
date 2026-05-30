@@ -22,6 +22,23 @@ jest.mock("@/shared/lib/api", () => ({
     },
 }));
 
+jest.mock("@/features/voice-message", () => ({
+    VoiceMessagePlayer: ({
+        mediaAssetId,
+        durationSeconds,
+    }: {
+        mediaAssetId?: string | null;
+        durationSeconds?: number | null;
+    }) => {
+        const { Text } = require("react-native");
+        return (
+            <Text testID="voice-message-player">
+                voice:{mediaAssetId}:{durationSeconds}
+            </Text>
+        );
+    },
+}));
+
 jest.mock("@/shared/ui/phosphor", () => {
     const makeIcon = (testID: string) => () => {
         const { Text } = require("react-native");
@@ -192,6 +209,32 @@ describe("ChatMessage read indicator", () => {
         });
 
         openUrlSpy.mockRestore();
+    });
+
+    it("renders voice attachments through the voice player instead of file opener", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                isOwn
+                time="12:00"
+                avatarUrl=""
+                attachments={[
+                    {
+                        name: "voice.m4a",
+                        url: "/api/media/asset-1/download-url",
+                        mediaAssetId: "asset-1",
+                        type: "Voice",
+                        mimeType: "audio/m4a",
+                        durationSeconds: 17,
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByTestId("voice-message-player")).toBeTruthy();
+        expect(screen.getByText("voice:asset-1:17")).toBeTruthy();
+        expect(screen.queryByText("voice.m4a")).toBeNull();
     });
 
     it("uses a browser download link for media attachments on web", async () => {

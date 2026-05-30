@@ -26,6 +26,21 @@ public sealed class MediaServiceClientTests
     }
 
     [Fact]
+    public async Task BatchGetMetadataAsync_MapsVoiceDuration_WhenPresent()
+    {
+        var assetId = Guid.NewGuid();
+        var ownerId = Guid.NewGuid();
+        var grpcClient = new StubInternalApiClient(assetId, ownerId, durationSeconds: 19);
+        var sut = new MediaServiceClient(
+            grpcClient,
+            new StubGrpcBearerTokenProvider("service-token"));
+
+        var result = await sut.BatchGetMetadataAsync(new[] { assetId }, default);
+
+        result.Should().ContainSingle().Which.DurationSeconds.Should().Be(19);
+    }
+
+    [Fact]
     public async Task GrantConversationAccessAsync_AddsAuthorizationMetadata_WhenBearerTokenIsAvailable()
     {
         var grpcClient = new StubInternalApiClient(Guid.NewGuid(), Guid.NewGuid());
@@ -45,7 +60,7 @@ public sealed class MediaServiceClientTests
             .ContainSingle(h => h.Key == "authorization" && h.Value == "Bearer service-token");
     }
 
-    private sealed class StubInternalApiClient(Guid assetId, Guid ownerId)
+    private sealed class StubInternalApiClient(Guid assetId, Guid ownerId, int? durationSeconds = null)
         : MediaGrpc.InternalApi.InternalApiClient
     {
         public Metadata? LastBatchGetMetadataHeaders { get; private set; }
@@ -59,20 +74,26 @@ public sealed class MediaServiceClientTests
             CancellationToken cancellationToken = default)
         {
             LastBatchGetMetadataHeaders = headers;
+            var metadata = new MediaGrpc.AssetMetadata
+            {
+                AssetId = assetId.ToString("D"),
+                OwnerId = ownerId.ToString("D"),
+                Kind = (int)AttachmentType.Image,
+                SizeBytes = 1024,
+                MimeType = "image/png",
+                OriginalFileName = "asset.png",
+                State = MediaGrpc.AssetState.Uploaded,
+            };
+            if (durationSeconds is { } duration)
+            {
+                metadata.DurationSeconds = duration;
+            }
+
             return Unary(new MediaGrpc.BatchGetMetadataReply
             {
                 Items =
                 {
-                    new MediaGrpc.AssetMetadata
-                    {
-                        AssetId = assetId.ToString("D"),
-                        OwnerId = ownerId.ToString("D"),
-                        Kind = (int)AttachmentType.Image,
-                        SizeBytes = 1024,
-                        MimeType = "image/png",
-                        OriginalFileName = "asset.png",
-                        State = MediaGrpc.AssetState.Uploaded,
-                    },
+                    metadata,
                 },
             });
         }

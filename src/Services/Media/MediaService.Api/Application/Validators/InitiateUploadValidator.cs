@@ -20,16 +20,20 @@ public sealed class InitiateUploadValidator : Validator<InitiateUploadRequest>
         RuleFor(x => x.Size)
             .GreaterThan(0).WithMessage("Size must be positive.");
 
+        RuleFor(x => x.RequestedKind)
+            .Must(k => k is null || MimeTypeCatalog.IsSupportedRequestedKind(k.Value))
+            .WithMessage("Requested kind is not supported for explicit upload classification.");
+
         RuleFor(x => x.MimeType)
             .NotEmpty()
             .MaximumLength(MediaConstraints.MaxMimeTypeLength)
-            .Must(mt => MimeTypeCatalog.TryResolve(mt, out _))
+            .Must((req, mt) => MimeTypeCatalog.TryResolve(mt, req.RequestedKind, out _))
             .WithMessage("Mime type is not in the white-list.");
 
         RuleFor(x => x)
             .Custom((req, context) =>
             {
-                if (!MimeTypeCatalog.TryResolve(req.MimeType, out var kind)) return;
+                if (!MimeTypeCatalog.TryResolve(req.MimeType, req.RequestedKind, out var kind)) return;
                 var kindLimit = limits.For(kind);
 
                 if (req.Size > kindLimit.MaxSizeBytes)

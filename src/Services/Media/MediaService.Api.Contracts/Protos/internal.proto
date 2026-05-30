@@ -69,6 +69,7 @@ message AssetMetadata {
   string original_file_name = 7;
   AssetState state = 8;
   string created_at_utc = 9;
+  optional int32 duration_seconds = 10;
 }
 
 message BatchGetMetadataReply {

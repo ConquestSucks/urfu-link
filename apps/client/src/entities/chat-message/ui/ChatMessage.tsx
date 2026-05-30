@@ -2,6 +2,7 @@ import { Avatar } from "@/shared/ui";
 import { Text, View, Pressable, Linking, Platform } from "react-native";
 import { ChatMessageProps } from "../model/types";
 import { apiClient } from "@/shared/lib/api";
+import type { AttachmentType } from "@urfu-link/api-client";
 import {
     ArrowBendDoubleUpRightIcon,
     ChatsCircleIcon,
@@ -16,6 +17,7 @@ import {
     WarningCircleIcon,
 } from "@/shared/ui/phosphor";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import { VoiceMessagePlayer } from "@/features/voice-message";
 
 const renderBodyWithMentions = (text: string) => {
     const parts = text.split(/(@[A-Za-zА-Яа-я0-9_.-]+)/g);
@@ -34,6 +36,9 @@ type AttachmentFile = {
     name: string;
     url: string;
     mediaAssetId?: string;
+    type?: AttachmentType;
+    mimeType?: string;
+    durationSeconds?: number | null;
 };
 
 const startWebDownload = (url: string, fileName: string) => {
@@ -294,23 +299,38 @@ export const ChatMessage = ({
 
                 {attachments.length > 0 && (
                     <View className="mb-1 gap-2">
-                        {attachments.map((file, index) => (
-                            <Pressable
-                                key={`${file.url}-${index}`}
-                                onPress={() => void openAttachment(file)}
-                                className={`flex-row items-center px-3 py-2.5 rounded-xl gap-2 active:opacity-60 ${
-                                    isOwn ? "bg-white/20" : "bg-white/10"
-                                }`}
-                            >
-                                <FileIcon size={20} className="text-white" />
-                                <Text
-                                    className="text-[13px] font-medium text-white flex-1"
-                                    numberOfLines={1}
+                        {attachments.map((file, index) =>
+                            file.type === "Voice" ? (
+                                <View
+                                    key={`${file.url}-${index}`}
+                                    className={`px-3 py-2.5 rounded-xl ${
+                                        isOwn ? "bg-white/20" : "bg-white/10"
+                                    }`}
                                 >
-                                    {file.name}
-                                </Text>
-                            </Pressable>
-                        ))}
+                                    <VoiceMessagePlayer
+                                        mediaAssetId={file.mediaAssetId}
+                                        durationSeconds={file.durationSeconds}
+                                        isOwn={isOwn}
+                                    />
+                                </View>
+                            ) : (
+                                <Pressable
+                                    key={`${file.url}-${index}`}
+                                    onPress={() => void openAttachment(file)}
+                                    className={`flex-row items-center px-3 py-2.5 rounded-xl gap-2 active:opacity-60 ${
+                                        isOwn ? "bg-white/20" : "bg-white/10"
+                                    }`}
+                                >
+                                    <FileIcon size={20} className="text-white" />
+                                    <Text
+                                        className="text-[13px] font-medium text-white flex-1"
+                                        numberOfLines={1}
+                                    >
+                                        {file.name}
+                                    </Text>
+                                </Pressable>
+                            ),
+                        )}
                     </View>
                 )}
 

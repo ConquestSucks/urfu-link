@@ -300,7 +300,8 @@ public sealed class ReplyInThreadService(
                 ThumbnailAssetId: null,
                 FileName: meta.OriginalFileName,
                 Size: meta.SizeBytes,
-                MimeType: meta.MimeType));
+                MimeType: meta.MimeType,
+                DurationSeconds: meta.DurationSeconds));
         }
         return resolved;
     }
