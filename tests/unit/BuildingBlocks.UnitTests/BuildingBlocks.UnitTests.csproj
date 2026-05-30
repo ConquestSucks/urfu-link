@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\..\src\BuildingBlocks\Auth\Auth.csproj" />
     <ProjectReference Include="..\..\..\src\BuildingBlocks\Contracts\Contracts.csproj" />
     <ProjectReference Include="..\..\..\src\BuildingBlocks\Observability\Observability.csproj" />
+    <ProjectReference Include="..\..\..\src\BuildingBlocks\Outbox\Outbox.csproj" />
     <ProjectReference Include="..\..\..\src\BuildingBlocks\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 
