@@ -103,6 +103,12 @@
     port: '50000:50100'
     proto: udp
 
+- name: Configure UFW - allow LiveKit TURN relay UDP range
+  ufw:
+    rule: allow
+    port: '50101:50200'
+    proto: udp
+
 - name: Configure UFW - allow internal k3s pod network traffic
   ufw:
     rule: allow

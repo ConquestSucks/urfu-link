@@ -117,6 +117,34 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
+    public void ProductionLiveKitShouldExposeBrowserReachableWebRtcAndTurnPorts()
+    {
+        var livekit = ReadRepoFile("deploy", "k8s", "platform", "media", "livekit.yaml");
+        var preflight = ReadRepoFile("deploy", "scripts", "prod-media-preflight.ps1");
+        var switchScript = ReadRepoFile("deploy", "scripts", "prod-media-switch.ps1");
+        var osPrep = ReadRepoFile("deploy", "ansible", "roles", "os_prep", "tasks", "main.yml");
+
+        Assert.Contains("hostNetwork: true", livekit, StringComparison.Ordinal);
+        Assert.Contains("use_external_ip: true", livekit, StringComparison.Ordinal);
+        Assert.Contains("tcp_port: 7881", livekit, StringComparison.Ordinal);
+        Assert.Contains("port_range_start: 50000", livekit, StringComparison.Ordinal);
+        Assert.Contains("port_range_end: 50100", livekit, StringComparison.Ordinal);
+        Assert.Contains("domain: turn.urfu-link.ghjc.ru", livekit, StringComparison.Ordinal);
+        Assert.Contains("udp_port: 3478", livekit, StringComparison.Ordinal);
+        Assert.Contains("tls_port: 5349", livekit, StringComparison.Ordinal);
+        Assert.Contains("relay_range_start: 50101", livekit, StringComparison.Ordinal);
+        Assert.Contains("relay_range_end: 50200", livekit, StringComparison.Ordinal);
+
+        Assert.Contains("UFW_50000_50100_UDP", preflight, StringComparison.Ordinal);
+        Assert.Contains("UFW_50101_50200_UDP", preflight, StringComparison.Ordinal);
+        foreach (var file in new[] { switchScript, osPrep })
+        {
+            Assert.Contains("50000:50100", file, StringComparison.Ordinal);
+            Assert.Contains("50101:50200", file, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void LocalKubernetesMediaStorageShouldUseClusterEndpointAndIngressHost()
     {
         var mediaValues = ReadRepoFile("deploy", "helm", "services", "media-service", "values-dev.yaml");
