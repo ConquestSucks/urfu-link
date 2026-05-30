@@ -144,10 +144,7 @@ const resolveMediaLink = (segments: string[]): NotificationNavigationTarget => (
 });
 
 const resolveCallLink = (segments: string[]): NotificationNavigationTarget => ({
-    href: buildHref("/chats", {
-        call: segments[0] ? toHyphenatedGuidIfCompact(segments[0]) : undefined,
-        callState: segments[1],
-    }),
+    href: segments[0] ? `/call/${toHyphenatedGuidIfCompact(segments[0])}` as Href : "/call" as Href,
 });
 
 const resolveSystemLink = (segments: string[]): NotificationNavigationTarget => ({

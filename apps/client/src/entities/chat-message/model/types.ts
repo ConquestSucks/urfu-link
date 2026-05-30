@@ -17,6 +17,15 @@ export interface MessageContextMenuAnchor {
 export interface ChatMessageProps {
     id: string;
     text: string;
+    kind?: "User" | "SystemCall";
+    systemCall?: {
+        callId: string;
+        callType: "Audio" | "Video";
+        status: string;
+        callerId: string;
+        duration?: string | null;
+        endReason?: string | null;
+    } | null;
     isOwn: boolean;
     time: string;
     avatarUrl: string;

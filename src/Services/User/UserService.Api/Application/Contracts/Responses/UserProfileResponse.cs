@@ -19,14 +19,16 @@ public sealed record NotificationsResponse(
     bool NewMessages,
     bool NotificationSound,
     bool DisciplineChatMessages,
-    bool Mentions);
+    bool Mentions,
+    IReadOnlyList<string> MutedConversationIds);
 
 public sealed record NotificationPreferencesResponse(
     IReadOnlyDictionary<int, ChannelToggleResponse> Categories,
     QuietHoursResponse QuietHours,
     bool DndEnabled,
     string Locale,
-    bool Sound);
+    bool Sound,
+    IReadOnlyList<string> MutedConversationIds);
 
 public sealed record ChannelToggleResponse(bool Push, bool Email, bool InApp);
 

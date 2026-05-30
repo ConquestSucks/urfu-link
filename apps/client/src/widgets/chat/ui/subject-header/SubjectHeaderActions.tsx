@@ -1,5 +1,5 @@
 import { Menu, MenuRef } from "@/shared/ui";
-import { DotsThreeVerticalIcon, MagnifyingGlassIcon, PhoneIcon, } from "@/shared/ui/phosphor";
+import { DotsThreeVerticalIcon, MagnifyingGlassIcon, PhoneIcon } from "@/shared/ui/phosphor";
 import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getSubjectHeaderActions } from "../../config/headerActions";
@@ -8,8 +8,19 @@ interface SubjectHeaderActionsProps {
     onStartGroupCall?: () => void;
     onOpenMembers: () => void;
     onOpenPinned: () => void;
+    notificationsMuted: boolean;
+    notificationsPending?: boolean;
+    onToggleNotifications: () => void;
 }
-export const SubjectHeaderActions = ({ canStartGroupCall = false, onStartGroupCall, onOpenMembers, onOpenPinned }: SubjectHeaderActionsProps) => {
+export const SubjectHeaderActions = ({
+    canStartGroupCall = false,
+    onStartGroupCall,
+    onOpenMembers,
+    onOpenPinned,
+    notificationsMuted,
+    notificationsPending,
+    onToggleNotifications,
+}: SubjectHeaderActionsProps) => {
     const menuRef = useRef<MenuRef>(null);
     const menuItems = getSubjectHeaderActions({
         onOpenMembers: () => {
@@ -20,6 +31,12 @@ export const SubjectHeaderActions = ({ canStartGroupCall = false, onStartGroupCa
             menuRef.current?.close();
             onOpenPinned();
         },
+        onToggleNotifications: () => {
+            menuRef.current?.close();
+            onToggleNotifications();
+        },
+        notificationsMuted,
+        notificationsPending,
     });
     return (<View className="flex-row gap-1 items-center">
       {canStartGroupCall && (

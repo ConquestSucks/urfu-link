@@ -99,7 +99,8 @@ public sealed class NotificationContractTests
             },
             new QuietHoursPayload("Asia/Yekaterinburg", "22:00", "08:00", true),
             DndEnabled: false,
-            Locale: "ru-RU");
+            Locale: "ru-RU",
+            MutedConversationIds: ["direct:abc", "discipline:def"]);
 
         var original = new UserNotificationSettingsChangedEvent(Guid.NewGuid(), prefs);
 

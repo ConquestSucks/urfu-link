@@ -75,7 +75,8 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
                 settings.QuietHours.Enabled),
             settings.DndEnabled,
             settings.Locale,
-            settings.Sound);
+            settings.Sound,
+            settings.MutedConversationIds);
 
         return JsonSerializer.Serialize(dto, JsonOptions);
     }
@@ -105,15 +106,26 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
             quietHours,
             dto.DndEnabled,
             dto.Locale,
-            dto.Sound);
+            dto.Sound,
+            NormalizeMutedConversationIds(dto.MutedConversationIds));
     }
+
+    private static string[] NormalizeMutedConversationIds(IReadOnlyList<string>? ids)
+        => ids is null
+            ? Array.Empty<string>()
+            : ids
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Select(id => id.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
 
     private sealed record NotificationSettingsDto(
         IReadOnlyDictionary<string, ChannelToggleDto> Categories,
         QuietHoursDto QuietHours,
         bool DndEnabled,
         string Locale,
-        bool Sound);
+        bool Sound,
+        IReadOnlyList<string>? MutedConversationIds = null);
 
     private sealed record ChannelToggleDto(bool Push, bool Email, bool InApp);
 

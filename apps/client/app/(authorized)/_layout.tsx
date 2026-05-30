@@ -12,11 +12,15 @@ import { useChatHub } from "@/shared/lib/useChatHub";
 import { useNotificationHub } from "@/features/notifications";
 import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
+import { useCallHub } from "@/shared/lib/useCallHub";
+import { IncomingCallModal } from "@/features/call";
+import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
     const isThreadDetail =
         (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
+    const isCallRoute = segments.includes("call") && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -25,6 +29,7 @@ export default function AuthLayout() {
     useChatHub();
     usePresenceHub();
     useNotificationHub();
+    useCallHub();
 
     const { data: profile } = useCurrentUser();
 
@@ -34,6 +39,7 @@ export default function AuthLayout() {
 
     useEffect(() => {
         configureMessageSounds(profile?.notifications);
+        configureBrowserNotifications(profile?.notifications);
     }, [profile?.notifications]);
 
     useEffect(() => {
@@ -43,7 +49,9 @@ export default function AuthLayout() {
     return (
         <SafeAreaView className="flex-1 bg-app-bg" edges={safeAreaEdges}>
             <View className="flex-1 flex-row">
-                {isDesktop && <SidebarDesktop onSettingsPress={() => setIsSettingsOpen(true)} />}
+                {isDesktop && !isCallRoute && (
+                    <SidebarDesktop onSettingsPress={() => setIsSettingsOpen(true)} />
+                )}
 
                 <View
                     className="flex-1 min-w-0"
@@ -56,7 +64,7 @@ export default function AuthLayout() {
                 </View>
             </View>
 
-            {isMobile && (
+            {isMobile && !isCallRoute && (
                 <View
                     style={{
                         position: "absolute",
@@ -75,6 +83,8 @@ export default function AuthLayout() {
             {isDesktop && (
                 <SettingsDesktop isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
             )}
+
+            <IncomingCallModal />
         </SafeAreaView>
     );
 }

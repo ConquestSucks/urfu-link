@@ -3,6 +3,11 @@ import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useConversationParticipants } from "@/entities/conversation/model/participants-store";
+import {
+    useCurrentUser,
+    useMuteConversationNotifications,
+    useUnmuteConversationNotifications,
+} from "@/entities/user";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
@@ -53,6 +58,13 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
         };
     }, [participantIdsKey, loadBatchPresence, participantIds, unwatchUserPresence, watchUserPresence]);
 
+    const { data: profile } = useCurrentUser();
+    const muteNotifications = useMuteConversationNotifications();
+    const unmuteNotifications = useUnmuteConversationNotifications();
+    const notificationsMuted =
+        profile?.notifications.mutedConversationIds?.includes(subjectId) ?? false;
+    const notificationsPending =
+        muteNotifications.isPending || unmuteNotifications.isPending;
     if (!conversation) return null;
 
     const subjectName = conversation.disciplineChatKind === "Subgroup"
@@ -116,6 +128,15 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
                     onStartGroupCall={handleStartGroupCall}
                     onOpenMembers={() => setIsMembersOpen(true)}
                     onOpenPinned={() => onOpenPinned?.()}
+                    notificationsMuted={notificationsMuted}
+                    notificationsPending={notificationsPending}
+                    onToggleNotifications={() => {
+                        if (notificationsMuted) {
+                            unmuteNotifications.mutate(subjectId);
+                        } else {
+                            muteNotifications.mutate(subjectId);
+                        }
+                    }}
                 />
             </View>
 

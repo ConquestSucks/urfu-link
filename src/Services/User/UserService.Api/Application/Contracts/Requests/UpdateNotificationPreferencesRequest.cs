@@ -5,7 +5,8 @@ public sealed record UpdateNotificationPreferencesRequest(
     QuietHoursRequest QuietHours,
     bool DndEnabled,
     string Locale,
-    bool Sound);
+    bool Sound,
+    IReadOnlyList<string>? MutedConversationIds = null);
 
 public sealed record ChannelToggleRequest(bool Push, bool Email, bool InApp);
 

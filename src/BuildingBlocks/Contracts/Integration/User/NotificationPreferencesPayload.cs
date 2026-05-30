@@ -4,7 +4,8 @@ public sealed record NotificationPreferencesPayload(
     IReadOnlyDictionary<int, ChannelTogglePayload> Categories,
     QuietHoursPayload QuietHours,
     bool DndEnabled,
-    string Locale);
+    string Locale,
+    IReadOnlyList<string>? MutedConversationIds = null);
 
 public sealed record ChannelTogglePayload(bool Push, bool Email, bool InApp);
 

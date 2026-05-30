@@ -26,6 +26,9 @@ export type {
   ConversationPreview,
   ConversationPreviewSnippet,
   MessageState,
+  MessageKind,
+  SystemCallStatus,
+  SystemCallInfo,
   AttachmentType,
   ChatAttachment,
   ReplyToDto,
@@ -92,12 +95,22 @@ export type {
   BulkNotificationActionResponse,
 } from "./notifications";
 
+export type {
+  CallType,
+  CallStatus,
+  CallEndReason,
+  CallParticipantDto,
+  CallSessionDto,
+  CallTokenDto,
+} from "./calls";
+
 import { createUsersApi } from "./users";
 import { createChatApi } from "./chat";
 import { createMediaApi } from "./media";
 import { createPresenceApi } from "./presence";
 import { createNotificationsApi } from "./notifications";
 import { createDisciplinesApi } from "./disciplines";
+import { createCallsApi } from "./calls";
 
 type ApiClientConfig = {
   baseUrl: string;
@@ -143,6 +156,7 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
     presence: createPresenceApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     notifications: createNotificationsApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     disciplines: createDisciplinesApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    calls: createCallsApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
 
     async health(): Promise<BackendHealth> {
       try {

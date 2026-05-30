@@ -27,15 +27,19 @@ import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import { useCallStore } from "@/entities/call";
 import {
     toChatThreadViewingContext,
     toChatViewingContext,
     usePresenceStore,
 } from "@/entities/presence";
+import { useRouter } from "expo-router";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
+    const router = useRouter();
     const { sendMessage, setPendingScrollToMessageId } = useChatStore();
+    const startCall = useCallStore((state) => state.startCall);
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === (params.id as string)),
     );
@@ -56,7 +60,30 @@ export const ChatView = () => {
     const listRef = useRef<MessagesListHandle>(null);
     const inputRef = useRef<ChatInputHandle>(null);
     const currentUserId = useCurrentUserId();
+    const [isStartingCall, setIsStartingCall] = useState(false);
     const setViewingContexts = usePresenceStore((s) => s.setViewingContexts);
+
+    const handleStartAudioCall = useCallback(async () => {
+        if (!conversation || conversation.type !== "Direct" || isStartingCall) return;
+        try {
+            setIsStartingCall(true);
+            const call = await startCall(conversation.id, "Audio");
+            router.push(`/call/${call.id}` as never);
+        } finally {
+            setIsStartingCall(false);
+        }
+    }, [conversation, isStartingCall, router, startCall]);
+
+    const handleStartVideoCall = useCallback(async () => {
+        if (!conversation || conversation.type !== "Direct" || isStartingCall) return;
+        try {
+            setIsStartingCall(true);
+            const call = await startCall(conversation.id, "Video");
+            router.push(`/call/${call.id}` as never);
+        } finally {
+            setIsStartingCall(false);
+        }
+    }, [conversation, isStartingCall, router, startCall]);
 
     const chatId = params.id as string;
     const routeMessageId = typeof params.message === "string" ? params.message : null;
@@ -308,6 +335,8 @@ export const ChatView = () => {
                         chatId={chatId}
                         onOpenSearch={() => setIsSearching(true)}
                         onOpenPinned={() => setIsPinnedModalOpen(true)}
+                        onStartAudioCall={handleStartAudioCall}
+                        onStartVideoCall={handleStartVideoCall}
                     />
                 )
             ) : (

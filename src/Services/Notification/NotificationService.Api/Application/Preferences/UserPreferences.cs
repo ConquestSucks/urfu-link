@@ -8,17 +8,23 @@ public sealed record UserPreferences(
     QuietHours QuietHours,
     bool DndEnabled,
     string Locale,
-    bool Sound)
+    bool Sound,
+    IReadOnlyList<string> MutedConversationIds)
 {
     public ChannelToggle GetToggle(NotificationCategory category)
         => Categories.TryGetValue(category, out var toggle) ? toggle : ChannelToggle.AllOn;
+
+    public bool IsConversationMuted(string? conversationId)
+        => !string.IsNullOrWhiteSpace(conversationId) &&
+           MutedConversationIds.Any(id => string.Equals(id, conversationId, StringComparison.Ordinal));
 
     public static UserPreferences Default { get; } = new(
         BuildDefault(),
         QuietHours.Disabled("Asia/Yekaterinburg"),
         DndEnabled: false,
         Locale: "ru-RU",
-        Sound: true);
+        Sound: true,
+        MutedConversationIds: Array.Empty<string>());
 
     private static Dictionary<NotificationCategory, ChannelToggle> BuildDefault()
     {
