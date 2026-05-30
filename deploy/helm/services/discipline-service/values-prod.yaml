@@ -3,7 +3,7 @@ fullnameOverride: discipline-service
 image:
   repository: ghcr.io/conquestsucks/urfu-link/discipline-service
   pullPolicy: IfNotPresent
-  tag: sha-43dcbd2
+  tag: sha-b7ca7c5
 
 imagePullSecrets:
   - name: ghcr-pull-secret
