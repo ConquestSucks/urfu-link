@@ -67,7 +67,7 @@ else {
 }
 
 Write-Host "[media] Ensuring host firewall allows LiveKit media ports." -ForegroundColor Cyan
-Invoke-Remote "ufw allow 7881/tcp >/dev/null; ufw allow 3478/udp >/dev/null; ufw allow 5349/tcp >/dev/null; ufw allow 50000:50100/udp >/dev/null"
+Invoke-Remote "ufw allow 7881/tcp >/dev/null; ufw allow 3478/udp >/dev/null; ufw allow 5349/tcp >/dev/null; ufw allow 50000:50100/udp >/dev/null; ufw allow 50101:50200/udp >/dev/null"
 
 Write-Host "[media] Requesting External Secrets refresh." -ForegroundColor Cyan
 Invoke-Remote "timeout 300 sh -c 'until kubectl get externalsecret livekit-secrets -n urfu-platform >/dev/null 2>&1; do sleep 5; done; until kubectl get externalsecret call-service-secrets -n urfu-prod >/dev/null 2>&1; do sleep 5; done; until kubectl get certificate livekit-turn-tls -n urfu-platform >/dev/null 2>&1; do sleep 5; done'"
