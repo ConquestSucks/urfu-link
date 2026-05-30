@@ -69,7 +69,10 @@ function Invoke-RemoteScript {
 
 foreach ($domain in $MediaDomains) {
     $addresses = @(Resolve-DnsName $domain -ErrorAction SilentlyContinue |
-        Where-Object { $_.Type -eq "A" } |
+        Where-Object {
+            $_.Type -eq "A" -and
+            ((-not ($_.PSObject.Properties.Name -contains "Section")) -or $_.Section -eq "Answer")
+        } |
         Select-Object -ExpandProperty IPAddress -Unique)
 
     if ($addresses.Count -eq 1 -and $addresses[0] -eq $ExpectedIp) {

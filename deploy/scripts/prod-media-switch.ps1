@@ -9,6 +9,16 @@ $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 function Invoke-Remote {
     param([string]$Command)
     ssh -o BatchMode=yes $SshTarget $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "Remote command failed with exit code ${LASTEXITCODE}: $Command"
+    }
+}
+
+function Invoke-RemoteScript {
+    param([string]$Script)
+    $normalizedScript = $Script.Replace("`r`n", "`n").Replace("`r", "`n")
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($normalizedScript))
+    Invoke-Remote "printf '%s' '$encoded' | base64 -d | bash"
 }
 
 if ($DirectApply) {
@@ -71,8 +81,11 @@ Invoke-Remote "kubectl delete deploy,svc,cm coturn -n urfu-platform --ignore-not
 Write-Host "[media] Restarting LiveKit and call-service." -ForegroundColor Cyan
 Invoke-Remote "kubectl rollout restart deploy/livekit -n urfu-platform"
 $restartAt = (Get-Date).ToUniversalTime().ToString("o")
-$callServiceRestartPatch = '{"spec":{"restartAt":"' + $restartAt + '"}}'
-Invoke-Remote "kubectl patch rollout call-service -n urfu-prod --type merge -p '$callServiceRestartPatch'"
+$callServiceRestartScript = @"
+set -eu
+kubectl patch rollout call-service -n urfu-prod --type merge --patch '{"spec":{"restartAt":"$restartAt"}}'
+"@
+Invoke-RemoteScript $callServiceRestartScript
 
 Write-Host "[media] Waiting for readiness." -ForegroundColor Cyan
 Invoke-Remote "kubectl rollout status deploy/livekit -n urfu-platform --timeout=180s"
