@@ -126,4 +126,22 @@ describe("VoiceMessagePlayer", () => {
         expect(screen.getByText("0:05")).toBeTruthy();
         expect(screen.getByText("0:17")).toBeTruthy();
     });
+
+    it("uses the loaded audio duration when saved metadata is longer", () => {
+        mockStatus = {
+            playing: false,
+            currentTime: 4.2,
+            duration: 4.2,
+        };
+
+        render(
+            <VoiceMessagePlayer
+                sourceUri="file://voice.m4a"
+                durationSeconds={5}
+            />,
+        );
+
+        expect(screen.getAllByText("0:04")).toHaveLength(2);
+        expect(screen.queryByText("0:05")).toBeNull();
+    });
 });

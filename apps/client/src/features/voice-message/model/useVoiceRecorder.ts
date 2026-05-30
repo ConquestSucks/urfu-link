@@ -82,7 +82,7 @@ export const useVoiceRecorder = ({
 
             const durationSeconds = Math.max(
                 1,
-                Math.min(maxDurationSeconds, Math.ceil(durationMillisRef.current / 1000)),
+                Math.min(maxDurationSeconds, Math.floor(durationMillisRef.current / 1000)),
             );
             const mimeType = getVoiceMimeType(uri, Platform.OS === "web" ? "web" : "native");
             const nextDraft: VoiceRecordingDraft = {

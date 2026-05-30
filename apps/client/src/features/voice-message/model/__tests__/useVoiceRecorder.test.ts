@@ -92,7 +92,7 @@ describe("useVoiceRecorder", () => {
         expect(result.current.error).toContain("микрофону");
     });
 
-    it("creates a voice draft with rounded duration and disables recording mode on stop", async () => {
+    it("creates a voice draft with whole-second duration and disables recording mode on stop", async () => {
         const { result, rerender } = renderHook(() => useVoiceRecorder());
         mockRecorderState = {
             isRecording: true,
@@ -110,7 +110,7 @@ describe("useVoiceRecorder", () => {
             expect.objectContaining({
                 uri: "file://voice.m4a",
                 mimeType: "audio/m4a",
-                durationSeconds: 13,
+                durationSeconds: 12,
             }),
         );
         expect(setAudioModeAsync).toHaveBeenCalledWith(
