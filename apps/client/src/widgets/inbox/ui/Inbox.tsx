@@ -38,7 +38,7 @@ export const Inbox = <T,>({
             ? "Уведомления"
             : currentTab === "chats"
               ? "Личные чаты"
-              : "Предметы";
+              : "Дисциплины";
     const showNotificationToolbar =
         currentView === "notifications" && !isSearchActive && data.length > 0;
 
