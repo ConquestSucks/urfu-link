@@ -7,11 +7,13 @@ import "../global.css";
 registerLiveKitGlobals();
 
 export default function RootLayout() {
-    return (<AppProviders>
-      <StatusBar style="light"/>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }}/>
-        <Stack.Screen name="(authorized)" options={{ headerShown: false }}/>
-      </Stack>
-    </AppProviders>);
+    return (
+        <AppProviders>
+            <StatusBar style="light" />
+            <Stack>
+                <Stack.Screen name="index" options={{ headerShown: false }} />
+                <Stack.Screen name="(authorized)" options={{ headerShown: false }} />
+            </Stack>
+        </AppProviders>
+    );
 }

@@ -133,16 +133,54 @@ describe("useCallStore", () => {
         });
     });
 
-    it("startCall calls the API and sets the active call", async () => {
-        const active = makeActiveCall({ callType: "Video" });
-        mockCalls.start.mockResolvedValue(active);
+    it("startCall calls the API and stores the outgoing ringing call", async () => {
+        const ringing = makeCall({ callType: "Video" });
+        mockCalls.start.mockResolvedValue(ringing);
 
         const result = await useCallStore.getState().startCall("conversation-1", "Video");
 
         expect(mockCalls.start).toHaveBeenCalledWith("conversation-1", "Video");
-        expect(result).toEqual(active);
-        expect(useCallStore.getState().activeCall).toEqual(active);
+        expect(result).toEqual(ringing);
+        expect(useCallStore.getState().outgoingCall).toEqual(ringing);
+        expect(useCallStore.getState().activeCall).toBeNull();
         expect(useCallStore.getState().incomingCall).toBeNull();
+    });
+
+    it("accept event promotes a matching outgoing call to active", () => {
+        const ringing = makeCall();
+        const active = makeActiveCall();
+        useCallStore.getState().setOutgoingCall(ringing);
+
+        useCallStore.getState().handleCallAccepted(active);
+
+        expect(useCallStore.getState().outgoingCall).toBeNull();
+        expect(useCallStore.getState().activeCall).toEqual(active);
+    });
+
+    it.each([
+        ["declined", "handleCallDeclined"],
+        ["cancelled", "handleCallCancelled"],
+        ["ended", "handleCallEnded"],
+    ] as const)("%s event clears matching outgoing call", (_label, handlerName) => {
+        const ringing = makeCall();
+        const ended = makeEndedCall();
+        useCallStore.getState().setOutgoingCall(ringing);
+
+        useCallStore.getState()[handlerName](ended);
+
+        expect(useCallStore.getState().outgoingCall).toBeNull();
+    });
+
+    it("cancelCall clears a matching outgoing call", async () => {
+        const ringing = makeCall();
+        const ended = makeEndedCall({ endReason: "CancelledByCaller" });
+        mockCalls.cancel.mockResolvedValue(ended);
+        useCallStore.getState().setOutgoingCall(ringing);
+
+        await useCallStore.getState().cancelCall("call-1");
+
+        expect(mockCalls.cancel).toHaveBeenCalledWith("call-1");
+        expect(useCallStore.getState().outgoingCall).toBeNull();
     });
 
     it("acceptIncoming accepts through the API and promotes active call", async () => {
@@ -195,6 +233,7 @@ describe("useCallStore", () => {
     it("clearToken and clearCallCache remove token and call state", async () => {
         mockCalls.token.mockResolvedValue(makeToken());
         useCallStore.getState().setIncomingCall(makeCall());
+        useCallStore.getState().setOutgoingCall(makeCall());
         useCallStore.getState().setActiveCall(makeActiveCall());
         await useCallStore.getState().loadToken("call-1");
 
@@ -206,6 +245,7 @@ describe("useCallStore", () => {
         useCallStore.getState().clearCallCache();
 
         expect(useCallStore.getState().incomingCall).toBeNull();
+        expect(useCallStore.getState().outgoingCall).toBeNull();
         expect(useCallStore.getState().activeCall).toBeNull();
         expect(useCallStore.getState().callTokens).toEqual({});
         expect(useCallStore.getState().tokenLoadingByCallId).toEqual({});

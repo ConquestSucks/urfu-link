@@ -33,12 +33,13 @@ public sealed class DeploymentContractTests
     public void ProductionPomeriumRoutesShouldProxyApiAndSignalRHubsToGateway()
     {
         var config = ReadRepoFile("deploy", "k8s", "platform", "identity", "pomerium-config.yaml");
+        var normalizedConfig = NormalizeLineEndings(config);
         var ingress = ReadRepoFile("deploy", "k8s", "platform", "ingress", "frontend-web-ingress.yaml");
 
         Assert.Contains("prefix: /api", config, StringComparison.Ordinal);
         Assert.Contains("prefix: /hubs", config, StringComparison.Ordinal);
         Assert.Contains("allow_websockets: true", config, StringComparison.Ordinal);
-        Assert.Contains("jwt_claims_headers:\n      X-Session-Id: sid\n\n    routes:", config, StringComparison.Ordinal);
+        Assert.Contains("jwt_claims_headers:\n      X-Session-Id: sid\n\n    routes:", normalizedConfig, StringComparison.Ordinal);
         Assert.Equal(1, CountOccurrences(config, "jwt_claims_headers:"));
         Assert.Contains("timeout: 12h", config, StringComparison.Ordinal);
         Assert.Contains("idle_timeout: 75s", config, StringComparison.Ordinal);
@@ -69,7 +70,9 @@ public sealed class DeploymentContractTests
         var gatewayValues = ReadRepoFile("deploy", "helm", "services", "api-gateway", "values-prod.yaml");
 
         Assert.Contains("EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru", frontendValues, StringComparison.Ordinal);
+        Assert.Contains("EXPO_PUBLIC_KEYCLOAK_URL: https://id.ghjc.ru", frontendValues, StringComparison.Ordinal);
         Assert.Contains("\"EXPO_PUBLIC_API_URL\": \"https://api.urfu-link.ghjc.ru\"", easConfig, StringComparison.Ordinal);
+        Assert.Contains("\"EXPO_PUBLIC_KEYCLOAK_URL\": \"https://id.ghjc.ru\"", easConfig, StringComparison.Ordinal);
         Assert.Contains("ingress/api-gateway-ingress.yaml", platformKustomization, StringComparison.Ordinal);
         Assert.Contains("- ingress-nginx", gatewayValues, StringComparison.Ordinal);
     }
@@ -364,6 +367,8 @@ public sealed class DeploymentContractTests
 
         return File.ReadAllText(Path.Combine([repoRoot, .. pathSegments]));
     }
+
+    private static string NormalizeLineEndings(string value) => value.ReplaceLineEndings("\n");
 
     private static string GetYamlDocumentByName(string manifest, string name)
     {

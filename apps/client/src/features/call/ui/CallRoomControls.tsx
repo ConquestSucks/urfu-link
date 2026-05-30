@@ -4,12 +4,12 @@ import {
     Pressable,
     ScrollView,
     Text,
-    TextInput,
     View,
 } from "react-native";
 import type { CallType } from "@urfu-link/api-client";
 import { Avatar, ModalOverlay } from "@/shared/ui";
 import {
+    ArrowsClockwiseIcon,
     ChatCircleTextIcon,
     DotsThreeVerticalIcon,
     MicrophoneIcon,
@@ -19,17 +19,21 @@ import {
     VideoCameraIcon,
     XIcon,
 } from "@/shared/ui/phosphor";
+import type { IconProps } from "@/shared/ui/phosphor";
 import type { ParticipantInfo } from "./CallRoom.types";
+import { CallChatPanel } from "./CallChatPanel";
 
 export type CallPanel = "none" | "participants" | "chat";
 
 export const NoVideoPanel = ({
     label,
+    avatarUrl,
 }: {
     label: string;
+    avatarUrl?: string | null;
 }) => (
     <View className="flex-1 bg-black/50 items-center justify-center px-10">
-        <Avatar name={label} size={160} />
+        <Avatar name={label} src={avatarUrl} size={160} />
         <Text className="text-white mt-4 text-base">{label}</Text>
         <Text className="text-white/70 text-sm mt-2">
             Подключено к звонку без видео
@@ -89,38 +93,57 @@ const Panel = ({
                 <XIcon size={14} className="text-white" />
             </Pressable>
         </View>
-        <View className="p-4">{children}</View>
+        <View className="flex-1 p-4">{children}</View>
     </View>
 );
 
-const SideAction = ({
+const ControlButton = ({
+    testID,
     icon: Icon,
     label,
     isActive,
+    danger,
     disabled,
+    showLabel,
     onPress,
 }: {
-    icon: React.ComponentType<{ size?: string | number; className?: string }>;
-    label: string;
+    testID: string;
+    icon: React.ComponentType<IconProps>;
+    label?: string;
     isActive?: boolean;
+    danger?: boolean;
     disabled?: boolean;
+    showLabel: boolean;
     onPress?: () => void;
 }) => (
     <Pressable
+        testID={testID}
+        accessibilityLabel={label}
         onPress={onPress}
         disabled={disabled || !onPress}
-        className={`h-12 rounded-xl px-3 flex-row items-center justify-center gap-2 flex-1 ${
+        className={`h-12 rounded-xl items-center justify-center gap-2 ${
+            showLabel ? "px-3 flex-1 flex-row" : "w-12"
+        } ${
             disabled
                 ? "bg-white/5"
-                : isActive
-                  ? "bg-brand-600"
-                  : "bg-white/10"
+                : danger
+                  ? "bg-red-600"
+                  : isActive
+                    ? "bg-brand-600"
+                    : "bg-white/10"
         }`}
     >
-        <Icon size={18} className={disabled ? "text-white/50" : "text-white"} />
-        <Text className={`text-xs font-semibold ${disabled ? "text-white/50" : "text-white"}`}>
-            {label}
-        </Text>
+        <Icon size={20} className={disabled ? "text-white/40" : "text-white"} />
+        {showLabel && label ? (
+            <Text
+                numberOfLines={1}
+                className={`text-xs font-semibold ${
+                    disabled ? "text-white/40" : "text-white"
+                }`}
+            >
+                {label}
+            </Text>
+        ) : null}
     </Pressable>
 );
 
@@ -129,10 +152,13 @@ export const CallControls = ({
     cameraEnabled,
     screenShareEnabled,
     screenShareAvailable,
+    switchCameraAvailable,
     callType,
     busy,
+    isMobile,
     onToggleMicrophone,
     onToggleCamera,
+    onSwitchCamera,
     onToggleScreenShare,
     onOpenChat,
     onOpenParticipants,
@@ -142,66 +168,100 @@ export const CallControls = ({
     cameraEnabled: boolean;
     screenShareEnabled: boolean;
     screenShareAvailable: boolean;
+    switchCameraAvailable?: boolean;
     callType: CallType;
     busy: boolean;
+    isMobile: boolean;
     onToggleMicrophone: () => Promise<void>;
     onToggleCamera: () => Promise<void>;
+    onSwitchCamera?: () => Promise<void>;
     onToggleScreenShare: () => Promise<void>;
     onOpenChat: () => void;
     onOpenParticipants: () => void;
     onLeave: () => void;
-}) => (
-    <View className="h-20 border-t border-white/10 px-3 pb-3 pt-2 flex-row gap-2 items-start">
-        <SideAction
-            icon={micEnabled ? MicrophoneIcon : MicrophoneSlashIcon}
-            label="Микрофон"
-            onPress={onToggleMicrophone}
-            isActive={micEnabled}
-            disabled={busy}
-        />
+}) => {
+    const showLabel = !isMobile;
+    const canUseVideoControls = callType === "Video";
 
-        <SideAction
-            icon={VideoCameraIcon}
-            label="Камера"
-            onPress={callType === "Video" ? onToggleCamera : undefined}
-            isActive={callType === "Video" && cameraEnabled}
-            disabled={busy || callType !== "Video"}
-        />
-
-        <SideAction
-            icon={ScreencastIcon}
-            label="Демонстрация экрана"
-            onPress={
-                screenShareAvailable && callType === "Video" ? onToggleScreenShare : undefined
-            }
-            isActive={callType === "Video" && screenShareEnabled}
-            disabled={busy || !screenShareAvailable || callType !== "Video"}
-        />
-
-        <SideAction icon={ChatCircleTextIcon} label="Чат" onPress={onOpenChat} />
-        <SideAction icon={DotsThreeVerticalIcon} label="Ещё" onPress={onOpenParticipants} />
-
-        <Pressable
-            onPress={onLeave}
-            disabled={busy}
-            className={`h-12 rounded-xl px-3 flex-1 min-w-24 flex-row items-center justify-center gap-2 bg-red-600 ${
-                busy ? "opacity-70" : ""
-            }`}
-        >
-            <PhoneDisconnectIcon size={18} className="text-white" />
-            <Text className="text-xs font-semibold text-white">Завершить</Text>
-        </Pressable>
-    </View>
-);
+    return (
+        <View className="border-t border-white/10 px-3 pb-3 pt-2 flex-row gap-2 items-center justify-center">
+            <ControlButton
+                testID="call-control-mic"
+                icon={micEnabled ? MicrophoneIcon : MicrophoneSlashIcon}
+                label="Микрофон"
+                onPress={onToggleMicrophone}
+                isActive={micEnabled}
+                disabled={busy}
+                showLabel={showLabel}
+            />
+            <ControlButton
+                testID="call-control-camera"
+                icon={VideoCameraIcon}
+                label="Камера"
+                onPress={canUseVideoControls ? onToggleCamera : undefined}
+                isActive={canUseVideoControls && cameraEnabled}
+                disabled={busy || !canUseVideoControls}
+                showLabel={showLabel}
+            />
+            <ControlButton
+                testID="call-control-switch-camera"
+                icon={ArrowsClockwiseIcon}
+                label="Сменить камеру"
+                onPress={
+                    canUseVideoControls && cameraEnabled && switchCameraAvailable
+                        ? onSwitchCamera
+                        : undefined
+                }
+                disabled={busy || !canUseVideoControls || !cameraEnabled || !switchCameraAvailable}
+                showLabel={showLabel}
+            />
+            <ControlButton
+                testID="call-control-screen"
+                icon={ScreencastIcon}
+                label="Экран"
+                onPress={
+                    screenShareAvailable && canUseVideoControls ? onToggleScreenShare : undefined
+                }
+                isActive={canUseVideoControls && screenShareEnabled}
+                disabled={busy || !screenShareAvailable || !canUseVideoControls}
+                showLabel={showLabel}
+            />
+            <ControlButton
+                testID="call-control-chat"
+                icon={ChatCircleTextIcon}
+                label="Чат"
+                onPress={onOpenChat}
+                showLabel={showLabel}
+            />
+            <ControlButton
+                testID="call-control-more"
+                icon={DotsThreeVerticalIcon}
+                onPress={onOpenParticipants}
+                showLabel={false}
+            />
+            <ControlButton
+                testID="call-control-leave"
+                icon={PhoneDisconnectIcon}
+                label="Завершить"
+                onPress={onLeave}
+                danger
+                disabled={busy}
+                showLabel={showLabel}
+            />
+        </View>
+    );
+};
 
 export const CallDrawer = ({
     panel,
     isMobile,
+    conversationId,
     participantInfos,
     onClose,
 }: {
     panel: CallPanel;
     isMobile: boolean;
+    conversationId: string;
     participantInfos: ParticipantInfo[];
     onClose: () => void;
 }) => {
@@ -210,7 +270,7 @@ export const CallDrawer = ({
     return (
         <View
             className={`absolute inset-y-0 right-0 ${
-                isMobile ? "w-full" : "w-80"
+                isMobile ? "w-full" : "w-96"
             } bg-app-card border-l border-white/10`}
         >
             {panel === "participants" ? (
@@ -222,11 +282,17 @@ export const CallDrawer = ({
                                     key={participant.userId}
                                     className="flex-row items-center gap-3"
                                 >
-                                    <Avatar size={32} name={participant.displayName} />
-                                    <View>
-                                        <Text className="text-white">{participant.displayName}</Text>
+                                    <Avatar
+                                        size={36}
+                                        src={participant.avatarUrl}
+                                        name={participant.displayName}
+                                    />
+                                    <View className="flex-1 min-w-0">
+                                        <Text className="text-white" numberOfLines={1}>
+                                            {participant.displayName}
+                                        </Text>
                                         <Text className="text-xs text-text-muted">
-                                            {participant.isConnected ? "В сети" : "Не в сети"}
+                                            {participant.isConnected ? "В звонке" : "Подключается"}
                                         </Text>
                                     </View>
                                 </View>
@@ -235,17 +301,7 @@ export const CallDrawer = ({
                     </ScrollView>
                 </Panel>
             ) : (
-                <Panel title="Чат" onClose={onClose}>
-                    <Text className="text-white/80 mb-4">
-                        Чат во время звонка будет доступен в следующей версии.
-                    </Text>
-                    <TextInput
-                        placeholder="Написать сообщение"
-                        placeholderTextColor="#9ca3af"
-                        editable={false}
-                        className="px-3 py-3 rounded-lg bg-white/10 text-white"
-                    />
-                </Panel>
+                <CallChatPanel conversationId={conversationId} onClose={onClose} />
             )}
         </View>
     );

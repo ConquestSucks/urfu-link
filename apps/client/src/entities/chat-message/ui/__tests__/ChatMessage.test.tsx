@@ -293,4 +293,28 @@ describe("ChatMessage read indicator", () => {
 
         expect(screen.getByText(label)).toBeTruthy();
     });
+
+    it("shows system call timing details", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Completed",
+                    callerId: "user-1",
+                    duration: "PT3M12S",
+                    endReason: "Completed",
+                }}
+            />,
+        );
+
+        expect(screen.getByText("Начало: 12:00")).toBeTruthy();
+        expect(screen.getByText("Длительность: 3:12")).toBeTruthy();
+    });
 });

@@ -147,9 +147,10 @@ export const ChatMessage = ({
 
     if (kind === "SystemCall") {
         const systemText = buildSystemCallLabel(systemCall);
+        const duration = formatDuration(systemCall?.duration);
         return (
             <View className="px-2 items-center">
-                <View className="px-3 py-2 rounded-full bg-white/5 border border-white/10">
+                <View className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
                     <View className="flex-row items-center gap-2">
                         {systemCall?.callType === "Video" ? (
                             <VideoCameraIcon size={12} className="text-text-muted" />
@@ -159,6 +160,18 @@ export const ChatMessage = ({
                         <Text className="text-[13px] text-text-subtle font-medium">
                             {systemText}
                         </Text>
+                    </View>
+                    <View className="mt-1 flex-row flex-wrap gap-2 justify-center">
+                        {time ? (
+                            <Text className="text-[11px] text-text-placeholder">
+                                Начало: {time}
+                            </Text>
+                        ) : null}
+                        {duration ? (
+                            <Text className="text-[11px] text-text-placeholder">
+                                Длительность: {duration}
+                            </Text>
+                        ) : null}
                     </View>
                 </View>
             </View>

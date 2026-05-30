@@ -42,14 +42,17 @@ const isTokenFresh = (token?: CallTokenDto | null): boolean => {
 
 export type CallStoreState = {
     incomingCall: CallSessionDto | null;
+    outgoingCall: CallSessionDto | null;
     activeCall: CallSessionDto | null;
     callTokens: TokenByCallId;
     tokenLoadingByCallId: LoadingByCallId;
     tokenErrorByCallId: ErrorByCallId;
 
     setIncomingCall: (call: CallSessionDto | null) => void;
+    setOutgoingCall: (call: CallSessionDto | null) => void;
     setActiveCall: (call: CallSessionDto | null) => void;
     clearIncomingCall: () => void;
+    clearOutgoingCall: () => void;
     clearActiveCall: () => void;
 
     handleIncomingCall: (call: CallSessionDto) => void;
@@ -73,6 +76,7 @@ export type CallStoreState = {
 
 export const useCallStore = create<CallStoreState>((set, get) => ({
     incomingCall: null,
+    outgoingCall: null,
     activeCall: null,
     callTokens: {},
     tokenLoadingByCallId: {},
@@ -81,12 +85,21 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     setIncomingCall: (call) =>
         set({ incomingCall: call, activeCall: call?.status === "Active" ? call : get().activeCall }),
 
+    setOutgoingCall: (call) =>
+        set({
+            outgoingCall: call,
+            activeCall: call?.status === "Active" ? call : get().activeCall,
+        }),
+
     setActiveCall: (call) => set({
         activeCall: call,
         incomingCall: call && get().incomingCall?.id === call.id ? null : get().incomingCall,
+        outgoingCall: call && get().outgoingCall?.id === call.id ? null : get().outgoingCall,
     }),
 
     clearIncomingCall: () => set({ incomingCall: null }),
+
+    clearOutgoingCall: () => set({ outgoingCall: null }),
 
     clearActiveCall: () => set({ activeCall: null }),
 
@@ -102,7 +115,9 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     handleCallAccepted: (call) =>
         set((state) => ({
             incomingCall: state.incomingCall?.id === call.id ? null : state.incomingCall,
+            outgoingCall: state.outgoingCall?.id === call.id ? null : state.outgoingCall,
             activeCall: state.activeCall?.id === call.id || state.incomingCall?.id === call.id
+                || state.outgoingCall?.id === call.id
                 ? call
                 : state.activeCall,
         })),
@@ -110,18 +125,21 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     handleCallDeclined: (call) =>
         set((state) => ({
             incomingCall: state.incomingCall?.id === call.id ? null : state.incomingCall,
+            outgoingCall: state.outgoingCall?.id === call.id ? null : state.outgoingCall,
             activeCall: state.activeCall?.id === call.id ? call : state.activeCall,
         })),
 
     handleCallCancelled: (call) =>
         set((state) => ({
             incomingCall: state.incomingCall?.id === call.id ? null : state.incomingCall,
+            outgoingCall: state.outgoingCall?.id === call.id ? null : state.outgoingCall,
             activeCall: state.activeCall?.id === call.id ? call : state.activeCall,
         })),
 
     handleCallEnded: (call) =>
         set((state) => ({
             incomingCall: state.incomingCall?.id === call.id ? null : state.incomingCall,
+            outgoingCall: state.outgoingCall?.id === call.id ? null : state.outgoingCall,
             activeCall: state.activeCall?.id === call.id ? call : state.activeCall,
         })),
 
@@ -165,7 +183,8 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
         const call = await apiClient.calls.start(conversationId, callType);
         set({
             incomingCall: null,
-            activeCall: call,
+            outgoingCall: call,
+            activeCall: call.status === "Active" ? call : null,
         });
         return call;
     },
@@ -196,6 +215,7 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
         set((state) => ({
             activeCall: state.activeCall?.id === call.id ? call : state.activeCall,
             incomingCall: state.incomingCall?.id === call.id ? null : state.incomingCall,
+            outgoingCall: state.outgoingCall?.id === call.id ? null : state.outgoingCall,
         }));
     },
 
@@ -215,6 +235,7 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
             const sameIdActive = state.activeCall && state.activeCall.id === call.id;
             return {
                 incomingCall: toBoolean(sameIdIncoming) ? call : state.incomingCall,
+                outgoingCall: state.outgoingCall?.id === call.id ? call : state.outgoingCall,
                 activeCall: toBoolean(sameIdActive) || !state.activeCall
                     ? call
                     : state.activeCall,
@@ -286,6 +307,7 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     clearCallCache: () =>
         set({
             incomingCall: null,
+            outgoingCall: null,
             activeCall: null,
             callTokens: {},
             tokenLoadingByCallId: {},
