@@ -1,12 +1,21 @@
 import React from "react";
 import {
     ActivityIndicator,
-    Pressable,
     ScrollView,
     Text,
     View,
 } from "react-native";
+import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
 import { Avatar, ModalOverlay } from "@/shared/ui";
+import {
+    FadeIn,
+    FadeInDown,
+    FadeInRight,
+    FadeOut,
+    LinearTransition,
+    ZoomIn,
+    ZoomOut,
+} from "react-native-reanimated";
 import {
     ArrowsClockwiseIcon,
     ChatCircleTextIcon,
@@ -31,20 +40,29 @@ export const NoVideoPanel = ({
     label: string;
     avatarUrl?: string | null;
 }) => (
-    <View className="flex-1 bg-black/50 items-center justify-center px-10">
+    <AnimatedView
+        entering={FadeIn.duration(180)}
+        exiting={FadeOut.duration(120)}
+        layout={LinearTransition.duration(200)}
+        className="flex-1 bg-black/50 items-center justify-center px-10"
+    >
         <Avatar name={label} src={avatarUrl} size={160} />
         <Text className="text-white mt-4 text-base">{label}</Text>
         <Text className="text-white/70 text-sm mt-2">
             Подключено к звонку без видео
         </Text>
-    </View>
+    </AnimatedView>
 );
 
 export const CallLoadingOverlay = () => (
-    <View className="absolute inset-0 items-center justify-center bg-black/70">
+    <AnimatedView
+        entering={FadeIn.duration(160)}
+        exiting={FadeOut.duration(120)}
+        className="absolute inset-0 items-center justify-center bg-black/70"
+    >
         <ActivityIndicator size="large" color="#fff" />
         <Text className="text-white mt-3">Подключение к звуковому каналу...</Text>
-    </View>
+    </AnimatedView>
 );
 
 export const CallErrorOverlay = ({
@@ -82,18 +100,24 @@ const Panel = ({
     onClose: () => void;
     children: React.ReactNode;
 }) => (
-    <View className="w-full h-full bg-app-card border-l border-white/10">
+    <AnimatedView
+        entering={FadeInRight.duration(180)}
+        exiting={FadeOut.duration(120)}
+        layout={LinearTransition.duration(180)}
+        className="w-full h-full bg-app-card border-l border-white/10"
+    >
         <View className="h-12 px-4 border-b border-white/10 flex-row items-center justify-between">
             <Text className="text-white font-semibold">{title}</Text>
-            <Pressable
+            <AnimatedPressable
                 className="h-8 w-8 rounded-full items-center justify-center bg-white/10"
                 onPress={onClose}
+                layout={LinearTransition.duration(160)}
             >
                 <XIcon size={14} className="text-white" />
-            </Pressable>
+            </AnimatedPressable>
         </View>
         <View className="flex-1 p-4">{children}</View>
-    </View>
+    </AnimatedView>
 );
 
 const ControlButton = ({
@@ -117,11 +141,14 @@ const ControlButton = ({
     iconOnlySize?: number;
     onPress?: () => void;
 }) => (
-    <Pressable
+    <AnimatedPressable
         testID={testID}
         accessibilityLabel={label}
         onPress={onPress}
         disabled={disabled || !onPress}
+        entering={ZoomIn.duration(150)}
+        exiting={ZoomOut.duration(120)}
+        layout={LinearTransition.duration(180)}
         style={
             showLabel
                 ? undefined
@@ -153,7 +180,7 @@ const ControlButton = ({
                 {label}
             </Text>
         ) : null}
-    </Pressable>
+    </AnimatedPressable>
 );
 
 const StatusIconBadge = ({
@@ -165,9 +192,12 @@ const StatusIconBadge = ({
     children: React.ReactNode;
     active?: boolean;
 }) => (
-    <View
+    <AnimatedView
         accessible
         accessibilityLabel={label}
+        entering={ZoomIn.duration(140)}
+        exiting={ZoomOut.duration(100)}
+        layout={LinearTransition.duration(160)}
         className={`h-7 w-7 rounded-full items-center justify-center border ${
             active
                 ? "border-brand-300/60 bg-brand-600/90"
@@ -175,7 +205,7 @@ const StatusIconBadge = ({
         }`}
     >
         {children}
-    </View>
+    </AnimatedView>
 );
 
 const CameraOffIcon = () => (
@@ -238,9 +268,12 @@ export const ParticipantStatusIcons = ({
 );
 
 const SpeakingIndicator = () => (
-    <View
+    <AnimatedView
         accessible
         accessibilityLabel="Сейчас говорит"
+        entering={ZoomIn.duration(150)}
+        exiting={ZoomOut.duration(120)}
+        layout={LinearTransition.duration(160)}
         className="absolute left-3 top-3 z-10 h-8 w-8 rounded-full bg-emerald-500/95 items-center justify-center flex-row gap-0.5"
     >
         {[10, 16, 12].map((height, index) => (
@@ -250,7 +283,7 @@ const SpeakingIndicator = () => (
                 style={{ height }}
             />
         ))}
-    </View>
+    </AnimatedView>
 );
 
 export const SpeakingFrame = ({
@@ -260,7 +293,8 @@ export const SpeakingFrame = ({
     isSpeaking: boolean;
     children: React.ReactNode;
 }) => (
-    <View
+    <AnimatedView
+        layout={LinearTransition.duration(200)}
         className={`relative flex-1 min-h-0 rounded-2xl overflow-hidden border bg-black/35 ${
             isSpeaking ? "border-emerald-400" : "border-white/10"
         }`}
@@ -277,7 +311,7 @@ export const SpeakingFrame = ({
     >
         {isSpeaking ? <SpeakingIndicator /> : null}
         {children}
-    </View>
+    </AnimatedView>
 );
 
 export const CallControls = ({
@@ -315,9 +349,15 @@ export const CallControls = ({
     const iconOnlySize = isMobile ? 44 : 48;
 
     return (
-        <View className="px-3 pb-4 pt-2 items-center justify-center">
-            <View
+        <AnimatedView
+            entering={FadeInDown.duration(180)}
+            layout={LinearTransition.duration(220)}
+            className="px-3 pb-4 pt-2 items-center justify-center"
+        >
+            <AnimatedView
                 testID="call-controls-dock"
+                entering={ZoomIn.duration(180)}
+                layout={LinearTransition.duration(220)}
                 style={isMobile ? { flexWrap: "wrap", maxWidth: 336 } : undefined}
                 className={`max-w-full rounded-[28px] border border-white/10 bg-app-card/95 p-2 flex-row ${
                     isMobile ? "gap-1.5" : "gap-2"
@@ -389,8 +429,8 @@ export const CallControls = ({
                     showLabel={showLabel}
                     iconOnlySize={iconOnlySize}
                 />
-            </View>
-        </View>
+            </AnimatedView>
+        </AnimatedView>
     );
 };
 
@@ -410,7 +450,11 @@ export const CallDrawer = ({
     if (panel === "none") return null;
 
     return (
-        <View
+        <AnimatedView
+            testID="call-drawer"
+            entering={(isMobile ? FadeInDown : FadeInRight).duration(200)}
+            exiting={FadeOut.duration(140)}
+            layout={LinearTransition.duration(220)}
             className={`absolute z-40 ${
                 isMobile
                     ? "inset-x-0 top-0 bottom-24"
@@ -421,9 +465,12 @@ export const CallDrawer = ({
                 <Panel title="Участники" onClose={onClose}>
                     <ScrollView>
                         <View className="gap-3">
-                            {participantInfos.map((participant) => (
-                                <View
+                            {participantInfos.map((participant, index) => (
+                                <AnimatedView
                                     key={participant.userId}
+                                    entering={FadeInRight.delay(index * 35).duration(160)}
+                                    exiting={FadeOut.duration(100)}
+                                    layout={LinearTransition.duration(180)}
                                     className="flex-row items-center gap-3"
                                 >
                                     <Avatar
@@ -439,7 +486,7 @@ export const CallDrawer = ({
                                             {participant.isConnected ? "В звонке" : "Подключается"}
                                         </Text>
                                     </View>
-                                </View>
+                                </AnimatedView>
                             ))}
                         </View>
                     </ScrollView>
@@ -447,6 +494,6 @@ export const CallDrawer = ({
             ) : (
                 <CallChatPanel conversationId={conversationId} onClose={onClose} />
             )}
-        </View>
+        </AnimatedView>
     );
 };

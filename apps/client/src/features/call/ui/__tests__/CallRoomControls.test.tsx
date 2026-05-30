@@ -1,5 +1,30 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 
+jest.mock("react-native-reanimated", () => {
+    const { Text, View } = require("react-native");
+    const animationBuilder = {
+        delay: () => animationBuilder,
+        duration: () => animationBuilder,
+        springify: () => animationBuilder,
+    };
+
+    return {
+        __esModule: true,
+        default: {
+            Text,
+            View,
+            createAnimatedComponent: (Component: React.ComponentType) => Component,
+        },
+        FadeIn: animationBuilder,
+        FadeInDown: animationBuilder,
+        FadeInRight: animationBuilder,
+        FadeOut: animationBuilder,
+        LinearTransition: animationBuilder,
+        ZoomIn: animationBuilder,
+        ZoomOut: animationBuilder,
+    };
+});
+
 import {
     CallControls,
     ParticipantStatusIcons,
