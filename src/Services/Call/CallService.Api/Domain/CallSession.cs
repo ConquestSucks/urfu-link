@@ -14,9 +14,12 @@ public sealed record CallSession(
     DateTimeOffset? AcceptedAtUtc,
     DateTimeOffset? EndedAtUtc,
     CallEndReason? EndReason,
-    IReadOnlyList<Guid> ConnectedParticipantIds)
+    IReadOnlyList<Guid> ConnectedParticipantIds,
+    string ConversationType = "Direct")
 {
     public bool IsParticipant(Guid userId) => ParticipantIds.Contains(userId);
+
+    public bool IsGroup => string.Equals(ConversationType, "Group", StringComparison.OrdinalIgnoreCase);
 
     public TimeSpan DurationUntil(DateTimeOffset nowUtc)
         => AcceptedAtUtc is { } acceptedAt

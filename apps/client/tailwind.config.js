@@ -28,7 +28,7 @@ module.exports = {
           secondary: "#CAD5E2",
           muted: "#90A1B9",
           subtle: "#8B8FA8",
-          placeholder: "#62748E",
+          placeholder: "#90A1B9",
           disabled: "#45556C",
         },
         success: {

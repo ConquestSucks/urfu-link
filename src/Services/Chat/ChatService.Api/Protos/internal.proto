@@ -59,4 +59,7 @@ message GetConversationReply {
   bool exists = 1;
   ConversationKind type = 2;
   repeated string participants = 3;
+  string group_subtype = 4;
+  string discipline_chat_kind = 5;
+  map<string, string> participant_roles = 6;
 }

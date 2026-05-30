@@ -35,6 +35,7 @@ public sealed class BadgeService
             perCategory,
             counts.TotalUnseen,
             counts.UrgentUnread,
-            counts.PerType);
+            counts.PerType,
+            counts.Scopes);
     }
 }

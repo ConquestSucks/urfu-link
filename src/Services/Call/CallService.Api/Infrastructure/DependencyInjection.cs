@@ -67,7 +67,9 @@ public static class ModuleRegistration
         services.AddSingleton(sp => new Urfu.Link.Services.Chat.Grpc.InternalApi.InternalApiClient(
             sp.GetRequiredService<GrpcChannel>()));
         services.AddSingleton<IChatConversationClient, ChatConversationClient>();
-        services.AddSingleton<ICallSessionStore, RedisCallSessionStore>();
+        services.AddSingleton<RedisCallSessionStore>();
+        services.AddSingleton<ICallSessionStore>(sp => sp.GetRequiredService<RedisCallSessionStore>());
+        services.AddSingleton<ICallUserActivityStore>(sp => sp.GetRequiredService<RedisCallSessionStore>());
         services.AddSingleton<ICallBroadcaster, CallBroadcaster>();
         services.AddSingleton<LiveKitTokenProvider>();
         services.AddScoped<CallEventDispatcher>();

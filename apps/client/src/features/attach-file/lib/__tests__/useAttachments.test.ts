@@ -1,4 +1,9 @@
-import { normalizeDroppedFile, normalizeDroppedFiles } from "../useAttachments";
+import {
+    filterAllowedAttachments,
+    isAllowedChatAttachment,
+    normalizeDroppedFile,
+    normalizeDroppedFiles,
+} from "../useAttachments";
 
 describe("normalizeDroppedFile", () => {
     const createObjectURL = jest.fn(() => "blob:test-file");
@@ -40,5 +45,27 @@ describe("normalizeDroppedFile", () => {
 
         expect(normalizeDroppedFiles(files)).toHaveLength(2);
         expect(createObjectURL).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe("chat attachment allowlist", () => {
+    it("allows source and archive files from the broad safe list", () => {
+        expect(isAllowedChatAttachment({ name: "component.tsx", mimeType: "text/plain" })).toBe(true);
+        expect(isAllowedChatAttachment({ name: "dataset.yaml", mimeType: "application/x-yaml" })).toBe(true);
+        expect(isAllowedChatAttachment({ name: "materials.7z", mimeType: "application/x-7z-compressed" })).toBe(true);
+    });
+
+    it("rejects executable and unknown octet-stream files", () => {
+        expect(isAllowedChatAttachment({ name: "installer.exe", mimeType: "application/x-msdownload" })).toBe(false);
+        expect(isAllowedChatAttachment({ name: "payload.bin", mimeType: "application/octet-stream" })).toBe(false);
+    });
+
+    it("filters rejected attachments before they are added", () => {
+        const accepted = filterAllowedAttachments([
+            { name: "report.pdf", mimeType: "application/pdf" },
+            { name: "payload.bin", mimeType: "application/octet-stream" },
+        ]);
+
+        expect(accepted).toEqual([{ name: "report.pdf", mimeType: "application/pdf" }]);
     });
 });

@@ -32,6 +32,10 @@ import { useCurrentUserId } from "@/shared/store/auth-store";
 import { TypingIndicator } from "@/entities/presence";
 import { formatMessageDateLabel, getMessageDayKey } from "../lib/message-date-labels";
 import { useWebFileDrop } from "@/shared/lib/useWebFileDrop";
+import {
+    useConversationParticipants,
+    useParticipantsStore,
+} from "@/entities/conversation/model/participants-store";
 
 interface MessagesListProps {
     chatId: string;
@@ -187,6 +191,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const lastScrollOffsetRef = useRef<number | null>(null);
 
         const currentUserId = useCurrentUserId();
+        const participants = useConversationParticipants(chatId);
+        const loadParticipants = useParticipantsStore((s) => s.load);
+        const participantsByUserId = useMemo(
+            () => new Map(participants.map((participant) => [participant.userId, participant])),
+            [participants],
+        );
         const readContextRef = useRef({ chatId, currentUserId, markRead });
         const handleFilesDropped = useCallback(
             (files: File[]) => {
@@ -207,6 +217,11 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             if (skipInitialLoad) return;
             loadMessages(chatId, type, true);
         }, [chatId, type, skipInitialLoad, loadMessages]);
+
+        useEffect(() => {
+            if (type !== "subject" || participants.length > 0) return;
+            loadParticipants(chatId).catch(() => undefined);
+        }, [chatId, loadParticipants, participants.length, type]);
 
         useEffect(() => {
             return () => {
@@ -401,8 +416,9 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         );
                     }
 
-                                            const message = item.message;
+                    const message = item.message;
                     const view = mapMessageToProps(message, currentUserId);
+                    const sender = participantsByUserId.get(message.senderId);
                     const isSystemMessage = message.kind === "SystemCall";
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
@@ -439,7 +455,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     isOwn={view.isOwn}
                                     seen={view.seen}
                                     time={view.time}
-                                    avatarUrl={view.avatarUrl}
+                                    avatarUrl={sender?.avatarUrl?.trim() || view.avatarUrl}
+                                    authorName={
+                                        shouldShowAvatars && !view.isOwn
+                                            ? sender?.displayName?.trim() || message.senderId
+                                            : undefined
+                                    }
                                     showAvatar={shouldShowAvatars}
                                     attachments={view.attachments}
                                     kind={view.kind}
@@ -497,6 +518,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 currentUserId,
                 highlightedMessageId,
                 listItems,
+                participantsByUserId,
                 shouldShowAvatars,
                 onMessageLongPress,
                 onMessageContextMenu,

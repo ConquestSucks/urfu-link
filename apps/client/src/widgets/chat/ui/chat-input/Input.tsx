@@ -511,7 +511,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         testID="chat-input-text"
                         className="text-white flex-1 text-[15px] outline-none focus:outline-none"
                         placeholder={editing ? "Изменение сообщения" : "Сообщение"}
-                        placeholderTextColor="#8B8FA8"
+                        placeholderTextColor="#90A1B9"
                         value={query}
                         onChangeText={handleQueryChange}
                         onKeyPress={handleInputKeyPress}
@@ -567,7 +567,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         onPress={handleStartVoiceRecording}
                         disabled={!canRecordVoice}
                         className={`w-11 h-11 rounded-full items-center justify-center ${
-                            canRecordVoice ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"
+                            canRecordVoice ? "bg-brand-650 active:opacity-80" : "bg-brand-650/30"
                         }`}
                     >
                         {voiceRecorder.isStarting ? (
@@ -585,7 +585,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         testID="chat-input-send-button"
                         onPress={submitComposer}
                         disabled={!canSend}
-                        className={`w-11 h-11 rounded-full items-center justify-center ${isSubmitting ? "bg-brand-600/70" : canSend ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"}`}
+                        className={`w-11 h-11 rounded-full items-center justify-center ${isSubmitting ? "bg-brand-650/80" : canSend ? "bg-brand-650 active:opacity-80" : "bg-brand-650/30"}`}
                     >
                         {isSubmitting ? (
                             <ActivityIndicator testID="chat-input-send-spinner" size="small" className="text-white" />

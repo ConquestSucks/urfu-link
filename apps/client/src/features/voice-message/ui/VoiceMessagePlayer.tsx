@@ -99,7 +99,7 @@ export const VoiceMessagePlayer = ({
                 onPress={togglePlayback}
                 disabled={isResolving}
                 className={`w-9 h-9 rounded-full items-center justify-center ${
-                    isOwn ? "bg-white/20 active:bg-white/30" : "bg-brand-600 active:bg-brand-500"
+                    isOwn ? "bg-white/20 active:bg-white/30" : "bg-brand-650 active:bg-brand-700"
                 } ${isResolving ? "opacity-70" : ""}`}
             >
                 {isResolving ? (
@@ -122,10 +122,10 @@ export const VoiceMessagePlayer = ({
                     />
                 </View>
                 <View className="flex-row items-center justify-between">
-                    <Text className="text-[11px] font-medium text-white/80">
+                    <Text className="text-[11px] font-medium text-white">
                         {formatVoiceDuration(currentSeconds)}
                     </Text>
-                    <Text className="text-[11px] font-medium text-white/80">
+                    <Text className="text-[11px] font-medium text-white">
                         {formatVoiceDuration(totalSeconds)}
                     </Text>
                 </View>

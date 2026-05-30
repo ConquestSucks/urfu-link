@@ -56,7 +56,7 @@ public sealed class ConversationDisciplineTests
     }
 
     [Fact]
-    public void ConversationCapabilities_AllowOnlyTeachersInSubgroupChatsToStartGroupCall()
+    public void ConversationCapabilities_AllowOnlyTeachersInDisciplineChatsToStartGroupCalls()
     {
         var teacherId = Guid.NewGuid();
         var studentId = Guid.NewGuid();
@@ -70,10 +70,19 @@ public sealed class ConversationDisciplineTests
             DateTimeOffset.UtcNow);
 
         ConversationDto.FromDomain(conv, teacherId).Capabilities!.CanStartGroupCall.Should().BeTrue();
+        ConversationDto.FromDomain(conv, teacherId).Capabilities!.CanStartGroupAudioCall.Should().BeTrue();
+        ConversationDto.FromDomain(conv, teacherId).Capabilities!.CanStartGroupVideoCall.Should().BeTrue();
+        ConversationDto.FromDomain(conv, teacherId).Capabilities!.CanManagePins.Should().BeTrue();
         ConversationDto.FromDomain(conv, studentId).Capabilities!.CanStartGroupCall.Should().BeFalse();
+        ConversationDto.FromDomain(conv, studentId).Capabilities!.CanStartGroupAudioCall.Should().BeFalse();
+        ConversationDto.FromDomain(conv, studentId).Capabilities!.CanStartGroupVideoCall.Should().BeFalse();
+        ConversationDto.FromDomain(conv, studentId).Capabilities!.CanManagePins.Should().BeFalse();
 
         var general = Conversation.OpenDiscipline(Guid.NewGuid(), teacherId, DateTimeOffset.UtcNow);
-        ConversationDto.FromDomain(general, teacherId).Capabilities!.CanStartGroupCall.Should().BeFalse();
+        ConversationDto.FromDomain(general, teacherId).Capabilities!.CanStartGroupCall.Should().BeTrue();
+        ConversationDto.FromDomain(general, teacherId).Capabilities!.CanStartGroupAudioCall.Should().BeTrue();
+        ConversationDto.FromDomain(general, teacherId).Capabilities!.CanStartGroupVideoCall.Should().BeTrue();
+        ConversationDto.FromDomain(general, teacherId).Capabilities!.CanManagePins.Should().BeTrue();
     }
 
     [Fact]

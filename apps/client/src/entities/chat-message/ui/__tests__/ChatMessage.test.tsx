@@ -3,11 +3,15 @@ import { Linking, Platform } from "react-native";
 
 import { ChatMessage } from "../ChatMessage";
 
-jest.mock("@/shared/ui", () => ({
-    Avatar: () => {
+const mockAvatar = jest.fn(
+    ({ name, src }: { name?: string; src?: string }) => {
         const { Text } = require("react-native");
-        return <Text testID="avatar">avatar</Text>;
+        return <Text testID="avatar">{`${name ?? ""}|${src ?? ""}`}</Text>;
     },
+);
+
+jest.mock("@/shared/ui", () => ({
+    Avatar: (props: { name?: string; src?: string }) => mockAvatar(props),
 }));
 
 jest.mock("@/shared/store/auth-store", () => ({
@@ -105,6 +109,59 @@ describe("ChatMessage read indicator", () => {
         fireEvent.press(screen.getByTestId("chat-message-reply-message-1"));
 
         expect(onReplyPress).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the sender name for incoming group messages", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        expect(screen.getByText("Ivan Petrov")).toBeTruthy();
+    });
+
+    it("passes the sender name to incoming message avatars", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl="https://cdn.test/ivan.webp"
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        expect(mockAvatar).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: "Ivan Petrov",
+                src: "https://cdn.test/ivan.webp",
+            }),
+        );
+    });
+
+    it("does not show the sender name for own messages", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        expect(screen.queryByText("Ivan Petrov")).toBeNull();
     });
 
     it("shows one check for an own message that has not been read", () => {

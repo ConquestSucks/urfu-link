@@ -12,6 +12,7 @@ const mockRemoveReaction = jest.fn();
 const mockTypingIndicator = jest.fn();
 const originalPlatformOS = Platform.OS;
 let mockDropHandler: ((files: File[]) => void) | null = null;
+let mockParticipants: Record<string, { items: { userId: string; displayName: string; avatarUrl: string }[] }> = {};
 
 let mockChatState = {
     messagesByConversation: {},
@@ -42,12 +43,16 @@ jest.mock("@/entities/chat-message", () => ({
     ChatMessage: ({
         id,
         text,
+        avatarUrl,
+        authorName,
         isHighlighted,
         replyTo,
         onReplyPress,
     }: {
         id: string;
         text: string;
+        avatarUrl?: string;
+        authorName?: string;
         isHighlighted?: boolean;
         replyTo?: { messageId: string; preview: string } | null;
         onReplyPress?: () => void;
@@ -58,6 +63,8 @@ jest.mock("@/entities/chat-message", () => ({
                 <Text testID={`message-${id}`}>
                     {text}:{isHighlighted ? "highlighted" : "plain"}
                 </Text>
+                {authorName ? <Text testID={`message-author-${id}`}>{authorName}</Text> : null}
+                {avatarUrl ? <Text testID={`message-avatar-${id}`}>{avatarUrl}</Text> : null}
                 {replyTo ? (
                     <Text testID={`reply-preview-${id}`} onPress={onReplyPress}>
                         {replyTo.preview}
@@ -121,10 +128,20 @@ jest.mock("@/shared/lib/useWebFileDrop", () => ({
     },
 }));
 
+jest.mock("@/entities/conversation/model/participants-store", () => ({
+    useConversationParticipants: (conversationId: string) =>
+        mockParticipants[conversationId]?.items ?? [],
+    useParticipantsStore: (selector?: (state: { load: jest.Mock }) => unknown) => {
+        const state = { load: jest.fn().mockResolvedValue([]) };
+        return selector ? selector(state) : state;
+    },
+}));
+
 describe("MessagesList loading state", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockDropHandler = null;
+        mockParticipants = {};
         Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatformOS });
         mockChatState = {
             messagesByConversation: {},
@@ -219,6 +236,64 @@ describe("MessagesList loading state", () => {
             showNames: false,
             variant: "bubble",
         });
+    });
+
+    it("passes subject message sender name and avatar from participants", () => {
+        mockParticipants = {
+            "subject-1": {
+                items: [
+                    {
+                        userId: "teacher-1",
+                        displayName: "Teacher One",
+                        avatarUrl: "https://cdn.test/teacher.png",
+                    },
+                ],
+            },
+        };
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "subject-1": [
+                    {
+                        id: "message-1",
+                        body: "lesson",
+                        senderId: "teacher-1",
+                        readAt: null,
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "subject-1": true },
+        };
+
+        render(<MessagesList chatId="subject-1" type="subject" />);
+
+        expect(screen.getByTestId("message-author-message-1").props.children).toBe("Teacher One");
+        expect(screen.getByTestId("message-avatar-message-1").props.children).toBe(
+            "https://cdn.test/teacher.png",
+        );
+    });
+
+    it("falls back to sender id when a subject participant is not cached", () => {
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "subject-2": [
+                    {
+                        id: "message-1",
+                        body: "lesson",
+                        senderId: "teacher-unknown",
+                        readAt: null,
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "subject-2": true },
+        };
+
+        render(<MessagesList chatId="subject-2" type="subject" />);
+
+        expect(screen.getByTestId("message-author-message-1").props.children).toBe(
+            "teacher-unknown",
+        );
     });
 
     it("renders date separators as sticky list rows", () => {

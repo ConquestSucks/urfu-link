@@ -160,7 +160,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             }
             : {}),
         web: {
-            bundler: "metro"
+            ...(config.web ?? {}),
+            bundler: "metro",
+            output: "single",
         }
     };
 };

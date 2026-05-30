@@ -8,6 +8,7 @@ interface SidebarItemProps {
     isActive: boolean;
     textAnimatedStyle?: AnimatedViewStyle;
     onPress?: () => void;
+    badgeCount?: number;
 }
 export const SidebarItem = ({
     icon: Icon,
@@ -15,16 +16,24 @@ export const SidebarItem = ({
     isActive,
     textAnimatedStyle,
     onPress,
+    badgeCount = 0,
 }: SidebarItemProps) => {
     return (
         <Pressable
             className={`overflow-hidden flex-row gap-3 items-center px-[17.5] py-[14px] rounded-xl transition-colors duration-300 select-none ${
-                isActive ? "bg-brand-600" : "bg-transparent hover:bg-white/5"
+                isActive ? "bg-brand-650" : "bg-transparent hover:bg-white/5"
             }`}
             onPress={onPress}
         >
             <View>
                 <Icon size={20} className={isActive ? "text-white" : "text-text-muted"} />
+                {badgeCount > 0 ? (
+                    <View className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 items-center justify-center border border-app-bg">
+                        <Text className="text-[10px] leading-none text-white font-bold">
+                            {badgeCount > 99 ? "99+" : badgeCount}
+                        </Text>
+                    </View>
+                ) : null}
             </View>
             <AnimatedView style={[{ flex: 1 }, textAnimatedStyle ?? {}]}>
                 <Text

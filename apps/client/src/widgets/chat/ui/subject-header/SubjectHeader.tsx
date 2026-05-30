@@ -2,7 +2,10 @@ import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { Avatar } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
-import { useConversationParticipants } from "@/entities/conversation/model/participants-store";
+import {
+    useConversationParticipants,
+    useParticipantsStore,
+} from "@/entities/conversation/model/participants-store";
 import {
     useCurrentUser,
     useMuteConversationNotifications,
@@ -16,14 +19,25 @@ import { SubjectMembersModal, type SubjectMember } from "./SubjectMembersModal";
 import { UserProfileModal } from "../chat-header/UserProfileModal";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { usePresenceStore } from "@/entities/presence";
-import type { ConversationParticipantDto } from "@urfu-link/api-client";
+import { useCallStore } from "@/entities/call";
+import { apiClient } from "@/shared/lib/api";
+import type { CallType, ConversationParticipantDto } from "@urfu-link/api-client";
 
 const roleLabel = (role: ConversationParticipantDto["role"]) =>
-    role === "Teacher" ? "Преподаватель" : role === "Student" ? "Студент" : "Участник";
+    role === "Teacher" ? "ÐŸÑ€ÐµÐ¿Ð¾Ð´Ð°Ð²Ð°Ñ‚ÐµÐ»ÑŒ" : role === "Student" ? "Ð¡Ñ‚ÑƒÐ´ÐµÐ½Ñ‚" : "Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº";
 
-export const SubjectHeader = ({ subjectId, onOpenPinned }: {
+export const SubjectHeader = ({
+    subjectId,
+    onOpenPinned,
+    onOpenSearch,
+    onStartGroupAudioCall,
+    onStartGroupVideoCall,
+}: {
     subjectId: string;
     onOpenPinned?: () => void;
+    onOpenSearch?: () => void;
+    onStartGroupAudioCall?: () => void;
+    onStartGroupVideoCall?: () => void;
 }) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
     const [profileUserId, setProfileUserId] = useState<string | null>(null);
@@ -31,7 +45,10 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === subjectId),
     );
+    const updateConversation = useChatStore((s) => s.updateConversation);
     const participants = useConversationParticipants(subjectId);
+    const primeParticipants = useParticipantsStore((s) => s.prime);
+    const startCall = useCallStore((s) => s.startCall);
     const currentUserId = useCurrentUserId();
     const presenceByUser = usePresenceStore((s) => s.presenceByUser);
     const watchUserPresence = usePresenceStore((s) => s.watchUserPresence);
@@ -65,11 +82,19 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
         profile?.notifications.mutedConversationIds?.includes(subjectId) ?? false;
     const notificationsPending =
         muteNotifications.isPending || unmuteNotifications.isPending;
+    const handleToggleNotifications = useCallback(() => {
+        if (notificationsMuted) {
+            unmuteNotifications.mutate(subjectId);
+        } else {
+            muteNotifications.mutate(subjectId);
+        }
+    }, [muteNotifications, notificationsMuted, subjectId, unmuteNotifications]);
+
     if (!conversation) return null;
 
     const subjectName = conversation.disciplineChatKind === "Subgroup"
-        ? `${conversation.disciplineTitle ?? "Дисциплина"} · ${conversation.disciplineSubgroupName ?? conversation.title ?? "Подгруппа"}`
-        : `${conversation.disciplineTitle ?? conversation.title ?? "Дисциплина"} · Общий чат`;
+        ? `${conversation.disciplineTitle ?? "Ð”Ð¸ÑÑ†Ð¸Ð¿Ð»Ð¸Ð½Ð°"} Â· ${conversation.disciplineSubgroupName ?? conversation.title ?? "ÐŸÐ¾Ð´Ð³Ñ€ÑƒÐ¿Ð¿Ð°"}`
+        : `${conversation.disciplineTitle ?? conversation.title ?? "Ð”Ð¸ÑÑ†Ð¸Ð¿Ð»Ð¸Ð½Ð°"} Â· ÐžÐ±Ñ‰Ð¸Ð¹ Ñ‡Ð°Ñ‚`;
     const subjectAvatarUrl = "";
     const onlineCount = participants.filter((participant) =>
         presenceByUser[participant.userId]?.status === "Online"
@@ -77,7 +102,7 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
     const totalCount = participants.length;
     const membersData: SubjectMember[] = participants.map((participant) => ({
         id: participant.userId,
-        name: participant.displayName || "Участник",
+        name: participant.displayName || "Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº",
         avatarUrl: participant.avatarUrl,
         role: roleLabel(participant.role),
         isOnline: presenceByUser[participant.userId]?.status === "Online",
@@ -85,18 +110,46 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
     const selectedParticipant = participants.find((participant) => participant.userId === profileUserId) ?? null;
     const selectedPresence = profileUserId ? presenceByUser[profileUserId] : undefined;
     const currentRole = currentUserId ? conversation.participantRoles?.[currentUserId] : undefined;
-    const canStartGroupCall =
+    const canStartDisciplineCall =
+        conversation.groupSubtype === "Discipline" && currentRole === "Teacher";
+    const canStartGroupAudioCall =
+        conversation.capabilities?.canStartGroupAudioCall ??
         conversation.capabilities?.canStartGroupCall ??
-        (conversation.disciplineChatKind === "Subgroup" && currentRole === "Teacher");
+        canStartDisciplineCall;
+    const canStartGroupVideoCall =
+        conversation.capabilities?.canStartGroupVideoCall ??
+        conversation.capabilities?.canStartGroupCall ??
+        canStartDisciplineCall;
+    const isSelectedSelf = selectedParticipant?.userId === currentUserId;
 
-    const handleStartGroupCall = useCallback(() => {
-        if (!canStartGroupCall || !subjectId) {
+    const handleStartDirectCallFromProfile = useCallback(async (callType: CallType) => {
+        if (!selectedParticipant || selectedParticipant.userId === currentUserId) {
             return;
         }
 
-        // TODO(#group-call): wire to real CallService adapter.
-        console.warn(`Групповые звонки пока недоступны: ${subjectId}`);
-    }, [canStartGroupCall, subjectId]);
+        const direct = await apiClient.chat.openDirectConversation(selectedParticipant.userId);
+        updateConversation(direct);
+
+        const currentParticipant =
+            currentUserId && profile
+                ? {
+                      userId: currentUserId,
+                      role: "Member" as const,
+                      displayName: profile.identity.name,
+                      avatarUrl: profile.account.avatarUrl ?? "",
+                  }
+                : null;
+        primeParticipants(direct.id, [
+            ...(currentParticipant ? [currentParticipant] : []),
+            {
+                userId: selectedParticipant.userId,
+                role: selectedParticipant.role,
+                displayName: selectedParticipant.displayName,
+                avatarUrl: selectedParticipant.avatarUrl,
+            },
+        ]);
+        await startCall(direct.id, callType);
+    }, [currentUserId, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
 
     return (
         <>
@@ -117,26 +170,23 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
                                 numberOfLines={1}
                                 className={`leading-none text-xs font-medium ${onlineCount > 0 ? "text-success-600" : "text-text-muted"}`}
                             >
-                                В сети {onlineCount} из {totalCount}
+                                Ð’ ÑÐµÑ‚Ð¸ {onlineCount} Ð¸Ð· {totalCount}
                             </Text>
                         </View>
                     </View>
                 </View>
 
                 <SubjectHeaderActions
-                    canStartGroupCall={canStartGroupCall}
-                    onStartGroupCall={handleStartGroupCall}
+                    canStartGroupAudioCall={canStartGroupAudioCall}
+                    canStartGroupVideoCall={canStartGroupVideoCall}
+                    onStartGroupAudioCall={onStartGroupAudioCall}
+                    onStartGroupVideoCall={onStartGroupVideoCall}
+                    onOpenSearch={onOpenSearch}
                     onOpenMembers={() => setIsMembersOpen(true)}
                     onOpenPinned={() => onOpenPinned?.()}
                     notificationsMuted={notificationsMuted}
                     notificationsPending={notificationsPending}
-                    onToggleNotifications={() => {
-                        if (notificationsMuted) {
-                            unmuteNotifications.mutate(subjectId);
-                        } else {
-                            muteNotifications.mutate(subjectId);
-                        }
-                    }}
+                    onToggleNotifications={handleToggleNotifications}
                 />
             </View>
 
@@ -150,11 +200,23 @@ export const SubjectHeader = ({ subjectId, onOpenPinned }: {
                 isOpen={!!selectedParticipant}
                 onClose={() => setProfileUserId(null)}
                 user={{
-                    name: selectedParticipant?.displayName || "Участник",
+                    name: selectedParticipant?.displayName || "Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº",
                     avatarUrl: selectedParticipant?.avatarUrl,
                     status: selectedPresence?.status,
                     lastSeenAt: selectedPresence?.lastSeenAt,
                 }}
+                onStartAudioCall={
+                    selectedParticipant && !isSelectedSelf
+                        ? () => void handleStartDirectCallFromProfile("Audio")
+                        : undefined
+                }
+                onStartVideoCall={
+                    selectedParticipant && !isSelectedSelf
+                        ? () => void handleStartDirectCallFromProfile("Video")
+                        : undefined
+                }
+                onToggleNotifications={handleToggleNotifications}
+                notificationsPending={notificationsPending}
             />
         </>
     );

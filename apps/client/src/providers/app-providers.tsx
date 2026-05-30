@@ -19,10 +19,10 @@ export default function AppProviders({ children }: PropsWithChildren) {
         },
     }));
     return (<SafeAreaProvider>
-      <AuthProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
           <AuthGate>{children}</AuthGate>
-        </QueryClientProvider>
-      </AuthProvider>
+        </AuthProvider>
+      </QueryClientProvider>
     </SafeAreaProvider>);
 }

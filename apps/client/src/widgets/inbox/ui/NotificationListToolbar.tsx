@@ -35,7 +35,7 @@ export const NotificationListToolbar = ({
                     onPress={onMarkAllRead}
                     className={`h-8 flex-row items-center gap-1.5 rounded-lg px-2.5 transition-colors duration-200 ${
                         canMarkAll
-                            ? "bg-brand-600 hover:bg-brand-500 active:bg-brand-700"
+                            ? "bg-brand-650 hover:bg-brand-500 active:bg-brand-700"
                             : "bg-white/[0.04] opacity-60"
                     }`}
                 >

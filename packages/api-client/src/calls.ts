@@ -83,9 +83,10 @@ export function createCallsApi(
       });
     },
 
-    token(callId: string): Promise<CallTokenDto> {
+    token(callId: string, clientInstanceId?: string | null): Promise<CallTokenDto> {
       return request<CallTokenDto>(`${PREFIX}/${encodeURIComponent(callId)}/token`, {
         method: "POST",
+        body: clientInstanceId ? JSON.stringify({ clientInstanceId }) : undefined,
       });
     },
   };

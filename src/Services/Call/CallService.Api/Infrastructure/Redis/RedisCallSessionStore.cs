@@ -7,10 +7,12 @@ using Urfu.Link.Services.Call.Domain;
 namespace Urfu.Link.Services.Call.Infrastructure.Redis;
 
 public sealed class RedisCallSessionStore(
-    IConnectionMultiplexer redis) : ICallSessionStore
+    IConnectionMultiplexer redis) : ICallSessionStore, ICallUserActivityStore
 {
     private const string KeyPrefix = "call:session:";
     private const string ExpiryIndexKey = "call:ring-expiry";
+    private const string UserActiveKeyPrefix = "call:user-active:";
+    private const string ClientInstanceKeyPrefix = "call:client-instance:";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -175,5 +177,88 @@ public sealed class RedisCallSessionStore(
         return sessions;
     }
 
+    public async Task<Guid?> GetActiveCallAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var payload = await redis.GetDatabase()
+            .StringGetAsync(UserActiveKey(userId))
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return Guid.TryParseExact(payload.ToString(), "N", out var callId)
+            ? callId
+            : null;
+    }
+
+    public async Task<bool> TryReserveActiveCallAsync(
+        Guid userId,
+        Guid callId,
+        TimeSpan ttl,
+        CancellationToken cancellationToken)
+    {
+        var db = redis.GetDatabase();
+        var result = await db.ScriptEvaluateAsync(
+                """
+                local current = redis.call('GET', KEYS[1])
+                if (not current) or current == ARGV[1] then
+                    redis.call('SET', KEYS[1], ARGV[1], 'PX', ARGV[2])
+                    return 1
+                end
+                return 0
+                """,
+                new RedisKey[] { UserActiveKey(userId) },
+                new RedisValue[]
+                {
+                    callId.ToString("N"),
+                    Milliseconds(ttl),
+                })
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return (long)result == 1L;
+    }
+
+    public Task ReleaseActiveCallAsync(Guid userId, Guid callId, CancellationToken cancellationToken)
+        => redis.GetDatabase()
+            .ScriptEvaluateAsync(
+                """
+                local current = redis.call('GET', KEYS[1])
+                if current == ARGV[1] then
+                    return redis.call('DEL', KEYS[1])
+                end
+                return 0
+                """,
+                new RedisKey[] { UserActiveKey(userId) },
+                new RedisValue[] { callId.ToString("N") })
+            .WaitAsync(cancellationToken);
+
+    public async Task<string?> SetClientInstanceAsync(
+        Guid callId,
+        Guid userId,
+        string clientInstanceId,
+        TimeSpan ttl,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientInstanceId);
+        var db = redis.GetDatabase();
+        var key = ClientInstanceKey(callId, userId);
+        var previous = await db.StringGetAsync(key)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await db.StringSetAsync(key, clientInstanceId, ttl)
+            .WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return previous.IsNullOrEmpty ? null : previous.ToString();
+    }
+
     private static string SessionKey(Guid callId) => KeyPrefix + callId.ToString("N");
+
+    private static string UserActiveKey(Guid userId) => UserActiveKeyPrefix + userId.ToString("N");
+
+    private static string ClientInstanceKey(Guid callId, Guid userId)
+        => string.Concat(ClientInstanceKeyPrefix, callId.ToString("N"), ":", userId.ToString("N"));
+
+    private static long Milliseconds(TimeSpan ttl)
+        => Math.Max(1L, (long)ttl.TotalMilliseconds);
 }

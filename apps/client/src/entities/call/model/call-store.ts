@@ -5,12 +5,14 @@ import {
     type CallType,
 } from "@urfu-link/api-client";
 import { apiClient } from "@/shared/lib/api";
+import { getCallClientInstanceId } from "./call-client-instance";
 
 const tokenRefreshMarginMs = 15_000;
 
 type TokenByCallId = Record<string, CallTokenDto>;
 type LoadingByCallId = Record<string, boolean>;
 type ErrorByCallId = Record<string, string | null>;
+type ReplacementByCallId = Record<string, string | null>;
 
 const toBoolean = (value: unknown) => !!value;
 
@@ -47,6 +49,7 @@ export type CallStoreState = {
     callTokens: TokenByCallId;
     tokenLoadingByCallId: LoadingByCallId;
     tokenErrorByCallId: ErrorByCallId;
+    replacedByClientInstanceId: ReplacementByCallId;
 
     setIncomingCall: (call: CallSessionDto | null) => void;
     setOutgoingCall: (call: CallSessionDto | null) => void;
@@ -62,6 +65,7 @@ export type CallStoreState = {
     handleCallEnded: (call: CallSessionDto) => void;
     handleCallParticipantJoined: (callId: string, userId: string) => void;
     handleCallParticipantLeft: (callId: string, userId: string) => void;
+    handleCallDeviceReplaced: (callId: string, clientInstanceId: string) => void;
 
     startCall: (conversationId: string, callType: CallType) => Promise<CallSessionDto>;
     acceptIncoming: () => Promise<void>;
@@ -81,6 +85,7 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     callTokens: {},
     tokenLoadingByCallId: {},
     tokenErrorByCallId: {},
+    replacedByClientInstanceId: {},
 
     setIncomingCall: (call) =>
         set({ incomingCall: call, activeCall: call?.status === "Active" ? call : get().activeCall }),
@@ -179,6 +184,29 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
             };
         }),
 
+    handleCallDeviceReplaced: (callId, clientInstanceId) => {
+        if (clientInstanceId === getCallClientInstanceId()) {
+            return;
+        }
+
+        set((state) => {
+            const nextTokens = cloneTokenByCallId(state.callTokens);
+            delete nextTokens[callId];
+
+            return {
+                callTokens: nextTokens,
+                replacedByClientInstanceId: {
+                    ...state.replacedByClientInstanceId,
+                    [callId]: clientInstanceId,
+                },
+                tokenErrorByCallId: {
+                    ...state.tokenErrorByCallId,
+                    [callId]: "Звонок открыт в другой вкладке или на другом устройстве.",
+                },
+            };
+        });
+    },
+
     startCall: async (conversationId, callType) => {
         const call = await apiClient.calls.start(conversationId, callType);
         set({
@@ -245,6 +273,18 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     },
 
     loadToken: async (callId) => {
+        const replacedBy = get().replacedByClientInstanceId[callId];
+        if (replacedBy) {
+            const message = "Звонок открыт в другой вкладке или на другом устройстве.";
+            set((state) => ({
+                tokenErrorByCallId: {
+                    ...state.tokenErrorByCallId,
+                    [callId]: message,
+                },
+            }));
+            throw new Error(message);
+        }
+
         const cached = get().callTokens[callId];
         if (isTokenFresh(cached)) {
             return cached;
@@ -262,7 +302,7 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
         }));
 
         try {
-            const token = await apiClient.calls.token(callId);
+            const token = await apiClient.calls.token(callId, getCallClientInstanceId());
             set((state) => ({
                 callTokens: {
                     ...state.callTokens,
@@ -312,5 +352,6 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
             callTokens: {},
             tokenLoadingByCallId: {},
             tokenErrorByCallId: {},
+            replacedByClientInstanceId: {},
         }),
 }));

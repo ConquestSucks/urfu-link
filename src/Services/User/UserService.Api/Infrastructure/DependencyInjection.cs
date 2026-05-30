@@ -37,6 +37,7 @@ public static class ModuleRegistration
         services.AddScoped<IUserRepository, UserRepository>();
 
         services.Configure<StorageOptions>(configuration.GetSection(StorageOptions.SectionName));
+        services.Configure<AvatarBackfillOptions>(configuration.GetSection(AvatarBackfillOptions.SectionName));
         services.AddSingleton<IAmazonS3>(sp =>
         {
             var storageOptions = configuration.GetSection(StorageOptions.SectionName).Get<StorageOptions>()
@@ -50,7 +51,11 @@ public static class ModuleRegistration
 
             return new AmazonS3Client(storageOptions.AccessKey, storageOptions.SecretKey, config);
         });
+        services.AddSingleton<IAvatarImageProcessor, ImageSharpAvatarImageProcessor>();
         services.AddSingleton<IAvatarStorage, MinioAvatarStorage>();
+        services.AddScoped<IAvatarBackfillRepository, EfAvatarBackfillRepository>();
+        services.AddScoped<AvatarBackfillService>();
+        services.AddHostedService<AvatarBackfillHostedService>();
 
         services.Configure<KeycloakAdminOptions>(configuration.GetSection(KeycloakAdminOptions.SectionName));
         services.AddHttpClient<ISessionManager, KeycloakSessionClient>();

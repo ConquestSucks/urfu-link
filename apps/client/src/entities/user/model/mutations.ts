@@ -39,10 +39,24 @@ export function useDeleteAvatar() {
 }
 
 export function useUpdatePrivacy() {
+  const queryClient = useQueryClient();
   const invalidateMe = useInvalidateMe();
   return useMutation({
     mutationFn: (dto: UpdatePrivacyDto) => apiClient.users.updatePrivacy(dto),
-    onSuccess: invalidateMe,
+    onMutate: async (dto) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.me });
+      const previous = queryClient.getQueryData<UserProfile>(userKeys.me);
+      queryClient.setQueryData<UserProfile>(userKeys.me, (current) =>
+        current ? { ...current, privacy: { ...dto } } : current,
+      );
+      return { previous };
+    },
+    onError: (_error, _dto, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(userKeys.me, context.previous);
+      }
+    },
+    onSettled: invalidateMe,
   });
 }
 
@@ -103,10 +117,32 @@ export function useUnmuteConversationNotifications() {
 }
 
 export function useUpdateSoundVideo() {
+  const queryClient = useQueryClient();
   const invalidateMe = useInvalidateMe();
   return useMutation({
     mutationFn: (dto: UpdateSoundVideoDto) => apiClient.users.updateSoundVideo(dto),
-    onSuccess: invalidateMe,
+    onMutate: async (dto) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.me });
+      const previous = queryClient.getQueryData<UserProfile>(userKeys.me);
+      queryClient.setQueryData<UserProfile>(userKeys.me, (current) =>
+        current
+          ? {
+              ...current,
+              soundVideo: {
+                ...current.soundVideo,
+                ...dto,
+              },
+            }
+          : current,
+      );
+      return { previous };
+    },
+    onError: (_error, _dto, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(userKeys.me, context.previous);
+      }
+    },
+    onSettled: invalidateMe,
   });
 }
 

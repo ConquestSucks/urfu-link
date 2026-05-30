@@ -26,7 +26,7 @@ const emojiKeyboardTheme = {
     search: {
         background: "rgba(255, 255, 255, 0.05)",
         text: "#FFFFFF",
-        placeholder: "#8B8FA8",
+        placeholder: "#90A1B9",
         icon: "#8B8FA8",
     },
     customButton: {

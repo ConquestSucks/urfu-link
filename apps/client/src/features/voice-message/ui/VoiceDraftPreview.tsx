@@ -41,7 +41,7 @@ export const VoiceDraftPreview = ({
             testID="voice-draft-submit"
             onPress={onSubmit}
             disabled={isSubmitting}
-            className={`w-11 h-11 rounded-full items-center justify-center bg-brand-600 ${
+            className={`w-11 h-11 rounded-full items-center justify-center bg-brand-650 ${
                 isSubmitting ? "opacity-70" : "active:opacity-80"
             }`}
         >
