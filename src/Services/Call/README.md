@@ -2,7 +2,7 @@
 
 ## Responsibility
 - Signaling and call session orchestration.
-- Integration with LiveKit/Coturn for media path setup.
+- Integration with LiveKit for media path setup.
 
 ## Planned modules
 - `Domain`: call session lifecycle model.

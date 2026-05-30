@@ -7,7 +7,7 @@
 
 ## External systems and platform components
 - Keycloak (identity provider)
-- LiveKit + Coturn (real-time media)
+- LiveKit with embedded TURN (real-time media)
 - Kafka (event bus)
 - PostgreSQL / MongoDB / Redis / MinIO (state)
 - On-prem Kubernetes platform with Linkerd mesh

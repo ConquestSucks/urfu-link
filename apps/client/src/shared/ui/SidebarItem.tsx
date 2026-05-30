@@ -19,7 +19,7 @@ export const SidebarItem = ({
     return (
         <Pressable
             className={`overflow-hidden flex-row gap-3 items-center px-[17.5] py-[14px] rounded-xl transition-colors duration-300 select-none ${
-                isActive ? "bg-brand-600 shadow-brand-soft" : "bg-transparent hover:bg-white/5"
+                isActive ? "bg-brand-600" : "bg-transparent hover:bg-white/5"
             }`}
             onPress={onPress}
         >
