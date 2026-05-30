@@ -294,7 +294,32 @@ describe("ChatMessage read indicator", () => {
         expect(screen.getByText(label)).toBeTruthy();
     });
 
-    it("shows system call timing details", () => {
+    it("shows started system call time without a prefix", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Started",
+                    callerId: "user-1",
+                    duration: null,
+                    endReason: null,
+                }}
+            />,
+        );
+
+        expect(screen.getByText("12:00")).toBeTruthy();
+        expect(screen.queryByText("Начало: 12:00")).toBeNull();
+        expect(screen.queryByText("Завершён: 12:00")).toBeNull();
+    });
+
+    it("shows completed system call end time and duration", () => {
         render(
             <ChatMessage
                 id="message-1"
@@ -314,7 +339,8 @@ describe("ChatMessage read indicator", () => {
             />,
         );
 
-        expect(screen.getByText("Начало: 12:00")).toBeTruthy();
+        expect(screen.getByText("Завершён: 12:00")).toBeTruthy();
+        expect(screen.queryByText("Начало: 12:00")).toBeNull();
         expect(screen.getByText("Длительность: 3:12")).toBeTruthy();
     });
 });
