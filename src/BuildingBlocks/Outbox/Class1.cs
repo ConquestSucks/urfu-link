@@ -216,19 +216,20 @@ public sealed class OutboxPublisherWorker(
 {
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await outboxStore.RecoverAsync(stoppingToken).ConfigureAwait(false);
+        await RecoverUntilSuccessfulAsync(stoppingToken).ConfigureAwait(false);
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var nextMessage = await outboxStore.DequeueAsync(stoppingToken).ConfigureAwait(false);
-            if (nextMessage is null)
-            {
-                await Task.Delay(options.Value.PollInterval, stoppingToken).ConfigureAwait(false);
-                continue;
-            }
-
+            OutboxMessage? nextMessage = null;
             try
             {
+                nextMessage = await outboxStore.DequeueAsync(stoppingToken).ConfigureAwait(false);
+                if (nextMessage is null)
+                {
+                    await Task.Delay(options.Value.PollInterval, stoppingToken).ConfigureAwait(false);
+                    continue;
+                }
+
                 await publisher
                     .PublishSerializedAsync(nextMessage.Topic, nextMessage.Key, nextMessage.Payload, stoppingToken)
                     .ConfigureAwait(false);
@@ -239,18 +240,51 @@ public sealed class OutboxPublisherWorker(
             {
                 throw;
             }
-            catch (Exception exception) when (
-                exception is KafkaException
-                or ProduceException<string, string>
-                or RedisException
-                or TimeoutException
-                or InvalidOperationException
-                or JsonException)
+            catch (Exception exception) when (IsRecoverableOutboxException(exception))
             {
-                logger.LogError(exception, "Outbox publish failed for message {MessageId}", nextMessage.Id);
+                if (nextMessage is null)
+                {
+                    logger.LogError(exception, "Outbox processing failed before a message was dequeued");
+                }
+                else
+                {
+                    logger.LogError(exception, "Outbox publish failed for message {MessageId}", nextMessage.Id);
+                }
+
                 await Task.Delay(options.Value.PollInterval, stoppingToken).ConfigureAwait(false);
             }
         }
+    }
+
+    private async Task RecoverUntilSuccessfulAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await outboxStore.RecoverAsync(stoppingToken).ConfigureAwait(false);
+                return;
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception) when (IsRecoverableOutboxException(exception))
+            {
+                logger.LogError(exception, "Outbox recovery failed; retrying");
+                await Task.Delay(options.Value.PollInterval, stoppingToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private static bool IsRecoverableOutboxException(Exception exception)
+    {
+        return exception is KafkaException
+            or ProduceException<string, string>
+            or RedisException
+            or TimeoutException
+            or InvalidOperationException
+            or JsonException;
     }
 }
 
