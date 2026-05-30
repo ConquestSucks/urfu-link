@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using DisciplineService.Api.Application.Contracts.Requests;
 using DisciplineService.Api.Application.Contracts.Responses;
 using DisciplineService.Api.Endpoints;
 using DisciplineService.IntegrationTests.Infrastructure;
@@ -25,135 +24,21 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
 
     private HttpClient CreateClient() => _factory.CreateClient();
 
-    /// <summary>
-    /// Returns an HttpClient with a fresh <c>Idempotency-Key</c> header pre-attached.
-    /// CreateDiscipline and EnrollUsers reject requests without the header so every
-    /// mutating call needs a unique key — using a single static key would make the
-    /// second call collide on the dedup window.
-    /// </summary>
-    private HttpClient CreateIdempotentClient()
-    {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        return client;
-    }
-
-    private static CreateDisciplineRequest SampleCreate(Guid ownerId)
-        => new(
-            Code: $"CS-{Guid.NewGuid():N}".Substring(0, 12),
-            Title: "Intro to CS",
-            Description: "Foundational course",
-            Semester: "2026-spring",
-            OwnerTeacherId: ownerId,
-            CoverAssetId: null);
-
     [Fact]
-    public async Task Post_Disciplines_AsAdmin_Returns201_WithBodyAndPublishesEvents()
-    {
-        var teacherId = Guid.NewGuid();
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-
-        var client = CreateIdempotentClient();
-        var response = await client.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            SampleCreate(teacherId));
-
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
-        var body = await response.Content.ReadFromJsonAsync<DisciplineResponse>();
-        body.Should().NotBeNull();
-        body!.OwnerTeacherId.Should().Be(teacherId);
-        body.Enrollments.Should().ContainSingle()
-            .Which.Role.Should().Be(DisciplineRole.Teacher);
-
-        _factory.OutboxWriter.Published.Should().Contain(p => p.EventType == "discipline.created.v1");
-        _factory.OutboxWriter.Published.Should().Contain(p => p.EventType == "discipline.user_enrolled.v1");
-    }
-
-    [Fact]
-    public async Task Post_Disciplines_WithoutAuth_Returns401()
-    {
-        TestAuthHandler.CurrentPrincipal = null;
-        var client = CreateIdempotentClient();
-        var response = await client.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            SampleCreate(Guid.NewGuid()));
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task Post_Disciplines_AsTeacher_Returns403()
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(Guid.NewGuid());
-        var client = CreateIdempotentClient();
-        var response = await client.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            SampleCreate(Guid.NewGuid()));
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task Post_Disciplines_DuplicateCode_Returns409()
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var teacherId = Guid.NewGuid();
-        var first = SampleCreate(teacherId);
-
-        // Two distinct Idempotency-Keys: we need to surface the unique-code conflict,
-        // not have the second request rejected as a duplicate request envelope.
-        var firstResponse = await CreateIdempotentClient().PostAsJsonAsync("/api/v1/disciplines", first);
-        firstResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-
-        var dup = first with { Title = "Other" };
-        var secondResponse = await CreateIdempotentClient().PostAsJsonAsync("/api/v1/disciplines", dup);
-        secondResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
-    }
-
-    [Fact]
-    public async Task Post_Disciplines_WithoutIdempotencyKey_Returns400()
+    public async Task Post_Disciplines_Returns405()
     {
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
         var response = await CreateClient().PostAsJsonAsync(
             "/api/v1/disciplines",
-            SampleCreate(Guid.NewGuid()));
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
+            new
+            {
+                Code = "CS101",
+                Title = "Intro",
+                Semester = "2026-spring",
+                OwnerTeacherId = Guid.NewGuid(),
+            });
 
-    [Fact]
-    public async Task Post_Disciplines_DuplicateIdempotencyKey_Returns409()
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var key = Guid.NewGuid().ToString("N");
-
-        var first = _factory.CreateClient();
-        first.DefaultRequestHeaders.Add("Idempotency-Key", key);
-        var firstResponse = await first.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            SampleCreate(Guid.NewGuid()));
-        firstResponse.StatusCode.Should().Be(HttpStatusCode.Created);
-
-        var second = _factory.CreateClient();
-        second.DefaultRequestHeaders.Add("Idempotency-Key", key);
-        var secondResponse = await second.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            SampleCreate(Guid.NewGuid()));
-        secondResponse.StatusCode.Should().Be(HttpStatusCode.Conflict);
-    }
-
-    [Fact]
-    public async Task Post_Disciplines_BlankCode_Returns400()
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var client = CreateClient();
-        var response = await client.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            new CreateDisciplineRequest(
-                Code: "",
-                Title: "X",
-                Description: null,
-                Semester: "2026-spring",
-                OwnerTeacherId: Guid.NewGuid(),
-                CoverAssetId: null));
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
 
     [Fact]
@@ -200,35 +85,12 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Put_Discipline_AsOwner_UpdatesAndReturns204()
-    {
-        var teacherId = Guid.NewGuid();
-        var created = await CreateDisciplineAsync(teacherId);
-        _factory.OutboxWriter.Clear();
-
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateClient().PutAsJsonAsync(
-            $"/api/v1/disciplines/{created.Id}",
-            new
-            {
-                Code = created.Code,
-                Title = "Updated Title",
-                Description = "New desc",
-                Semester = "2026-fall",
-                CoverAssetId = (Guid?)null,
-            });
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        _factory.OutboxWriter.Published.Should().Contain(p => p.EventType == "discipline.updated.v1");
-    }
-
-    [Fact]
-    public async Task Put_Discipline_AsStudent_Returns403()
+    public async Task Put_Discipline_Returns405()
     {
         var teacherId = Guid.NewGuid();
         var created = await CreateDisciplineAsync(teacherId);
 
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Student(Guid.NewGuid());
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
         var response = await CreateClient().PutAsJsonAsync(
             $"/api/v1/disciplines/{created.Id}",
             new
@@ -239,31 +101,75 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
                 Semester = "2026-spring",
                 CoverAssetId = (Guid?)null,
             });
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
 
     [Fact]
-    public async Task Delete_Discipline_AsAdmin_ArchivesAndReturns204()
+    public async Task Delete_Discipline_Returns405()
     {
         var teacherId = Guid.NewGuid();
         var created = await CreateDisciplineAsync(teacherId);
-        _factory.OutboxWriter.Clear();
 
         TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
         var response = await CreateClient().DeleteAsync($"/api/v1/disciplines/{created.Id}");
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        _factory.OutboxWriter.Published.Should().Contain(p => p.EventType == "discipline.deleted.v1");
+        response.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
     }
 
     [Fact]
-    public async Task Delete_Discipline_AsTeacher_Returns403()
+    public async Task Mutate_Subgroups_IsNotAvailable()
     {
         var teacherId = Guid.NewGuid();
         var created = await CreateDisciplineAsync(teacherId);
+        var subgroupId = created.Subgroups[0].Id;
 
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateClient().DeleteAsync($"/api/v1/disciplines/{created.Id}");
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+
+        var createResponse = await CreateClient().PostAsJsonAsync(
+            $"/api/v1/disciplines/{created.Id}/subgroups",
+            new { Name = "Practice" });
+        var updateResponse = await CreateClient().PatchAsJsonAsync(
+            $"/api/v1/disciplines/{created.Id}/subgroups/{subgroupId}",
+            new { Name = "Renamed" });
+        var deleteResponse = await CreateClient().DeleteAsync(
+            $"/api/v1/disciplines/{created.Id}/subgroups/{subgroupId}");
+
+        createResponse.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Mutate_Enrollments_IsNotAvailable()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var created = await CreateDisciplineAsync(teacherId);
+        var subgroupId = created.Subgroups[0].Id;
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
+
+        var enrollResponse = await CreateClient().PostAsJsonAsync(
+            $"/api/v1/disciplines/{created.Id}/enrollments",
+            new
+            {
+                Enrollments = new[]
+                {
+                    new { UserId = studentId, Role = DisciplineRole.Student, SubgroupId = (Guid?)subgroupId },
+                },
+            });
+        var roleResponse = await CreateClient().PatchAsJsonAsync(
+            $"/api/v1/disciplines/{created.Id}/enrollments/{studentId}/role",
+            new { Role = DisciplineRole.Teacher });
+        var subgroupResponse = await CreateClient().PatchAsJsonAsync(
+            $"/api/v1/disciplines/{created.Id}/enrollments/{studentId}/subgroup",
+            new { SubgroupId = subgroupId });
+        var deleteResponse = await CreateClient().DeleteAsync(
+            $"/api/v1/disciplines/{created.Id}/enrollments/{studentId}");
+
+        enrollResponse.StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+        roleResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        subgroupResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -354,145 +260,13 @@ public sealed class DisciplineEndpointsTests : IAsyncLifetime
         body!.Items.Should().ContainSingle(i => i.Id == disc.Id && i.Role == DisciplineRole.Student);
     }
 
-    [Fact]
-    public async Task Post_Enrollments_AsOwner_AddsParticipantsAndPublishesEvents()
-    {
-        var teacherId = Guid.NewGuid();
-        var disc = await CreateDisciplineAsync(teacherId);
-        _factory.OutboxWriter.Clear();
-        var subgroupId = disc.Subgroups[0].Id;
-
-        var s1 = Guid.NewGuid();
-        var s2 = Guid.NewGuid();
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateIdempotentClient().PostAsJsonAsync(
-            $"/api/v1/disciplines/{disc.Id}/enrollments",
-            new
-            {
-                Enrollments = new[]
-                {
-                    new EnrollmentInput(s1, DisciplineRole.Student, subgroupId),
-                    new EnrollmentInput(s2, DisciplineRole.Student, subgroupId),
-                },
-            });
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await response.Content.ReadFromJsonAsync<EnrollUsersResponse>();
-        body!.Enrollments.Should().HaveCount(2);
-        _factory.OutboxWriter.Published.Count(p => p.EventType == "discipline.user_enrolled.v1")
-            .Should().Be(2);
-    }
-
-    [Fact]
-    public async Task Post_Enrollments_DuplicateUser_Returns409()
-    {
-        var teacherId = Guid.NewGuid();
-        var disc = await CreateDisciplineAsync(teacherId);
-
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateIdempotentClient().PostAsJsonAsync(
-            $"/api/v1/disciplines/{disc.Id}/enrollments",
-            new
-            {
-                Enrollments = new[] { new EnrollmentInput(teacherId, DisciplineRole.Teacher) },
-            });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-    }
-
-    [Fact]
-    public async Task Delete_Enrollment_AsOwner_RemovesParticipant()
-    {
-        var teacherId = Guid.NewGuid();
-        var studentId = Guid.NewGuid();
-        var disc = await CreateDisciplineAsync(teacherId);
-        await EnrollAsync(disc.Id, teacherId, [(studentId, DisciplineRole.Student)]);
-        _factory.OutboxWriter.Clear();
-
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateClient().DeleteAsync(
-            $"/api/v1/disciplines/{disc.Id}/enrollments/{studentId}");
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        _factory.OutboxWriter.Published.Should().Contain(p => p.EventType == "discipline.user_unenrolled.v1");
-    }
-
-    [Fact]
-    public async Task Delete_Enrollment_OwnerTeacher_Returns409()
-    {
-        var teacherId = Guid.NewGuid();
-        var disc = await CreateDisciplineAsync(teacherId);
-
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var response = await CreateClient().DeleteAsync(
-            $"/api/v1/disciplines/{disc.Id}/enrollments/{teacherId}");
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-    }
-
-    [Fact]
-    public async Task Patch_EnrollmentRole_AsOwner_ChangesRole()
-    {
-        var teacherId = Guid.NewGuid();
-        var studentId = Guid.NewGuid();
-        var disc = await CreateDisciplineAsync(teacherId);
-        await EnrollAsync(disc.Id, teacherId, [(studentId, DisciplineRole.Student)]);
-        _factory.OutboxWriter.Clear();
-
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var response = await CreateClient().PatchAsJsonAsync(
-            $"/api/v1/disciplines/{disc.Id}/enrollments/{studentId}/role",
-            new { Role = DisciplineRole.Teacher });
-
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
-        _factory.OutboxWriter.Published.Should().Contain(p => p.EventType == "discipline.enrollment_role_changed.v1");
-    }
-
-    [Fact]
-    public async Task Patch_EnrollmentRole_OnOwnerTeacher_Returns409()
-    {
-        var teacherId = Guid.NewGuid();
-        var disc = await CreateDisciplineAsync(teacherId);
-
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var response = await CreateClient().PatchAsJsonAsync(
-            $"/api/v1/disciplines/{disc.Id}/enrollments/{teacherId}/role",
-            new { Role = DisciplineRole.Student, SubgroupId = disc.Subgroups[0].Id });
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-    }
-
     private async Task<DisciplineResponse> CreateDisciplineAsync(Guid teacherId)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var resp = await CreateIdempotentClient().PostAsJsonAsync("/api/v1/disciplines", SampleCreate(teacherId));
-        resp.EnsureSuccessStatusCode();
-        return (await resp.Content.ReadFromJsonAsync<DisciplineResponse>())!;
-    }
+        => await _factory.SeedDisciplineAsync(teacherId);
 
     private async Task EnrollAsync(
         Guid disciplineId,
         Guid teacherId,
         IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var discipline = await GetDisciplineById(disciplineId);
-        var defaultSubgroupId = discipline.Subgroups[0].Id;
-        var resp = await CreateIdempotentClient().PostAsJsonAsync(
-            $"/api/v1/disciplines/{disciplineId}/enrollments",
-            new
-            {
-                Enrollments = users
-                    .Select(u => new EnrollmentInput(
-                        u.UserId,
-                        u.Role,
-                        u.Role == DisciplineRole.Student ? defaultSubgroupId : null))
-                    .ToList(),
-            });
-        resp.EnsureSuccessStatusCode();
-    }
+        => await _factory.SeedEnrollmentsAsync(disciplineId, teacherId, users);
 
-    private async Task<DisciplineResponse> GetDisciplineById(Guid disciplineId)
-    {
-        var response = await CreateClient().GetAsync($"/api/v1/disciplines/{disciplineId}");
-        response.EnsureSuccessStatusCode();
-        return (await response.Content.ReadFromJsonAsync<DisciplineResponse>())!;
-    }
 }

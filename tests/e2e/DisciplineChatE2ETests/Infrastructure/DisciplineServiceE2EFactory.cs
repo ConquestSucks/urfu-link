@@ -16,9 +16,12 @@ using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Urfu.Link.BuildingBlocks.Auth;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
+using Discipline = DisciplineApi::DisciplineService.Api.Domain.Aggregates.Discipline;
 using DisciplineDbContext = DisciplineApi::DisciplineService.Api.Infrastructure.Persistence.DisciplineDbContext;
+using IDisciplineRepository = DisciplineApi::DisciplineService.Api.Domain.Interfaces.IDisciplineRepository;
 
 namespace DisciplineChatE2ETests.Infrastructure;
 
@@ -59,6 +62,41 @@ public sealed class DisciplineServiceE2EFactory : WebApplicationFactory<Discipli
         await ctx.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE disciplines.enrollments, disciplines.disciplines, disciplines.outbox_messages RESTART IDENTITY CASCADE");
         ResetCapturedState();
+    }
+
+    public async Task<SeededDiscipline> SeedDisciplineAsync(Guid ownerTeacherId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDisciplineRepository>();
+        var discipline = Discipline.CreateNew(
+            $"E2E-{Guid.NewGuid():N}"[..12],
+            "E2E Discipline",
+            "Discipline seeded by cross-service E2E test.",
+            "2026-spring",
+            ownerTeacherId,
+            coverAssetId: null,
+            initiatedBy: ownerTeacherId);
+        var subgroup = discipline.CreateSubgroup("Practice E2E");
+
+        repository.Add(discipline);
+        await repository.SaveChangesAsync(CancellationToken.None);
+        return new SeededDiscipline(discipline.Id, subgroup.Id, subgroup.Name);
+    }
+
+    public async Task SeedEnrollmentAsync(
+        Guid disciplineId,
+        Guid enrolledBy,
+        Guid userId,
+        DisciplineRole role,
+        Guid? subgroupId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDisciplineRepository>();
+        var discipline = await repository.GetByIdAsync(disciplineId, CancellationToken.None)
+            ?? throw new InvalidOperationException($"Discipline '{disciplineId}' was not found.");
+
+        discipline.Enroll(userId, role, subgroupId, enrolledBy);
+        await repository.SaveChangesAsync(CancellationToken.None);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -132,3 +170,5 @@ public sealed class DisciplineServiceE2EFactory : WebApplicationFactory<Discipli
                     .RequireAuthenticatedUser()));
     }
 }
+
+public sealed record SeededDiscipline(Guid Id, Guid SubgroupId, string SubgroupName);
