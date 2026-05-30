@@ -77,11 +77,10 @@ internal static class DisciplineMapping
         ClaimsPrincipal principal,
         DisciplineAuthorizationService authorization)
     {
-        var canModify = authorization.CanModify(principal, discipline);
         return new DisciplinePermissionsResponse(
-            CanUpdate: canModify,
-            CanArchive: authorization.CanDelete(principal),
-            CanManageEnrollments: canModify,
-            CanManageSubgroups: canModify);
+            CanUpdate: false,
+            CanArchive: false,
+            CanManageEnrollments: false,
+            CanManageSubgroups: false);
     }
 }

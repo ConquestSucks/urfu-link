@@ -1,5 +1,3 @@
-using System.Net.Http.Json;
-using DisciplineService.Api.Application.Contracts.Requests;
 using DisciplineService.Api.Application.Contracts.Responses;
 using DisciplineService.IntegrationTests.Infrastructure;
 using FluentAssertions;
@@ -243,52 +241,11 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
     }
 
     private async Task<DisciplineResponse> CreateDisciplineAsync(Guid teacherId)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var http = _factory.CreateClient();
-        http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        var resp = await http.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            new CreateDisciplineRequest(
-                $"CS-{Guid.NewGuid():N}".Substring(0, 12),
-                "Intro",
-                null,
-                "2026-spring",
-                teacherId,
-                null));
-        resp.EnsureSuccessStatusCode();
-        return (await resp.Content.ReadFromJsonAsync<DisciplineResponse>())!;
-    }
+        => await _factory.SeedDisciplineAsync(teacherId, title: "Intro");
 
     private async Task EnrollAsync(
         Guid disciplineId,
         Guid teacherId,
         IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var discipline = await CreateDisciplineByIdAsync(disciplineId);
-        var defaultSubgroupId = discipline.Subgroups[0].Id;
-        var http = _factory.CreateClient();
-        http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        var resp = await http.PostAsJsonAsync(
-            $"/api/v1/disciplines/{disciplineId}/enrollments",
-            new
-            {
-                Enrollments = users
-                    .Select(u => new EnrollmentInput(
-                        u.UserId,
-                        u.Role,
-                        u.Role == DisciplineRole.Student ? defaultSubgroupId : null))
-                    .ToList(),
-            });
-        resp.EnsureSuccessStatusCode();
-    }
-
-    private async Task<DisciplineResponse> CreateDisciplineByIdAsync(Guid disciplineId)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var resp = await _factory.CreateClient().GetAsync($"/api/v1/disciplines/{disciplineId}");
-        resp.EnsureSuccessStatusCode();
-        return (await resp.Content.ReadFromJsonAsync<DisciplineResponse>())!;
-    }
+        => await _factory.SeedEnrollmentsAsync(disciplineId, teacherId, users);
 }

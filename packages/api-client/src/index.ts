@@ -56,14 +56,10 @@ export type {
   Discipline,
   DisciplineListItem,
   MyDiscipline,
-  CreateDisciplineRequest,
-  UpdateDisciplineRequest,
-  EnrollmentInput,
   ListDisciplinesResponse,
   ListMyDisciplinesResponse,
   ListSubgroupsResponse,
   ListEnrollmentsResponse,
-  EnrollUsersResponse,
 } from "./disciplines";
 
 export type {
