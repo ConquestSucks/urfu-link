@@ -9,6 +9,7 @@ using Urfu.Link.Services.Chat.Application.Conversations;
 using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Application.Messages;
 using Urfu.Link.Services.Chat.Application.Threads;
+using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Infrastructure.Auth;
@@ -90,7 +91,11 @@ public sealed class ChatHub(
                 .ConfigureAwait(false);
             foreach (var d in disciplines)
             {
-                conversationIds.Add($"discipline:{d.DisciplineId.ToString("N", CultureInfo.InvariantCulture)}");
+                conversationIds.Add(Conversation.ComputeDisciplineId(d.DisciplineId));
+                foreach (var subgroupId in d.VisibleSubgroupIds ?? Array.Empty<Guid>())
+                {
+                    conversationIds.Add(Conversation.ComputeDisciplineSubgroupId(d.DisciplineId, subgroupId));
+                }
             }
         }
         catch (RpcException ex)
@@ -138,7 +143,7 @@ public sealed class ChatHub(
         var conversation = await openDirect.OpenAsync(caller, peerUserId, Context.ConnectionAborted).ConfigureAwait(false);
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupNameFor(conversation.Id), Context.ConnectionAborted)
             .ConfigureAwait(false);
-        return ConversationDto.FromDomain(conversation);
+        return ConversationDto.FromDomain(conversation, caller);
     }
 
     public Task<MessageDto> SendMessage(SendMessageHubInput input)

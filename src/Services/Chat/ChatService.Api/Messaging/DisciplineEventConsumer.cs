@@ -192,6 +192,50 @@ public sealed class DisciplineEventConsumer(
                     break;
                 }
 
+            case "discipline.enrollment_subgroup_changed.v1":
+                {
+                    var evt = payloadElement.Deserialize<EnrollmentSubgroupChangedEvent>(JsonOptions);
+                    if (evt is not null)
+                    {
+                        await service.HandleEnrollmentSubgroupChangedAsync(evt, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    break;
+                }
+
+            case "discipline.subgroup_created.v1":
+                {
+                    var evt = payloadElement.Deserialize<DisciplineSubgroupCreatedEvent>(JsonOptions);
+                    if (evt is not null)
+                    {
+                        await service.HandleSubgroupCreatedAsync(evt, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    break;
+                }
+
+            case "discipline.subgroup_updated.v1":
+                {
+                    var evt = payloadElement.Deserialize<DisciplineSubgroupUpdatedEvent>(JsonOptions);
+                    if (evt is not null)
+                    {
+                        await service.HandleSubgroupUpdatedAsync(evt, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    break;
+                }
+
+            case "discipline.subgroup_archived.v1":
+                {
+                    var evt = payloadElement.Deserialize<DisciplineSubgroupArchivedEvent>(JsonOptions);
+                    if (evt is not null)
+                    {
+                        await service.HandleSubgroupArchivedAsync(evt, cancellationToken).ConfigureAwait(false);
+                    }
+
+                    break;
+                }
+
             case "discipline.deleted.v1":
                 {
                     var evt = payloadElement.Deserialize<DisciplineDeletedEvent>(JsonOptions);

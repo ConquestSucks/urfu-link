@@ -13,13 +13,29 @@ public sealed record DisciplineResponse(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? ArchivedAtUtc,
+    IReadOnlyList<DisciplineSubgroupResponse> Subgroups,
+    DisciplinePermissionsResponse Permissions,
     IReadOnlyList<EnrollmentResponse> Enrollments);
 
 public sealed record EnrollmentResponse(
     Guid UserId,
     DisciplineRole Role,
+    Guid? SubgroupId,
     DateTimeOffset EnrolledAtUtc,
     Guid EnrolledBy);
+
+public sealed record DisciplineSubgroupResponse(
+    Guid Id,
+    string Name,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    DateTimeOffset? ArchivedAtUtc);
+
+public sealed record DisciplinePermissionsResponse(
+    bool CanUpdate,
+    bool CanArchive,
+    bool CanManageEnrollments,
+    bool CanManageSubgroups);
 
 public sealed record DisciplineListItem(
     Guid Id,
@@ -29,7 +45,8 @@ public sealed record DisciplineListItem(
     Guid OwnerTeacherId,
     Guid? CoverAssetId,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? ArchivedAtUtc);
+    DateTimeOffset? ArchivedAtUtc,
+    DisciplinePermissionsResponse Permissions);
 
 public sealed record MyDisciplineResponse(
     Guid Id,
@@ -38,4 +55,5 @@ public sealed record MyDisciplineResponse(
     string Semester,
     Guid OwnerTeacherId,
     Guid? CoverAssetId,
-    DisciplineRole Role);
+    DisciplineRole Role,
+    Guid? SubgroupId);

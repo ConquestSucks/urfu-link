@@ -461,4 +461,57 @@ describe("useInboxConversations", () => {
 
         expect(mockUnwatchUserPresence).toHaveBeenCalledWith("peer-1");
     });
+
+    it("maps discipline general and subgroup chats for grouped subject inbox", () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "discipline:abc",
+                    type: "Group",
+                    participants: ["user-1", "student-1"],
+                    groupSubtype: "Discipline",
+                    disciplineId: "discipline-1",
+                    disciplineTitle: "Математика",
+                    disciplineChatKind: "General",
+                    title: "Математика",
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+                {
+                    id: "discipline:abc:subgroup:def",
+                    type: "Group",
+                    participants: ["user-1", "student-1"],
+                    groupSubtype: "Discipline",
+                    disciplineId: "discipline-1",
+                    disciplineTitle: "Математика",
+                    disciplineChatKind: "Subgroup",
+                    disciplineSubgroupName: "ПИ-101",
+                    title: "ПИ-101",
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        const { result } = renderHook(() => useInboxConversations("subjects"));
+
+        expect(result.current).toEqual([
+            expect.objectContaining({
+                id: "discipline:abc",
+                name: "Общий чат",
+                disciplineId: "discipline-1",
+                disciplineTitle: "Математика",
+                disciplineChatKind: "General",
+            }),
+            expect.objectContaining({
+                id: "discipline:abc:subgroup:def",
+                name: "ПИ-101",
+                disciplineId: "discipline-1",
+                disciplineTitle: "Математика",
+                disciplineChatKind: "Subgroup",
+            }),
+        ]);
+    });
 });

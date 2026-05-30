@@ -76,19 +76,17 @@ export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProp
                     <ActionBtn icon={BellSlashIcon} label="Уведомления" />
                 </View>
 
-                <View className="w-full border border-white/5 bg-white/5 rounded-2xl overflow-hidden">
-                    <InfoRow
-                        icon={PhoneIcon}
-                        label="Телефон"
-                        value={user.phone || "+7 (999) 000-00-00"}
-                    />
-                    <View className="h-[1px] w-full bg-white/5 ml-14" />
-                    <InfoRow
-                        icon={EnvelopeIcon}
-                        label="Почта"
-                        value={user.email || "user@urfu.ru"}
-                    />
-                </View>
+                {(user.phone || user.email) && (
+                    <View className="w-full border border-white/5 bg-white/5 rounded-2xl overflow-hidden">
+                        {user.phone && (
+                            <InfoRow icon={PhoneIcon} label="Телефон" value={user.phone} />
+                        )}
+                        {user.phone && user.email && <View className="h-[1px] w-full bg-white/5 ml-14" />}
+                        {user.email && (
+                            <InfoRow icon={EnvelopeIcon} label="Почта" value={user.email} />
+                        )}
+                    </View>
+                )}
             </View>
         </ModalOverlay>
     );

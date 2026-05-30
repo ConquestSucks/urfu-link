@@ -31,7 +31,7 @@ public class MongoIndexInitializerTests : IClassFixture<MongoFixture>
         {
             "ix_conversations_participants",
             "ix_conversations_lastMessageAtUtc_desc",
-            "ux_conversations_disciplineId",
+            "ux_conversations_discipline_scope",
         });
 
         var msgIndexes = await context.Database

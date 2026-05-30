@@ -11,6 +11,7 @@ public sealed class FakeDisciplineServiceClient : IDisciplineServiceClient
 {
     private readonly Dictionary<Guid, List<UserDisciplineSnapshot>> _disciplinesByUser = new();
     private readonly Dictionary<Guid, List<DisciplineMember>> _membersByDiscipline = new();
+    private readonly List<DisciplineSnapshot> _disciplineSnapshots = new();
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> _calledForUsers = new();
     private readonly System.Collections.Concurrent.ConcurrentBag<Guid> _calledForDisciplines = new();
 
@@ -30,10 +31,18 @@ public sealed class FakeDisciplineServiceClient : IDisciplineServiceClient
         _membersByDiscipline[disciplineId] = members.ToList();
     }
 
+    public void SeedSnapshots(params DisciplineSnapshot[] snapshots)
+    {
+        ArgumentNullException.ThrowIfNull(snapshots);
+        _disciplineSnapshots.Clear();
+        _disciplineSnapshots.AddRange(snapshots);
+    }
+
     public void Reset()
     {
         _disciplinesByUser.Clear();
         _membersByDiscipline.Clear();
+        _disciplineSnapshots.Clear();
         _calledForUsers.Clear();
         _calledForDisciplines.Clear();
     }
@@ -60,5 +69,27 @@ public sealed class FakeDisciplineServiceClient : IDisciplineServiceClient
             return Task.FromResult<IReadOnlyList<DisciplineMember>>(members.ToList());
         }
         return Task.FromResult<IReadOnlyList<DisciplineMember>>(Array.Empty<DisciplineMember>());
+    }
+
+    public Task<DisciplineSnapshotPage> ListDisciplineSnapshotsAsync(
+        string? pageToken,
+        int pageSize,
+        bool includeArchived,
+        CancellationToken cancellationToken)
+    {
+        _ = cancellationToken;
+        var offset = int.TryParse(pageToken, out var parsed) ? parsed : 0;
+        var normalizedPageSize = pageSize <= 0 ? 100 : pageSize;
+        var source = includeArchived
+            ? _disciplineSnapshots
+            : _disciplineSnapshots.Where(s => !s.IsArchived).ToList();
+        var items = source
+            .Skip(offset)
+            .Take(normalizedPageSize)
+            .ToList();
+        var next = offset + normalizedPageSize < source.Count
+            ? (offset + normalizedPageSize).ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : null;
+        return Task.FromResult(new DisciplineSnapshotPage(items, next));
     }
 }

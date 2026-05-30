@@ -44,7 +44,27 @@ export type {
   ActiveThreadDto,
   ParticipantRole,
   ConversationParticipantDto,
+  DisciplineChatKind,
+  ConversationCapabilities,
 } from "./chat";
+
+export type {
+  DisciplineRole,
+  DisciplinePermissions,
+  DisciplineSubgroup,
+  DisciplineEnrollment,
+  Discipline,
+  DisciplineListItem,
+  MyDiscipline,
+  CreateDisciplineRequest,
+  UpdateDisciplineRequest,
+  EnrollmentInput,
+  ListDisciplinesResponse,
+  ListMyDisciplinesResponse,
+  ListSubgroupsResponse,
+  ListEnrollmentsResponse,
+  EnrollUsersResponse,
+} from "./disciplines";
 
 export type {
   Visibility,
@@ -89,6 +109,7 @@ import { createChatApi } from "./chat";
 import { createMediaApi } from "./media";
 import { createPresenceApi } from "./presence";
 import { createNotificationsApi } from "./notifications";
+import { createDisciplinesApi } from "./disciplines";
 import { createCallsApi } from "./calls";
 
 type ApiClientConfig = {
@@ -134,6 +155,7 @@ export function createApiClient({ baseUrl, getAccessToken, onUnauthorized }: Api
     media: createMediaApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     presence: createPresenceApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     notifications: createNotificationsApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
+    disciplines: createDisciplinesApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
     calls: createCallsApi(normalizedBaseUrl, authHeaders, handleUnauthorized),
 
     async health(): Promise<BackendHealth> {

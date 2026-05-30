@@ -17,7 +17,9 @@ public sealed class ListDisciplinesResponse
     public IReadOnlyList<DisciplineListItem> Items { get; init; } = [];
 }
 
-public sealed class ListDisciplinesEndpoint(IEnrollmentRepository enrollments)
+public sealed class ListDisciplinesEndpoint(
+    IEnrollmentRepository enrollments,
+    DisciplineService.Api.Application.Authorization.DisciplineAuthorizationService authorization)
     : Endpoint<ListDisciplinesQueryParams, ListDisciplinesResponse>
 {
     public override void Configure()
@@ -50,7 +52,7 @@ public sealed class ListDisciplinesEndpoint(IEnrollmentRepository enrollments)
         await Send.OkAsync(
             new ListDisciplinesResponse
             {
-                Items = items.Select(d => d.ToListItem()).ToList(),
+                Items = items.Select(d => d.ToListItem(User, authorization)).ToList(),
             },
             cancellation: ct).ConfigureAwait(false);
     }

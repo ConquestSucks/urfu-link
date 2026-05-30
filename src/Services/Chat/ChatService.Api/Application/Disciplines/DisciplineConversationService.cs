@@ -9,19 +9,6 @@ using Urfu.Link.Services.Chat.Realtime;
 
 namespace Urfu.Link.Services.Chat.Application.Disciplines;
 
-/// <summary>
-/// Reacts to discipline integration events by keeping the corresponding group conversation
-/// in sync. All operations are idempotent: the discipline-events topic is at-least-once,
-/// so each handler must tolerate replays. After every state change the corresponding SignalR
-/// notification is emitted so connected clients see participant updates in real time, and
-/// the matching chat integration event is published on <c>urfu.chat.events.v1</c> for any
-/// downstream consumer (notifications, search, analytics).
-///
-/// Invariant ownership: the source of truth for discipline membership (incl. the rule
-/// "≥1 Teacher per discipline") is DisciplineService — the upstream aggregate enforces it.
-/// This projection follows whatever events arrive; any drift (e.g. the last Teacher leaving)
-/// is logged at Warning so operators can detect upstream invariant violations.
-/// </summary>
 public sealed class DisciplineConversationService(
     IConversationRepository conversations,
     IChatBroadcaster broadcaster,
@@ -35,7 +22,7 @@ public sealed class DisciplineConversationService(
         ArgumentNullException.ThrowIfNull(evt);
 
         var existing = await conversations
-            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+            .GetGeneralDisciplineAsync(evt.DisciplineId, cancellationToken)
             .ConfigureAwait(false);
         if (existing is not null)
         {
@@ -51,12 +38,10 @@ public sealed class DisciplineConversationService(
         var created = await conversations.TryCreateAsync(conversation, cancellationToken).ConfigureAwait(false);
         if (!created)
         {
-            // A concurrent at-least-once delivery materialised the same conversation first.
-            // No broadcast — that delivery already covered it.
             return;
         }
 
-        var dto = ConversationDto.FromDomain(conversation);
+        var dto = ConversationDto.FromDomain(conversation, evt.OwnerTeacherId);
         await broadcaster
             .NotifyConversationCreatedAsync([evt.OwnerTeacherId], dto, cancellationToken)
             .ConfigureAwait(false);
@@ -77,8 +62,86 @@ public sealed class DisciplineConversationService(
     {
         ArgumentNullException.ThrowIfNull(evt);
 
+        var updated = await conversations
+            .UpdateDisciplineMetadataAsync(evt.DisciplineId, evt.Title, evt.CoverAssetId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!updated)
+        {
+            return;
+        }
+
+        var disciplineConversations = await conversations
+            .ListByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var conversation in disciplineConversations)
+        {
+            conversation.UpdateDisciplineMetadata(evt.Title, evt.CoverAssetId);
+            await broadcaster
+                .NotifyConversationUpdatedAsync(
+                    conversation.Participants.ToList(),
+                    ConversationDto.FromDomain(conversation),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
+    public async Task HandleSubgroupCreatedAsync(
+        DisciplineSubgroupCreatedEvent evt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        var existing = await conversations
+            .GetByDisciplineSubgroupIdAsync(evt.DisciplineId, evt.SubgroupId, cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return;
+        }
+
+        var conversation = Conversation.OpenDisciplineSubgroup(
+            evt.DisciplineId,
+            evt.SubgroupId,
+            evt.DisciplineTitle,
+            evt.Name,
+            evt.TeacherUserIds,
+            evt.StudentUserIds,
+            evt.OccurredAtUtc,
+            evt.DisciplineCoverAssetId);
+        var created = await conversations.TryCreateAsync(conversation, cancellationToken).ConfigureAwait(false);
+        if (!created)
+        {
+            return;
+        }
+
+        foreach (var participantId in conversation.Participants)
+        {
+            await broadcaster
+                .NotifyConversationCreatedAsync(
+                    [participantId],
+                    ConversationDto.FromDomain(conversation, participantId),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        await dispatcher.PublishAsync(
+            new ChatDisciplineConversationCreatedEvent(
+                conversation.Id,
+                evt.DisciplineId,
+                evt.TeacherUserIds.Count > 0 ? evt.TeacherUserIds[0] : Guid.Empty,
+                evt.DisciplineTitle,
+                evt.DisciplineCoverAssetId),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task HandleSubgroupUpdatedAsync(
+        DisciplineSubgroupUpdatedEvent evt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
         var conversation = await conversations
-            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+            .GetByDisciplineSubgroupIdAsync(evt.DisciplineId, evt.SubgroupId, cancellationToken)
             .ConfigureAwait(false);
         if (conversation is null)
         {
@@ -86,19 +149,37 @@ public sealed class DisciplineConversationService(
         }
 
         var updated = await conversations
-            .UpdateMetadataAsync(conversation.Id, evt.Title, evt.CoverAssetId, cancellationToken)
+            .UpdateSubgroupMetadataAsync(conversation.Id, evt.Name, cancellationToken)
             .ConfigureAwait(false);
         if (!updated)
         {
             return;
         }
 
-        // Apply the same projection in-memory so the broadcast carries the new title/cover.
-        conversation.UpdateMetadata(evt.Title, evt.CoverAssetId);
-        var dto = ConversationDto.FromDomain(conversation);
+        conversation.UpdateSubgroupMetadata(evt.Name);
         await broadcaster
-            .NotifyConversationUpdatedAsync(conversation.Participants.ToList(), dto, cancellationToken)
+            .NotifyConversationUpdatedAsync(
+                conversation.Participants.ToList(),
+                ConversationDto.FromDomain(conversation),
+                cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task HandleSubgroupArchivedAsync(
+        DisciplineSubgroupArchivedEvent evt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        var conversation = await conversations
+            .GetByDisciplineSubgroupIdAsync(evt.DisciplineId, evt.SubgroupId, cancellationToken)
+            .ConfigureAwait(false);
+        if (conversation is null)
+        {
+            return;
+        }
+
+        await ArchiveConversationAsync(conversation, evt.OccurredAtUtc, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleUserEnrolledAsync(
@@ -107,46 +188,37 @@ public sealed class DisciplineConversationService(
     {
         ArgumentNullException.ThrowIfNull(evt);
 
-        var conversation = await conversations
-            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+        var general = await conversations
+            .GetGeneralDisciplineAsync(evt.DisciplineId, cancellationToken)
             .ConfigureAwait(false);
-        if (conversation is null)
+        if (general is not null)
         {
+            await AddParticipantAsync(general, evt.UserId, MapRole(evt.Role), cancellationToken).ConfigureAwait(false);
+        }
+
+        if (evt.Role == DisciplineRole.Teacher)
+        {
+            var all = await conversations.ListByDisciplineIdAsync(evt.DisciplineId, cancellationToken).ConfigureAwait(false);
+            foreach (var subgroupConversation in all.Where(c => c.DisciplineChatKind == DisciplineChatKind.Subgroup))
+            {
+                await AddParticipantAsync(subgroupConversation, evt.UserId, ParticipantRole.Teacher, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             return;
         }
 
-        var role = MapRole(evt.Role);
-        var added = await conversations
-            .AddParticipantAsync(conversation.Id, evt.UserId, role, cancellationToken)
-            .ConfigureAwait(false);
-        if (!added)
+        if (evt.SubgroupId is { } subgroupId)
         {
-            // Already a participant — duplicate event, no broadcast.
-            return;
-        }
-
-        // Notify everyone who was already in the conversation that a new participant joined —
-        // computed against the pre-add roster so we don't notify the newly added user via this
-        // path (they get a ConversationCreated below instead).
-        var existingParticipants = conversation.Participants.ToList();
-        if (existingParticipants.Count > 0)
-        {
-            await broadcaster
-                .NotifyParticipantJoinedAsync(existingParticipants, conversation.Id, evt.UserId, role, cancellationToken)
+            var subgroup = await conversations
+                .GetByDisciplineSubgroupIdAsync(evt.DisciplineId, subgroupId, cancellationToken)
                 .ConfigureAwait(false);
+            if (subgroup is not null)
+            {
+                await AddParticipantAsync(subgroup, evt.UserId, ParticipantRole.Student, cancellationToken)
+                    .ConfigureAwait(false);
+            }
         }
-
-        // Mirror the persistence write into the in-memory aggregate so the DTO carries the
-        // post-add roster without re-reading the document.
-        conversation.AddParticipant(evt.UserId, role);
-        var dto = ConversationDto.FromDomain(conversation);
-        await broadcaster
-            .NotifyConversationCreatedAsync([evt.UserId], dto, cancellationToken)
-            .ConfigureAwait(false);
-
-        await dispatcher.PublishAsync(
-            new ChatParticipantJoinedEvent(conversation.Id, evt.UserId, MapToContract(role)),
-            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task HandleUserUnenrolledAsync(
@@ -155,33 +227,37 @@ public sealed class DisciplineConversationService(
     {
         ArgumentNullException.ThrowIfNull(evt);
 
-        var conversation = await conversations
-            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+        var general = await conversations
+            .GetGeneralDisciplineAsync(evt.DisciplineId, cancellationToken)
             .ConfigureAwait(false);
-        if (conversation is null)
+        var oldRole = evt.Role.HasValue ? MapRole(evt.Role.Value) : general?.RoleOf(evt.UserId) ?? ParticipantRole.Member;
+        if (general is not null)
         {
-            return;
+            await RemoveParticipantAsync(general, evt.UserId, cancellationToken).ConfigureAwait(false);
+            if (oldRole == ParticipantRole.Teacher)
+            {
+                WarnIfLastTeacherLost(general, evt.UserId);
+            }
         }
 
-        var removed = await conversations
-            .RemoveParticipantAsync(conversation.Id, evt.UserId, cancellationToken)
-            .ConfigureAwait(false);
-        if (!removed)
+        if (oldRole == ParticipantRole.Teacher)
         {
-            return;
+            var all = await conversations.ListByDisciplineIdAsync(evt.DisciplineId, cancellationToken).ConfigureAwait(false);
+            foreach (var subgroupConversation in all.Where(c => c.DisciplineChatKind == DisciplineChatKind.Subgroup))
+            {
+                await RemoveParticipantAsync(subgroupConversation, evt.UserId, cancellationToken).ConfigureAwait(false);
+            }
         }
-
-        WarnIfLastTeacherLost(conversation, evt.UserId);
-
-        // Notify the pre-removal participant list — including the unenrolled user themselves so
-        // their other open sessions can drop the chat from their list.
-        await broadcaster
-            .NotifyParticipantLeftAsync(conversation.Participants.ToList(), conversation.Id, evt.UserId, cancellationToken)
-            .ConfigureAwait(false);
-
-        await dispatcher.PublishAsync(
-            new ChatParticipantLeftEvent(conversation.Id, evt.UserId),
-            cancellationToken).ConfigureAwait(false);
+        else if (evt.SubgroupId is { } subgroupId)
+        {
+            var subgroup = await conversations
+                .GetByDisciplineSubgroupIdAsync(evt.DisciplineId, subgroupId, cancellationToken)
+                .ConfigureAwait(false);
+            if (subgroup is not null)
+            {
+                await RemoveParticipantAsync(subgroup, evt.UserId, cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     public async Task HandleEnrollmentRoleChangedAsync(
@@ -190,40 +266,76 @@ public sealed class DisciplineConversationService(
     {
         ArgumentNullException.ThrowIfNull(evt);
 
-        var conversation = await conversations
-            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+        var general = await conversations
+            .GetGeneralDisciplineAsync(evt.DisciplineId, cancellationToken)
             .ConfigureAwait(false);
-        if (conversation is null)
-        {
-            return;
-        }
-
-        var oldRole = conversation.RoleOf(evt.UserId);
         var newRole = MapRole(evt.NewRole);
-        var changed = await conversations
-            .ChangeParticipantRoleAsync(conversation.Id, evt.UserId, newRole, cancellationToken)
-            .ConfigureAwait(false);
-        if (!changed)
+        if (general is not null)
         {
-            return;
+            var changed = await conversations
+                .ChangeParticipantRoleAsync(general.Id, evt.UserId, newRole, cancellationToken)
+                .ConfigureAwait(false);
+            if (changed)
+            {
+                await broadcaster
+                    .NotifyParticipantRoleChangedAsync(general.Participants.ToList(), general.Id, evt.UserId, newRole, cancellationToken)
+                    .ConfigureAwait(false);
+
+                await dispatcher.PublishAsync(
+                    new ChatParticipantRoleChangedEvent(
+                        general.Id,
+                        evt.UserId,
+                        MapToContract(MapRole(evt.OldRole)),
+                        MapToContract(newRole)),
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
 
-        if (oldRole == ParticipantRole.Teacher && newRole != ParticipantRole.Teacher)
+        if (evt.OldRole == DisciplineRole.Student && evt.OldSubgroupId is { } oldSubgroupId)
         {
-            WarnIfLastTeacherLost(conversation, evt.UserId);
+            await RemoveFromSubgroupAsync(evt.DisciplineId, oldSubgroupId, evt.UserId, cancellationToken).ConfigureAwait(false);
         }
 
-        await broadcaster
-            .NotifyParticipantRoleChangedAsync(conversation.Participants.ToList(), conversation.Id, evt.UserId, newRole, cancellationToken)
-            .ConfigureAwait(false);
+        var all = await conversations.ListByDisciplineIdAsync(evt.DisciplineId, cancellationToken).ConfigureAwait(false);
+        if (evt.NewRole == DisciplineRole.Teacher)
+        {
+            foreach (var subgroupConversation in all.Where(c => c.DisciplineChatKind == DisciplineChatKind.Subgroup))
+            {
+                await AddParticipantAsync(subgroupConversation, evt.UserId, ParticipantRole.Teacher, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+        else
+        {
+            foreach (var subgroupConversation in all.Where(c => c.DisciplineChatKind == DisciplineChatKind.Subgroup))
+            {
+                await RemoveParticipantAsync(subgroupConversation, evt.UserId, cancellationToken).ConfigureAwait(false);
+            }
 
-        await dispatcher.PublishAsync(
-            new ChatParticipantRoleChangedEvent(
-                conversation.Id,
-                evt.UserId,
-                MapToContract(MapRole(evt.OldRole)),
-                MapToContract(newRole)),
-            cancellationToken).ConfigureAwait(false);
+            if (evt.NewSubgroupId is { } newSubgroupId)
+            {
+                await AddToSubgroupAsync(evt.DisciplineId, newSubgroupId, evt.UserId, ParticipantRole.Student, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task HandleEnrollmentSubgroupChangedAsync(
+        EnrollmentSubgroupChangedEvent evt,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(evt);
+
+        if (evt.OldSubgroupId is { } oldSubgroupId)
+        {
+            await RemoveFromSubgroupAsync(evt.DisciplineId, oldSubgroupId, evt.UserId, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (evt.NewSubgroupId is { } newSubgroupId)
+        {
+            await AddToSubgroupAsync(evt.DisciplineId, newSubgroupId, evt.UserId, ParticipantRole.Student, cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     public async Task HandleDisciplineDeletedAsync(
@@ -232,16 +344,107 @@ public sealed class DisciplineConversationService(
     {
         ArgumentNullException.ThrowIfNull(evt);
 
-        var conversation = await conversations
-            .GetByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
+        var disciplineConversations = await conversations
+            .ListByDisciplineIdAsync(evt.DisciplineId, cancellationToken)
             .ConfigureAwait(false);
-        if (conversation is null)
+        foreach (var conversation in disciplineConversations)
+        {
+            await ArchiveConversationAsync(conversation, evt.OccurredAtUtc, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task AddToSubgroupAsync(
+        Guid disciplineId,
+        Guid subgroupId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken)
+    {
+        var subgroup = await conversations
+            .GetByDisciplineSubgroupIdAsync(disciplineId, subgroupId, cancellationToken)
+            .ConfigureAwait(false);
+        if (subgroup is not null)
+        {
+            await AddParticipantAsync(subgroup, userId, role, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task RemoveFromSubgroupAsync(
+        Guid disciplineId,
+        Guid subgroupId,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var subgroup = await conversations
+            .GetByDisciplineSubgroupIdAsync(disciplineId, subgroupId, cancellationToken)
+            .ConfigureAwait(false);
+        if (subgroup is not null)
+        {
+            await RemoveParticipantAsync(subgroup, userId, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task AddParticipantAsync(
+        Conversation conversation,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken)
+    {
+        var added = await conversations
+            .AddParticipantAsync(conversation.Id, userId, role, cancellationToken)
+            .ConfigureAwait(false);
+        if (!added)
         {
             return;
         }
 
+        var existingParticipants = conversation.Participants.ToList();
+        if (existingParticipants.Count > 0)
+        {
+            await broadcaster
+                .NotifyParticipantJoinedAsync(existingParticipants, conversation.Id, userId, role, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        conversation.AddParticipant(userId, role);
+        await broadcaster
+            .NotifyConversationCreatedAsync([userId], ConversationDto.FromDomain(conversation, userId), cancellationToken)
+            .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatParticipantJoinedEvent(conversation.Id, userId, MapToContract(role)),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task RemoveParticipantAsync(
+        Conversation conversation,
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        var removed = await conversations
+            .RemoveParticipantAsync(conversation.Id, userId, cancellationToken)
+            .ConfigureAwait(false);
+        if (!removed)
+        {
+            return;
+        }
+
+        await broadcaster
+            .NotifyParticipantLeftAsync(conversation.Participants.ToList(), conversation.Id, userId, cancellationToken)
+            .ConfigureAwait(false);
+
+        await dispatcher.PublishAsync(
+            new ChatParticipantLeftEvent(conversation.Id, userId),
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ArchiveConversationAsync(
+        Conversation conversation,
+        DateTimeOffset archivedAtUtc,
+        CancellationToken cancellationToken)
+    {
         var archived = await conversations
-            .ArchiveAsync(conversation.Id, evt.OccurredAtUtc, cancellationToken)
+            .ArchiveAsync(conversation.Id, archivedAtUtc, cancellationToken)
             .ConfigureAwait(false);
         if (!archived)
         {
@@ -249,20 +452,14 @@ public sealed class DisciplineConversationService(
         }
 
         await broadcaster
-            .NotifyConversationArchivedAsync(conversation.Participants.ToList(), conversation.Id, evt.OccurredAtUtc, cancellationToken)
+            .NotifyConversationArchivedAsync(conversation.Participants.ToList(), conversation.Id, archivedAtUtc, cancellationToken)
             .ConfigureAwait(false);
 
         await dispatcher.PublishAsync(
-            new ChatConversationArchivedEvent(conversation.Id, evt.OccurredAtUtc),
+            new ChatConversationArchivedEvent(conversation.Id, archivedAtUtc),
             cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>
-    /// DisciplineService owns the "≥1 Teacher per discipline" invariant. If we observe an event
-    /// that would leave the chat without any Teacher, that's a sign the upstream invariant
-    /// failed (or there's a race / replay we should look at). Loud Warning + structured
-    /// payload so operators can alert on it.
-    /// </summary>
     private void WarnIfLastTeacherLost(Conversation conversation, Guid userIdLeavingTeacherRole)
     {
         var remainingTeachers = conversation.ParticipantRoles

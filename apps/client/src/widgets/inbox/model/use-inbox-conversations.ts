@@ -126,10 +126,17 @@ const mapConversation = (
         preview?.sentAtUtc ??
         preview?.sentAt ??
         (preview ? c.lastMessageAtUtc ?? c.lastMessageAt ?? null : null);
+    const isDisciplineGroup = c.type === "Group" && c.groupSubtype === "Discipline";
+    const disciplineRowName = isDisciplineGroup
+        ? c.disciplineChatKind === "Subgroup"
+            ? c.disciplineSubgroupName ?? c.title ?? "Подгруппа"
+            : "Общий чат"
+        : null;
     return {
         id: c.id,
         avatarUrl: peerAvatar ?? "",
         name:
+            disciplineRowName ??
             c.title ??
             peerName ??
             (c.type === "Direct" ? "Личный чат" : "Чат предмета"),
@@ -143,6 +150,10 @@ const mapConversation = (
                 : previewReadAt !== null
             : false,
         isTyping: typingPreview !== null,
+        disciplineId: c.disciplineId ?? null,
+        disciplineTitle: c.disciplineTitle ?? c.title ?? null,
+        disciplineChatKind: c.disciplineChatKind ?? null,
+        disciplineSubgroupName: c.disciplineSubgroupName ?? null,
     };
 };
 

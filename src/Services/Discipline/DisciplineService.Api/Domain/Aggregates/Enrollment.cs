@@ -12,6 +12,8 @@ public sealed class Enrollment
 
     public DisciplineRole Role { get; private set; }
 
+    public Guid? SubgroupId { get; private set; }
+
     public DateTimeOffset EnrolledAtUtc { get; private set; }
 
     public Guid EnrolledBy { get; private set; }
@@ -24,6 +26,7 @@ public sealed class Enrollment
         Guid disciplineId,
         Guid userId,
         DisciplineRole role,
+        Guid? subgroupId,
         Guid enrolledBy,
         DateTimeOffset enrolledAtUtc)
     {
@@ -33,10 +36,17 @@ public sealed class Enrollment
             DisciplineId = disciplineId,
             UserId = userId,
             Role = role,
+            SubgroupId = subgroupId,
             EnrolledBy = enrolledBy,
             EnrolledAtUtc = enrolledAtUtc,
         };
     }
 
-    internal void SetRole(DisciplineRole newRole) => Role = newRole;
+    internal void SetRole(DisciplineRole newRole, Guid? subgroupId)
+    {
+        Role = newRole;
+        SubgroupId = subgroupId;
+    }
+
+    internal void SetSubgroup(Guid subgroupId) => SubgroupId = subgroupId;
 }

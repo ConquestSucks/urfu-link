@@ -15,12 +15,17 @@ public sealed record ConversationDto(
     Guid? CoverAssetId = null,
     Guid? DisciplineId = null,
     GroupSubtype? GroupSubtype = null,
+    DisciplineChatKind? DisciplineChatKind = null,
+    Guid? DisciplineSubgroupId = null,
+    string? DisciplineTitle = null,
+    string? DisciplineSubgroupName = null,
     bool IsAnnouncementOnly = false,
     DateTimeOffset? ArchivedAtUtc = null,
     IReadOnlyDictionary<Guid, ParticipantRole>? ParticipantRoles = null,
+    ConversationCapabilitiesDto? Capabilities = null,
     int? UnreadCount = null)
 {
-    public static ConversationDto FromDomain(Conversation conversation)
+    public static ConversationDto FromDomain(Conversation conversation, Guid? callerUserId = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         return new ConversationDto(
@@ -39,11 +44,16 @@ public sealed record ConversationDto(
             CoverAssetId: conversation.CoverAssetId,
             DisciplineId: conversation.DisciplineId,
             GroupSubtype: conversation.GroupSubtype,
+            DisciplineChatKind: conversation.DisciplineChatKind,
+            DisciplineSubgroupId: conversation.DisciplineSubgroupId,
+            DisciplineTitle: conversation.DisciplineTitle,
+            DisciplineSubgroupName: conversation.DisciplineSubgroupName,
             IsAnnouncementOnly: conversation.IsAnnouncementOnly,
             ArchivedAtUtc: conversation.ArchivedAtUtc,
             ParticipantRoles: conversation.ParticipantRoles.Count == 0
                 ? null
-                : conversation.ParticipantRoles.ToDictionary(kv => kv.Key, kv => kv.Value));
+                : conversation.ParticipantRoles.ToDictionary(kv => kv.Key, kv => kv.Value),
+            Capabilities: ConversationCapabilitiesDto.FromDomain(conversation, callerUserId));
     }
 
     public ConversationDto WithUnreadCount(int unreadCount)
@@ -65,6 +75,20 @@ public sealed record ConversationDto(
                 AttachmentFileNames = message.Attachments.Select(a => a.FileName).ToList(),
             },
         };
+    }
+}
+
+public sealed record ConversationCapabilitiesDto(bool CanStartGroupCall)
+{
+    public static ConversationCapabilitiesDto FromDomain(Conversation conversation, Guid? callerUserId)
+    {
+        ArgumentNullException.ThrowIfNull(conversation);
+        var canStartGroupCall = callerUserId.HasValue
+            && conversation.Type == ConversationType.Group
+            && conversation.GroupSubtype == GroupSubtype.Discipline
+            && conversation.DisciplineChatKind == DisciplineChatKind.Subgroup
+            && conversation.RoleOf(callerUserId.Value) == ParticipantRole.Teacher;
+        return new ConversationCapabilitiesDto(canStartGroupCall);
     }
 }
 

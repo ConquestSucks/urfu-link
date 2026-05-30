@@ -39,7 +39,11 @@ builder.Services
             options.Configuration.ConnectRetry = 5;
         });
 builder.Services.AddSingleton<IUserIdProvider, ChatUserIdProvider>();
-builder.Services.AddFastEndpoints();
+builder.Services.AddFastEndpoints(o =>
+{
+    o.Assemblies = [typeof(Program).Assembly];
+    o.DisableAutoDiscovery = true;
+});
 builder.Services.AddServiceDefaults(builder.Configuration, "chat-service");
 
 // SignalR clients can't set the Authorization header during the WebSocket upgrade handshake —

@@ -55,7 +55,7 @@ public sealed class CreateDisciplineEndpoint(
         repository.Add(discipline);
         await repository.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        var response = discipline.ToResponse();
+        var response = discipline.ToResponse(User, authorization);
         await Send.CreatedAtAsync<GetDisciplineEndpoint>(
             new { id = discipline.Id },
             response,
