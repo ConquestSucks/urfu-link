@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import {
     CallControls,
+    ParticipantStatusIcons,
     SpeakingFrame,
 } from "../CallRoomControls";
 
@@ -106,6 +107,57 @@ describe("CallRoomControls", () => {
         expect(screen.queryByText("Камера")).toBeNull();
         expect(screen.queryByText("Сменить камеру")).toBeNull();
         expect(screen.queryByText("Экран")).toBeNull();
+    });
+
+    it("uses an adaptive icon-only wrapped dock on mobile", () => {
+        render(
+            <CallControls
+                micEnabled
+                cameraEnabled
+                screenShareEnabled={false}
+                switchCameraAvailable
+                screenShareAvailable
+                busy={false}
+                isMobile
+                onToggleMicrophone={jest.fn()}
+                onToggleCamera={jest.fn()}
+                onSwitchCamera={jest.fn()}
+                onToggleScreenShare={jest.fn()}
+                onOpenChat={jest.fn()}
+                onOpenParticipants={jest.fn()}
+                onLeave={jest.fn()}
+            />,
+        );
+
+        expect(screen.getByTestId("call-controls-dock").props.style).toEqual(
+            expect.objectContaining({ flexWrap: "wrap" }),
+        );
+        expect(screen.getByTestId("call-control-mic").props.style).toEqual(
+            expect.objectContaining({ width: 44, height: 44 }),
+        );
+        expect(screen.queryByText("Микрофон")).toBeNull();
+        expect(screen.queryByText("Камера")).toBeNull();
+        expect(screen.queryByText("Экран")).toBeNull();
+    });
+
+    it("renders participant media states as icons without long compact text badges", () => {
+        render(
+            <ParticipantStatusIcons
+                isConnected={false}
+                isMicrophoneEnabled={false}
+                isCameraEnabled={false}
+                isScreenShareEnabled
+                showCamera
+            />,
+        );
+
+        expect(screen.getByLabelText("Участник подключается")).toBeTruthy();
+        expect(screen.getByLabelText("Микрофон выключен")).toBeTruthy();
+        expect(screen.getByLabelText("Камера выключена")).toBeTruthy();
+        expect(screen.getByLabelText("Демонстрация экрана")).toBeTruthy();
+        expect(screen.queryByText("Микрофон выключен")).toBeNull();
+        expect(screen.queryByText("Камера выключена")).toBeNull();
+        expect(screen.queryByText("Демонстрация экрана")).toBeNull();
     });
 
     it("shows a speaking indicator only while participant is speaking", () => {

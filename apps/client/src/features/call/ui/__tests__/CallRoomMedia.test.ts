@@ -1,7 +1,13 @@
 import {
+    buildScreenShareAudioKey,
+    isActiveScreenShareAudio,
+    normalizeSelectedStageItem,
     pickActiveScreenShare,
+    resolveDefaultStageItem,
+    SCREEN_SHARE_CAPTURE_OPTIONS,
     shouldDisableLocalScreenShareForRemoteOwner,
     type ScreenShareCandidate,
+    type StageMediaItem,
 } from "../CallRoomMedia";
 
 const candidate = (
@@ -62,5 +68,118 @@ describe("CallRoomMedia", () => {
             .toBe(false);
         expect(shouldDisableLocalScreenShareForRemoteOwner("user-1", "remote-2", false))
             .toBe(false);
+    });
+
+    it("uses screen share as the default stage item when it is available", () => {
+        const items: StageMediaItem[] = [
+            {
+                id: "participant:user-1",
+                kind: "participant",
+                ownerId: "user-1",
+                hasCamera: true,
+                isSpeaking: true,
+                isConnected: true,
+            },
+            {
+                id: "screen:user-2:screen-track",
+                kind: "screen",
+                ownerId: "user-2",
+                trackKey: "screen-track",
+                hasCamera: false,
+                isSpeaking: false,
+                isConnected: true,
+            },
+        ];
+
+        expect(resolveDefaultStageItem(items, new Set(["user-1"]))?.id)
+            .toBe("screen:user-2:screen-track");
+    });
+
+    it("falls back to speaking, camera, connected, then first participant stage item", () => {
+        const items: StageMediaItem[] = [
+            {
+                id: "participant:user-1",
+                kind: "participant",
+                ownerId: "user-1",
+                hasCamera: false,
+                isSpeaking: false,
+                isConnected: false,
+            },
+            {
+                id: "participant:user-2",
+                kind: "participant",
+                ownerId: "user-2",
+                hasCamera: true,
+                isSpeaking: false,
+                isConnected: true,
+            },
+            {
+                id: "participant:user-3",
+                kind: "participant",
+                ownerId: "user-3",
+                hasCamera: false,
+                isSpeaking: true,
+                isConnected: true,
+            },
+        ];
+
+        expect(resolveDefaultStageItem(items, new Set(["user-3"]))?.id)
+            .toBe("participant:user-3");
+        expect(resolveDefaultStageItem(
+            items.map((item) => ({ ...item, isSpeaking: false })),
+            new Set(),
+        )?.id)
+            .toBe("participant:user-2");
+        expect(resolveDefaultStageItem([items[0]], new Set())?.id)
+            .toBe("participant:user-1");
+    });
+
+    it("keeps a manually selected stage item only while it still exists", () => {
+        const items: StageMediaItem[] = [
+            {
+                id: "participant:user-1",
+                kind: "participant",
+                ownerId: "user-1",
+                hasCamera: false,
+                isSpeaking: false,
+                isConnected: true,
+            },
+            {
+                id: "screen:user-2:screen-track",
+                kind: "screen",
+                ownerId: "user-2",
+                trackKey: "screen-track",
+                hasCamera: false,
+                isSpeaking: false,
+                isConnected: true,
+            },
+        ];
+
+        expect(normalizeSelectedStageItem("participant:user-1", items)?.id)
+            .toBe("participant:user-1");
+        expect(normalizeSelectedStageItem("participant:missing", items)?.id)
+            .toBe("screen:user-2:screen-track");
+    });
+
+    it("builds stable screen share audio keys", () => {
+        expect(buildScreenShareAudioKey("user-1", "track-1")).toBe("screen-audio:user-1:track-1");
+        expect(buildScreenShareAudioKey("user-1", null)).toBe("screen-audio:user-1:unknown");
+    });
+
+    it("uses browser screen capture options that request share audio", () => {
+        expect(SCREEN_SHARE_CAPTURE_OPTIONS).toEqual(
+            expect.objectContaining({
+                audio: true,
+                systemAudio: "include",
+                surfaceSwitching: "include",
+                contentHint: "detail",
+            }),
+        );
+    });
+
+    it("only plays screen-share audio for the active remote owner", () => {
+        expect(isActiveScreenShareAudio("remote-1", "remote-1", false)).toBe(true);
+        expect(isActiveScreenShareAudio("remote-2", "remote-1", false)).toBe(false);
+        expect(isActiveScreenShareAudio("user-1", "user-1", true)).toBe(false);
     });
 });

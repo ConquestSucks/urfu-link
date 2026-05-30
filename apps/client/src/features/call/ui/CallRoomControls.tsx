@@ -104,6 +104,7 @@ const ControlButton = ({
     danger,
     disabled,
     showLabel,
+    iconOnlySize = 48,
     onPress,
 }: {
     testID: string;
@@ -113,6 +114,7 @@ const ControlButton = ({
     danger?: boolean;
     disabled?: boolean;
     showLabel: boolean;
+    iconOnlySize?: number;
     onPress?: () => void;
 }) => (
     <Pressable
@@ -120,6 +122,14 @@ const ControlButton = ({
         accessibilityLabel={label}
         onPress={onPress}
         disabled={disabled || !onPress}
+        style={
+            showLabel
+                ? undefined
+                : {
+                      width: iconOnlySize,
+                      height: iconOnlySize,
+                  }
+        }
         className={`h-12 rounded-xl items-center justify-center gap-2 ${
             showLabel ? "px-4 min-w-[82px] flex-row" : "w-12"
         } ${
@@ -144,6 +154,87 @@ const ControlButton = ({
             </Text>
         ) : null}
     </Pressable>
+);
+
+const StatusIconBadge = ({
+    label,
+    children,
+    active = false,
+}: {
+    label: string;
+    children: React.ReactNode;
+    active?: boolean;
+}) => (
+    <View
+        accessible
+        accessibilityLabel={label}
+        className={`h-7 w-7 rounded-full items-center justify-center border ${
+            active
+                ? "border-brand-300/60 bg-brand-600/90"
+                : "border-white/10 bg-black/65"
+        }`}
+    >
+        {children}
+    </View>
+);
+
+const CameraOffIcon = () => (
+    <View className="relative">
+        <VideoCameraIcon size={14} className="text-white" />
+        <View
+            className="absolute left-1/2 top-1/2 h-[2px] w-5 rounded-full bg-white"
+            style={{ transform: [{ translateX: -10 }, { translateY: -1 }, { rotate: "-38deg" }] }}
+        />
+    </View>
+);
+
+export const ParticipantStatusIcons = ({
+    isConnected,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    isScreenShareEnabled,
+    showCamera,
+}: {
+    isConnected: boolean;
+    isMicrophoneEnabled: boolean;
+    isCameraEnabled: boolean;
+    isScreenShareEnabled: boolean;
+    showCamera: boolean;
+}) => (
+    <View className="flex-row flex-wrap gap-1">
+        {!isConnected ? (
+            <StatusIconBadge label="Участник подключается">
+                <View className="h-2.5 w-2.5 rounded-full bg-amber-300 animate-pulse" />
+            </StatusIconBadge>
+        ) : null}
+        <StatusIconBadge
+            label={isMicrophoneEnabled ? "Микрофон включен" : "Микрофон выключен"}
+            active={isMicrophoneEnabled}
+        >
+            {isMicrophoneEnabled ? (
+                <MicrophoneIcon size={14} className="text-white" />
+            ) : (
+                <MicrophoneSlashIcon size={14} className="text-white" />
+            )}
+        </StatusIconBadge>
+        {showCamera ? (
+            <StatusIconBadge
+                label={isCameraEnabled ? "Камера включена" : "Камера выключена"}
+                active={isCameraEnabled}
+            >
+                {isCameraEnabled ? (
+                    <VideoCameraIcon size={14} className="text-white" />
+                ) : (
+                    <CameraOffIcon />
+                )}
+            </StatusIconBadge>
+        ) : null}
+        {isScreenShareEnabled ? (
+            <StatusIconBadge label="Демонстрация экрана" active>
+                <ScreencastIcon size={14} className="text-white" />
+            </StatusIconBadge>
+        ) : null}
+    </View>
 );
 
 const SpeakingIndicator = () => (
@@ -221,10 +312,17 @@ export const CallControls = ({
     onLeave: () => void;
 }) => {
     const showLabel = !isMobile;
+    const iconOnlySize = isMobile ? 44 : 48;
 
     return (
         <View className="px-3 pb-4 pt-2 items-center justify-center">
-            <View className="max-w-full rounded-[28px] border border-white/10 bg-app-card/95 p-2 flex-row gap-2 items-center justify-center">
+            <View
+                testID="call-controls-dock"
+                style={isMobile ? { flexWrap: "wrap", maxWidth: 336 } : undefined}
+                className={`max-w-full rounded-[28px] border border-white/10 bg-app-card/95 p-2 flex-row ${
+                    isMobile ? "gap-1.5" : "gap-2"
+                } items-center justify-center`}
+            >
                 <ControlButton
                     testID="call-control-mic"
                     icon={micEnabled ? MicrophoneIcon : MicrophoneSlashIcon}
@@ -233,6 +331,7 @@ export const CallControls = ({
                     isActive={micEnabled}
                     disabled={busy}
                     showLabel={showLabel}
+                    iconOnlySize={iconOnlySize}
                 />
                 <ControlButton
                     testID="call-control-camera"
@@ -242,6 +341,7 @@ export const CallControls = ({
                     isActive={cameraEnabled}
                     disabled={busy}
                     showLabel={showLabel}
+                    iconOnlySize={iconOnlySize}
                 />
                 {isMobile && switchCameraAvailable ? (
                     <ControlButton
@@ -251,6 +351,7 @@ export const CallControls = ({
                         onPress={onSwitchCamera}
                         disabled={busy || !cameraEnabled}
                         showLabel={showLabel}
+                        iconOnlySize={iconOnlySize}
                     />
                 ) : null}
                 <ControlButton
@@ -261,6 +362,7 @@ export const CallControls = ({
                     isActive={screenShareEnabled}
                     disabled={busy || !screenShareAvailable}
                     showLabel={showLabel}
+                    iconOnlySize={iconOnlySize}
                 />
                 <ControlButton
                     testID="call-control-chat"
@@ -268,12 +370,14 @@ export const CallControls = ({
                     label="Чат"
                     onPress={onOpenChat}
                     showLabel={showLabel}
+                    iconOnlySize={iconOnlySize}
                 />
                 <ControlButton
                     testID="call-control-more"
                     icon={DotsThreeVerticalIcon}
                     onPress={onOpenParticipants}
                     showLabel={false}
+                    iconOnlySize={iconOnlySize}
                 />
                 <ControlButton
                     testID="call-control-leave"
@@ -283,6 +387,7 @@ export const CallControls = ({
                     danger
                     disabled={busy}
                     showLabel={showLabel}
+                    iconOnlySize={iconOnlySize}
                 />
             </View>
         </View>

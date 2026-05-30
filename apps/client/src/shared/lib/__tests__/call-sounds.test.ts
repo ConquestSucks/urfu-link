@@ -47,8 +47,6 @@ describe("call sounds", () => {
                 incoming: "call-incoming.wav",
                 micOn: "call-mic-on.wav",
                 micOff: "call-mic-off.wav",
-                cameraOn: "call-camera-on.wav",
-                cameraOff: "call-camera-off.wav",
                 leave: "call-leave.wav",
             },
         });
@@ -74,6 +72,18 @@ describe("call sounds", () => {
         expect(createAudioPlayer).toHaveBeenCalledTimes(1);
         expect(players[0].loop).toBe(false);
         expect(players[0].play).toHaveBeenCalledTimes(1);
+    });
+
+    it("only exposes the supported call sound kinds", async () => {
+        await expect(playCallSound("micOn")).resolves.toBe(true);
+        await expect(playCallSound("micOff")).resolves.toBe(true);
+        await expect(playCallSound("leave")).resolves.toBe(true);
+
+        // @ts-expect-error camera toggle sounds were intentionally removed.
+        const unsupportedCameraOn: Parameters<typeof playCallSound>[0] = "cameraOn";
+        // @ts-expect-error camera toggle sounds were intentionally removed.
+        const unsupportedCameraOff: Parameters<typeof playCallSound>[0] = "cameraOff";
+        expect([unsupportedCameraOn, unsupportedCameraOff]).toEqual(["cameraOn", "cameraOff"]);
     });
 
     it("respects global sound preferences", async () => {
