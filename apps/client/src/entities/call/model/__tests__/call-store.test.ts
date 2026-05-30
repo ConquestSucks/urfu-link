@@ -16,6 +16,10 @@ jest.mock("@/shared/lib/api", () => ({
     },
 }));
 
+jest.mock("../call-client-instance", () => ({
+    getCallClientInstanceId: jest.fn(() => "client-1"),
+}));
+
 const { useCallStore } = require("../call-store");
 
 const now = "2026-05-30T10:00:00.000Z";
@@ -217,8 +221,25 @@ describe("useCallStore", () => {
         expect(first).toEqual(token);
         expect(second).toEqual(token);
         expect(mockCalls.token).toHaveBeenCalledTimes(1);
+        expect(mockCalls.token).toHaveBeenCalledWith("call-1", "client-1");
         expect(useCallStore.getState().tokenLoadingByCallId["call-1"]).toBe(false);
         expect(useCallStore.getState().tokenErrorByCallId["call-1"]).toBeNull();
+    });
+
+    it("device replacement clears local token and blocks reconnect from old tab", async () => {
+        mockCalls.token.mockResolvedValue(makeToken());
+        await useCallStore.getState().loadToken("call-1");
+
+        useCallStore.getState().handleCallDeviceReplaced("call-1", "client-2");
+
+        expect(useCallStore.getState().callTokens["call-1"]).toBeUndefined();
+        expect(useCallStore.getState().tokenErrorByCallId["call-1"]).toBe(
+            "Звонок открыт в другой вкладке или на другом устройстве.",
+        );
+        await expect(useCallStore.getState().loadToken("call-1")).rejects.toThrow(
+            "Звонок открыт в другой вкладке или на другом устройстве.",
+        );
+        expect(mockCalls.token).toHaveBeenCalledTimes(1);
     });
 
     it("loadToken records error state and clears loading on failure", async () => {

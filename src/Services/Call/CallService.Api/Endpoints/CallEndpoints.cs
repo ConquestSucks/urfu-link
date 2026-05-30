@@ -79,7 +79,15 @@ public static class CallEndpoints
     {
         try
         {
-            return TypedResults.Ok(await calls.CreateTokenAsync(callId, httpContext.User.GetUserId(), cancellationToken)
+            var request = httpContext.Request.ContentLength > 0
+                ? await httpContext.Request.ReadFromJsonAsync<CallTokenRequest>(cancellationToken).ConfigureAwait(false)
+                : null;
+
+            return TypedResults.Ok(await calls.CreateTokenAsync(
+                    callId,
+                    httpContext.User.GetUserId(),
+                    request?.ClientInstanceId,
+                    cancellationToken)
                 .ConfigureAwait(false));
         }
         catch (CallProblemException ex)

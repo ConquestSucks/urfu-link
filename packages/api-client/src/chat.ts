@@ -12,6 +12,9 @@ export type ParticipantRole = "Member" | "Teacher" | "Student";
 
 export type ConversationCapabilities = {
   canStartGroupCall: boolean;
+  canStartGroupAudioCall?: boolean;
+  canStartGroupVideoCall?: boolean;
+  canManagePins?: boolean;
 };
 
 export type ConversationPreview = {

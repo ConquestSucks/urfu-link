@@ -63,7 +63,7 @@ export const EditMessageModal = () => {
                 <Pressable
                     onPress={onSave}
                     disabled={saving}
-                    className={`px-4 py-2 rounded-xl ${saving ? "bg-brand-600/40" : "bg-brand-600 active:opacity-80"}`}
+                    className={`px-4 py-2 rounded-xl ${saving ? "bg-brand-650/50" : "bg-brand-650 active:opacity-80"}`}
                 >
                     <Text className="text-white font-medium">Сохранить</Text>
                 </Pressable>

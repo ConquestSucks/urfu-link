@@ -153,6 +153,7 @@ export const ChatMessage = ({
     isOwn,
     time,
     avatarUrl,
+    authorName,
     showAvatar,
     seen,
     attachments = [],
@@ -224,7 +225,7 @@ export const ChatMessage = ({
     if (isDeleted) {
         return (
             <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
-                {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} />}
+                {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} name={authorName} />}
                 <View className="max-w-[85%] px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2">
                     <TrashIcon size={14} className="text-text-muted" />
                     <Text className="text-text-muted text-[13px] italic">Сообщение удалено</Text>
@@ -251,7 +252,7 @@ export const ChatMessage = ({
 
     return (
         <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
-            {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} />}
+            {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} name={authorName} />}
 
             <Pressable
                 onLongPress={onLongPress}
@@ -260,17 +261,23 @@ export const ChatMessage = ({
                 style={{ opacity: isOptimistic ? 0.6 : 1 }}
                 testID={`chat-message-bubble-${id}`}
                 className={`max-w-[85%] gap-1 px-3 py-3 rounded-2xl border border-transparent ${
-                    isOwn ? "bg-brand-600" : "bg-white/5"
+                    isOwn ? "bg-brand-650" : "bg-white/5"
                 }`}
             >
                 {forwardedFrom && (
                     <View className="flex-row items-center gap-1 mb-1 opacity-80">
                         <ArrowBendDoubleUpRightIcon size={12} className="text-white" />
-                        <Text className="text-[11px] italic text-white/80">
+                        <Text className="text-[11px] italic text-white">
                             Переслано
                         </Text>
                     </View>
                 )}
+
+                {!isOwn && authorName ? (
+                    <Text className="text-[12px] font-semibold text-brand-200" numberOfLines={1}>
+                        {authorName}
+                    </Text>
+                ) : null}
 
                 {replyTo && (
                     <Pressable
@@ -283,13 +290,13 @@ export const ChatMessage = ({
                         } ${onReplyPress ? "hover:bg-white/5 active:bg-white/10" : ""}`}
                     >
                         <Text
-                            className="text-[12px] text-white/80 font-semibold"
+                            className="text-[12px] text-white font-semibold"
                             numberOfLines={1}
                         >
                             Ответ
                         </Text>
                         <Text
-                            className="text-[12px] text-white/70"
+                            className="text-[12px] text-white"
                             numberOfLines={2}
                         >
                             {replyTo.preview}
@@ -359,7 +366,7 @@ export const ChatMessage = ({
                                     } ${onReactionPress ? "active:opacity-70" : ""}`}
                                 >
                                     <Text className="text-[12px]">{emoji}</Text>
-                                    <Text className="text-[11px] text-white/80">
+                                    <Text className="text-[11px] text-white">
                                         {userIds.length}
                                     </Text>
                                 </Container>
@@ -374,8 +381,8 @@ export const ChatMessage = ({
                         className="flex-row items-center gap-1 mt-1 active:opacity-70"
                         hitSlop={4}
                     >
-                        <ChatsCircleIcon size={14} className="text-white/80" />
-                        <Text className="text-[12px] text-white/80 font-medium">
+                        <ChatsCircleIcon size={14} className="text-white" />
+                        <Text className="text-[12px] text-white font-medium">
                             {threadReplyCount} {threadReplyCount === 1 ? "ответ" : "ответов"}
                         </Text>
                     </Pressable>
@@ -386,11 +393,11 @@ export const ChatMessage = ({
                         <View className="flex-row items-center mr-1">
                             <PencilSimpleIcon
                                 size={10}
-                                className={isOwn ? "text-white/70" : "text-text-placeholder"}
+                                className={isOwn ? "text-white" : "text-text-placeholder"}
                             />
                             <Text
                                 className={`text-[10px] font-medium ml-0.5 ${
-                                    isOwn ? "text-white/70" : "text-text-placeholder"
+                                    isOwn ? "text-white" : "text-text-placeholder"
                                 }`}
                             >
                                 изм.
@@ -399,7 +406,7 @@ export const ChatMessage = ({
                     )}
                     <Text
                         className={`text-[10px] font-medium ${
-                            isOwn ? "text-white/70" : "text-text-placeholder"
+                            isOwn ? "text-white" : "text-text-placeholder"
                         } text-right`}
                     >
                         {time}
@@ -408,10 +415,10 @@ export const ChatMessage = ({
                         <ChecksIcon size={12} className="text-white" weight="bold" />
                     )}
                     {isOwn && !isOptimistic && !isFailed && !seen && (
-                        <CheckIcon size={12} className="text-white/70" weight="bold" />
+                        <CheckIcon size={12} className="text-white" weight="bold" />
                     )}
                     {isOwn && isOptimistic && (
-                        <ClockIcon size={12} className="text-white/70" />
+                        <ClockIcon size={12} className="text-white" />
                     )}
                     {isOwn && isFailed && (
                         <WarningCircleIcon

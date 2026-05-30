@@ -6,25 +6,49 @@ import {
     VideoCameraIcon,
     XIcon,
 } from "@/shared/ui/phosphor";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { LastSeenLabel, presenceStatusToLabel } from "@/entities/presence";
 import type { PresenceStatus } from "@urfu-link/api-client";
 
+type ProfileUser = {
+    name: string;
+    avatarUrl?: string;
+    email?: string;
+    phone?: string;
+    status?: PresenceStatus;
+    lastSeenAt?: string | null;
+};
+
 interface UserProfileModalProps {
     isOpen: boolean;
     onClose: () => void;
-    user: {
-        name: string;
-        avatarUrl?: string;
-        email?: string;
-        phone?: string;
-        status?: PresenceStatus;
-        lastSeenAt?: string | null;
-    };
+    user: ProfileUser;
+    onStartAudioCall?: () => void;
+    onStartVideoCall?: () => void;
+    onToggleNotifications?: () => void;
+    notificationsPending?: boolean;
 }
 
-export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProps) => {
+export const UserProfileModal = ({
+    isOpen,
+    onClose,
+    user,
+    onStartAudioCall,
+    onStartVideoCall,
+    onToggleNotifications,
+    notificationsPending = false,
+}: UserProfileModalProps) => {
+    const stableUserRef = useRef<ProfileUser>(user);
+
+    useEffect(() => {
+        if (isOpen) {
+            stableUserRef.current = user;
+        }
+    }, [isOpen, user]);
+
+    const displayUser = isOpen ? user : stableUserRef.current;
+
     return (
         <ModalOverlay
             visible={isOpen}
@@ -33,7 +57,7 @@ export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProp
             contentClassName="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-full max-w-[420px]"
         >
             <View className="flex-row justify-between items-center px-8 pt-7 pb-4 border-b border-white/5">
-                <Text className="text-lg text-white font-bold">Профиль</Text>
+                <Text className="text-lg text-white font-bold">ÐŸÑ€Ð¾Ñ„Ð¸Ð»ÑŒ</Text>
                 <Pressable
                     onPress={onClose}
                     className="p-2 -mr-2 rounded-xl active:bg-white/10 transition-colors"
@@ -45,45 +69,61 @@ export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProp
             <View className="px-8 pb-8 pt-6 gap-8 items-center">
                 <View className="items-center gap-4">
                     <View className="relative">
-                        <Avatar size={100} src={user.avatarUrl} name={user.name} />
-                        {user.status === "Online" && (
+                        <Avatar size={100} src={displayUser.avatarUrl} name={displayUser.name} />
+                        {displayUser.status === "Online" && (
                             <View className="absolute bottom-1 right-1 w-5 h-5 bg-success-500 border-[3px] border-app-card rounded-full" />
                         )}
                     </View>
                     <View className="items-center gap-1">
                         <Text className="text-2xl text-white font-bold text-center">
-                            {user.name}
+                            {displayUser.name}
                         </Text>
-                        {user.status === "Online" ? (
+                        {displayUser.status === "Online" ? (
                             <Text className="text-sm text-success-500 font-medium">
-                                {presenceStatusToLabel(user.status)}
+                                {presenceStatusToLabel(displayUser.status)}
                             </Text>
-                        ) : user.lastSeenAt ? (
+                        ) : displayUser.lastSeenAt ? (
                             <LastSeenLabel
-                                lastSeenAt={user.lastSeenAt}
+                                lastSeenAt={displayUser.lastSeenAt}
                                 className="text-sm text-text-muted font-medium"
                             />
                         ) : (
                             <Text className="text-sm text-text-muted font-medium">
-                                {user.status ? presenceStatusToLabel(user.status) : "Не в сети"}
+                                {displayUser.status ? presenceStatusToLabel(displayUser.status) : "ÐÐµ Ð² ÑÐµÑ‚Ð¸"}
                             </Text>
                         )}
                     </View>
                 </View>
                 <View className="flex-row justify-center gap-4 w-full">
-                    <ActionBtn icon={PhoneIcon} label="Вызов" />
-                    <ActionBtn icon={VideoCameraIcon} label="Видео" />
-                    <ActionBtn icon={BellSlashIcon} label="Уведомления" />
+                    <ActionBtn
+                        testID="profile-action-audio"
+                        icon={PhoneIcon}
+                        label="Ð’Ñ‹Ð·Ð¾Ð²"
+                        onPress={onStartAudioCall}
+                    />
+                    <ActionBtn
+                        testID="profile-action-video"
+                        icon={VideoCameraIcon}
+                        label="Ð’Ð¸Ð´ÐµÐ¾"
+                        onPress={onStartVideoCall}
+                    />
+                    <ActionBtn
+                        testID="profile-action-notifications"
+                        icon={BellSlashIcon}
+                        label="Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ"
+                        onPress={onToggleNotifications}
+                        disabled={notificationsPending}
+                    />
                 </View>
 
-                {(user.phone || user.email) && (
+                {(displayUser.phone || displayUser.email) && (
                     <View className="w-full border border-white/5 bg-white/5 rounded-2xl overflow-hidden">
-                        {user.phone && (
-                            <InfoRow icon={PhoneIcon} label="Телефон" value={user.phone} />
+                        {displayUser.phone && (
+                            <InfoRow icon={PhoneIcon} label="Ð¢ÐµÐ»ÐµÑ„Ð¾Ð½" value={displayUser.phone} />
                         )}
-                        {user.phone && user.email && <View className="h-[1px] w-full bg-white/5 ml-14" />}
-                        {user.email && (
-                            <InfoRow icon={EnvelopeIcon} label="Почта" value={user.email} />
+                        {displayUser.phone && displayUser.email && <View className="h-[1px] w-full bg-white/5 ml-14" />}
+                        {displayUser.email && (
+                            <InfoRow icon={EnvelopeIcon} label="ÐŸÐ¾Ñ‡Ñ‚Ð°" value={displayUser.email} />
                         )}
                     </View>
                 )}
@@ -91,16 +131,35 @@ export const UserProfileModal = ({ isOpen, onClose, user }: UserProfileModalProp
         </ModalOverlay>
     );
 };
-const ActionBtn = ({ icon: Icon, label }: { icon: any; label: string }) => (
-    <View className="w-20 items-center gap-2">
+
+const ActionBtn = ({
+    icon: Icon,
+    label,
+    onPress,
+    disabled,
+    testID,
+}: {
+    icon: any;
+    label: string;
+    onPress?: () => void;
+    disabled?: boolean;
+    testID: string;
+}) => (
+    <Pressable
+        testID={testID}
+        onPress={onPress}
+        disabled={!onPress || disabled}
+        className={`w-20 items-center gap-2 ${onPress && !disabled ? "active:opacity-70" : "opacity-45"}`}
+    >
         <View className="w-12 h-12 rounded-full bg-white/5 border border-white/10 items-center justify-center">
             <Icon size={20} className="text-text-muted" />
         </View>
         <Text className="text-[11px] text-text-muted font-medium text-center" numberOfLines={1}>
             {label}
         </Text>
-    </View>
+    </Pressable>
 );
+
 const InfoRow = ({ icon: Icon, label, value }: { icon: any; label: string; value: string }) => (
     <View className="flex-row items-center gap-4 p-4">
         <Icon size={20} className="text-text-placeholder" />

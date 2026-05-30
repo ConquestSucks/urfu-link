@@ -43,6 +43,7 @@ export type ChatMessagePropsMapped = {
     isOwn: boolean;
     time: string;
     avatarUrl: string;
+    authorName?: string;
     showAvatar?: boolean;
     seen?: boolean;
     attachments?: {

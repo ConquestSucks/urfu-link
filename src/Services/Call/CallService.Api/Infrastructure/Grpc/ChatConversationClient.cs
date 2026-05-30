@@ -22,6 +22,9 @@ internal sealed class ChatConversationClient(
             reply.Type == ConversationKind.Group ? "Group" : "Direct",
             reply.Participants
                 .Select(Guid.Parse)
-                .ToList());
+                .ToList(),
+            string.IsNullOrWhiteSpace(reply.GroupSubtype) ? null : reply.GroupSubtype,
+            string.IsNullOrWhiteSpace(reply.DisciplineChatKind) ? null : reply.DisciplineChatKind,
+            reply.ParticipantRoles.ToDictionary(kv => Guid.Parse(kv.Key), kv => kv.Value));
     }
 }

@@ -17,6 +17,8 @@ namespace CallService.UnitTests;
 public sealed class CallSessionServiceTests
 {
     private const string ConversationId = "direct-1";
+    private const string SecondConversationId = "direct-2";
+    private const string GroupConversationId = "discipline:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
     private static readonly Guid CallerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid CalleeId = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -25,6 +27,7 @@ public sealed class CallSessionServiceTests
 
     private readonly FakeChatConversationClient _chat = new();
     private readonly InMemoryCallSessionStore _store = new();
+    private readonly InMemoryCallUserActivityStore _activity = new();
     private readonly CapturingCallBroadcaster _broadcaster = new();
     private readonly CapturingOutboxWriter _outbox = new();
     private readonly ManualTimeProvider _time = new(StartTime);
@@ -55,6 +58,7 @@ public sealed class CallSessionServiceTests
         _service = new CallSessionService(
             _chat,
             _store,
+            _activity,
             tokenProvider,
             callOptions,
             liveKitOptions,
@@ -95,11 +99,50 @@ public sealed class CallSessionServiceTests
     }
 
     [Fact]
-    public async Task StartAsync_rejects_non_direct_conversation()
+    public async Task StartAsync_rejects_common_group_conversation()
     {
         _chat.Set(ConversationId, new CallConversationMetadata(true, "Group", [CallerId, CalleeId]));
 
         var act = () => _service.StartAsync(ConversationId, CallerId, CallType.Video, CancellationToken.None);
+
+        await act.Should().ThrowAsync<CallProblemException>()
+            .Where(ex => ex.StatusCode == StatusCodes.Status409Conflict);
+    }
+
+    [Fact]
+    public async Task StartAsync_creates_active_group_call_for_teacher_and_invites_students()
+    {
+        _chat.Set(GroupConversationId, DisciplineGroupConversation(CallerId, CalleeId, OtherUserId));
+
+        var call = await _service.StartAsync(GroupConversationId, CallerId, CallType.Video, CancellationToken.None);
+
+        call.Status.Should().Be(CallStatus.Active);
+        call.AcceptedAtUtc.Should().Be(StartTime);
+        call.CallType.Should().Be(CallType.Video);
+        call.ParticipantIds.Should().BeEquivalentTo([CallerId, CalleeId, OtherUserId]);
+        call.Participants.Where(p => p.IsConnected).Select(p => p.UserId).Should().Equal(CallerId);
+        _broadcaster.Incoming.Should().ContainSingle()
+            .Which.Recipients.Should().BeEquivalentTo([CalleeId, OtherUserId]);
+    }
+
+    [Fact]
+    public async Task StartAsync_rejects_group_call_from_student()
+    {
+        _chat.Set(GroupConversationId, DisciplineGroupConversation(CallerId, CalleeId, OtherUserId));
+
+        var act = () => _service.StartAsync(GroupConversationId, CalleeId, CallType.Audio, CancellationToken.None);
+
+        await act.Should().ThrowAsync<CallProblemException>()
+            .Where(ex => ex.StatusCode == StatusCodes.Status403Forbidden);
+    }
+
+    [Fact]
+    public async Task StartAsync_rejects_second_active_call_for_same_user()
+    {
+        _chat.Set(SecondConversationId, DirectConversation(CallerId, OtherUserId));
+        await StartCallAsync();
+
+        var act = () => _service.StartAsync(SecondConversationId, CallerId, CallType.Audio, CancellationToken.None);
 
         await act.Should().ThrowAsync<CallProblemException>()
             .Where(ex => ex.StatusCode == StatusCodes.Status409Conflict);
@@ -154,6 +197,22 @@ public sealed class CallSessionServiceTests
         active.Status.Should().Be(CallStatus.Active);
         _broadcaster.Accepted.Should().BeEmpty();
         _broadcaster.Joined.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task AcceptAsync_adds_student_to_active_group_call()
+    {
+        _chat.Set(GroupConversationId, DisciplineGroupConversation(CallerId, CalleeId, OtherUserId));
+        var group = await _service.StartAsync(GroupConversationId, CallerId, CallType.Audio, CancellationToken.None);
+        _broadcaster.Clear();
+
+        var active = await _service.AcceptAsync(group.Id, CalleeId, CancellationToken.None);
+
+        active.Status.Should().Be(CallStatus.Active);
+        active.Participants.Where(p => p.IsConnected).Select(p => p.UserId)
+            .Should().BeEquivalentTo([CallerId, CalleeId]);
+        _broadcaster.Accepted.Should().BeEmpty();
+        _broadcaster.Joined.Should().ContainSingle(j => j.CallId == group.Id && j.UserId == CalleeId);
     }
 
     [Fact]
@@ -284,12 +343,44 @@ public sealed class CallSessionServiceTests
     }
 
     [Fact]
+    public async Task LeaveAsync_by_student_in_active_group_disconnects_only_that_student()
+    {
+        _chat.Set(GroupConversationId, DisciplineGroupConversation(CallerId, CalleeId, OtherUserId));
+        var group = await _service.StartAsync(GroupConversationId, CallerId, CallType.Audio, CancellationToken.None);
+        await _service.AcceptAsync(group.Id, CalleeId, CancellationToken.None);
+        _broadcaster.Clear();
+
+        var active = await _service.LeaveAsync(group.Id, CalleeId, CancellationToken.None);
+
+        active.Status.Should().Be(CallStatus.Active);
+        active.Participants.Single(p => p.UserId == CalleeId).IsConnected.Should().BeFalse();
+        active.Participants.Single(p => p.UserId == CallerId).IsConnected.Should().BeTrue();
+        _broadcaster.Left.Should().ContainSingle(l => l.CallId == group.Id && l.UserId == CalleeId);
+        _broadcaster.Ended.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task LeaveAsync_by_teacher_in_active_group_ends_call_for_everyone()
+    {
+        _chat.Set(GroupConversationId, DisciplineGroupConversation(CallerId, CalleeId, OtherUserId));
+        var group = await _service.StartAsync(GroupConversationId, CallerId, CallType.Audio, CancellationToken.None);
+        await _service.AcceptAsync(group.Id, CalleeId, CancellationToken.None);
+        _broadcaster.Clear();
+
+        var ended = await _service.LeaveAsync(group.Id, CallerId, CancellationToken.None);
+
+        ended.Status.Should().Be(CallStatus.Ended);
+        ended.EndReason.Should().Be(CallEndReason.Completed);
+        _broadcaster.Ended.Should().ContainSingle();
+    }
+
+    [Fact]
     public async Task CreateTokenAsync_returns_livekit_token_for_active_call()
     {
         var ringing = await StartCallAsync();
         await _service.AcceptAsync(ringing.Id, CalleeId, CancellationToken.None);
 
-        var token = await _service.CreateTokenAsync(ringing.Id, CalleeId, CancellationToken.None);
+        var token = await _service.CreateTokenAsync(ringing.Id, CalleeId, null, CancellationToken.None);
 
         token.CallId.Should().Be(ringing.Id);
         token.ServerUrl.Should().Be("wss://livekit.test");
@@ -299,12 +390,25 @@ public sealed class CallSessionServiceTests
     }
 
     [Fact]
+    public async Task CreateTokenAsync_replaces_previous_client_instance_for_same_user_and_call()
+    {
+        var ringing = await StartCallAsync();
+        await _service.AcceptAsync(ringing.Id, CalleeId, CancellationToken.None);
+
+        await _service.CreateTokenAsync(ringing.Id, CalleeId, "tab-1", CancellationToken.None);
+        await _service.CreateTokenAsync(ringing.Id, CalleeId, "tab-2", CancellationToken.None);
+
+        _broadcaster.DeviceReplaced.Should().ContainSingle(r =>
+            r.UserId == CalleeId && r.CallId == ringing.Id && r.ClientInstanceId == "tab-2");
+    }
+
+    [Fact]
     public async Task CreateTokenAsync_rejects_ended_call()
     {
         var ringing = await StartCallAsync();
         await _service.CancelAsync(ringing.Id, CallerId, CancellationToken.None);
 
-        var act = () => _service.CreateTokenAsync(ringing.Id, CalleeId, CancellationToken.None);
+        var act = () => _service.CreateTokenAsync(ringing.Id, CalleeId, null, CancellationToken.None);
 
         await act.Should().ThrowAsync<CallProblemException>()
             .Where(ex => ex.StatusCode == StatusCodes.Status409Conflict);
@@ -372,6 +476,22 @@ public sealed class CallSessionServiceTests
 
     private static CallConversationMetadata DirectConversation(params Guid[] participantIds)
         => new(true, "Direct", participantIds);
+
+    private static CallConversationMetadata DisciplineGroupConversation(Guid teacherId, params Guid[] studentIds)
+    {
+        var participants = new[] { teacherId }.Concat(studentIds).ToList();
+        var roles = participants.ToDictionary(
+            id => id,
+            id => id == teacherId ? "Teacher" : "Student");
+
+        return new CallConversationMetadata(
+            true,
+            "Group",
+            participants,
+            GroupSubtype: "Discipline",
+            DisciplineChatKind: "General",
+            ParticipantRoles: roles);
+    }
 
     private sealed class FakeChatConversationClient : IChatConversationClient
     {
@@ -446,6 +566,55 @@ public sealed class CallSessionServiceTests
         public CallSession Require(Guid callId) => _sessions[callId];
     }
 
+    private sealed class InMemoryCallUserActivityStore : ICallUserActivityStore
+    {
+        private readonly Dictionary<Guid, Guid> _activeCallByUser = [];
+        private readonly Dictionary<(Guid CallId, Guid UserId), string> _clientInstanceByCallUser = [];
+
+        public Task<Guid?> GetActiveCallAsync(Guid userId, CancellationToken cancellationToken)
+            => Task.FromResult(_activeCallByUser.TryGetValue(userId, out var callId) ? callId : (Guid?)null);
+
+        public Task<bool> TryReserveActiveCallAsync(
+            Guid userId,
+            Guid callId,
+            TimeSpan ttl,
+            CancellationToken cancellationToken)
+        {
+            _ = ttl;
+            if (_activeCallByUser.TryGetValue(userId, out var existingCallId) && existingCallId != callId)
+            {
+                return Task.FromResult(false);
+            }
+
+            _activeCallByUser[userId] = callId;
+            return Task.FromResult(true);
+        }
+
+        public Task ReleaseActiveCallAsync(Guid userId, Guid callId, CancellationToken cancellationToken)
+        {
+            if (_activeCallByUser.TryGetValue(userId, out var existingCallId) && existingCallId == callId)
+            {
+                _activeCallByUser.Remove(userId);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<string?> SetClientInstanceAsync(
+            Guid callId,
+            Guid userId,
+            string clientInstanceId,
+            TimeSpan ttl,
+            CancellationToken cancellationToken)
+        {
+            _ = ttl;
+            var key = (callId, userId);
+            _clientInstanceByCallUser.TryGetValue(key, out var previous);
+            _clientInstanceByCallUser[key] = clientInstanceId;
+            return Task.FromResult(previous);
+        }
+    }
+
     private sealed class CapturingCallBroadcaster : ICallBroadcaster
     {
         public List<(IReadOnlyList<Guid> Recipients, CallSessionDto Call)> Incoming { get; } = [];
@@ -461,6 +630,8 @@ public sealed class CallSessionServiceTests
         public List<(IReadOnlyList<Guid> Recipients, Guid CallId, Guid UserId)> Left { get; } = [];
 
         public List<(IReadOnlyList<Guid> Recipients, CallSessionDto Call)> Ended { get; } = [];
+
+        public List<(Guid UserId, Guid CallId, string ClientInstanceId)> DeviceReplaced { get; } = [];
 
         public Task NotifyIncomingAsync(
             IReadOnlyList<Guid> recipientUserIds,
@@ -527,6 +698,16 @@ public sealed class CallSessionServiceTests
             return Task.CompletedTask;
         }
 
+        public Task NotifyDeviceReplacedAsync(
+            Guid userId,
+            Guid callId,
+            string clientInstanceId,
+            CancellationToken cancellationToken)
+        {
+            DeviceReplaced.Add((userId, callId, clientInstanceId));
+            return Task.CompletedTask;
+        }
+
         public void Clear()
         {
             Incoming.Clear();
@@ -536,6 +717,7 @@ public sealed class CallSessionServiceTests
             Joined.Clear();
             Left.Clear();
             Ended.Clear();
+            DeviceReplaced.Clear();
         }
     }
 

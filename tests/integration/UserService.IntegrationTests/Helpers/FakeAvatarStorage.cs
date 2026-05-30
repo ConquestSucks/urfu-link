@@ -6,6 +6,7 @@ namespace UserService.IntegrationTests.Helpers;
 public sealed class FakeAvatarStorage : IAvatarStorage
 {
     public ConcurrentDictionary<string, byte[]> Uploads { get; } = new();
+    private readonly ConcurrentDictionary<string, string> _contentTypes = new();
 
     public async Task<string> UploadAsync(Guid userId, Stream fileStream, string contentType, CancellationToken cancellationToken = default)
     {
@@ -25,13 +26,23 @@ public sealed class FakeAvatarStorage : IAvatarStorage
         using var ms = new MemoryStream();
         await fileStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
         Uploads[url] = ms.ToArray();
+        _contentTypes[url] = contentType;
 
         return url;
+    }
+
+    public Task<AvatarObject?> DownloadAsync(string objectUrl, CancellationToken cancellationToken = default)
+    {
+        return Task.FromResult(
+            Uploads.TryGetValue(objectUrl, out var content)
+                ? new AvatarObject(content, _contentTypes.GetValueOrDefault(objectUrl, "application/octet-stream"))
+                : null);
     }
 
     public Task DeleteAsync(string objectUrl, CancellationToken cancellationToken = default)
     {
         Uploads.TryRemove(objectUrl, out _);
+        _contentTypes.TryRemove(objectUrl, out _);
         return Task.CompletedTask;
     }
 }

@@ -27,7 +27,7 @@ EOF
 # Inject app-config.js before the bundle so window.__APP_CONFIG__ is set
 # before config.ts module runs. Only inject if not already present.
 if ! grep -q 'app-config.js' "${HTML}"; then
-    sed -i 's|<script src="/_expo/static/js/|<script src="/app-config.js"></script><script src="/_expo/static/js/|' "${HTML}"
+    sed -i 's|<script src="/_expo/static/js/|<script src="/app-config.js" defer></script><script src="/_expo/static/js/|' "${HTML}"
 fi
 
 exec nginx -g 'daemon off;'

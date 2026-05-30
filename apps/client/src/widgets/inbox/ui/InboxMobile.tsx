@@ -46,6 +46,7 @@ export const InboxMobile = <T,>({
             <MobileHeader
                 currentView={currentView}
                 createHref={createViewHref}
+                notificationScope={currentTab === "subjects" ? "disciplines" : "chats"}
             />
 
             <View className="px-4 py-2">

@@ -127,7 +127,7 @@ export const IncomingCallModal = () => {
                     <Pressable
                         onPress={handleAccept}
                         disabled={isAccepting || isDeclining}
-                        className="flex-1 rounded-xl py-2.5 items-center bg-brand-600 disabled:opacity-60"
+                        className="flex-1 rounded-xl py-2.5 items-center bg-brand-650 disabled:opacity-60"
                     >
                         {isAccepting ? (
                             <ActivityIndicator size="small" color="#fff" />

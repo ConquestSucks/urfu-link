@@ -17,4 +17,6 @@ public interface ICallClient
     Task CallParticipantLeft(Guid callId, Guid userId);
 
     Task CallEnded(CallSessionDto call);
+
+    Task CallDeviceReplaced(Guid callId, string clientInstanceId);
 }

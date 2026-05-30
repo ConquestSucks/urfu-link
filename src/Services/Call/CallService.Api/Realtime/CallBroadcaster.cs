@@ -69,6 +69,15 @@ public sealed class CallBroadcaster(IHubContext<CallHub, ICallClient> hub) : ICa
         return hub.Clients.Users(ToUserIds(participantUserIds)).CallEnded(call);
     }
 
+    public Task NotifyDeviceReplacedAsync(Guid userId, Guid callId, string clientInstanceId, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientInstanceId);
+
+        _ = cancellationToken;
+        return hub.Clients.User(userId.ToString("D", CultureInfo.InvariantCulture))
+            .CallDeviceReplaced(callId, clientInstanceId);
+    }
+
     private static List<string> ToUserIds(IReadOnlyList<Guid> userIds)
         => userIds.Select(u => u.ToString("D", CultureInfo.InvariantCulture)).ToList();
 }

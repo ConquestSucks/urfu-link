@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using Urfu.Link.Services.Notification.Application.Services;
 using Urfu.Link.Services.Notification.Domain.Aggregates;
 using Urfu.Link.Services.Notification.Domain;
 using Urfu.Link.Services.Notification.Domain.Enums;
@@ -343,12 +344,40 @@ public sealed class NotificationRepository(NotificationDbContext db) : INotifica
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+        var scopeRows = await unreadQuery
+            .Select(n => new { n.Category, n.Data })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var scopeInputs = scopeRows
+            .Select(row =>
+            {
+                row.Data.Values.TryGetValue("conversationId", out var conversationId);
+                return new BadgeScopeInput(row.Category, conversationId);
+            })
+            .ToList();
+        var conversationIds = scopeInputs
+            .Select(input => input.ConversationId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var disciplineConversationIds = conversationIds.Count == 0
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : (await db.DisciplineConversations
+                .AsNoTracking()
+                .Where(conversation => conversationIds.Contains(conversation.ConversationId))
+                .Select(conversation => conversation.ConversationId)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .ToHashSet(StringComparer.Ordinal);
+        var scopes = BadgeScopeClassifier.ClassifyUnreadScopes(scopeInputs, disciplineConversationIds);
+
         return new NotificationBadgeCounts(
             totalUnread,
             totalUnseen,
             urgentUnread,
             perCategory.ToDictionary(g => g.Key, g => g.Count),
-            perType.ToDictionary(g => g.Key, g => g.Count, StringComparer.Ordinal));
+            perType.ToDictionary(g => g.Key, g => g.Count, StringComparer.Ordinal),
+            scopes);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)

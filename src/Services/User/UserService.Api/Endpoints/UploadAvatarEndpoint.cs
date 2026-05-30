@@ -13,7 +13,8 @@ public sealed class UploadAvatarRequest
 
 public sealed class UploadAvatarEndpoint(
     IUserRepository userRepository,
-    IAvatarStorage avatarStorage) : Endpoint<UploadAvatarRequest, AvatarUploadResponse>
+    IAvatarStorage avatarStorage,
+    IAvatarImageProcessor avatarImageProcessor) : Endpoint<UploadAvatarRequest, AvatarUploadResponse>
 {
     private static readonly HashSet<string> AllowedContentTypes =
     [
@@ -69,8 +70,14 @@ public sealed class UploadAvatarEndpoint(
             await avatarStorage.DeleteAsync(user.Account.AvatarUrl, ct).ConfigureAwait(false);
         }
 
-        using var stream = req.File.OpenReadStream();
-        var avatarUrl = await avatarStorage.UploadAsync(userId, stream, req.File.ContentType, ct).ConfigureAwait(false);
+        await using var stream = req.File.OpenReadStream();
+        var processed = await avatarImageProcessor
+            .ProcessAsync(stream, req.File.ContentType, ct)
+            .ConfigureAwait(false);
+        await using var processedStream = new MemoryStream(processed.Content.ToArray(), writable: false);
+        var avatarUrl = await avatarStorage
+            .UploadAsync(userId, processedStream, processed.ContentType, ct)
+            .ConfigureAwait(false);
 
         user.UploadAvatar(avatarUrl);
         await userRepository.SaveChangesAsync(ct).ConfigureAwait(false);

@@ -5,6 +5,8 @@ namespace Urfu.Link.Services.Call.Application.Contracts;
 
 public sealed record StartCallRequest(CallType CallType);
 
+public sealed record CallTokenRequest(string? ClientInstanceId);
+
 public sealed record CallParticipantDto(Guid UserId, bool IsConnected);
 
 public sealed record CallSessionDto(

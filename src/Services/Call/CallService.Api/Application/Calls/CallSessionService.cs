@@ -11,6 +11,7 @@ namespace Urfu.Link.Services.Call.Application.Calls;
 public sealed class CallSessionService(
     IChatConversationClient chat,
     ICallSessionStore sessions,
+    ICallUserActivityStore activity,
     LiveKitTokenProvider tokenProvider,
     IOptions<CallOptions> options,
     IOptions<LiveKitOptions> liveKitOptions,
@@ -19,6 +20,11 @@ public sealed class CallSessionService(
     CallEventDispatcher events,
     ILogger<CallSessionService> logger)
 {
+    private const string DirectConversationType = "Direct";
+    private const string GroupConversationType = "Group";
+    private const string DisciplineGroupSubtype = "Discipline";
+    private const string TeacherRole = "Teacher";
+
     public async Task<CallSessionDto> StartAsync(
         string conversationId,
         Guid callerId,
@@ -27,24 +33,33 @@ public sealed class CallSessionService(
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
         var conversation = await chat.GetConversationAsync(conversationId, cancellationToken).ConfigureAwait(false);
-        EnsureDirectParticipantConversation(conversation, conversationId, callerId);
+        var startsAsActiveGroup = EnsureCallableConversation(conversation, conversationId, callerId);
 
         var now = timeProvider.GetUtcNow();
+        var callId = Guid.NewGuid();
+        await ReserveActiveCallAsync(callerId, callId, cancellationToken).ConfigureAwait(false);
         var session = new CallSession(
-            Guid.NewGuid(),
+            callId,
             conversationId,
             callerId,
             conversation.ParticipantIds,
             callType,
-            CallStatus.Ringing,
+            startsAsActiveGroup ? CallStatus.Active : CallStatus.Ringing,
             now,
             now.Add(options.Value.RingTimeout),
-            AcceptedAtUtc: null,
+            AcceptedAtUtc: startsAsActiveGroup ? now : null,
             EndedAtUtc: null,
             EndReason: null,
-            ConnectedParticipantIds: [callerId]);
+            ConnectedParticipantIds: [callerId],
+            ConversationType: conversation.Type);
 
-        await sessions.TryCreateAsync(session, options.Value.SessionTtl, cancellationToken).ConfigureAwait(false);
+        var created = await sessions.TryCreateAsync(session, options.Value.SessionTtl, cancellationToken)
+            .ConfigureAwait(false);
+        if (!created)
+        {
+            await activity.ReleaseActiveCallAsync(callerId, callId, cancellationToken).ConfigureAwait(false);
+            throw new CallProblemException(StatusCodes.Status409Conflict, "Call could not be created.");
+        }
 
         await events.PublishAsync(
             new CallIncomingV2Event(
@@ -69,13 +84,40 @@ public sealed class CallSessionService(
         return CallSessionDto.FromDomain(session);
     }
 
-    public async Task<CallTokenDto> CreateTokenAsync(Guid callId, Guid callerId, CancellationToken cancellationToken)
+    public async Task<CallTokenDto> CreateTokenAsync(
+        Guid callId,
+        Guid callerId,
+        string? clientInstanceId,
+        CancellationToken cancellationToken)
     {
         var session = await RequireSessionAsync(callId, cancellationToken).ConfigureAwait(false);
         EnsureSessionParticipant(session, callerId);
         if (session.Status == CallStatus.Ended)
         {
             throw new CallProblemException(StatusCodes.Status409Conflict, "Call has already ended.");
+        }
+
+        await ReserveActiveCallAsync(callerId, session.Id, cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(clientInstanceId))
+        {
+            var previousClientInstanceId = await activity.SetClientInstanceAsync(
+                    session.Id,
+                    callerId,
+                    clientInstanceId,
+                    options.Value.SessionTtl,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (previousClientInstanceId is not null
+                && !string.Equals(previousClientInstanceId, clientInstanceId, StringComparison.Ordinal))
+            {
+                await broadcaster.NotifyDeviceReplacedAsync(
+                        callerId,
+                        session.Id,
+                        clientInstanceId,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
         }
 
         var roomName = RoomNameFor(session.Id);
@@ -98,7 +140,32 @@ public sealed class CallSessionService(
 
         if (session.Status == CallStatus.Active)
         {
-            return CallSessionDto.FromDomain(session);
+            if (session.ConnectedParticipantIds.Contains(callerId))
+            {
+                return CallSessionDto.FromDomain(session);
+            }
+
+            await ReserveActiveCallAsync(callerId, session.Id, cancellationToken).ConfigureAwait(false);
+            var joined = session with
+            {
+                ConnectedParticipantIds = AddConnected(session, callerId),
+            };
+            var activeSaved = await sessions.TrySaveAsync(session, joined, options.Value.SessionTtl, cancellationToken)
+                .ConfigureAwait(false);
+            if (!activeSaved)
+            {
+                await activity.ReleaseActiveCallAsync(callerId, session.Id, cancellationToken).ConfigureAwait(false);
+                var current = await RequireSessionAsync(callId, cancellationToken).ConfigureAwait(false);
+                return CallSessionDto.FromDomain(current);
+            }
+
+            await broadcaster.NotifyParticipantJoinedAsync(
+                    joined.ParticipantIds,
+                    joined.Id,
+                    callerId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return CallSessionDto.FromDomain(joined);
         }
 
         if (callerId == session.CallerId)
@@ -106,6 +173,7 @@ public sealed class CallSessionService(
             throw new CallProblemException(StatusCodes.Status409Conflict, "Caller cannot accept their own ringing call.");
         }
 
+        await ReserveActiveCallAsync(callerId, session.Id, cancellationToken).ConfigureAwait(false);
         var now = timeProvider.GetUtcNow();
         var active = session with
         {
@@ -117,6 +185,7 @@ public sealed class CallSessionService(
             .ConfigureAwait(false);
         if (!saved)
         {
+            await activity.ReleaseActiveCallAsync(callerId, session.Id, cancellationToken).ConfigureAwait(false);
             var current = await RequireSessionAsync(callId, cancellationToken).ConfigureAwait(false);
             return CallSessionDto.FromDomain(current);
         }
@@ -143,6 +212,13 @@ public sealed class CallSessionService(
 
         if (session.Status != CallStatus.Ringing)
         {
+            if (session.Status == CallStatus.Active
+                && session.IsGroup
+                && !session.ConnectedParticipantIds.Contains(callerId))
+            {
+                return CallSessionDto.FromDomain(session);
+            }
+
             throw new CallProblemException(StatusCodes.Status409Conflict, "Only a ringing call can be declined.");
         }
 
@@ -204,6 +280,35 @@ public sealed class CallSessionService(
         if (session.Status == CallStatus.Ended)
         {
             return CallSessionDto.FromDomain(session);
+        }
+
+        if (session.IsGroup && callerId != session.CallerId)
+        {
+            await activity.ReleaseActiveCallAsync(callerId, session.Id, cancellationToken).ConfigureAwait(false);
+            if (!session.ConnectedParticipantIds.Contains(callerId))
+            {
+                return CallSessionDto.FromDomain(session);
+            }
+
+            var disconnected = session with
+            {
+                ConnectedParticipantIds = RemoveConnected(session, callerId),
+            };
+            var saved = await sessions.TrySaveAsync(session, disconnected, options.Value.SessionTtl, cancellationToken)
+                .ConfigureAwait(false);
+            if (!saved)
+            {
+                var current = await RequireSessionAsync(callId, cancellationToken).ConfigureAwait(false);
+                return CallSessionDto.FromDomain(current);
+            }
+
+            await broadcaster.NotifyParticipantLeftAsync(
+                    disconnected.ParticipantIds,
+                    disconnected.Id,
+                    callerId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            return CallSessionDto.FromDomain(disconnected);
         }
 
         await broadcaster.NotifyParticipantLeftAsync(session.ParticipantIds, session.Id, callerId, cancellationToken).ConfigureAwait(false);
@@ -296,6 +401,7 @@ public sealed class CallSessionService(
             return (current, false);
         }
 
+        await ReleaseActiveCallsAsync(ended, cancellationToken).ConfigureAwait(false);
         await events.PublishAsync(
             new CallEndedV2Event(
                 ended.Id,
@@ -322,7 +428,7 @@ public sealed class CallSessionService(
         return session;
     }
 
-    private static void EnsureDirectParticipantConversation(
+    private static bool EnsureCallableConversation(
         CallConversationMetadata conversation,
         string conversationId,
         Guid callerId)
@@ -332,15 +438,33 @@ public sealed class CallSessionService(
             throw new CallProblemException(StatusCodes.Status404NotFound, "Conversation was not found.");
         }
 
-        if (!string.Equals(conversation.Type, "Direct", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new CallProblemException(StatusCodes.Status409Conflict, "Calls are available only in direct chats.");
-        }
-
-        if (conversation.ParticipantIds.Count != 2 || !conversation.ParticipantIds.Contains(callerId))
+        if (!conversation.ParticipantIds.Contains(callerId))
         {
             throw new CallProblemException(StatusCodes.Status403Forbidden, $"User cannot start a call in conversation {conversationId}.");
         }
+
+        if (string.Equals(conversation.Type, DirectConversationType, StringComparison.OrdinalIgnoreCase))
+        {
+            if (conversation.ParticipantIds.Count != 2)
+            {
+                throw new CallProblemException(StatusCodes.Status403Forbidden, $"User cannot start a call in conversation {conversationId}.");
+            }
+
+            return false;
+        }
+
+        if (!string.Equals(conversation.Type, GroupConversationType, StringComparison.OrdinalIgnoreCase)
+            || !string.Equals(conversation.GroupSubtype, DisciplineGroupSubtype, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CallProblemException(StatusCodes.Status409Conflict, "Calls are available only in direct chats and discipline group chats.");
+        }
+
+        if (!string.Equals(conversation.RoleOf(callerId), TeacherRole, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new CallProblemException(StatusCodes.Status403Forbidden, "Only teachers can start group calls.");
+        }
+
+        return true;
     }
 
     private static void EnsureSessionParticipant(CallSession session, Guid callerId)
@@ -355,6 +479,32 @@ public sealed class CallSessionService(
         => session.ConnectedParticipantIds.Contains(userId)
             ? session.ConnectedParticipantIds
             : session.ConnectedParticipantIds.Append(userId).ToList();
+
+    private static List<Guid> RemoveConnected(CallSession session, Guid userId)
+        => session.ConnectedParticipantIds.Where(id => id != userId).ToList();
+
+    private async Task ReserveActiveCallAsync(Guid userId, Guid callId, CancellationToken cancellationToken)
+    {
+        var reserved = await activity.TryReserveActiveCallAsync(
+                userId,
+                callId,
+                options.Value.SessionTtl,
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!reserved)
+        {
+            throw new CallProblemException(StatusCodes.Status409Conflict, "User already has another active call.");
+        }
+    }
+
+    private async Task ReleaseActiveCallsAsync(CallSession session, CancellationToken cancellationToken)
+    {
+        foreach (var participantId in session.ParticipantIds)
+        {
+            await activity.ReleaseActiveCallAsync(participantId, session.Id, cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
 
     private static string RoomNameFor(Guid callId) => $"call-{callId:N}";
 

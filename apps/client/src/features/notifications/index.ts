@@ -1,4 +1,5 @@
 export { useNotificationBadge, useNotifications, notificationKeys } from "./model/queries";
+export { getNotificationScopeUnreadCount, type NotificationScope } from "./model/scoped-badge";
 export {
     useMarkNotificationRead,
     useMarkNotificationDone,

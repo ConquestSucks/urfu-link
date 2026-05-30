@@ -10,7 +10,7 @@
     "ios": "pnpm exec expo start --ios",
     "web": "pnpm exec expo start --web",
     "web:local": "cross-env EXPO_PUBLIC_API_URL=http://localhost:5080 EXPO_PUBLIC_KEYCLOAK_URL=http://localhost:8080 pnpm exec expo start --web --port 3000",
-    "web:build": "pnpm exec expo export --platform web",
+    "web:build": "pnpm exec expo export --platform web && node scripts/patch-web-index.js",
     "test": "jest --watchAll=false",
     "test:watch": "jest --watch",
     "typecheck": "pnpm exec tsc --noEmit",

@@ -12,6 +12,10 @@ export default function Root({ children }: PropsWithChildren) {
                     name="viewport"
                     content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
                 />
+                <meta
+                    name="description"
+                    content="URFU Link — рабочее пространство для чатов, дисциплин, уведомлений и звонков студентов и преподавателей УрФУ."
+                />
                 <meta name="theme-color" content={APP_THEME_BG} />
                 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
                 <title>URFU Link</title>
