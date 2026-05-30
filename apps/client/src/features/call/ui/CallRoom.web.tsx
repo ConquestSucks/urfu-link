@@ -1,5 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
+import {
+    FadeIn,
+    FadeInDown,
+    FadeInRight,
+    FadeOut,
+    LinearTransition,
+    ZoomIn,
+    ZoomOut,
+} from "react-native-reanimated";
 import {
     ConnectionState,
     isBrowserSupported,
@@ -12,6 +21,7 @@ import {
 } from "livekit-client";
 import { Avatar } from "@/shared/ui";
 import { playCallSound } from "@/shared/lib/call-sounds";
+import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
 import { SpeakerHighIcon } from "@/shared/ui/phosphor";
 import type { CallRoomProps, ParticipantInfo } from "./CallRoom.types";
 import {
@@ -25,6 +35,8 @@ import {
 } from "./CallRoomControls";
 import {
     buildScreenShareAudioKey,
+    getCallStageLayoutStyles,
+    getParticipantRailCardStyle,
     isActiveScreenShareAudio,
     normalizeSelectedStageItem,
     pickActiveScreenShare,
@@ -251,16 +263,22 @@ const ScreenShareVolumeControl = ({
 
     return (
         <View className="relative">
-            <Pressable
+            <AnimatedPressable
                 testID="call-screen-audio-toggle"
                 accessibilityLabel={volume <= 0 ? "Включить звук демонстрации" : "Настроить звук демонстрации"}
                 onPress={() => setIsOpen((value) => !value)}
+                layout={LinearTransition.duration(180)}
                 className="h-9 w-9 rounded-full bg-white/12 items-center justify-center active:scale-95"
             >
                 <SpeakerHighIcon size={16} className={volume <= 0 ? "text-white/45" : "text-white"} />
-            </Pressable>
+            </AnimatedPressable>
             {isOpen ? (
-                <View className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-black/85 p-3 gap-3">
+                <AnimatedView
+                    entering={FadeInDown.duration(180)}
+                    exiting={FadeOut.duration(120)}
+                    layout={LinearTransition.duration(180)}
+                    className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-black/85 p-3 gap-3"
+                >
                     <View className="flex-row items-center justify-between">
                         <Text className="text-white text-xs font-semibold">Звук экрана</Text>
                         <Text className="text-white/70 text-xs">{percent}%</Text>
@@ -279,16 +297,17 @@ const ScreenShareVolumeControl = ({
                             accentColor: "#2563eb",
                         },
                     })}
-                    <Pressable
+                    <AnimatedPressable
                         accessibilityLabel={volume <= 0 ? "Включить звук демонстрации" : "Выключить звук демонстрации"}
                         onPress={() => onVolumeChange(volume <= 0 ? 1 : 0)}
+                        layout={LinearTransition.duration(180)}
                         className="h-8 rounded-lg bg-white/10 items-center justify-center"
                     >
                         <Text className="text-white text-xs font-semibold">
                             {volume <= 0 ? "Включить" : "Выключить"}
                         </Text>
-                    </Pressable>
-                </View>
+                    </AnimatedPressable>
+                </AnimatedView>
             ) : null}
         </View>
     );
@@ -314,10 +333,14 @@ const ParticipantTile = ({
         localFacingMode === "user";
 
     return (
-        <Pressable
+        <AnimatedPressable
             testID="call-participant-tile"
             accessibilityLabel={`Сделать главным: ${participant.displayName}`}
             onPress={onPress}
+            entering={FadeIn.duration(160)}
+            exiting={FadeOut.duration(120)}
+            layout={LinearTransition.duration(220)}
+            style={{ width: "100%", height: "100%" }}
             className="flex-1 min-h-0 active:scale-[0.99]"
         >
             <SpeakingFrame isSpeaking={participant.isSpeaking}>
@@ -362,7 +385,7 @@ const ParticipantTile = ({
                     </View>
                 </View>
             </SpeakingFrame>
-        </Pressable>
+        </AnimatedPressable>
     );
 };
 
@@ -389,10 +412,14 @@ const ScreenShareTile = ({
     const ownerName = owner?.displayName ?? "Пользователь";
 
     return (
-        <Pressable
+        <AnimatedPressable
             testID="call-screen-share-tile"
             accessibilityLabel={`Сделать главной демонстрацию: ${ownerName}`}
             onPress={onPress}
+            entering={FadeIn.duration(160)}
+            exiting={FadeOut.duration(120)}
+            layout={LinearTransition.duration(220)}
+            style={{ width: "100%", height: "100%" }}
             className="flex-1 min-h-0 rounded-[28px] overflow-hidden border border-white/10 bg-black active:scale-[0.99]"
         >
             {track ? (
@@ -414,17 +441,18 @@ const ScreenShareTile = ({
                         volume={screenShareVolume}
                         onVolumeChange={onScreenShareVolumeChange}
                     />
-                    <Pressable
+                    <AnimatedPressable
                         testID="call-screen-fullscreen"
                         accessibilityLabel="Открыть демонстрацию на весь экран"
                         onPress={onOpenScreenShareFullscreen}
+                        layout={LinearTransition.duration(180)}
                         className="rounded-full bg-white/12 px-3 py-2 active:scale-95"
                     >
                         <Text className="text-white text-xs font-semibold">Во весь экран</Text>
-                    </Pressable>
+                    </AnimatedPressable>
                 </View>
             ) : null}
-        </Pressable>
+        </AnimatedPressable>
     );
 };
 
@@ -484,6 +512,7 @@ const ParticipantRail = ({
     participants,
     isVideoCall,
     isMobile,
+    hasScreenShare,
     localFacingMode,
     onSelectItem,
 }: {
@@ -491,10 +520,14 @@ const ParticipantRail = ({
     participants: ParticipantMediaInfo[];
     isVideoCall: boolean;
     isMobile: boolean;
+    hasScreenShare: boolean;
     localFacingMode: CameraFacingMode;
     onSelectItem: (itemId: string) => void;
 }) => {
     if (items.length === 0) return null;
+
+    const layoutStyles = getCallStageLayoutStyles(isMobile);
+    const cardStyle = getParticipantRailCardStyle(isMobile, hasScreenShare);
 
     return (
         <ScrollView
@@ -502,15 +535,24 @@ const ParticipantRail = ({
             horizontal={isMobile}
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
-            className={isMobile ? "max-h-28" : "w-40"}
-            contentContainerStyle={isMobile ? { gap: 8 } : { gap: 8 }}
+            style={layoutStyles.rail}
+            className={isMobile ? "max-h-32" : "w-44"}
+            contentContainerStyle={
+                isMobile
+                    ? { gap: 8, paddingRight: 4 }
+                    : { gap: 8, alignItems: "stretch" }
+            }
         >
             <View className={`gap-2 ${isMobile ? "flex-row" : ""}`}>
-                {items.map((item) => (
-                    <View
+                {items.map((item, index) => (
+                    <AnimatedView
                         key={item.id}
                         testID={item.kind === "screen" ? "call-screen-share-rail-card" : undefined}
-                        className={`${isMobile ? "w-28 h-24" : "w-40 h-28"} rounded-2xl overflow-hidden`}
+                        entering={(isMobile ? FadeInDown : FadeInRight).delay(index * 35).duration(180)}
+                        exiting={FadeOut.duration(120)}
+                        layout={LinearTransition.duration(220)}
+                        style={cardStyle}
+                        className="rounded-2xl overflow-hidden"
                     >
                         <StageItemTile
                             item={item}
@@ -524,7 +566,7 @@ const ParticipantRail = ({
                             screenShareVolume={1}
                             onScreenShareVolumeChange={() => undefined}
                         />
-                    </View>
+                    </AnimatedView>
                 ))}
             </View>
         </ScrollView>
@@ -557,13 +599,28 @@ const CallStage = ({
     onScreenShareVolumeChange: (volume: number) => void;
 }) => {
     const mainItem = selectedItem ?? items[0] ?? null;
-    if (!mainItem) return <View className="flex-1" />;
+    if (!mainItem) return <View className="flex-1 w-full self-stretch" />;
 
     const railItems = items.filter((item) => item.id !== mainItem.id);
+    const layoutStyles = getCallStageLayoutStyles(isMobile);
+    const hasScreenShare = items.some((item) => item.kind === "screen");
 
     return (
-        <View className={`flex-1 gap-3 p-3 ${isMobile ? "" : "flex-row"}`}>
-            <View className="flex-1 min-h-0">
+        <AnimatedView
+            testID="call-stage"
+            entering={FadeIn.duration(180)}
+            layout={LinearTransition.duration(240)}
+            style={layoutStyles.container}
+            className={`flex-1 min-w-0 min-h-0 self-stretch gap-3 p-3 ${
+                isMobile ? "" : "flex-row"
+            }`}
+        >
+            <AnimatedView
+                testID="call-stage-main"
+                layout={LinearTransition.duration(240)}
+                style={layoutStyles.main}
+                className="flex-1 min-w-0 min-h-0 self-stretch"
+            >
                 <StageItemTile
                     item={mainItem}
                     participants={participants}
@@ -576,16 +633,17 @@ const CallStage = ({
                     screenShareVolume={screenShareVolume}
                     onScreenShareVolumeChange={onScreenShareVolumeChange}
                 />
-            </View>
+            </AnimatedView>
             <ParticipantRail
                 items={railItems}
                 participants={participants}
                 isVideoCall={isVideoCall}
                 isMobile={isMobile}
+                hasScreenShare={hasScreenShare}
                 localFacingMode={localFacingMode}
                 onSelectItem={onSelectStageItem}
             />
-        </View>
+        </AnimatedView>
     );
 };
 
@@ -1151,8 +1209,8 @@ export const CallRoom = ({
     }, [activeScreenShareTrack, closeScreenShareFullscreen, isScreenShareFullscreen]);
 
     return (
-        <View className="flex-1">
-            <View className="flex-1 relative">
+        <View className="flex-1 min-w-0 self-stretch">
+            <View className="flex-1 min-w-0 relative self-stretch">
                 <CallErrorOverlay
                     message={connectionError}
                     isLeaving={isLeaving}
@@ -1176,9 +1234,13 @@ export const CallRoom = ({
                 {isConnecting ? <CallLoadingOverlay /> : null}
 
                 {connectionState === ConnectionState.Reconnecting ? (
-                    <View className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-2">
+                    <AnimatedView
+                        entering={FadeInDown.duration(180)}
+                        exiting={FadeOut.duration(120)}
+                        className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-2"
+                    >
                         <Text className="text-white text-xs">Восстановление соединения...</Text>
-                    </View>
+                    </AnimatedView>
                 ) : null}
             </View>
 
@@ -1210,27 +1272,37 @@ export const CallRoom = ({
             />
 
             {isScreenShareFullscreen && activeScreenShareTrack ? (
-                <View className="absolute inset-0 z-50 bg-black">
+                <AnimatedView
+                    entering={FadeIn.duration(160)}
+                    exiting={FadeOut.duration(120)}
+                    className="absolute inset-0 z-50 bg-black"
+                >
                     <VideoElement
                         track={activeScreenShareTrack.track}
                         muted={activeScreenShareTrack.isLocal}
                         objectFit="contain"
                     />
-                    <Pressable
+                    <AnimatedPressable
                         accessibilityLabel="Закрыть полноэкранную демонстрацию"
                         onPress={closeScreenShareFullscreen}
+                        entering={ZoomIn.duration(160)}
+                        exiting={ZoomOut.duration(120)}
                         className="absolute right-4 top-4 rounded-full bg-white/15 px-4 py-2"
                     >
                         <Text className="text-white text-sm font-semibold">Закрыть</Text>
-                    </Pressable>
-                    <View className="absolute right-4 top-16">
+                    </AnimatedPressable>
+                    <AnimatedView
+                        entering={FadeInRight.duration(180)}
+                        exiting={FadeOut.duration(120)}
+                        className="absolute right-4 top-16"
+                    >
                         <ScreenShareVolumeControl
                             available={hasActiveScreenShareAudio}
                             volume={screenShareVolume}
                             onVolumeChange={setScreenShareVolume}
                         />
-                    </View>
-                </View>
+                    </AnimatedView>
+                </AnimatedView>
             ) : null}
         </View>
     );

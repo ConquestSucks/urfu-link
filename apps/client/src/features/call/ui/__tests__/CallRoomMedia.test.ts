@@ -1,6 +1,8 @@
 import {
     buildScreenShareAudioKey,
     isActiveScreenShareAudio,
+    getCallStageLayoutStyles,
+    getParticipantRailCardStyle,
     normalizeSelectedStageItem,
     pickActiveScreenShare,
     resolveDefaultStageItem,
@@ -181,5 +183,43 @@ describe("CallRoomMedia", () => {
         expect(isActiveScreenShareAudio("remote-1", "remote-1", false)).toBe(true);
         expect(isActiveScreenShareAudio("remote-2", "remote-1", false)).toBe(false);
         expect(isActiveScreenShareAudio("user-1", "user-1", true)).toBe(false);
+    });
+
+    it("stretches the desktop call stage across the available viewport", () => {
+        const layout = getCallStageLayoutStyles(false);
+
+        expect(layout.container).toEqual(
+            expect.objectContaining({
+                alignSelf: "stretch",
+                flexGrow: 1,
+                minWidth: 0,
+                width: "100%",
+            }),
+        );
+        expect(layout.main).toEqual(
+            expect.objectContaining({
+                alignSelf: "stretch",
+                flexBasis: 0,
+                flexGrow: 1,
+                minWidth: 0,
+            }),
+        );
+        expect(layout.rail).toEqual(
+            expect.objectContaining({
+                alignSelf: "stretch",
+                flexShrink: 0,
+                width: 176,
+            }),
+        );
+    });
+
+    it("uses larger rail cards when screen share is present", () => {
+        const desktopDefault = getParticipantRailCardStyle(false, false);
+        const desktopScreenShare = getParticipantRailCardStyle(false, true);
+        const mobileScreenShare = getParticipantRailCardStyle(true, true);
+
+        expect(desktopScreenShare.width).toBeGreaterThan(desktopDefault.width);
+        expect(desktopScreenShare.height).toBeGreaterThan(desktopDefault.height);
+        expect(mobileScreenShare).toEqual(expect.objectContaining({ width: 128, height: 108 }));
     });
 });

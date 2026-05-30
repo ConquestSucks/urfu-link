@@ -1,4 +1,5 @@
 import type { ScreenShareCaptureOptions } from "livekit-client";
+import type { ViewStyle } from "react-native";
 
 export type ScreenShareCandidate = {
     ownerId: string;
@@ -96,3 +97,52 @@ export const isActiveScreenShareAudio = (
     activeOwnerId: string | null,
     isLocal: boolean,
 ) => Boolean(activeOwnerId && ownerId === activeOwnerId && !isLocal);
+
+export const getCallStageLayoutStyles = (
+    isMobile: boolean,
+): { container: ViewStyle; main: ViewStyle; rail: ViewStyle } => ({
+    container: {
+        alignSelf: "stretch",
+        flexGrow: 1,
+        flexShrink: 1,
+        minHeight: 0,
+        minWidth: 0,
+        width: "100%",
+    },
+    main: {
+        alignSelf: "stretch",
+        flexBasis: isMobile ? "auto" : 0,
+        flexGrow: 1,
+        flexShrink: 1,
+        minHeight: 0,
+        minWidth: 0,
+        width: "100%",
+    },
+    rail: isMobile
+        ? {
+              flexShrink: 0,
+              maxHeight: 132,
+              width: "100%",
+          }
+        : {
+              alignSelf: "stretch",
+              flexShrink: 0,
+              minHeight: 0,
+              width: 176,
+          },
+});
+
+export const getParticipantRailCardStyle = (
+    isMobile: boolean,
+    hasScreenShare: boolean,
+): ViewStyle & { width: number; height: number } => {
+    if (isMobile) {
+        return hasScreenShare
+            ? { width: 128, height: 108 }
+            : { width: 112, height: 96 };
+    }
+
+    return hasScreenShare
+        ? { width: 176, height: 128 }
+        : { width: 160, height: 112 };
+};
