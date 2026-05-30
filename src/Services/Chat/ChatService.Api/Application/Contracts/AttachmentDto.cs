@@ -9,7 +9,8 @@ public sealed record AttachmentDto(
     Guid? ThumbnailAssetId,
     string FileName,
     long Size,
-    string MimeType)
+    string MimeType,
+    int? DurationSeconds = null)
 {
     public static AttachmentDto FromDomain(Attachment attachment)
     {
@@ -20,8 +21,16 @@ public sealed record AttachmentDto(
             attachment.ThumbnailAssetId,
             attachment.FileName,
             attachment.Size,
-            attachment.MimeType);
+            attachment.MimeType,
+            attachment.DurationSeconds);
     }
 
-    public Attachment ToDomain() => new(MediaAssetId, Type, ThumbnailAssetId, FileName, Size, MimeType);
+    public Attachment ToDomain() => new(
+        MediaAssetId,
+        Type,
+        ThumbnailAssetId,
+        FileName,
+        Size,
+        MimeType,
+        DurationSeconds);
 }

@@ -64,6 +64,8 @@ export type {
 
 export type {
   Visibility,
+  MediaAssetKind,
+  RequestedUploadKind,
   InitUploadRequest,
   InitUploadResponse,
   CompleteUploadRequest,

@@ -10,6 +10,7 @@ import React, {
 import { View, Pressable, Text, TextInput, Keyboard, Animated, Dimensions, Platform } from "react-native";
 import {
     PaperPlaneRightIcon,
+    MicrophoneIcon,
     PencilSimpleIcon,
     PlusCircleIcon,
     SmileyIcon,
@@ -28,6 +29,12 @@ import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { ConversationParticipantDto } from "@urfu-link/api-client";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
+import {
+    useVoiceRecorder,
+    VoiceDraftPreview,
+    VoiceRecorderBar,
+    type VoiceRecordingDraft,
+} from "@/features/voice-message";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const MIN_INPUT_CONTENT_HEIGHT = 24;
@@ -77,8 +84,10 @@ interface ChatInputProps {
         files: DocumentPickerAsset[],
         replyToMessageId?: string,
         mentionUserIds?: string[],
+        voiceDraft?: VoiceRecordingDraft | null,
     ) => void | Promise<void>;
     typingEnabled?: boolean;
+    composerMode?: "conversation" | "thread";
 }
 
 export type ChatInputHandle = {
@@ -96,7 +105,7 @@ const normalizeMentionLabel = (displayName: string | null | undefined) =>
 const mentionTextFor = (label: string) => `@${label}`;
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
-    ({ conversationId, onSend, typingEnabled = true }, ref) => {
+    ({ conversationId, onSend, typingEnabled = true, composerMode = "conversation" }, ref) => {
     const [query, setQuery] = useState("");
     const { onTextChange: notifyTyping, onSend: notifyStopTyping } = useTypingIndicator(
         conversationId,
@@ -120,13 +129,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const heightAnim = useRef(new Animated.Value(0)).current;
     const slideAnim = useRef(new Animated.Value(320)).current;
 
-    const replyTo = useComposerStore((s) => s.replyTo);
-    const editing = useComposerStore((s) => s.editing);
+    const storeReplyTo = useComposerStore((s) => s.replyTo);
+    const storeEditing = useComposerStore((s) => s.editing);
     const resetComposer = useComposerStore((s) => s.reset);
     const setReply = useComposerStore((s) => s.setReply);
     const editMessage = useChatStore((s) => s.editMessage);
     const currentUserId = useCurrentUserId();
     const participants = useConversationParticipants(conversationId);
+    const replyTo = composerMode === "conversation" ? storeReplyTo : null;
+    const editing = composerMode === "conversation" ? storeEditing : null;
 
     // Токен под курсором: либо валидный mention, либо null.
     const mentionToken = useMemo(() => findMentionAtCursor(query, selection.start), [
@@ -213,31 +224,44 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         removeAttachment,
         clearAttachments,
     } = useAttachments(MAX_FILES_LIMIT, () => animate(false));
+    const voiceRecorder = useVoiceRecorder();
+    const discardVoiceDraft = voiceRecorder.discardDraft;
+    const startVoiceRecording = voiceRecorder.startRecording;
 
-    const canSend = !isSubmitting && (query.trim().length > 0 || attachments.length > 0);
+    const hasVoiceDraft = !!voiceRecorder.draft;
+    const canRecordVoice =
+        !isSubmitting &&
+        !editing &&
+        query.trim().length === 0 &&
+        attachments.length === 0 &&
+        !hasVoiceDraft &&
+        !voiceRecorder.isRecording &&
+        !voiceRecorder.isStarting;
+    const canSend = !isSubmitting && (query.trim().length > 0 || attachments.length > 0 || hasVoiceDraft);
 
     const resetInput = useCallback(() => {
         setQuery("");
         setSelectedMentions([]);
         clearAttachments();
+        discardVoiceDraft();
         if (replyTo) setReply(null);
         previousLineCountRef.current = 1;
         pendingLineChangeContentHeightRef.current = null;
         pendingLineChangeDirectionRef.current = null;
         setInputHeight(MIN_INPUT_CONTENT_HEIGHT);
-    }, [clearAttachments, replyTo, setReply]);
+    }, [clearAttachments, discardVoiceDraft, replyTo, setReply]);
 
     useImperativeHandle(
         ref,
         () => ({
             addFilesAndOpenModal: (files: File[]) => {
-                if (files.length === 0 || editing) return;
+                if (files.length === 0 || editing || hasVoiceDraft || voiceRecorder.isRecording) return;
                 setSubmitError(null);
                 animate(false);
                 addAttachments(files, { openModal: true });
             },
         }),
-        [addAttachments, animate, editing],
+        [addAttachments, animate, editing, hasVoiceDraft, voiceRecorder.isRecording],
     );
 
     const handlePickEmoji = useCallback((emoji: string) => setQuery((prev) => prev + emoji), []);
@@ -327,11 +351,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         const mentionUserIds = selectedMentions
             .filter((mention) => trimmed.includes(mentionTextFor(mention.label)))
             .map((mention) => mention.userId);
+        const voiceDraft = voiceRecorder.draft;
 
         setSubmitError(null);
         setIsSubmitting(true);
         try {
-            if (mentionUserIds.length > 0) {
+            if (voiceDraft) {
+                await onSend("", [], undefined, undefined, voiceDraft);
+            } else if (mentionUserIds.length > 0) {
                 await onSend(trimmed, attachments, replyTo?.id, mentionUserIds);
             } else {
                 await onSend(trimmed, attachments, replyTo?.id);
@@ -355,6 +382,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         resetComposer,
         resetInput,
         selectedMentions,
+        voiceRecorder.draft,
     ]);
 
     const handleInputKeyPress = (event: {
@@ -374,6 +402,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
         event.preventDefault?.();
         void submitComposer();
     };
+
+    const handleStartVoiceRecording = useCallback(() => {
+        if (!canRecordVoice) return;
+        Keyboard.dismiss();
+        animate(false);
+        notifyStopTyping();
+        setSubmitError(null);
+        void startVoiceRecording();
+    }, [animate, canRecordVoice, notifyStopTyping, startVoiceRecording]);
 
     const composerHint = editing
         ? { icon: "edit" as const, title: "Изменение", preview: editing.body }
@@ -432,14 +469,38 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 </Text>
             ) : null}
 
+            {voiceRecorder.error ? (
+                <Text className="text-danger-300 text-xs font-medium mb-2 pl-1">
+                    {voiceRecorder.error}
+                </Text>
+            ) : null}
+
+            {voiceRecorder.isRecording ? (
+                <VoiceRecorderBar
+                    durationSeconds={voiceRecorder.durationSeconds}
+                    maxDurationSeconds={voiceRecorder.maxDurationSeconds}
+                    isStopping={voiceRecorder.isStopping}
+                    onStop={() => {
+                        void voiceRecorder.stopRecording();
+                    }}
+                    onCancel={voiceRecorder.cancelRecording}
+                />
+            ) : voiceRecorder.draft ? (
+                <VoiceDraftPreview
+                    draft={voiceRecorder.draft}
+                    isSubmitting={isSubmitting}
+                    onDelete={voiceRecorder.discardDraft}
+                    onSubmit={submitComposer}
+                />
+            ) : (
             <View className="flex-row items-end gap-3">
                 <Pressable
                     onPress={() => {
                         animate(false);
                         setIsFilesModalVisible(true);
                     }}
-                    className={`mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting ? "opacity-30" : "active:opacity-60"}`}
-                    disabled={attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting}
+                    className={`mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting || voiceRecorder.isStarting ? "opacity-30" : "active:opacity-60"}`}
+                    disabled={attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting || voiceRecorder.isStarting}
                 >
                     <PlusCircleIcon size={28} className="text-text-subtle" />
                 </Pressable>
@@ -500,23 +561,45 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                     </Pressable>
                 </View>
 
-                <Pressable
-                    testID="chat-input-send-button"
-                    onPress={submitComposer}
-                    disabled={!canSend}
-                    className={`w-11 h-11 rounded-full items-center justify-center ${isSubmitting ? "bg-brand-600/70" : canSend ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"}`}
-                >
-                    {isSubmitting ? (
-                        <ActivityIndicator testID="chat-input-send-spinner" size="small" className="text-white" />
-                    ) : (
-                        <PaperPlaneRightIcon
-                            size={22}
-                            className={canSend ? "text-white" : "text-white/40"}
-                            weight="fill"
-                        />
-                    )}
-                </Pressable>
+                {query.trim().length === 0 && attachments.length === 0 && !editing ? (
+                    <Pressable
+                        testID="chat-input-voice-button"
+                        onPress={handleStartVoiceRecording}
+                        disabled={!canRecordVoice}
+                        className={`w-11 h-11 rounded-full items-center justify-center ${
+                            canRecordVoice ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"
+                        }`}
+                    >
+                        {voiceRecorder.isStarting ? (
+                            <ActivityIndicator testID="chat-input-voice-spinner" size="small" className="text-white" />
+                        ) : (
+                            <MicrophoneIcon
+                                size={22}
+                                className={canRecordVoice ? "text-white" : "text-white/40"}
+                                weight="fill"
+                            />
+                        )}
+                    </Pressable>
+                ) : (
+                    <Pressable
+                        testID="chat-input-send-button"
+                        onPress={submitComposer}
+                        disabled={!canSend}
+                        className={`w-11 h-11 rounded-full items-center justify-center ${isSubmitting ? "bg-brand-600/70" : canSend ? "bg-brand-600 active:opacity-80" : "bg-brand-600/30"}`}
+                    >
+                        {isSubmitting ? (
+                            <ActivityIndicator testID="chat-input-send-spinner" size="small" className="text-white" />
+                        ) : (
+                            <PaperPlaneRightIcon
+                                size={22}
+                                className={canSend ? "text-white" : "text-white/40"}
+                                weight="fill"
+                            />
+                        )}
+                    </Pressable>
+                )}
             </View>
+            )}
 
             <Animated.View
                 style={{ height: heightAnim, overflow: "hidden", backgroundColor: "#0B1225" }}

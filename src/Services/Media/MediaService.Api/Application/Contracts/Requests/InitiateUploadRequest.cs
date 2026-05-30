@@ -13,4 +13,5 @@ public sealed record InitiateUploadRequest(
     long Size,
     string MimeType,
     Visibility Visibility,
+    AssetKind? RequestedKind = null,
     int? DurationSeconds = null);

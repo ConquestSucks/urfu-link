@@ -49,6 +49,14 @@ const buildConversationMessageKey = (
     messageId?: string | null,
 ) => conversationId && messageId ? `message:${conversationId}:${messageId}` : null;
 
+const getMessageNotificationBody = (message: MessageDto) => {
+    if (message.body) return message.body;
+    if (message.attachments.some((attachment) => attachment.type === "Voice")) {
+        return "Голосовое сообщение";
+    }
+    return message.attachments.length > 0 ? "Вложение" : "Новое сообщение";
+};
+
 const showBrowserNotification = (input: BrowserNotificationInput): boolean => {
     const NotificationCtor = getNotificationCtor();
     if (!NotificationCtor || NotificationCtor.permission !== "granted") return false;
@@ -115,7 +123,7 @@ export const showMessageBrowserNotification = (
     return showBrowserNotification({
         key: buildConversationMessageKey(message.conversationId, message.id) ?? `message:${message.id}`,
         title: context.title || "Новое сообщение",
-        body: message.body || (message.attachments.length > 0 ? "Вложение" : "Новое сообщение"),
+        body: getMessageNotificationBody(message),
         href: buildConversationHref(
             message.conversationId,
             message.id,

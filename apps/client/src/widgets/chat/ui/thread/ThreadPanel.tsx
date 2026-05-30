@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { ArrowBendUpLeftIcon, XIcon } from "@/shared/ui/phosphor";
 import { EmptyState } from "@/shared/ui";
 import { useThreadStore, useThreadMessages } from "@/entities/conversation/model/thread-store";
@@ -8,6 +8,10 @@ import { ChatMessage } from "@/entities/chat-message";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { MessageDto } from "@urfu-link/api-client";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
+import { ChatInput } from "../chat-input/Input";
+import type { DocumentPickerAsset } from "expo-document-picker";
+import type { VoiceRecordingDraft } from "@/features/voice-message";
+import { uploadChatAttachments } from "../../lib/upload-chat-attachments";
 
 interface ThreadPanelProps {
     rootMessageId: string;
@@ -42,6 +46,14 @@ const styles = StyleSheet.create({
     },
 });
 
+const getRootPreview = (message: MessageDto) => {
+    if (message.body) return message.body;
+    if (message.attachments.some((attachment) => attachment.type === "Voice")) {
+        return "Голосовое сообщение";
+    }
+    return "вложение";
+};
+
 export const ThreadPanel = ({
     rootMessageId,
     targetMessageId,
@@ -68,7 +80,6 @@ export const ThreadPanel = ({
     });
 
     const currentUserId = useCurrentUserId();
-    const [body, setBody] = React.useState("");
 
     useEffect(() => {
         loadThread(rootMessageId, true);
@@ -106,16 +117,23 @@ export const ThreadPanel = ({
 
     const rootMsg = root ?? conversationRoot;
 
-    const handleSend = useCallback(async () => {
-        const trimmed = body.trim();
-        if (!trimmed) return;
+    const handleSend = useCallback(async (
+        text: string,
+        files: DocumentPickerAsset[],
+        _replyToMessageId?: string,
+        _mentionUserIds?: string[],
+        voiceDraft?: VoiceRecordingDraft | null,
+    ) => {
+        const trimmed = text.trim();
+        if (!trimmed && files.length === 0 && !voiceDraft) return;
         try {
-            await replyInThread(rootMessageId, trimmed);
-            setBody("");
+            const assetIds = await uploadChatAttachments(files, voiceDraft);
+            await replyInThread(rootMessageId, trimmed, assetIds);
         } catch (e) {
             console.error("Reply in thread failed", e);
+            throw e;
         }
-    }, [body, rootMessageId, replyInThread]);
+    }, [rootMessageId, replyInThread]);
 
     const renderItem = useMemo(
         () =>
@@ -165,7 +183,7 @@ export const ThreadPanel = ({
                     <Text className="text-white text-base font-semibold">Тред</Text>
                     {rootMsg && (
                         <Text className="text-text-muted text-xs" numberOfLines={1}>
-                            {rootMsg.body || "вложение"}
+                            {getRootPreview(rootMsg)}
                         </Text>
                     )}
                 </View>
@@ -210,26 +228,14 @@ export const ThreadPanel = ({
                 }
             />
 
-            <View className="border-t border-white/5 p-3 flex-row items-end gap-2">
-                <View className="flex-1 bg-white/5 rounded-2xl px-3 py-2">
-                    <TextInput
-                        value={body}
-                        onChangeText={setBody}
-                        placeholder="Ответить в треде…"
-                        placeholderTextColor="#8B8FA8"
-                        multiline
-                        className="text-white text-[15px] min-h-[24px]"
-                        style={{ textAlignVertical: "center" }}
-                    />
-                </View>
-                <Pressable
-                    onPress={handleSend}
-                    disabled={body.trim().length === 0}
-                    className={`px-4 py-2 rounded-xl ${body.trim().length === 0 ? "bg-brand-600/30" : "bg-brand-600 active:opacity-80"}`}
-                >
-                    <Text className="text-white font-medium">Отправить</Text>
-                </Pressable>
-            </View>
+            {rootMsg ? (
+                <ChatInput
+                    conversationId={rootMsg.conversationId}
+                    onSend={handleSend}
+                    typingEnabled={false}
+                    composerMode="thread"
+                />
+            ) : null}
         </View>
     );
 };

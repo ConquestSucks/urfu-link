@@ -1,12 +1,16 @@
 import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
 export type Visibility = "Private" | "Public";
+export type MediaAssetKind = "Image" | "Video" | "Audio" | "Voice" | "Document";
+export type RequestedUploadKind = "Voice";
 
 export type InitUploadRequest = {
   fileName: string;
   size: number;
   mimeType: string;
   visibility: Visibility;
+  requestedKind?: RequestedUploadKind;
+  durationSeconds?: number;
 };
 
 export type InitUploadResponse = {
@@ -30,9 +34,11 @@ export type AssetMetadata = {
   objectKey: string;
   size: number;
   mimeType: string;
+  kind: MediaAssetKind;
   originalFileName: string;
   state: "Initiated" | "Uploaded" | "Failed" | "Deleted";
   createdAt: string;
+  durationSeconds?: number | null;
 };
 
 export type DownloadUrlResponse = {

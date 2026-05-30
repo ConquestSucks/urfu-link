@@ -9,6 +9,17 @@ namespace MediaService.Api.Application.Limits;
 /// </summary>
 public static class MimeTypeCatalog
 {
+    private static readonly HashSet<string> VoiceRecorderMimeTypes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "audio/m4a",
+            "audio/mp4",
+            "audio/x-m4a",
+            "audio/webm",
+            "audio/ogg",
+            "audio/opus",
+        };
+
     private static readonly Dictionary<string, AssetKind> Map =
         new(StringComparer.OrdinalIgnoreCase)
         {
@@ -52,8 +63,28 @@ public static class MimeTypeCatalog
         };
 
     public static bool TryResolve(string mimeType, out AssetKind kind)
+        => TryResolve(mimeType, requestedKind: null, out kind);
+
+    public static bool TryResolve(string mimeType, AssetKind? requestedKind, out AssetKind kind)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
-        return Map.TryGetValue(mimeType.Trim(), out kind);
+        var normalized = mimeType.Trim();
+
+        if (requestedKind is null)
+        {
+            return Map.TryGetValue(normalized, out kind);
+        }
+
+        if (requestedKind == AssetKind.Voice && VoiceRecorderMimeTypes.Contains(normalized))
+        {
+            kind = AssetKind.Voice;
+            return true;
+        }
+
+        kind = default;
+        return false;
     }
+
+    public static bool IsSupportedRequestedKind(AssetKind requestedKind)
+        => requestedKind == AssetKind.Voice;
 }
