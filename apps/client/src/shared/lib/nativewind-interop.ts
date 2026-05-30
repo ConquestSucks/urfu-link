@@ -8,3 +8,5 @@ cssInterop(Animated.Text, { className: "style" });
 export const AnimatedView = Animated.createAnimatedComponent(View);
 export const AnimatedText = Animated.createAnimatedComponent(Text);
 export const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+cssInterop(AnimatedPressable, { className: "style" });
