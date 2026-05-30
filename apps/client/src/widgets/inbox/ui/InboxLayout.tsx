@@ -109,6 +109,7 @@ export const InboxLayout = () => {
             const target = resolveNotificationDeepLink(
                 notification.deepLink,
                 notification.scope,
+                notification.data,
             );
             if (!target) return;
 

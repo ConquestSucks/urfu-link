@@ -12,6 +12,7 @@ import {
     useParticipantsStore,
 } from "@/entities/conversation/model/participants-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import { useCurrentUser } from "@/entities/user";
 import { playCallSound } from "@/shared/lib/call-sounds";
 import { CallRoom } from "./CallRoom";
 import type { ParticipantInfo } from "./CallRoom.types";
@@ -42,6 +43,7 @@ export const CallScreen = () => {
     const callId = normalizeId(id);
     const { isMobile } = useWindowSize();
     const currentUserId = useCurrentUserId();
+    const { data: currentUser } = useCurrentUser();
 
     const loadCall = useCallStore((state) => state.loadCall);
     const setActiveCall = useCallStore((state) => state.setActiveCall);
@@ -99,18 +101,29 @@ export const CallScreen = () => {
                 (entry) => entry.userId === userId,
             );
             const isSelf = userId === currentUserId;
+            const displayName = conversationParticipant?.displayName?.trim()
+                || (isSelf ? currentUser?.identity.name?.trim() : null)
+                || "Участник";
+            const avatarUrl = conversationParticipant?.avatarUrl
+                || (isSelf ? currentUser?.account.avatarUrl : null)
+                || null;
 
             return {
                 userId,
-                displayName: isSelf
-                    ? "Вы"
-                    : conversationParticipant?.displayName || "Участник",
-                avatarUrl: conversationParticipant?.avatarUrl ?? null,
+                displayName,
+                avatarUrl,
                 isSelf,
                 isConnected: Boolean(connectedByUserId.get(userId)),
             };
         });
-    }, [call?.participantIds, call?.participants, conversationParticipants, currentUserId]);
+    }, [
+        call?.participantIds,
+        call?.participants,
+        conversationParticipants,
+        currentUser?.account.avatarUrl,
+        currentUser?.identity.name,
+        currentUserId,
+    ]);
 
     const statusText = useMemo(() => {
         if (!call) {

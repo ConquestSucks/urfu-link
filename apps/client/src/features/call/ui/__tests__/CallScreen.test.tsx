@@ -70,6 +70,23 @@ jest.mock("@/shared/store/auth-store", () => ({
     useCurrentUserId: () => "user-1",
 }));
 
+jest.mock("@/entities/user", () => ({
+    useCurrentUser: () => ({
+        data: {
+            userId: "user-1",
+            identity: {
+                name: "Current User",
+                email: "current@example.test",
+                username: "current",
+            },
+            account: {
+                avatarUrl: "https://cdn.test/current.png",
+                aboutMe: null,
+            },
+        },
+    }),
+}));
+
 jest.mock("@/entities/call", () => ({
     useCallStore: (selector: (state: typeof mockCallState) => unknown) =>
         selector(mockCallState),
@@ -86,8 +103,8 @@ jest.mock("@/entities/conversation/model/chat-store", () => ({
 
 jest.mock("@/entities/conversation/model/participants-store", () => ({
     useConversationParticipants: () => [
-        { userId: "user-1", displayName: "Current User" },
-        { userId: "user-2", displayName: "Second User" },
+        { userId: "user-1", displayName: "Current User", avatarUrl: "" },
+        { userId: "user-2", displayName: "Second User", avatarUrl: "https://cdn.test/second.png" },
     ],
     useParticipantsStore: {
         getState: () => ({ load: mockLoadParticipants }),
@@ -95,9 +112,21 @@ jest.mock("@/entities/conversation/model/participants-store", () => ({
 }));
 
 jest.mock("../CallRoom", () => ({
-    CallRoom: ({ call }: { call: CallSessionDto }) => {
+    CallRoom: ({
+        call,
+        participantInfos,
+    }: {
+        call: CallSessionDto;
+        participantInfos: Array<{ userId: string; displayName: string; avatarUrl?: string | null; isSelf: boolean }>;
+    }) => {
         const { Text } = require("react-native");
-        return <Text>LiveKit room for {call.id}</Text>;
+        const self = participantInfos.find((participant) => participant.isSelf);
+        return (
+            <>
+                <Text>LiveKit room for {call.id}</Text>
+                <Text>{`self:${self?.displayName}:${self?.avatarUrl}`}</Text>
+            </>
+        );
     },
 }));
 
@@ -124,5 +153,12 @@ describe("CallScreen", () => {
         expect(
             screen.queryByText("Звонки в веб-версии временно недоступны"),
         ).toBeNull();
+    });
+
+    it("renders the current user like a normal participant with profile avatar fallback", () => {
+        render(<CallScreen />);
+
+        expect(screen.getByText("self:Current User:https://cdn.test/current.png")).toBeTruthy();
+        expect(screen.queryByText("self:Вы:https://cdn.test/current.png")).toBeNull();
     });
 });

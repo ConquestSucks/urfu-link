@@ -52,6 +52,31 @@ public sealed class CallNotificationHandlerTests
     }
 
     [Fact]
+    public async Task Incoming_call_v2_notification_routes_to_source_chat()
+    {
+        const string conversationId = "direct-1";
+        var evt = new CallIncomingV2Event(
+            CallId,
+            conversationId,
+            CallerId,
+            [CallerId, CalleeId, OtherRecipientId],
+            CallType.Video,
+            OccurredAt);
+
+        var intents = await new CallIncomingHandler().PrepareAsync(evt, CancellationToken.None);
+
+        intents.Select(intent => intent.RecipientUserId).Should().BeEquivalentTo([CalleeId, OtherRecipientId]);
+        intents.Should().AllSatisfy(intent =>
+        {
+            intent.Content.DeepLink.Should().Be($"urfulink://chat/conv/{conversationId}");
+            intent.Data.Values["conversationId"].Should().Be(conversationId);
+            intent.Data.Values["callId"].Should().Be(CallId.ToString("N"));
+            intent.Data.Values["callerId"].Should().Be(CallerId.ToString("N"));
+            intent.Data.Values["callType"].Should().Be(nameof(CallType.Video));
+        });
+    }
+
+    [Fact]
     public async Task Missed_call_notification_targets_recipient_and_includes_ring_seconds()
     {
         var evt = new CallMissedEvent(
@@ -79,6 +104,30 @@ public sealed class CallNotificationHandlerTests
         intent.Data.Values["ringSeconds"].Should().Be("47");
         intent.Actor.Should().NotBeNull();
         intent.Actor!.Id.Should().Be(CallerId);
+    }
+
+    [Fact]
+    public async Task Missed_call_v2_notification_routes_to_source_chat()
+    {
+        const string conversationId = "direct-1";
+        var evt = new CallMissedV2Event(
+            CallId,
+            conversationId,
+            CallerId,
+            CalleeId,
+            [CallerId, CalleeId],
+            CallType.Audio,
+            TimeSpan.FromSeconds(47),
+            OccurredAt);
+
+        var intents = await new CallMissedHandler().PrepareAsync(evt, CancellationToken.None);
+
+        var intent = intents.Should().ContainSingle().Subject;
+        intent.Content.DeepLink.Should().Be($"urfulink://chat/conv/{conversationId}");
+        intent.Data.Values["conversationId"].Should().Be(conversationId);
+        intent.Data.Values["callId"].Should().Be(CallId.ToString("N"));
+        intent.Data.Values["callerId"].Should().Be(CallerId.ToString("N"));
+        intent.Data.Values["ringSeconds"].Should().Be("47");
     }
 
     [Fact]

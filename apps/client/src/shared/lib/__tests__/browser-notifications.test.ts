@@ -268,4 +268,86 @@ describe("browser notifications", () => {
         expect(showServerBrowserNotification({ ...notification, id: "notification-2" })).toBe(false);
         expect(instances).toHaveLength(1);
     });
+
+    it("routes server call notifications to the source chat when conversation data is available", () => {
+        const navigate = jest.fn();
+        setBrowserNotificationNavigationForTests(navigate);
+
+        const notification: NotificationDto = {
+            id: "notification-call",
+            recipientUserId: "user-1",
+            type: "call.missed",
+            category: 11,
+            severity: 1,
+            title: "Пропущенный звонок",
+            body: "Звонок остался без ответа",
+            imageUrl: null,
+            deepLink: "urfulink://call/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/missed",
+            data: {
+                conversationId: "direct-1",
+                callId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            actor: null,
+            entity: null,
+            actions: [],
+            groupKey: null,
+            occurrenceCount: 1,
+            createdAtUtc: "2026-05-24T10:03:00.000Z",
+            lastOccurrenceAtUtc: "2026-05-24T10:03:00.000Z",
+            readAtUtc: null,
+            seenAtUtc: null,
+            savedAtUtc: null,
+            doneAtUtc: null,
+            archivedAtUtc: null,
+            snoozedUntilUtc: null,
+            expiresAtUtc: null,
+        };
+
+        expect(showServerBrowserNotification(notification)).toBe(true);
+
+        instances[0].onclick?.();
+
+        expect(navigate).toHaveBeenCalledWith("/chats/direct-1");
+        expect(navigate).not.toHaveBeenCalledWith(expect.stringContaining("/call/"));
+    });
+
+    it("shows stale server call notifications without opening the call screen", () => {
+        const navigate = jest.fn();
+        setBrowserNotificationNavigationForTests(navigate);
+
+        const notification: NotificationDto = {
+            id: "notification-call",
+            recipientUserId: "user-1",
+            type: "call.missed",
+            category: 11,
+            severity: 1,
+            title: "Пропущенный звонок",
+            body: "Звонок остался без ответа",
+            imageUrl: null,
+            deepLink: "urfulink://call/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/missed",
+            data: {
+                callId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            actor: null,
+            entity: null,
+            actions: [],
+            groupKey: null,
+            occurrenceCount: 1,
+            createdAtUtc: "2026-05-24T10:03:00.000Z",
+            lastOccurrenceAtUtc: "2026-05-24T10:03:00.000Z",
+            readAtUtc: null,
+            seenAtUtc: null,
+            savedAtUtc: null,
+            doneAtUtc: null,
+            archivedAtUtc: null,
+            snoozedUntilUtc: null,
+            expiresAtUtc: null,
+        };
+
+        expect(showServerBrowserNotification(notification)).toBe(true);
+
+        instances[0].onclick?.();
+
+        expect(navigate).not.toHaveBeenCalled();
+    });
 });

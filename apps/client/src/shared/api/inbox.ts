@@ -30,6 +30,7 @@ export const inboxApi = {
                 time: formatTime(item.lastOccurrenceAtUtc),
                 scope: inferNotificationScope({ ...item, deepLink }),
                 deepLink,
+                data: item.data,
                 actorName: item.actor?.displayName ?? null,
                 isRead: item.readAtUtc !== null,
             };
