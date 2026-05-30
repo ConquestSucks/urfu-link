@@ -1,5 +1,6 @@
 using System.Globalization;
 using Grpc.Core;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Grpc;
 
@@ -69,7 +70,9 @@ public sealed class InternalApiService(IConversationRepository conversations) : 
         var reply = new GetConversationReply
         {
             Exists = true,
-            Type = ConversationKind.Direct,
+            Type = conv.Type == ConversationType.Group
+                ? ConversationKind.Group
+                : ConversationKind.Direct,
         };
         reply.Participants.AddRange(conv.Participants.Select(p => p.ToString("D", CultureInfo.InvariantCulture)));
         return reply;

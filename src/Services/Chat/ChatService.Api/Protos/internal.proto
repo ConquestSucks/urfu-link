@@ -48,6 +48,7 @@ message IsParticipantReply {
 
 enum ConversationKind {
   CONVERSATION_KIND_DIRECT = 0;
+  CONVERSATION_KIND_GROUP = 1;
 }
 
 message GetConversationRequest {

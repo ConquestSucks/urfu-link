@@ -401,8 +401,9 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         );
                     }
 
-                    const message = item.message;
+                                            const message = item.message;
                     const view = mapMessageToProps(message, currentUserId);
+                    const isSystemMessage = message.kind === "SystemCall";
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
                     const itemAbove = listItems[index + 1];
@@ -441,6 +442,8 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     avatarUrl={view.avatarUrl}
                                     showAvatar={shouldShowAvatars}
                                     attachments={view.attachments}
+                                    kind={view.kind}
+                                    systemCall={view.systemCall}
                                     replyTo={message.replyTo ?? null}
                                     reactions={message.reactions}
                                     editedAtUtc={message.editedAtUtc}
@@ -449,9 +452,13 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     isHighlighted={isHighlighted}
                                     threadReplyCount={message.threadReplyCount ?? 0}
                                     localStatus={localStatus}
-                                    onLongPress={() => onMessageLongPress?.(message)}
-                                    onContextMenu={(anchor) =>
-                                        onMessageContextMenu?.(message, anchor)
+                                    onLongPress={
+                                        isSystemMessage ? undefined : () => onMessageLongPress?.(message)
+                                    }
+                                    onContextMenu={
+                                        isSystemMessage
+                                            ? undefined
+                                            : (anchor) => onMessageContextMenu?.(message, anchor)
                                     }
                                     onReplyPress={
                                         message.replyTo?.messageId
@@ -461,16 +468,20 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                             : undefined
                                     }
                                     onReactionPress={
+                                        isSystemMessage
+                                            ? undefined
+                                            : (
                                         currentUserId
-                                            ? (emoji) => {
-                                                  const reacters = message.reactions?.[emoji] ?? [];
-                                                  if (reacters.includes(currentUserId)) {
-                                                      removeReaction(message.id, emoji);
-                                                  } else {
-                                                      addReaction(message.id, emoji);
+                                                ? (emoji) => {
+                                                      const reacters = message.reactions?.[emoji] ?? [];
+                                                      if (reacters.includes(currentUserId)) {
+                                                          removeReaction(message.id, emoji);
+                                                      } else {
+                                                          addReaction(message.id, emoji);
+                                                      }
                                                   }
-                                              }
-                                            : undefined
+                                                : undefined
+                                              )
                                     }
                                     onThreadOpen={
                                         message.threadReplyCount && message.threadReplyCount > 0

@@ -67,6 +67,9 @@ export const MessageActionsMenu = ({
     const { width, height } = useWindowDimensions();
 
     if (!message) return null;
+    if (message.kind === "SystemCall") {
+        return null;
+    }
 
     const items: MenuItemConfig[] = [
         { id: "reply", label: "Ответить", Icon: ArrowBendUpLeftIcon },

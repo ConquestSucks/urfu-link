@@ -36,7 +36,9 @@ jest.mock("@/shared/ui/phosphor", () => {
         ClockIcon: makeIcon("clock-icon"),
         FileIcon: makeIcon("file-icon"),
         PencilSimpleIcon: makeIcon("edit-icon"),
+        PhoneIcon: makeIcon("phone-icon"),
         TrashIcon: makeIcon("trash-icon"),
+        VideoCameraIcon: makeIcon("video-icon"),
         WarningCircleIcon: makeIcon("warning-icon"),
     };
 });
@@ -258,5 +260,37 @@ describe("ChatMessage read indicator", () => {
             configurable: true,
             get: () => originalOS,
         });
+    });
+
+    it.each([
+        ["Started", "Audio", "Звонок", null],
+        ["Started", "Video", "Видеозвонок", null],
+        ["Missed", "Audio", "Пропущенный звонок", null],
+        ["Declined", "Audio", "Звонок отклонён", null],
+        ["Cancelled", "Audio", "Звонок отменён", null],
+        ["Failed", "Audio", "Звонок завершён", null],
+        ["Completed", "Audio", "Звонок завершён • 3:12", "PT3M12S"],
+        ["Completed", "Video", "Звонок завершён • 1:02:03", "PT1H2M3S"],
+    ] as const)("renders %s %s system call label", (status, callType, label, duration) => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType,
+                    status,
+                    callerId: "user-1",
+                    duration,
+                    endReason: null,
+                }}
+            />,
+        );
+
+        expect(screen.getByText(label)).toBeTruthy();
     });
 });

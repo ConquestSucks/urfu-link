@@ -31,6 +31,15 @@ export type LocalMessageDto = MessageDto & {
 export type ChatMessagePropsMapped = {
     id: string;
     text: string;
+    kind?: "User" | "SystemCall";
+    systemCall?: {
+        callId: string;
+        callType: "Audio" | "Video";
+        status: string;
+        callerId: string;
+        duration?: string | null;
+        endReason?: string | null;
+    } | null;
     isOwn: boolean;
     time: string;
     avatarUrl: string;
@@ -1225,6 +1234,8 @@ export const mapMessageToProps = (
     return {
         id: normalized.id,
         text: normalized.body,
+        kind: normalized.kind,
+        systemCall: normalized.systemCall,
         isOwn: normalized.senderId === currentUserId,
         time: timeStr,
         avatarUrl: "",

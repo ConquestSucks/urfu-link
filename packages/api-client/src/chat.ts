@@ -38,6 +38,16 @@ export type ConversationPreview = {
 
 export type MessageState = "Sent" | "Delivered" | "Read" | "Deleted";
 export type AttachmentType = "Image" | "Video" | "Audio" | "Voice" | "Document";
+export type MessageKind = "User" | "SystemCall";
+export type SystemCallStatus = "Started" | "Missed" | "Completed" | "Declined" | "Cancelled" | "Failed";
+export type SystemCallInfo = {
+  callId: string;
+  callType: "Audio" | "Video";
+  status: SystemCallStatus;
+  callerId: string;
+  duration?: string | null;
+  endReason?: string | null;
+};
 
 export type ChatAttachment = {
   mediaAssetId: string;
@@ -86,6 +96,8 @@ export type MessageDto = {
   threadLastReplyAtUtc?: string | null;
   deletedAtUtc?: string | null;
   deletedMode?: DeleteMode | null;
+  kind?: MessageKind;
+  systemCall?: SystemCallInfo | null;
 };
 
 export type Paginated<T> = {

@@ -38,6 +38,23 @@ public sealed class CallEventsConsumer(
                     break;
                 }
 
+            case "call.incoming.v2":
+                {
+                    var evt = payload.Deserialize<CallIncomingV2Event>(JsonOptions)
+                        ?? throw new JsonException("CallIncomingV2Event payload null");
+                    await RoutingDispatcher.Route(
+                        scope,
+                        scope.GetRequiredService<CallIncomingHandler>(),
+                        new CallIncomingEvent(
+                            evt.CallId,
+                            evt.CallerId,
+                            evt.ParticipantIds,
+                            evt.CallType,
+                            evt.OccurredAtUtc),
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
             case "call.missed.v1":
                 {
                     var evt = payload.Deserialize<CallMissedEvent>(JsonOptions)
@@ -46,10 +63,41 @@ public sealed class CallEventsConsumer(
                     break;
                 }
 
+            case "call.missed.v2":
+                {
+                    var evt = payload.Deserialize<CallMissedV2Event>(JsonOptions)
+                        ?? throw new JsonException("CallMissedV2Event payload null");
+                    await RoutingDispatcher.Route(
+                        scope,
+                        scope.GetRequiredService<CallMissedHandler>(),
+                        new CallMissedEvent(
+                            evt.CallId,
+                            evt.CallerId,
+                            evt.RecipientId,
+                            evt.CallType,
+                            evt.RingDuration,
+                            evt.OccurredAtUtc),
+                        cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
             case "call.ended.v1":
                 {
                     var evt = payload.Deserialize<CallEndedEvent>(JsonOptions)
                         ?? throw new JsonException("CallEndedEvent payload null");
+                    await scope.GetRequiredService<NotificationLifecycleService>()
+                        .ArchiveBySourceActionAsync(
+                            NotificationSourceActions.CallIncoming(evt.CallId),
+                            evt.OccurredAtUtc,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    break;
+                }
+
+            case "call.ended.v2":
+                {
+                    var evt = payload.Deserialize<CallEndedV2Event>(JsonOptions)
+                        ?? throw new JsonException("CallEndedV2Event payload null");
                     await scope.GetRequiredService<NotificationLifecycleService>()
                         .ArchiveBySourceActionAsync(
                             NotificationSourceActions.CallIncoming(evt.CallId),

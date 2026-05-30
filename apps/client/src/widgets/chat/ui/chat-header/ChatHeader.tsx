@@ -37,9 +37,17 @@ interface ChatHeaderProps {
     chatId: string;
     onOpenSearch?: () => void;
     onOpenPinned?: () => void;
+    onStartAudioCall?: () => void;
+    onStartVideoCall?: () => void;
 }
 
-export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderProps) => {
+export const ChatHeader = ({
+    chatId,
+    onOpenSearch,
+    onOpenPinned,
+    onStartAudioCall,
+    onStartVideoCall,
+}: ChatHeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
     const conversation = useChatStore((s) =>
@@ -215,6 +223,12 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
                     onOpenProfile={() => setIsProfileOpen(true)}
                     onOpenPinned={() => onOpenPinned?.()}
                     onSearchPress={() => onOpenSearch?.()}
+                    onStartAudioCall={
+                        conversation?.type === "Direct" ? onStartAudioCall : undefined
+                    }
+                    onStartVideoCall={
+                        conversation?.type === "Direct" ? onStartVideoCall : undefined
+                    }
                     notificationsMuted={notificationsMuted}
                     notificationsPending={notificationsPending}
                     onToggleNotifications={() => {
