@@ -38,7 +38,7 @@ export const SubjectMembersModal = ({ isOpen, onClose, members, onOpenProfile }:
 
             <ScrollView className="w-full" contentContainerClassName="px-8 py-6 gap-2" showsVerticalScrollIndicator={false}>
                 {members.length === 0 ? (
-                    <EmptyState size="compact" icon={UsersIcon} title="В предмете пока нет участников" />
+                    <EmptyState size="compact" icon={UsersIcon} title="В дисциплине пока нет участников" />
                 ) : (
                     members.map((member) => (
                         <Pressable
