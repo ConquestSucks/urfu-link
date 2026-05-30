@@ -94,8 +94,15 @@ spec:
           port: 9000
         - protocol: TCP
           port: 7880
+        - protocol: TCP
+          port: 7881
         - protocol: UDP
           port: 3478
+        - protocol: TCP
+          port: 5349
+        - protocol: UDP
+          port: 50000
+          endPort: 50100
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

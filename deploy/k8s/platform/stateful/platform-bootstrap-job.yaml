@@ -371,14 +371,21 @@ spec:
               fi
               PRESENCE_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=presence_db;Username=presence;Password=%s;GSS Encryption Mode=Disable"}}' "$PRESENCE_DB_PASSWORD")"
               NOTIFICATION_PAYLOAD="$(printf '{"data":{"primary_connection":"Host=urfu-postgres-rw.urfu-platform.svc.cluster.local;Port=5432;Database=notification_db;Username=notification;Password=%s;GSS Encryption Mode=Disable","kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}' "$NOTIFICATION_DB_PASSWORD")"
-                EXISTING_CALL_SVC="$(vault_read urfu-link/prod/call-service)"
-                EXISTING_CALL_INTERNAL_AUTH_SECRET="$(json_get_string "$EXISTING_CALL_SVC" internal_auth_client_secret)"
-                if [ -n "$EXISTING_CALL_INTERNAL_AUTH_SECRET" ]; then
-                  CALL_PAYLOAD="$(printf '{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092","internal_auth_client_secret":"%s"}}' "$EXISTING_CALL_INTERNAL_AUTH_SECRET")"
-                else
-                  CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
-                fi
-                GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
+              EXISTING_LIVEKIT="$(vault_read urfu-link/prod/livekit)"
+              LIVEKIT_API_KEY="$(json_get_string "$EXISTING_LIVEKIT" api_key)"
+              LIVEKIT_API_SECRET="$(json_get_string "$EXISTING_LIVEKIT" api_secret)"
+              [ -n "$LIVEKIT_API_KEY" ] || LIVEKIT_API_KEY="urfu$(rand 24)"
+              [ -n "$LIVEKIT_API_SECRET" ] || LIVEKIT_API_SECRET="$(rand 48)"
+              LIVEKIT_SERVER_URL="wss://livekit.urfu-link.ghjc.ru"
+              LIVEKIT_PAYLOAD="$(printf '{"data":{"api_key":"%s","api_secret":"%s","server_url":"%s"}}' "$LIVEKIT_API_KEY" "$LIVEKIT_API_SECRET" "$LIVEKIT_SERVER_URL")"
+              EXISTING_CALL_SVC="$(vault_read urfu-link/prod/call-service)"
+              EXISTING_CALL_INTERNAL_AUTH_SECRET="$(json_get_string "$EXISTING_CALL_SVC" internal_auth_client_secret)"
+              if [ -n "$EXISTING_CALL_INTERNAL_AUTH_SECRET" ]; then
+                CALL_PAYLOAD="$(printf '{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092","internal_auth_client_secret":"%s"}}' "$EXISTING_CALL_INTERNAL_AUTH_SECRET")"
+              else
+                CALL_PAYLOAD='{"data":{"kafka_bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
+              fi
+              GRAFANA_PAYLOAD="$(printf '{"data":{"admin_password":"%s"}}' "$GRAFANA_ADMIN_PASSWORD")"
               KAFKA_PAYLOAD='{"data":{"bootstrap_servers":"urfu-kafka.urfu-platform.svc.cluster.local:9092"}}'
               API_GATEWAY_PAYLOAD="$(printf '{"data":{"auth_client_secret":"%s"}}' "$API_GATEWAY_CLIENT_SECRET")"
               MONGO_PAYLOAD="$(printf '{"data":{"app_user_password":"%s"}}' "$MONGO_APP_PASSWORD")"
@@ -395,6 +402,7 @@ spec:
               vault_put urfu-link/prod/chat-service "$CHAT_PAYLOAD"
               vault_put urfu-link/prod/presence-service "$PRESENCE_PAYLOAD"
               vault_put urfu-link/prod/notification-service "$NOTIFICATION_PAYLOAD"
+              vault_put urfu-link/prod/livekit "$LIVEKIT_PAYLOAD"
               vault_put urfu-link/prod/call-service "$CALL_PAYLOAD"
               vault_put urfu-link/prod/grafana "$GRAFANA_PAYLOAD"
               vault_put urfu-link/prod/kafka "$KAFKA_PAYLOAD"

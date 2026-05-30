@@ -94,7 +94,6 @@ Write-Host "[urfu-link] Creating local config maps..." -ForegroundColor Cyan
 kubectl create configmap postgres-init -n urfu-platform --from-file=platform/dev/local-k8s/postgres-init.sql --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap keycloak-realm -n urfu-platform --from-file=realm-urfu-link.json=platform/dev/keycloak/realm-urfu-link.json --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap livekit-config -n urfu-platform --from-file=livekit.yaml=platform/dev/livekit/livekit.yaml --dry-run=client -o yaml | kubectl apply -f -
-kubectl create configmap coturn-config -n urfu-platform --from-file=turnserver.conf=platform/dev/coturn/turnserver.conf --dry-run=client -o yaml | kubectl apply -f -
 kubectl create configmap otel-collector-config -n observability --from-file=config.yaml=platform/dev/otel/otel-collector-config.yaml --dry-run=client -o yaml | kubectl apply -f -
 
 Write-Host "[urfu-link] Applying local platform resources..." -ForegroundColor Cyan

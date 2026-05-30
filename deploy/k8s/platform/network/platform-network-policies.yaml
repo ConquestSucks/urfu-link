@@ -204,7 +204,7 @@ spec:
         - protocol: TCP
           port: 8080
 ---
-# LiveKit + CoTURN: allow ingress from urfu-prod (call-service)
+# LiveKit media ingress from services and ingress-nginx.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -217,7 +217,6 @@ spec:
         operator: In
         values:
           - livekit
-          - coturn
   policyTypes:
     - Ingress
   ingress:
@@ -225,11 +224,21 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: urfu-prod
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
       ports:
         - protocol: TCP
           port: 7880
+        - protocol: TCP
+          port: 7881
         - protocol: UDP
           port: 3478
+        - protocol: TCP
+          port: 5349
+        - protocol: UDP
+          port: 50000
+          endPort: 50100
 ---
 # Bootstrap jobs: allow egress to Vault, Kubernetes API, and external HTTPS (apk packages)
 apiVersion: networking.k8s.io/v1

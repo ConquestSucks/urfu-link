@@ -44,7 +44,6 @@ const emojiKeyboardStyles = {
     container: {
         borderRadius: 0,
         elevation: 0,
-        shadowOpacity: 0,
     },
     searchBar: {
         container: {

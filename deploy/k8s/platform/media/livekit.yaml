@@ -22,14 +22,25 @@ spec:
         - name: livekit
           image: livekit/livekit-server:v1.9.12
           args: ["--config", "/etc/livekit/livekit.yaml"]
+          envFrom:
+            - secretRef:
+                name: livekit-secrets
           ports:
             - name: http
               containerPort: 7880
             - name: rtc
               containerPort: 7881
+            - name: turn-udp
+              containerPort: 3478
+              protocol: UDP
+            - name: turn-tls
+              containerPort: 5349
           volumeMounts:
             - name: livekit-config
               mountPath: /etc/livekit
+            - name: livekit-turn-tls
+              mountPath: /etc/livekit/turn-tls
+              readOnly: true
           resources:
             requests:
               cpu: 100m
@@ -41,6 +52,9 @@ spec:
         - name: livekit-config
           configMap:
             name: livekit-config
+        - name: livekit-turn-tls
+          secret:
+            secretName: livekit-turn-tls
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -55,8 +69,27 @@ data:
       tcp_port: 7881
       port_range_start: 50000
       port_range_end: 50100
-    keys:
-      prodkey: replace-me
+    turn:
+      enabled: true
+      domain: turn.urfu-link.ghjc.ru
+      udp_port: 3478
+      tls_port: 5349
+      cert_file: /etc/livekit/turn-tls/tls.crt
+      key_file: /etc/livekit/turn-tls/tls.key
+    log_level: info
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: livekit-turn-tls
+  namespace: urfu-platform
+spec:
+  secretName: livekit-turn-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  dnsNames:
+    - turn.urfu-link.ghjc.ru
 ---
 apiVersion: v1
 kind: Service
@@ -73,3 +106,39 @@ spec:
     - name: rtc
       port: 7881
       targetPort: rtc
+    - name: turn-udp
+      port: 3478
+      protocol: UDP
+      targetPort: turn-udp
+    - name: turn-tls
+      port: 5349
+      targetPort: turn-tls
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: livekit
+  namespace: urfu-platform
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-production
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - livekit.urfu-link.ghjc.ru
+      secretName: livekit-urfu-link-ghjc-ru-tls
+  rules:
+    - host: livekit.urfu-link.ghjc.ru
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: livekit
+                port:
+                  number: 7880
