@@ -7,6 +7,7 @@ import {
     VideoTrack,
 } from "@livekit/react-native";
 import { Track } from "livekit-client";
+import { playCallSound } from "@/shared/lib/call-sounds";
 import type { CallRoomProps } from "./CallRoom.types";
 import {
     CallControls,
@@ -19,6 +20,7 @@ import {
 
 type TrackRef = Parameters<typeof VideoTrack>[0]["trackRef"];
 type DefinedTrackRef = Exclude<TrackRef, null | undefined>;
+type CameraFacingMode = "user" | "environment";
 
 const NativeVideoPanel = ({
     isVideoAvailable,
@@ -69,11 +71,13 @@ const NativeRoomContent = ({
     isLeaving,
     isMobile,
     callTitle,
+    conversationId,
     participantInfos,
     onLeave,
     onCloseError,
 }: CallRoomProps) => {
     const [panel, setPanel] = useState<CallPanel>("none");
+    const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
     const isVideoCall = call.callType === "Video";
     const isConnectedToCall = call.status === "Active";
 
@@ -112,7 +116,9 @@ const NativeRoomContent = ({
     const toggleMicrophone = useCallback(async () => {
         if (!localParticipant) return;
         try {
-            await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled);
+            const next = !isMicrophoneEnabled;
+            await localParticipant.setMicrophoneEnabled(next);
+            await playCallSound(next ? "micOn" : "micOff");
         } catch (error) {
             console.error("Failed to toggle microphone", error);
         }
@@ -121,15 +127,45 @@ const NativeRoomContent = ({
     const toggleCamera = useCallback(async () => {
         if (!localParticipant || !isVideoCall) return;
         try {
-            await localParticipant.setCameraEnabled(!isCameraEnabled);
+            const next = !isCameraEnabled;
+            await localParticipant.setCameraEnabled(next, { facingMode });
+            await playCallSound(next ? "cameraOn" : "cameraOff");
         } catch (error) {
             console.error("Failed to toggle camera", error);
         }
-    }, [isVideoCall, isCameraEnabled, localParticipant]);
+    }, [facingMode, isVideoCall, isCameraEnabled, localParticipant]);
+
+    const switchCamera = useCallback(async () => {
+        if (!localParticipant || !isVideoCall || !isCameraEnabled) return;
+
+        const nextFacingMode: CameraFacingMode = facingMode === "user" ? "environment" : "user";
+        try {
+            const localTrack = localCameraTrack?.publication?.track as
+                | { restartTrack?: (options?: { facingMode?: CameraFacingMode }) => Promise<void> }
+                | undefined;
+
+            if (localTrack?.restartTrack) {
+                await localTrack.restartTrack({ facingMode: nextFacingMode });
+            } else {
+                await localParticipant.setCameraEnabled(true, { facingMode: nextFacingMode });
+            }
+
+            setFacingMode(nextFacingMode);
+            await playCallSound("cameraOn");
+        } catch (error) {
+            console.error("Failed to switch camera", error);
+        }
+    }, [facingMode, isCameraEnabled, isVideoCall, localCameraTrack, localParticipant]);
 
     const toggleScreenShare = useCallback(async () => {
-        // Native screen share is out of scope for the current mobile implementation.
-    }, []);
+        if (!localParticipant || !isVideoCall) return;
+
+        try {
+            await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
+        } catch (error) {
+            console.error("Failed to toggle screen share", error);
+        }
+    }, [isScreenShareEnabled, isVideoCall, localParticipant]);
 
     return (
         <View className="flex-1">
@@ -156,11 +192,14 @@ const NativeRoomContent = ({
                 micEnabled={isMicrophoneEnabled}
                 cameraEnabled={isCameraEnabled}
                 screenShareEnabled={isScreenShareEnabled}
-                screenShareAvailable={false}
+                screenShareAvailable={isVideoCall}
+                switchCameraAvailable={isVideoCall && isCameraEnabled}
                 callType={call.callType}
                 busy={isLeaving}
+                isMobile={isMobile}
                 onToggleMicrophone={toggleMicrophone}
                 onToggleCamera={toggleCamera}
+                onSwitchCamera={switchCamera}
                 onToggleScreenShare={toggleScreenShare}
                 onOpenChat={() => setPanel(panel === "chat" ? "none" : "chat")}
                 onOpenParticipants={() =>
@@ -172,6 +211,7 @@ const NativeRoomContent = ({
             <CallDrawer
                 panel={panel}
                 isMobile={isMobile}
+                conversationId={conversationId}
                 participantInfos={participantInfos}
                 onClose={() => setPanel("none")}
             />
@@ -190,9 +230,9 @@ export const CallRoom = (props: CallRoomProps) => {
             serverUrl={callToken?.serverUrl}
             token={callToken?.token}
             audio={true}
-            video={isVideoCall && (isConnectedToCall || call.status === "Ringing")}
+            video={isVideoCall && isConnectedToCall}
             screen={false}
-            connect={Boolean(callToken?.token)}
+            connect={Boolean(isConnectedToCall && callToken?.token)}
             onDisconnected={() => {
                 // keep room auto-disconnecting on leave.
             }}

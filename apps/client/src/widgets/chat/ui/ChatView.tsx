@@ -12,8 +12,6 @@ import {
     restoreDirectDraftConversation,
 } from "@/entities/conversation/model/direct-draft-cache";
 import { isDirectDraftConversation } from "@/entities/conversation/model/direct-draft-status";
-import { apiClient } from "@/shared/lib/api";
-import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
 import {
     ForwardPickerModal,
@@ -26,6 +24,7 @@ import { PinnedMessagesModal } from "./PinnedMessagesModal";
 import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
+import { apiClient } from "@/shared/lib/api";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { useCallStore } from "@/entities/call";
 import {
@@ -33,12 +32,11 @@ import {
     toChatViewingContext,
     usePresenceStore,
 } from "@/entities/presence";
-import { useRouter } from "expo-router";
+import { useConversationSend } from "../lib/use-conversation-send";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
-    const router = useRouter();
-    const { sendMessage, setPendingScrollToMessageId } = useChatStore();
+    const { setPendingScrollToMessageId } = useChatStore();
     const startCall = useCallStore((state) => state.startCall);
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === (params.id as string)),
@@ -62,73 +60,35 @@ export const ChatView = () => {
     const currentUserId = useCurrentUserId();
     const [isStartingCall, setIsStartingCall] = useState(false);
     const setViewingContexts = usePresenceStore((s) => s.setViewingContexts);
+    const chatId = params.id as string;
+    const handleSend = useConversationSend(chatId);
 
     const handleStartAudioCall = useCallback(async () => {
         if (!conversation || conversation.type !== "Direct" || isStartingCall) return;
         try {
             setIsStartingCall(true);
-            const call = await startCall(conversation.id, "Audio");
-            router.push(`/call/${call.id}` as never);
+            await startCall(conversation.id, "Audio");
         } finally {
             setIsStartingCall(false);
         }
-    }, [conversation, isStartingCall, router, startCall]);
+    }, [conversation, isStartingCall, startCall]);
 
     const handleStartVideoCall = useCallback(async () => {
         if (!conversation || conversation.type !== "Direct" || isStartingCall) return;
         try {
             setIsStartingCall(true);
-            const call = await startCall(conversation.id, "Video");
-            router.push(`/call/${call.id}` as never);
+            await startCall(conversation.id, "Video");
         } finally {
             setIsStartingCall(false);
         }
-    }, [conversation, isStartingCall, router, startCall]);
+    }, [conversation, isStartingCall, startCall]);
 
-    const chatId = params.id as string;
     const routeMessageId = typeof params.message === "string" ? params.message : null;
     const routeThreadRootId = typeof params.thread === "string" ? params.thread : null;
     const type = currentTab === "chats" ? "chat" : "subject";
     const isDirectDraft = isDirectDraftConversation(conversation);
     const isUnknownDirectDraft = type === "chat" && !conversation && isDirectDraftId(chatId);
     const shouldSkipRemoteConversationLoads = isDirectDraft || isUnknownDirectDraft;
-
-    const handleSend = useCallback(
-        async (
-            text: string,
-            files: DocumentPickerAsset[],
-            replyToMessageId?: string,
-            mentionUserIds?: string[],
-        ) => {
-            try {
-                const assetIds: string[] = [];
-
-                for (const file of files) {
-                    const initRes = await apiClient.media.initUpload({
-                        fileName: file.name,
-                        size: file.size ?? 0,
-                        mimeType: file.mimeType ?? "application/octet-stream",
-                        visibility: "Private",
-                    });
-
-                    const uploadBody = file.file ?? (await fetch(file.uri).then((r) => r.blob()));
-                    await fetch(initRes.presignedPutUrl, {
-                        method: "PUT",
-                        body: uploadBody,
-                    });
-
-                    await apiClient.media.completeUpload({ assetId: initRes.assetId });
-                    assetIds.push(initRes.assetId);
-                }
-
-                await sendMessage(chatId, text, assetIds, replyToMessageId, mentionUserIds);
-            } catch (error) {
-                console.error("Failed to send message", error);
-                throw error;
-            }
-        },
-        [chatId, sendMessage],
-    );
 
     const handleSearchResultPress = useCallback(
         async (item: SearchResultDto) => {

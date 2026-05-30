@@ -9,52 +9,80 @@ import {
     RoomEvent,
     Track,
 } from "livekit-client";
-import type { CallRoomProps } from "./CallRoom.types";
+import { Avatar } from "@/shared/ui";
+import { playCallSound } from "@/shared/lib/call-sounds";
+import type { CallRoomProps, ParticipantInfo } from "./CallRoom.types";
 import {
     CallControls,
     CallDrawer,
     CallErrorOverlay,
     CallLoadingOverlay,
     type CallPanel,
-    NoVideoPanel,
 } from "./CallRoomControls";
+
+type CameraFacingMode = "user" | "environment";
 
 type WebVideoTrackRef = {
     key: string;
+    ownerId: string;
+    source: Track.Source;
     track: LocalVideoTrack | RemoteVideoTrack;
+    isLocal: boolean;
 };
 
-const collectVideoTracks = (room: Room) => {
-    const remoteCameraTracks: WebVideoTrackRef[] = [];
+type ParticipantMediaInfo = ParticipantInfo & {
+    isMicrophoneEnabled: boolean;
+    isCameraEnabled: boolean;
+    isScreenShareEnabled: boolean;
+    cameraTrack: WebVideoTrackRef | null;
+    screenTrack: WebVideoTrackRef | null;
+};
+
+const collectVideoTracks = (room: Room, participantInfos: ParticipantInfo[]) => {
+    const tracks: WebVideoTrackRef[] = [];
+    const localInfo = participantInfos.find((participant) => participant.isSelf);
 
     room.remoteParticipants.forEach((participant) => {
         participant.videoTrackPublications.forEach((publication) => {
             const track = publication.videoTrack;
-            if (publication.source !== Track.Source.Camera || !track || publication.isMuted) {
+            if (!track || publication.isMuted) return;
+            if (
+                publication.source !== Track.Source.Camera &&
+                publication.source !== Track.Source.ScreenShare
+            ) {
                 return;
             }
 
-            remoteCameraTracks.push({
+            tracks.push({
                 key: `${participant.sid}-${publication.trackSid}`,
+                ownerId: participant.identity,
+                source: publication.source,
                 track,
+                isLocal: false,
             });
         });
     });
 
-    let localCameraTrack: WebVideoTrackRef | null = null;
     room.localParticipant.videoTrackPublications.forEach((publication) => {
         const track = publication.videoTrack;
-        if (publication.source !== Track.Source.Camera || !track || publication.isMuted) {
+        if (!track || publication.isMuted) return;
+        if (
+            publication.source !== Track.Source.Camera &&
+            publication.source !== Track.Source.ScreenShare
+        ) {
             return;
         }
 
-        localCameraTrack = {
+        tracks.push({
             key: `local-${publication.trackSid}`,
+            ownerId: localInfo?.userId ?? room.localParticipant.identity,
+            source: publication.source,
             track,
-        };
+            isLocal: true,
+        });
     });
 
-    return { localCameraTrack, remoteCameraTracks };
+    return tracks;
 };
 
 const disposeAudioElement = (element: HTMLMediaElement) => {
@@ -114,9 +142,11 @@ const detachRemoteAudioTracks = (
 const VideoElement = ({
     track,
     muted,
+    mirrored,
 }: {
     track: LocalVideoTrack | RemoteVideoTrack;
     muted?: boolean;
+    mirrored?: boolean;
 }) => {
     const ref = useRef<HTMLVideoElement | null>(null);
 
@@ -144,44 +174,109 @@ const VideoElement = ({
             height: "100%",
             backgroundColor: "#000",
             objectFit: "cover",
+            transform: mirrored ? "scaleX(-1)" : undefined,
         },
     });
 };
 
-const WebVideoPanel = ({
-    isVideoAvailable,
-    mainTrack,
-    thumbnailTracks,
-    mainPlaceholderLabel,
+const ParticipantTile = ({
+    participant,
+    isVideoCall,
+    localFacingMode,
 }: {
-    isVideoAvailable: boolean;
-    mainTrack: WebVideoTrackRef | null;
-    thumbnailTracks: WebVideoTrackRef[];
-    mainPlaceholderLabel: string;
+    participant: ParticipantMediaInfo;
+    isVideoCall: boolean;
+    localFacingMode: CameraFacingMode;
 }) => {
-    if (!isVideoAvailable || !mainTrack) {
-        return <NoVideoPanel label={mainPlaceholderLabel} />;
-    }
+    const visibleTrack = participant.screenTrack ?? participant.cameraTrack;
+    const shouldMirror =
+        participant.isSelf &&
+        visibleTrack === participant.cameraTrack &&
+        localFacingMode === "user";
 
     return (
-        <View className="relative flex-1 bg-black/30">
-            <VideoElement track={mainTrack.track} />
+        <View
+            testID="call-participant-tile"
+            className="flex-1 min-h-0 rounded-2xl overflow-hidden border border-white/10 bg-black/35"
+        >
+            <View className="flex-1 items-center justify-center bg-black/30">
+                {isVideoCall && visibleTrack ? (
+                    <VideoElement
+                        track={visibleTrack.track}
+                        muted={visibleTrack.isLocal}
+                        mirrored={shouldMirror}
+                    />
+                ) : (
+                    <View className="items-center gap-3">
+                        <Avatar
+                            size={96}
+                            src={participant.avatarUrl}
+                            name={participant.displayName}
+                        />
+                        <Text className="text-white text-base font-semibold">
+                            {participant.displayName}
+                        </Text>
+                    </View>
+                )}
+            </View>
 
-            {thumbnailTracks.length > 0 ? (
-                <View className="absolute top-3 right-3 w-48 gap-2">
-                    {thumbnailTracks.map((thumbnailTrack) => (
-                        <View
-                            key={thumbnailTrack.key}
-                            className="w-full h-28 rounded-lg overflow-hidden border border-white/20"
-                        >
-                            <VideoElement track={thumbnailTrack.track} muted />
-                        </View>
-                    ))}
+            <View className="absolute left-3 right-3 bottom-3 gap-2">
+                <View className="self-start rounded-full bg-black/65 px-3 py-1">
+                    <Text className="text-white text-xs font-semibold">
+                        {participant.displayName}
+                    </Text>
                 </View>
-            ) : null}
+                <View className="flex-row flex-wrap gap-1">
+                    {!participant.isConnected ? (
+                        <View className="rounded-full bg-white/10 px-2 py-1">
+                            <Text className="text-white/80 text-[11px]">Подключается</Text>
+                        </View>
+                    ) : null}
+                    {!participant.isMicrophoneEnabled ? (
+                        <View className="rounded-full bg-white/10 px-2 py-1">
+                            <Text className="text-white/80 text-[11px]">
+                                Микрофон выключен
+                            </Text>
+                        </View>
+                    ) : null}
+                    {isVideoCall && !participant.isCameraEnabled ? (
+                        <View className="rounded-full bg-white/10 px-2 py-1">
+                            <Text className="text-white/80 text-[11px]">Камера выключена</Text>
+                        </View>
+                    ) : null}
+                    {participant.isScreenShareEnabled ? (
+                        <View className="rounded-full bg-brand-600/90 px-2 py-1">
+                            <Text className="text-white text-[11px]">Демонстрация экрана</Text>
+                        </View>
+                    ) : null}
+                </View>
+            </View>
         </View>
     );
 };
+
+const CallStage = ({
+    participants,
+    isVideoCall,
+    isMobile,
+    localFacingMode,
+}: {
+    participants: ParticipantMediaInfo[];
+    isVideoCall: boolean;
+    isMobile: boolean;
+    localFacingMode: CameraFacingMode;
+}) => (
+    <View className={`flex-1 p-3 gap-3 ${isMobile ? "" : "flex-row"}`}>
+        {participants.map((participant) => (
+            <ParticipantTile
+                key={participant.userId}
+                participant={participant}
+                isVideoCall={isVideoCall}
+                localFacingMode={localFacingMode}
+            />
+        ))}
+    </View>
+);
 
 export const CallRoom = ({
     call,
@@ -191,7 +286,7 @@ export const CallRoom = ({
     loadError,
     isLeaving,
     isMobile,
-    callTitle,
+    conversationId,
     participantInfos,
     onLeave,
     onCloseError,
@@ -206,8 +301,8 @@ export const CallRoom = ({
     const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
     const [isCameraEnabled, setIsCameraEnabled] = useState(false);
     const [isScreenShareEnabled, setIsScreenShareEnabled] = useState(false);
-    const [localCameraTrack, setLocalCameraTrack] = useState<WebVideoTrackRef | null>(null);
-    const [remoteCameraTracks, setRemoteCameraTracks] = useState<WebVideoTrackRef[]>([]);
+    const [videoTracks, setVideoTracks] = useState<WebVideoTrackRef[]>([]);
+    const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
 
     const isVideoCall = call.callType === "Video";
     const isConnectedToCall = call.status === "Active";
@@ -225,23 +320,20 @@ export const CallRoom = ({
             setIsMicrophoneEnabled(false);
             setIsCameraEnabled(false);
             setIsScreenShareEnabled(false);
-            setLocalCameraTrack(null);
-            setRemoteCameraTracks([]);
+            setVideoTracks([]);
             return;
         }
 
-        const tracks = collectVideoTracks(room);
         setConnectionState(room.state);
         setIsMicrophoneEnabled(room.localParticipant.isMicrophoneEnabled);
         setIsCameraEnabled(room.localParticipant.isCameraEnabled);
         setIsScreenShareEnabled(room.localParticipant.isScreenShareEnabled);
-        setLocalCameraTrack(tracks.localCameraTrack);
-        setRemoteCameraTracks(tracks.remoteCameraTracks);
+        setVideoTracks(collectVideoTracks(room, participantInfos));
         syncRemoteAudioTracks(room, remoteAudioElementsRef);
-    }, []);
+    }, [participantInfos]);
 
     useEffect(() => {
-        if (!callToken?.serverUrl || !callToken.token || call.status === "Ended") {
+        if (!callToken?.serverUrl || !callToken.token || call.status !== "Active") {
             return;
         }
 
@@ -292,7 +384,7 @@ export const CallRoom = ({
                 });
 
                 if (call.callType === "Video") {
-                    await room.localParticipant.setCameraEnabled(true).catch((error) => {
+                    await room.localParticipant.setCameraEnabled(true, { facingMode }).catch((error) => {
                         console.error("Failed to enable camera", error);
                         setRoomError("Не удалось включить камеру. Проверьте разрешения браузера.");
                     });
@@ -337,17 +429,61 @@ export const CallRoom = ({
         call.status,
         callToken?.serverUrl,
         callToken?.token,
+        facingMode,
         syncRoomState,
+    ]);
+
+    const participantMediaInfos = useMemo<ParticipantMediaInfo[]>(() => {
+        const room = roomRef.current;
+
+        return participantInfos.map((participant) => {
+            const liveParticipant = participant.isSelf
+                ? room?.localParticipant
+                : room?.remoteParticipants.get(participant.userId);
+            const cameraTrack =
+                videoTracks.find(
+                    (track) =>
+                        track.ownerId === participant.userId &&
+                        track.source === Track.Source.Camera,
+                ) ?? null;
+            const screenTrack =
+                videoTracks.find(
+                    (track) =>
+                        track.ownerId === participant.userId &&
+                        track.source === Track.Source.ScreenShare,
+                ) ?? null;
+
+            return {
+                ...participant,
+                isMicrophoneEnabled: participant.isSelf
+                    ? isMicrophoneEnabled
+                    : Boolean(liveParticipant?.isMicrophoneEnabled),
+                isCameraEnabled: participant.isSelf
+                    ? isCameraEnabled
+                    : Boolean(liveParticipant?.isCameraEnabled || cameraTrack),
+                isScreenShareEnabled: participant.isSelf
+                    ? isScreenShareEnabled
+                    : Boolean(liveParticipant?.isScreenShareEnabled || screenTrack),
+                cameraTrack,
+                screenTrack,
+            };
+        });
+    }, [
+        isCameraEnabled,
+        isMicrophoneEnabled,
+        isScreenShareEnabled,
+        participantInfos,
+        videoTracks,
     ]);
 
     const toggleMicrophone = useCallback(async () => {
         const room = roomRef.current;
         if (!room) return;
 
+        const next = !room.localParticipant.isMicrophoneEnabled;
         try {
-            await room.localParticipant.setMicrophoneEnabled(
-                !room.localParticipant.isMicrophoneEnabled,
-            );
+            await room.localParticipant.setMicrophoneEnabled(next);
+            await playCallSound(next ? "micOn" : "micOff");
             syncRoomState();
         } catch (error) {
             console.error("Failed to toggle microphone", error);
@@ -358,13 +494,41 @@ export const CallRoom = ({
         const room = roomRef.current;
         if (!room || !isVideoCall) return;
 
+        const next = !room.localParticipant.isCameraEnabled;
         try {
-            await room.localParticipant.setCameraEnabled(!room.localParticipant.isCameraEnabled);
+            await room.localParticipant.setCameraEnabled(next, { facingMode });
+            await playCallSound(next ? "cameraOn" : "cameraOff");
             syncRoomState();
         } catch (error) {
             console.error("Failed to toggle camera", error);
         }
-    }, [isVideoCall, syncRoomState]);
+    }, [facingMode, isVideoCall, syncRoomState]);
+
+    const switchCamera = useCallback(async () => {
+        const room = roomRef.current;
+        if (!room || !isVideoCall || !room.localParticipant.isCameraEnabled) return;
+
+        const nextFacingMode = facingMode === "user" ? "environment" : "user";
+        try {
+            const localTrack = videoTracks.find(
+                (track) => track.isLocal && track.source === Track.Source.Camera,
+            )?.track as LocalVideoTrack | undefined;
+
+            if (localTrack?.restartTrack) {
+                await localTrack.restartTrack({ facingMode: nextFacingMode });
+            } else {
+                await room.localParticipant.setCameraEnabled(true, {
+                    facingMode: nextFacingMode,
+                });
+            }
+
+            setFacingMode(nextFacingMode);
+            await playCallSound("cameraOn");
+            syncRoomState();
+        } catch (error) {
+            console.error("Failed to switch camera", error);
+        }
+    }, [facingMode, isVideoCall, syncRoomState, videoTracks]);
 
     const toggleScreenShare = useCallback(async () => {
         const room = roomRef.current;
@@ -380,26 +544,12 @@ export const CallRoom = ({
         }
     }, [canShareScreen, isVideoCall, syncRoomState]);
 
-    const mainCameraTrack = remoteCameraTracks[0] ?? localCameraTrack;
-    const thumbnailCameraTracks = useMemo(() => {
-        if (!mainCameraTrack) {
-            return [];
-        }
-
-        if (mainCameraTrack === localCameraTrack) {
-            return remoteCameraTracks;
-        }
-
-        return localCameraTrack ? [...remoteCameraTracks.slice(1), localCameraTrack] : remoteCameraTracks.slice(1);
-    }, [remoteCameraTracks, localCameraTrack, mainCameraTrack]);
-
-    const connectionError =
-        tokenError || loadError || roomError;
+    const connectionError = tokenError || loadError || roomError;
     const isConnecting =
         isTokenLoading ||
         (!!callToken?.token &&
             connectionState !== ConnectionState.Connected &&
-            call.status !== "Ended");
+            call.status === "Active");
 
     return (
         <View className="flex-1">
@@ -410,16 +560,14 @@ export const CallRoom = ({
                     onClose={onCloseError}
                 />
 
-                {isConnecting ? (
-                    <CallLoadingOverlay />
-                ) : (
-                    <WebVideoPanel
-                        isVideoAvailable={isVideoCall && isConnectedToCall}
-                        mainTrack={mainCameraTrack}
-                        thumbnailTracks={thumbnailCameraTracks}
-                        mainPlaceholderLabel={callTitle}
-                    />
-                )}
+                <CallStage
+                    participants={participantMediaInfos}
+                    isVideoCall={isVideoCall && isConnectedToCall}
+                    isMobile={isMobile}
+                    localFacingMode={facingMode}
+                />
+
+                {isConnecting ? <CallLoadingOverlay /> : null}
 
                 {connectionState === ConnectionState.Reconnecting ? (
                     <View className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-2">
@@ -433,10 +581,13 @@ export const CallRoom = ({
                 cameraEnabled={isCameraEnabled}
                 screenShareEnabled={isScreenShareEnabled}
                 screenShareAvailable={canShareScreen}
+                switchCameraAvailable
                 callType={call.callType}
                 busy={isLeaving}
+                isMobile={isMobile}
                 onToggleMicrophone={toggleMicrophone}
                 onToggleCamera={toggleCamera}
+                onSwitchCamera={switchCamera}
                 onToggleScreenShare={toggleScreenShare}
                 onOpenChat={() => setPanel(panel === "chat" ? "none" : "chat")}
                 onOpenParticipants={() =>
@@ -448,6 +599,7 @@ export const CallRoom = ({
             <CallDrawer
                 panel={panel}
                 isMobile={isMobile}
+                conversationId={conversationId}
                 participantInfos={participantInfos}
                 onClose={() => setPanel("none")}
             />

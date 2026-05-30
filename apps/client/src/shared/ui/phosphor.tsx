@@ -20,6 +20,7 @@ const wrap = (Base: Parameters<typeof cssInterop>[0]) =>
 const iconBases = {
   ArrowBendUpLeftIcon: Phosphor.ArrowBendUpLeftIcon,
   ArrowBendDoubleUpRightIcon: Phosphor.ArrowBendDoubleUpRightIcon,
+  ArrowsClockwiseIcon: Phosphor.ArrowsClockwiseIcon,
   AtIcon: Phosphor.AtIcon,
   BellIcon: Phosphor.BellIcon,
   BellSlashIcon: Phosphor.BellSlashIcon,
@@ -82,6 +83,7 @@ const wrappedIcons = Object.fromEntries(
 export const {
   ArrowBendUpLeftIcon,
   ArrowBendDoubleUpRightIcon,
+  ArrowsClockwiseIcon,
   AtIcon,
   BellIcon,
   BellSlashIcon,
