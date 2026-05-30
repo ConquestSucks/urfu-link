@@ -3,6 +3,8 @@ import { View } from "react-native";
 import { router, useSegments } from "expo-router";
 
 import { InboxChat } from "@/entities/inbox-chat";
+import { InboxSubjectGroup } from "@/entities/inbox-subject";
+import type { InboxSubjectProps } from "@/entities/inbox-subject";
 import { InboxNotification, InboxNotificationProps } from "@/entities/inbox-notification";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
@@ -27,6 +29,32 @@ export const InboxLayout = () => {
     );
     const chats = useInboxConversations("chats");
     const subjects = useInboxConversations("subjects");
+    const subjectGroups = useMemo<InboxSubjectProps[]>(() => {
+        const groups = new Map<string, InboxSubjectProps>();
+        for (const chat of subjects) {
+            const disciplineId = chat.disciplineId ?? chat.id;
+            const title = chat.disciplineTitle ?? chat.name;
+            const existing = groups.get(disciplineId);
+            if (existing) {
+                existing.messages.push(chat);
+            } else {
+                groups.set(disciplineId, {
+                    id: disciplineId,
+                    title,
+                    messages: [chat],
+                });
+            }
+        }
+
+        return [...groups.values()].map((group) => ({
+            ...group,
+            messages: [...group.messages].sort((a, b) => {
+                if (a.disciplineChatKind === "General" && b.disciplineChatKind !== "General") return -1;
+                if (a.disciplineChatKind !== "General" && b.disciplineChatKind === "General") return 1;
+                return a.name.localeCompare(b.name, "ru");
+            }),
+        }));
+    }, [subjects]);
 
     const notifications = useInboxStore((s) => s.notifications);
     const isNotificationsLoading = useInboxStore((s) => s.isNotificationsLoading);
@@ -56,8 +84,8 @@ export const InboxLayout = () => {
         if (currentView === "notifications") {
             return notifications.filter((n) => n.scope === currentTab);
         }
-        return currentTab === "chats" ? chats : subjects;
-    }, [currentView, currentTab, chats, subjects, notifications]);
+        return currentTab === "chats" ? chats : subjectGroups;
+    }, [currentView, currentTab, chats, subjectGroups, notifications]);
 
     const isLoading =
         currentView === "notifications" ? isNotificationsLoading : conversationsLoading;
@@ -125,17 +153,14 @@ export const InboxLayout = () => {
                 );
             }
 
-            // For "subjects" tab we currently render the same chat-row variant.
-            // A dedicated subject grouping is tracked separately in a follow-up.
-            const isActive = item.id === params.id;
-
+            const subject = item as InboxSubjectProps;
             return (
-                <View key={item.id}>
-                    <InboxChat
-                        {...item}
-                        isActive={isActive}
-                        onPress={() => {
-                            router.push(`/subjects/${item.id}`);
+                <View key={subject.id}>
+                    <InboxSubjectGroup
+                        subject={subject}
+                        activeChatId={typeof params.id === "string" ? params.id : undefined}
+                        onChatPress={(chatId) => {
+                            router.push(`/subjects/${chatId}`);
                         }}
                     />
                 </View>

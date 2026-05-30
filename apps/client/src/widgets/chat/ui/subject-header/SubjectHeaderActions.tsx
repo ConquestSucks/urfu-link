@@ -1,9 +1,11 @@
 import { Menu, MenuRef } from "@/shared/ui";
-import { DotsThreeVerticalIcon, MagnifyingGlassIcon } from "@/shared/ui/phosphor";
+import { DotsThreeVerticalIcon, MagnifyingGlassIcon, PhoneIcon } from "@/shared/ui/phosphor";
 import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getSubjectHeaderActions } from "../../config/headerActions";
 interface SubjectHeaderActionsProps {
+    canStartGroupCall?: boolean;
+    onStartGroupCall?: () => void;
     onOpenMembers: () => void;
     onOpenPinned: () => void;
     notificationsMuted: boolean;
@@ -11,6 +13,8 @@ interface SubjectHeaderActionsProps {
     onToggleNotifications: () => void;
 }
 export const SubjectHeaderActions = ({
+    canStartGroupCall = false,
+    onStartGroupCall,
     onOpenMembers,
     onOpenPinned,
     notificationsMuted,
@@ -35,9 +39,14 @@ export const SubjectHeaderActions = ({
         notificationsPending,
     });
     return (<View className="flex-row gap-1 items-center">
-            <Pressable className="p-2 rounded-xl active:bg-white/10">
-                <MagnifyingGlassIcon size={24} className="text-text-muted" weight="regular"/>
-            </Pressable>
+      {canStartGroupCall && (
+        <Pressable className="p-2 rounded-xl active:bg-white/10" onPress={onStartGroupCall}>
+          <PhoneIcon size={24} className="text-text-muted" weight="regular"/>
+        </Pressable>
+      )}
+      <Pressable className="p-2 rounded-xl active:bg-white/10">
+        <MagnifyingGlassIcon size={24} className="text-text-muted" weight="regular"/>
+      </Pressable>
       <Pressable className="p-2 rounded-xl active:bg-white/10" onPress={() => menuRef.current?.toggle()}>
         <DotsThreeVerticalIcon size={24} className="text-text-muted" weight="bold"/>
       </Pressable>

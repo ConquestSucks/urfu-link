@@ -22,6 +22,10 @@ public sealed class Conversation
         IEnumerable<Guid>? pinnedMessageIds,
         IReadOnlyDictionary<Guid, ParticipantRole>? participantRoles,
         Guid? disciplineId,
+        DisciplineChatKind? disciplineChatKind,
+        Guid? disciplineSubgroupId,
+        string? disciplineTitle,
+        string? disciplineSubgroupName,
         DateTimeOffset? archivedAtUtc,
         string? title,
         Guid? coverAssetId,
@@ -39,6 +43,10 @@ public sealed class Conversation
             ? new Dictionary<Guid, ParticipantRole>()
             : new Dictionary<Guid, ParticipantRole>(participantRoles);
         DisciplineId = disciplineId;
+        DisciplineChatKind = disciplineChatKind;
+        DisciplineSubgroupId = disciplineSubgroupId;
+        DisciplineTitle = disciplineTitle;
+        DisciplineSubgroupName = disciplineSubgroupName;
         ArchivedAtUtc = archivedAtUtc;
         Title = title;
         CoverAssetId = coverAssetId;
@@ -65,6 +73,14 @@ public sealed class Conversation
     /// Used by the consumer to look up an existing discipline conversation idempotently.
     /// </summary>
     public Guid? DisciplineId { get; }
+
+    public DisciplineChatKind? DisciplineChatKind { get; }
+
+    public Guid? DisciplineSubgroupId { get; }
+
+    public string? DisciplineTitle { get; private set; }
+
+    public string? DisciplineSubgroupName { get; private set; }
 
     public DateTimeOffset? ArchivedAtUtc { get; private set; }
 
@@ -118,6 +134,10 @@ public sealed class Conversation
             pinnedMessageIds: null,
             participantRoles: null,
             disciplineId: null,
+            disciplineChatKind: null,
+            disciplineSubgroupId: null,
+            disciplineTitle: null,
+            disciplineSubgroupName: null,
             archivedAtUtc: null,
             title: null,
             coverAssetId: null,
@@ -161,8 +181,74 @@ public sealed class Conversation
                 [ownerTeacherId] = ParticipantRole.Teacher,
             },
             disciplineId: disciplineId,
+            disciplineChatKind: Enums.DisciplineChatKind.General,
+            disciplineSubgroupId: null,
+            disciplineTitle: title,
+            disciplineSubgroupName: null,
             archivedAtUtc: null,
             title: title,
+            coverAssetId: coverAssetId,
+            groupSubtype: Enums.GroupSubtype.Discipline,
+            isAnnouncementOnly: false);
+    }
+
+    public static Conversation OpenDisciplineSubgroup(
+        Guid disciplineId,
+        Guid subgroupId,
+        string disciplineTitle,
+        string subgroupName,
+        IEnumerable<Guid> teacherUserIds,
+        IEnumerable<Guid> studentUserIds,
+        DateTimeOffset nowUtc,
+        Guid? coverAssetId = null)
+    {
+        if (disciplineId == Guid.Empty)
+        {
+            throw new ArgumentException("Discipline id is required.", nameof(disciplineId));
+        }
+
+        if (subgroupId == Guid.Empty)
+        {
+            throw new ArgumentException("Subgroup id is required.", nameof(subgroupId));
+        }
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(subgroupName);
+
+        var participants = new List<Guid>();
+        var roles = new Dictionary<Guid, ParticipantRole>();
+        foreach (var teacherId in teacherUserIds.Where(id => id != Guid.Empty).Distinct())
+        {
+            participants.Add(teacherId);
+            roles[teacherId] = ParticipantRole.Teacher;
+        }
+
+        foreach (var studentId in studentUserIds.Where(id => id != Guid.Empty).Distinct())
+        {
+            if (!roles.ContainsKey(studentId))
+            {
+                participants.Add(studentId);
+            }
+
+            roles[studentId] = ParticipantRole.Student;
+        }
+
+        var normalizedSubgroupName = subgroupName.Trim();
+        return new Conversation(
+            ComputeDisciplineSubgroupId(disciplineId, subgroupId),
+            ConversationType.Group,
+            participants,
+            nowUtc,
+            nowUtc,
+            lastMessagePreview: null,
+            pinnedMessageIds: null,
+            participantRoles: roles,
+            disciplineId: disciplineId,
+            disciplineChatKind: Enums.DisciplineChatKind.Subgroup,
+            disciplineSubgroupId: subgroupId,
+            disciplineTitle: disciplineTitle,
+            disciplineSubgroupName: normalizedSubgroupName,
+            archivedAtUtc: null,
+            title: normalizedSubgroupName,
             coverAssetId: coverAssetId,
             groupSubtype: Enums.GroupSubtype.Discipline,
             isAnnouncementOnly: false);
@@ -178,6 +264,10 @@ public sealed class Conversation
         IEnumerable<Guid>? pinnedMessageIds = null,
         IReadOnlyDictionary<Guid, ParticipantRole>? participantRoles = null,
         Guid? disciplineId = null,
+        DisciplineChatKind? disciplineChatKind = null,
+        Guid? disciplineSubgroupId = null,
+        string? disciplineTitle = null,
+        string? disciplineSubgroupName = null,
         DateTimeOffset? archivedAtUtc = null,
         string? title = null,
         Guid? coverAssetId = null,
@@ -193,6 +283,10 @@ public sealed class Conversation
             pinnedMessageIds,
             participantRoles,
             disciplineId,
+            disciplineChatKind,
+            disciplineSubgroupId,
+            disciplineTitle,
+            disciplineSubgroupName,
             archivedAtUtc,
             title,
             coverAssetId,
@@ -306,7 +400,34 @@ public sealed class Conversation
     public void UpdateMetadata(string? title, Guid? coverAssetId)
     {
         Title = title;
+        if (DisciplineChatKind == Enums.DisciplineChatKind.General)
+        {
+            DisciplineTitle = title;
+        }
+
         CoverAssetId = coverAssetId;
+    }
+
+    public void UpdateDisciplineMetadata(string? disciplineTitle, Guid? coverAssetId)
+    {
+        DisciplineTitle = disciplineTitle;
+        if (DisciplineChatKind == Enums.DisciplineChatKind.General)
+        {
+            Title = disciplineTitle;
+        }
+
+        CoverAssetId = coverAssetId;
+    }
+
+    public void UpdateSubgroupMetadata(string subgroupName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(subgroupName);
+        var normalized = subgroupName.Trim();
+        DisciplineSubgroupName = normalized;
+        if (DisciplineChatKind == Enums.DisciplineChatKind.Subgroup)
+        {
+            Title = normalized;
+        }
     }
 
     /// <summary>
@@ -329,6 +450,9 @@ public sealed class Conversation
     }
 #pragma warning restore CA5350
 
-    private static string ComputeDisciplineId(Guid disciplineId)
+    public static string ComputeDisciplineId(Guid disciplineId)
         => $"discipline:{disciplineId.ToString("N", CultureInfo.InvariantCulture)}";
+
+    public static string ComputeDisciplineSubgroupId(Guid disciplineId, Guid subgroupId)
+        => $"discipline:{disciplineId.ToString("N", CultureInfo.InvariantCulture)}:subgroup:{subgroupId.ToString("N", CultureInfo.InvariantCulture)}";
 }

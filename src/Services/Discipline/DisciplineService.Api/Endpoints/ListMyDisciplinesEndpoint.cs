@@ -37,7 +37,8 @@ public sealed class ListMyDisciplinesEndpoint(IEnrollmentRepository enrollments)
                 m.Semester,
                 m.OwnerTeacherId,
                 m.CoverAssetId,
-                m.Role))
+                m.Role,
+                m.SubgroupId))
             .ToList();
 
         await Send.OkAsync(new ListMyDisciplinesResponse { Items = items }, cancellation: ct).ConfigureAwait(false);

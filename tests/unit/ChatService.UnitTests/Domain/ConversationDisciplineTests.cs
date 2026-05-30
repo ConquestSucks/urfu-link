@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Urfu.Link.Services.Chat.Application.Contracts;
 using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 
@@ -18,10 +19,61 @@ public sealed class ConversationDisciplineTests
         conv.Id.Should().Be("discipline:11111111222233334444555555555555");
         conv.Type.Should().Be(ConversationType.Group);
         conv.DisciplineId.Should().Be(disciplineId);
+        conv.DisciplineChatKind.Should().Be(DisciplineChatKind.General);
+        conv.DisciplineSubgroupId.Should().BeNull();
         conv.IsArchived.Should().BeFalse();
         conv.Participants.Should().ContainSingle().Which.Should().Be(teacherId);
         conv.RoleOf(teacherId).Should().Be(ParticipantRole.Teacher);
         conv.IsTeacher(teacherId).Should().BeTrue();
+    }
+
+    [Fact]
+    public void OpenDisciplineSubgroup_GeneratesDeterministicIdAndStoresMetadata()
+    {
+        var disciplineId = Guid.Parse("11111111-2222-3333-4444-555555555555");
+        var subgroupId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+
+        var conv = Conversation.OpenDisciplineSubgroup(
+            disciplineId,
+            subgroupId,
+            "Математика",
+            "ПИ-101",
+            [teacherId],
+            [studentId],
+            now);
+
+        conv.Id.Should().Be("discipline:11111111222233334444555555555555:subgroup:aaaaaaaabbbbccccddddeeeeeeeeeeee");
+        conv.DisciplineChatKind.Should().Be(DisciplineChatKind.Subgroup);
+        conv.DisciplineSubgroupId.Should().Be(subgroupId);
+        conv.DisciplineTitle.Should().Be("Математика");
+        conv.DisciplineSubgroupName.Should().Be("ПИ-101");
+        conv.Title.Should().Be("ПИ-101");
+        conv.RoleOf(teacherId).Should().Be(ParticipantRole.Teacher);
+        conv.RoleOf(studentId).Should().Be(ParticipantRole.Student);
+    }
+
+    [Fact]
+    public void ConversationCapabilities_AllowOnlyTeachersInSubgroupChatsToStartGroupCall()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var conv = Conversation.OpenDisciplineSubgroup(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "Математика",
+            "ПИ-101",
+            [teacherId],
+            [studentId],
+            DateTimeOffset.UtcNow);
+
+        ConversationDto.FromDomain(conv, teacherId).Capabilities!.CanStartGroupCall.Should().BeTrue();
+        ConversationDto.FromDomain(conv, studentId).Capabilities!.CanStartGroupCall.Should().BeFalse();
+
+        var general = Conversation.OpenDiscipline(Guid.NewGuid(), teacherId, DateTimeOffset.UtcNow);
+        ConversationDto.FromDomain(general, teacherId).Capabilities!.CanStartGroupCall.Should().BeFalse();
     }
 
     [Fact]

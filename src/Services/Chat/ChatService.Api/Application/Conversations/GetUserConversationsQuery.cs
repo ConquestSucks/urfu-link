@@ -39,7 +39,7 @@ public sealed class GetUserConversationsQuery(
         var items = pageConversations
             .Select(c =>
             {
-                var dto = ConversationDto.FromDomain(c)
+                var dto = ConversationDto.FromDomain(c, userId)
                     .WithUnreadCount(unreadCounts.TryGetValue(c.Id, out var unreadCount) ? unreadCount : 0);
                 return latestByConversation.TryGetValue(c.Id, out var latest)
                     ? dto.WithLastMessageMetadata(latest)

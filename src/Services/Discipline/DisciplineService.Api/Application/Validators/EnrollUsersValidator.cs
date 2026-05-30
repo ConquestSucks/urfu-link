@@ -21,6 +21,14 @@ public sealed class EnrollUsersValidator : Validator<EnrollUsersRouteRequest>
         {
             child.RuleFor(e => e.UserId).NotEqual(Guid.Empty);
             child.RuleFor(e => e.Role).IsInEnum();
+            child.RuleFor(e => e.SubgroupId)
+                .NotNull()
+                .When(e => e.Role == Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineRole.Student)
+                .WithMessage("Student enrollment requires subgroupId.");
+            child.RuleFor(e => e.SubgroupId)
+                .Null()
+                .When(e => e.Role == Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines.DisciplineRole.Teacher)
+                .WithMessage("Teacher enrollment must not include subgroupId.");
         });
     }
 
