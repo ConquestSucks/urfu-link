@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { View } from "react-native";
 import {
     LiveKitRoom,
@@ -14,6 +14,7 @@ import {
     CallDrawer,
     CallErrorOverlay,
     CallLoadingOverlay,
+    MediaOverlayControls,
     type CallPanel,
     NoVideoPanel,
 } from "./CallRoomControls";
@@ -27,27 +28,29 @@ const NativeVideoPanel = ({
     mainTrack,
     thumbnailTracks,
     mainPlaceholderLabel,
+    controls,
 }: {
     isVideoAvailable: boolean;
     mainTrack: DefinedTrackRef | null;
     thumbnailTracks: DefinedTrackRef[];
     mainPlaceholderLabel: string;
+    controls?: React.ReactNode;
 }) => {
-    if (!isVideoAvailable || !mainTrack) {
-        return <NoVideoPanel label={mainPlaceholderLabel} />;
-    }
-
     return (
         <View className="relative flex-1 bg-black/30">
-            <VideoTrack
-                trackRef={mainTrack}
-                style={{
-                    width: "100%",
-                    height: "100%",
-                }}
-            />
+            {!isVideoAvailable || !mainTrack ? (
+                <NoVideoPanel label={mainPlaceholderLabel} />
+            ) : (
+                <VideoTrack
+                    trackRef={mainTrack}
+                    style={{
+                        width: "100%",
+                        height: "100%",
+                    }}
+                />
+            )}
 
-            {thumbnailTracks.length > 0 ? (
+            {isVideoAvailable && mainTrack && thumbnailTracks.length > 0 ? (
                 <View className="absolute top-3 right-3 w-48 gap-2">
                     {thumbnailTracks.map((thumbnailTrack) => (
                         <View
@@ -59,6 +62,8 @@ const NativeVideoPanel = ({
                     ))}
                 </View>
             ) : null}
+
+            {controls ? <View className="absolute left-3 top-3">{controls}</View> : null}
         </View>
     );
 };
@@ -125,7 +130,7 @@ const NativeRoomContent = ({
     }, [isMicrophoneEnabled, localParticipant]);
 
     const toggleCamera = useCallback(async () => {
-        if (!localParticipant || !isVideoCall) return;
+        if (!localParticipant || !isConnectedToCall) return;
         try {
             const next = !isCameraEnabled;
             await localParticipant.setCameraEnabled(next, { facingMode });
@@ -133,10 +138,10 @@ const NativeRoomContent = ({
         } catch (error) {
             console.error("Failed to toggle camera", error);
         }
-    }, [facingMode, isVideoCall, isCameraEnabled, localParticipant]);
+    }, [facingMode, isConnectedToCall, isCameraEnabled, localParticipant]);
 
     const switchCamera = useCallback(async () => {
-        if (!localParticipant || !isVideoCall || !isCameraEnabled) return;
+        if (!localParticipant || !isConnectedToCall || !isCameraEnabled) return;
 
         const nextFacingMode: CameraFacingMode = facingMode === "user" ? "environment" : "user";
         try {
@@ -155,17 +160,17 @@ const NativeRoomContent = ({
         } catch (error) {
             console.error("Failed to switch camera", error);
         }
-    }, [facingMode, isCameraEnabled, isVideoCall, localCameraTrack, localParticipant]);
+    }, [facingMode, isCameraEnabled, isConnectedToCall, localCameraTrack, localParticipant]);
 
     const toggleScreenShare = useCallback(async () => {
-        if (!localParticipant || !isVideoCall) return;
+        if (!localParticipant || !isConnectedToCall) return;
 
         try {
             await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
         } catch (error) {
             console.error("Failed to toggle screen share", error);
         }
-    }, [isScreenShareEnabled, isVideoCall, localParticipant]);
+    }, [isScreenShareEnabled, isConnectedToCall, localParticipant]);
 
     return (
         <View className="flex-1">
@@ -180,27 +185,33 @@ const NativeRoomContent = ({
                     <CallLoadingOverlay />
                 ) : (
                     <NativeVideoPanel
-                        isVideoAvailable={isVideoCall && isConnectedToCall}
+                        isVideoAvailable={isConnectedToCall}
                         mainTrack={mainCameraTrack}
                         thumbnailTracks={thumbnailCameraTracks}
                         mainPlaceholderLabel={callTitle}
+                        controls={
+                            isConnectedToCall ? (
+                                <MediaOverlayControls
+                                    cameraEnabled={isCameraEnabled}
+                                    screenShareEnabled={isScreenShareEnabled}
+                                    switchCameraAvailable={isCameraEnabled}
+                                    screenShareAvailable={isConnectedToCall}
+                                    busy={isLeaving}
+                                    onToggleCamera={toggleCamera}
+                                    onSwitchCamera={switchCamera}
+                                    onToggleScreenShare={toggleScreenShare}
+                                />
+                            ) : null
+                        }
                     />
                 )}
             </View>
 
             <CallControls
                 micEnabled={isMicrophoneEnabled}
-                cameraEnabled={isCameraEnabled}
-                screenShareEnabled={isScreenShareEnabled}
-                screenShareAvailable={isVideoCall}
-                switchCameraAvailable={isVideoCall && isCameraEnabled}
-                callType={call.callType}
                 busy={isLeaving}
                 isMobile={isMobile}
                 onToggleMicrophone={toggleMicrophone}
-                onToggleCamera={toggleCamera}
-                onSwitchCamera={switchCamera}
-                onToggleScreenShare={toggleScreenShare}
                 onOpenChat={() => setPanel(panel === "chat" ? "none" : "chat")}
                 onOpenParticipants={() =>
                     setPanel(panel === "participants" ? "none" : "participants")

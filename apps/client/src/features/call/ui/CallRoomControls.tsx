@@ -6,7 +6,6 @@ import {
     Text,
     View,
 } from "react-native";
-import type { CallType } from "@urfu-link/api-client";
 import { Avatar, ModalOverlay } from "@/shared/ui";
 import {
     ArrowsClockwiseIcon,
@@ -147,41 +146,133 @@ const ControlButton = ({
     </Pressable>
 );
 
-export const CallControls = ({
-    micEnabled,
+const OverlayButton = ({
+    testID,
+    icon: Icon,
+    label,
+    isActive,
+    disabled,
+    onPress,
+}: {
+    testID: string;
+    icon: React.ComponentType<IconProps>;
+    label: string;
+    isActive?: boolean;
+    disabled?: boolean;
+    onPress?: () => void;
+}) => (
+    <Pressable
+        testID={testID}
+        accessibilityLabel={label}
+        onPress={onPress}
+        disabled={disabled || !onPress}
+        className={`h-11 w-11 rounded-full items-center justify-center border ${
+            disabled
+                ? "bg-black/35 border-white/10"
+                : isActive
+                  ? "bg-brand-600 border-brand-400/70"
+                  : "bg-black/65 border-white/15"
+        }`}
+    >
+        <Icon size={19} className={disabled ? "text-white/35" : "text-white"} />
+    </Pressable>
+);
+
+export const MediaOverlayControls = ({
     cameraEnabled,
     screenShareEnabled,
-    screenShareAvailable,
     switchCameraAvailable,
-    callType,
+    screenShareAvailable,
     busy,
-    isMobile,
-    onToggleMicrophone,
     onToggleCamera,
     onSwitchCamera,
     onToggleScreenShare,
+}: {
+    cameraEnabled: boolean;
+    screenShareEnabled: boolean;
+    switchCameraAvailable: boolean;
+    screenShareAvailable: boolean;
+    busy: boolean;
+    onToggleCamera: () => Promise<void> | void;
+    onSwitchCamera: () => Promise<void> | void;
+    onToggleScreenShare: () => Promise<void> | void;
+}) => (
+    <View className="flex-row gap-2 rounded-full bg-black/25 p-1">
+        <OverlayButton
+            testID="call-media-camera"
+            icon={VideoCameraIcon}
+            label="Камера"
+            onPress={onToggleCamera}
+            isActive={cameraEnabled}
+            disabled={busy}
+        />
+        <OverlayButton
+            testID="call-media-switch-camera"
+            icon={ArrowsClockwiseIcon}
+            label="Сменить камеру"
+            onPress={onSwitchCamera}
+            disabled={busy || !cameraEnabled || !switchCameraAvailable}
+        />
+        <OverlayButton
+            testID="call-media-screen"
+            icon={ScreencastIcon}
+            label="Экран"
+            onPress={onToggleScreenShare}
+            isActive={screenShareEnabled}
+            disabled={busy || !screenShareAvailable}
+        />
+    </View>
+);
+
+export const SpeakingFrame = ({
+    isSpeaking,
+    children,
+}: {
+    isSpeaking: boolean;
+    children: React.ReactNode;
+}) => (
+    <View
+        className={`relative flex-1 min-h-0 rounded-2xl overflow-hidden border bg-black/35 ${
+            isSpeaking ? "border-emerald-400" : "border-white/10"
+        }`}
+        style={
+            isSpeaking
+                ? {
+                      shadowColor: "#34d399",
+                      shadowOpacity: 0.45,
+                      shadowRadius: 14,
+                      shadowOffset: { width: 0, height: 0 },
+                  }
+                : undefined
+        }
+    >
+        {isSpeaking ? (
+            <View className="absolute left-3 top-3 z-10 rounded-full bg-emerald-500/95 px-2 py-1">
+                <Text className="text-white text-[11px] font-semibold">Говорит</Text>
+            </View>
+        ) : null}
+        {children}
+    </View>
+);
+
+export const CallControls = ({
+    micEnabled,
+    busy,
+    isMobile,
+    onToggleMicrophone,
     onOpenChat,
     onOpenParticipants,
     onLeave,
 }: {
     micEnabled: boolean;
-    cameraEnabled: boolean;
-    screenShareEnabled: boolean;
-    screenShareAvailable: boolean;
-    switchCameraAvailable?: boolean;
-    callType: CallType;
     busy: boolean;
     isMobile: boolean;
     onToggleMicrophone: () => Promise<void>;
-    onToggleCamera: () => Promise<void>;
-    onSwitchCamera?: () => Promise<void>;
-    onToggleScreenShare: () => Promise<void>;
     onOpenChat: () => void;
     onOpenParticipants: () => void;
     onLeave: () => void;
 }) => {
     const showLabel = !isMobile;
-    const canUseVideoControls = callType === "Video";
 
     return (
         <View className="border-t border-white/10 px-3 pb-3 pt-2 flex-row gap-2 items-center justify-center">
@@ -192,38 +283,6 @@ export const CallControls = ({
                 onPress={onToggleMicrophone}
                 isActive={micEnabled}
                 disabled={busy}
-                showLabel={showLabel}
-            />
-            <ControlButton
-                testID="call-control-camera"
-                icon={VideoCameraIcon}
-                label="Камера"
-                onPress={canUseVideoControls ? onToggleCamera : undefined}
-                isActive={canUseVideoControls && cameraEnabled}
-                disabled={busy || !canUseVideoControls}
-                showLabel={showLabel}
-            />
-            <ControlButton
-                testID="call-control-switch-camera"
-                icon={ArrowsClockwiseIcon}
-                label="Сменить камеру"
-                onPress={
-                    canUseVideoControls && cameraEnabled && switchCameraAvailable
-                        ? onSwitchCamera
-                        : undefined
-                }
-                disabled={busy || !canUseVideoControls || !cameraEnabled || !switchCameraAvailable}
-                showLabel={showLabel}
-            />
-            <ControlButton
-                testID="call-control-screen"
-                icon={ScreencastIcon}
-                label="Экран"
-                onPress={
-                    screenShareAvailable && canUseVideoControls ? onToggleScreenShare : undefined
-                }
-                isActive={canUseVideoControls && screenShareEnabled}
-                disabled={busy || !screenShareAvailable || !canUseVideoControls}
                 showLabel={showLabel}
             />
             <ControlButton
