@@ -47,7 +47,7 @@ export default function SubjectsScreen() {
             <View className="flex-row items-center justify-between gap-4">
                 <View>
                     <Text className="text-white text-2xl font-bold">Дисциплины</Text>
-                    <Text className="text-text-muted text-sm mt-1">Управление предметами, подгруппами и участниками</Text>
+                    <Text className="text-text-muted text-sm mt-1">Просмотр дисциплин, подгрупп и участников</Text>
                 </View>
             </View>
 
