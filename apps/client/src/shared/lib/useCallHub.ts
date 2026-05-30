@@ -4,6 +4,7 @@ import { HubConnectionState } from "@microsoft/signalr";
 import type { CallSessionDto } from "@urfu-link/api-client";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { useCallStore } from "@/entities/call/model/call-store";
+import { playMessageSound } from "@/shared/lib/message-sounds";
 
 const connectHub = async (connection: ReturnType<typeof createHubConnection>) => {
     if (connection.state === HubConnectionState.Connected) {
@@ -31,6 +32,9 @@ export const useCallHub = () => {
 
         connection.on("IncomingCall", (call: CallSessionDto) => {
             handleIncomingCall(call);
+            void playMessageSound("receive", {
+                conversationId: call.conversationId,
+            });
         });
 
         connection.on("CallAccepted", (call: CallSessionDto) => {
