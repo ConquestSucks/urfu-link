@@ -20,6 +20,7 @@ Firewall requirements on the k3s node:
 - `3478/udp` for LiveKit embedded TURN/UDP and STUN.
 - `5349/tcp` for LiveKit embedded TURN/TLS.
 - `50000:50100/udp` for LiveKit WebRTC media.
+- `50101:50200/udp` for LiveKit embedded TURN relay allocations.
 - Do not expose `7880/tcp` directly; it is reached through ingress only.
 
 Vault requirements:

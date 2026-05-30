@@ -194,6 +194,8 @@ for token in [
     "domain: turn.urfu-link.ghjc.ru",
     "udp_port: 3478",
     "tls_port: 5349",
+    "relay_range_start: 50101",
+    "relay_range_end: 50200",
 ]:
     print("LIVEKIT_CONFIG_HAS_" + re.sub(r"[^A-Za-z0-9]+", "_", token).strip("_").upper() + "=" + str(token in text).lower())
 PY
@@ -257,6 +259,7 @@ checks = {
     "UFW_3478_UDP": r"(?m)^3478/udp\s+ALLOW",
     "UFW_5349_TCP": r"(?m)^5349/tcp\s+ALLOW",
     "UFW_50000_50100_UDP": r"(?m)^50000(?::|-)?50100/udp\s+ALLOW",
+    "UFW_50101_50200_UDP": r"(?m)^50101(?::|-)?50200/udp\s+ALLOW",
 }
 for name, pattern in checks.items():
     print(f"{name}={str(bool(re.search(pattern, text))).lower()}")
@@ -275,7 +278,7 @@ foreach ($line in $remoteOutput) {
     }
 }
 
-foreach ($portCheck in @("UFW_7881_TCP", "UFW_3478_UDP", "UFW_5349_TCP", "UFW_50000_50100_UDP")) {
+foreach ($portCheck in @("UFW_7881_TCP", "UFW_3478_UDP", "UFW_5349_TCP", "UFW_50000_50100_UDP", "UFW_50101_50200_UDP")) {
     if ($remote[$portCheck] -eq "true") {
         Add-Ok "$portCheck is allowed"
     }
@@ -364,6 +367,8 @@ foreach ($configCheck in @(
     "LIVEKIT_CONFIG_HAS_DOMAIN_TURN_URFU_LINK_GHJC_RU",
     "LIVEKIT_CONFIG_HAS_UDP_PORT_3478",
     "LIVEKIT_CONFIG_HAS_TLS_PORT_5349",
+    "LIVEKIT_CONFIG_HAS_RELAY_RANGE_START_50101",
+    "LIVEKIT_CONFIG_HAS_RELAY_RANGE_END_50200",
     "LIVEKIT_DEPLOY_HOSTNETWORK",
     "LIVEKIT_DEPLOY_ENVFROM_LIVEKIT_SECRETS",
     "LIVEKIT_DEPLOY_MOUNT_TURN_TLS",
