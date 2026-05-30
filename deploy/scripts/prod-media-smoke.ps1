@@ -12,6 +12,9 @@ $ErrorActionPreference = "Stop"
 function Invoke-Remote {
     param([string]$Command)
     ssh -o BatchMode=yes $SshTarget $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "Remote command failed with exit code ${LASTEXITCODE}: $Command"
+    }
 }
 
 Write-Host "[smoke] Checking LiveKit HTTPS endpoint." -ForegroundColor Cyan
