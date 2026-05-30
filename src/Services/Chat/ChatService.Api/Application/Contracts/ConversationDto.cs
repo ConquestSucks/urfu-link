@@ -35,7 +35,7 @@ public sealed record ConversationDto(
             conversation.CreatedAtUtc,
             conversation.LastMessageAtUtc,
             conversation.LastMessagePreview is { } p
-                ? new MessagePreviewDto(p.SenderId, p.Body, p.SentAtUtc, p.HasAttachments, p.AttachmentFileNames)
+                ? new MessagePreviewDto(p.SenderId, p.Body, p.SentAtUtc, p.HasAttachments, p.AttachmentFileNames, p.AttachmentTypes)
                 : null,
             PinnedMessageIds: conversation.PinnedMessageIds.Count == 0
                 ? Array.Empty<Guid>()
@@ -73,6 +73,7 @@ public sealed record ConversationDto(
                 MessageId = message.Id,
                 ReadAtUtc = message.ReadAtUtc,
                 AttachmentFileNames = message.Attachments.Select(a => a.FileName).ToList(),
+                AttachmentTypes = message.Attachments.Select(a => a.Type).ToList(),
             },
         };
     }
@@ -98,5 +99,6 @@ public sealed record MessagePreviewDto(
     DateTimeOffset SentAtUtc,
     bool HasAttachments,
     IReadOnlyList<string> AttachmentFileNames,
+    IReadOnlyList<AttachmentType>? AttachmentTypes = null,
     Guid? MessageId = null,
     DateTimeOffset? ReadAtUtc = null);

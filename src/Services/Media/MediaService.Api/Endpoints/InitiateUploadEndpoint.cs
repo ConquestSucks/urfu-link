@@ -33,7 +33,7 @@ public sealed class InitiateUploadEndpoint(
         ArgumentNullException.ThrowIfNull(req);
 
         // InitiateUploadValidator has already accepted the MIME type — TryResolve cannot fail.
-        MimeTypeCatalog.TryResolve(req.MimeType, out var kind);
+        MimeTypeCatalog.TryResolve(req.MimeType, req.RequestedKind, out var kind);
 
         var ownerId = HttpContext.User.GetUserId();
         var bucket = req.Visibility == Visibility.Public
@@ -44,7 +44,16 @@ public sealed class InitiateUploadEndpoint(
         var objectKey = $"{ownerId:N}/{assetId:N}/{FileNameSanitizer.Sanitize(req.FileName)}";
 
         var asset = MediaAsset.Initiate(
-            assetId, ownerId, req.Visibility, kind, bucket, objectKey, req.Size, req.MimeType, req.FileName);
+            assetId,
+            ownerId,
+            req.Visibility,
+            kind,
+            bucket,
+            objectKey,
+            req.Size,
+            req.MimeType,
+            req.FileName,
+            kind == AssetKind.Voice ? req.DurationSeconds : null);
         assetRepository.Add(asset);
 
         var session = UploadSession.Open(assetId, storageOptions.Value.UploadSessionTtl);

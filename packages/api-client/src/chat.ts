@@ -33,6 +33,7 @@ export type ConversationPreview = {
     sentAtUtc?: string;
     hasAttachments?: boolean;
     attachmentFileNames?: string[];
+    attachmentTypes?: AttachmentType[];
     readAt?: string | null;
     readAtUtc?: string | null;
   } | null;
@@ -70,6 +71,7 @@ export type ChatAttachment = {
   fileName: string;
   size: number;
   mimeType: string;
+  durationSeconds?: number | null;
 };
 
 export type ReplyToDto = {

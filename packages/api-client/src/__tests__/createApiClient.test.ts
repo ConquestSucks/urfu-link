@@ -317,5 +317,46 @@ describe("createApiClient", () => {
       expect(keys.every(Boolean)).toBe(true);
       expect(new Set(keys).size).toBe(3);
     });
+
+    it("serializes explicit voice upload metadata", async () => {
+      const uploadInit = {
+        assetId: "asset-1",
+        presignedPutUrl: "https://storage.example/upload",
+        expiresAt: "2026-05-24T10:00:00.000Z",
+        bucket: "media-private",
+        objectKey: "owner/asset/voice.m4a",
+      };
+      const fetchSpy = mockFetchWith({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve(uploadInit),
+      });
+
+      const client = createApiClient({ baseUrl: "" });
+
+      await client.media.initUpload({
+        fileName: "voice.m4a",
+        size: 2048,
+        mimeType: "audio/m4a",
+        visibility: "Private",
+        requestedKind: "Voice",
+        durationSeconds: 17,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/media/upload/init",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            fileName: "voice.m4a",
+            size: 2048,
+            mimeType: "audio/m4a",
+            visibility: "Private",
+            requestedKind: "Voice",
+            durationSeconds: 17,
+          }),
+        }),
+      );
+    });
   });
 });

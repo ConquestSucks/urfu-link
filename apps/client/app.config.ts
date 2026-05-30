@@ -76,8 +76,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             [
                 "expo-audio",
                 {
-                    microphonePermission: false,
-                    recordAudioAndroid: false,
+                    microphonePermission: "Разрешите URFU Link записывать голосовые сообщения в чатах.",
+                    recordAudioAndroid: true,
                     enableBackgroundRecording: false,
                     enableBackgroundPlayback: false,
                 },
@@ -130,6 +130,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
                     ...(config.android?.permissions ?? []),
                     "android.permission.FOREGROUND_SERVICE",
                     "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
+                    "android.permission.RECORD_AUDIO",
                     "android.permission.POST_NOTIFICATIONS",
                 ]),
             ),

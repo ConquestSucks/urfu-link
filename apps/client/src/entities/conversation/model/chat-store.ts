@@ -45,7 +45,14 @@ export type ChatMessagePropsMapped = {
     avatarUrl: string;
     showAvatar?: boolean;
     seen?: boolean;
-    attachments?: { name: string; url: string; mediaAssetId?: string }[];
+    attachments?: {
+        name: string;
+        url: string;
+        mediaAssetId?: string;
+        type?: MessageDto["attachments"][number]["type"];
+        mimeType?: string;
+        durationSeconds?: number | null;
+    }[];
 };
 
 type ThreadEvent =
@@ -199,6 +206,7 @@ const updateConversationPreviewFromMessage = (
             sentAtUtc,
             hasAttachments: message.attachments.length > 0,
             attachmentFileNames: message.attachments.map((a) => a.fileName),
+            attachmentTypes: message.attachments.map((a) => a.type),
             readAtUtc: message.readAt,
         },
     };
@@ -256,6 +264,9 @@ const mergeConversationUpdate = (
             attachmentFileNames:
                 incomingPreview.attachmentFileNames ??
                 currentPreview.attachmentFileNames,
+            attachmentTypes:
+                incomingPreview.attachmentTypes ??
+                currentPreview.attachmentTypes,
         },
     };
 };
@@ -328,6 +339,7 @@ const updateConversationPreviewForEditedMessage = (
             body: message.body,
             hasAttachments: message.attachments.length > 0,
             attachmentFileNames: message.attachments.map((a) => a.fileName),
+            attachmentTypes: message.attachments.map((a) => a.type),
             readAtUtc: message.readAt,
         },
     };
@@ -1244,6 +1256,9 @@ export const mapMessageToProps = (
             name: a.fileName,
             url: `/api/media/${a.mediaAssetId}/download-url`,
             mediaAssetId: a.mediaAssetId,
+            type: a.type,
+            mimeType: a.mimeType,
+            durationSeconds: a.durationSeconds,
         })),
     };
 };

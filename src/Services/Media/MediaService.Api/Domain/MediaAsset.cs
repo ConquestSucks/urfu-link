@@ -26,6 +26,7 @@ public sealed class MediaAsset
     public long Size { get; private set; }
     public string MimeType { get; private set; } = string.Empty;
     public string OriginalFileName { get; private set; } = string.Empty;
+    public int? DurationSeconds { get; private set; }
     public string? Checksum { get; private set; }
     public AssetState State { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
@@ -51,13 +52,18 @@ public sealed class MediaAsset
         string objectKey,
         long size,
         string mimeType,
-        string originalFileName)
+        string originalFileName,
+        int? durationSeconds = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(bucket);
         ArgumentException.ThrowIfNullOrWhiteSpace(objectKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
         ArgumentException.ThrowIfNullOrWhiteSpace(originalFileName);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
+        if (durationSeconds is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(durationSeconds));
+        }
 
         return new MediaAsset
         {
@@ -70,6 +76,7 @@ public sealed class MediaAsset
             Size = size,
             MimeType = mimeType,
             OriginalFileName = originalFileName,
+            DurationSeconds = durationSeconds,
             State = AssetState.Initiated,
             CreatedAtUtc = DateTimeOffset.UtcNow,
         };

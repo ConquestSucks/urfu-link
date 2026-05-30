@@ -312,7 +312,8 @@ public sealed class SendMessageService(
                 ThumbnailAssetId: null,
                 FileName: meta.OriginalFileName,
                 Size: meta.SizeBytes,
-                MimeType: meta.MimeType));
+                MimeType: meta.MimeType,
+                DurationSeconds: meta.DurationSeconds));
         }
         return resolved;
     }
@@ -365,7 +366,8 @@ public sealed class SendMessageService(
         message.Body,
         message.CreatedAtUtc,
         message.HasAttachments,
-        message.Attachments.Select(a => a.FileName).ToList());
+        message.Attachments.Select(a => a.FileName).ToList(),
+        message.Attachments.Select(a => a.Type).ToList());
 
     private static string BuildPreviewText(string body, bool hasAttachments)
     {

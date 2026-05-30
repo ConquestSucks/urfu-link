@@ -161,11 +161,45 @@ public class SendMessageServiceTests : IAsyncLifetime
         attachment.MimeType.Should().Be("image/png");
         attachment.FileName.Should().Be("server-controlled.png");
 
+        var loadedConv = await scope.ServiceProvider.GetRequiredService<IConversationRepository>()
+            .GetByIdAsync(conv.Id, default);
+        loadedConv!.LastMessagePreview!.AttachmentTypes.Should().ContainSingle().Which.Should().Be(AttachmentType.Image);
+
         _factory.MediaServiceClient.Grants
             .Should().ContainSingle(g => g.AssetId == assetId
                 && g.ConversationId == conv.Id
                 && g.GrantedByUserId == sender
                 && g.UserIds.SequenceEqual(new[] { peer }));
+    }
+
+    [Fact]
+    public async Task SendAsync_WithVoiceAttachment_PersistsDurationAndPreviewType()
+    {
+        var (sender, _, conv) = await OpenConversationAsync();
+        var assetId = Guid.NewGuid();
+        _factory.MediaServiceClient.RegisterAsset(
+            assetId,
+            ownerId: sender,
+            kind: AttachmentType.Voice,
+            sizeBytes: 2048,
+            mimeType: "audio/m4a",
+            fileName: "voice.m4a",
+            durationSeconds: 17);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
+
+        var dto = await send.SendAsync(
+            new SendMessageRequest(conv.Id, sender, "", new[] { assetId }, $"c-{Guid.NewGuid():N}"),
+            default);
+
+        var attachment = dto.Attachments.Should().ContainSingle().Subject;
+        attachment.Type.Should().Be(AttachmentType.Voice);
+        attachment.DurationSeconds.Should().Be(17);
+
+        var loadedConv = await scope.ServiceProvider.GetRequiredService<IConversationRepository>()
+            .GetByIdAsync(conv.Id, default);
+        loadedConv!.LastMessagePreview!.AttachmentTypes.Should().ContainSingle().Which.Should().Be(AttachmentType.Voice);
     }
 
     private async Task<(Guid sender, Guid peer, Conversation conv)> OpenConversationAsync()

@@ -533,6 +533,9 @@ describe("chat store direct draft sending", () => {
                 name: "file.json",
                 url: "/api/media/asset-1/download-url",
                 mediaAssetId: "asset-1",
+                type: "Document",
+                mimeType: "application/json",
+                durationSeconds: undefined,
             },
         ]);
     });

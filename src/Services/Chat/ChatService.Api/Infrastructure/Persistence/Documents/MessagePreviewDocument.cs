@@ -1,4 +1,5 @@
 using MongoDB.Bson.Serialization.Attributes;
+using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Chat.Infrastructure.Persistence.Documents;
@@ -20,13 +21,18 @@ internal sealed class MessagePreviewDocument
     [BsonElement("attachmentFileNames")]
     public List<string> AttachmentFileNames { get; set; } = new();
 
+    [BsonElement("attachmentTypes")]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public List<AttachmentType> AttachmentTypes { get; set; } = new();
+
     public MessagePreview ToDomain()
         => new(
             SenderId,
             Body,
             new DateTimeOffset(DateTime.SpecifyKind(SentAtUtc, DateTimeKind.Utc)),
             HasAttachments,
-            AttachmentFileNames);
+            AttachmentFileNames,
+            AttachmentTypes);
 
     public static MessagePreviewDocument FromDomain(MessagePreview preview) => new()
     {
@@ -35,5 +41,6 @@ internal sealed class MessagePreviewDocument
         SentAtUtc = preview.SentAtUtc.UtcDateTime,
         HasAttachments = preview.HasAttachments,
         AttachmentFileNames = preview.AttachmentFileNames.ToList(),
+        AttachmentTypes = preview.AttachmentTypes.ToList(),
     };
 }

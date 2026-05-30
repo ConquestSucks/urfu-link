@@ -25,6 +25,7 @@ const formatPinnedTime = (value: string | undefined) => {
 const getPreview = (message: MessageDto) => {
     if (message.state === "Deleted") return "Сообщение удалено";
     if (message.body) return message.body;
+    if (message.attachments.some((attachment) => attachment.type === "Voice")) return "Голосовое сообщение";
     return message.attachments.length > 0 ? "Вложение" : "Без текста";
 };
 

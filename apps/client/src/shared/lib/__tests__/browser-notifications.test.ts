@@ -129,6 +129,35 @@ describe("browser notifications", () => {
         expect(instances[0].close).toHaveBeenCalled();
     });
 
+    it("uses the voice label for voice-only message notifications", () => {
+        const shown = showMessageBrowserNotification(
+            {
+                id: "message-voice",
+                conversationId: "direct-1",
+                senderId: "peer-1",
+                body: "",
+                attachments: [
+                    {
+                        mediaAssetId: "asset-1",
+                        type: "Voice",
+                        fileName: "voice.m4a",
+                        size: 2048,
+                        mimeType: "audio/m4a",
+                        durationSeconds: 17,
+                    },
+                ],
+                state: "Sent",
+                createdAt: "2026-05-24T10:03:00.000Z",
+                deliveredAt: null,
+                readAt: null,
+            },
+            { currentUserId: "user-1", title: "Peer" },
+        );
+
+        expect(shown).toBe(true);
+        expect(instances[0].options.body).toBe("Голосовое сообщение");
+    });
+
     it("deduplicates and skips own or muted message notifications", () => {
         configureBrowserNotifications({
             newMessages: true,
