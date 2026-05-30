@@ -121,7 +121,7 @@ const ControlButton = ({
         onPress={onPress}
         disabled={disabled || !onPress}
         className={`h-12 rounded-xl items-center justify-center gap-2 ${
-            showLabel ? "px-3 flex-1 flex-row" : "w-12"
+            showLabel ? "px-4 min-w-[82px] flex-row" : "w-12"
         } ${
             disabled
                 ? "bg-white/5"
@@ -146,81 +146,19 @@ const ControlButton = ({
     </Pressable>
 );
 
-const OverlayButton = ({
-    testID,
-    icon: Icon,
-    label,
-    isActive,
-    disabled,
-    onPress,
-}: {
-    testID: string;
-    icon: React.ComponentType<IconProps>;
-    label: string;
-    isActive?: boolean;
-    disabled?: boolean;
-    onPress?: () => void;
-}) => (
-    <Pressable
-        testID={testID}
-        accessibilityLabel={label}
-        onPress={onPress}
-        disabled={disabled || !onPress}
-        className={`h-11 w-11 rounded-full items-center justify-center border ${
-            disabled
-                ? "bg-black/35 border-white/10"
-                : isActive
-                  ? "bg-brand-600 border-brand-400/70"
-                  : "bg-black/65 border-white/15"
-        }`}
+const SpeakingIndicator = () => (
+    <View
+        accessible
+        accessibilityLabel="Сейчас говорит"
+        className="absolute left-3 top-3 z-10 h-8 w-8 rounded-full bg-emerald-500/95 items-center justify-center flex-row gap-0.5"
     >
-        <Icon size={19} className={disabled ? "text-white/35" : "text-white"} />
-    </Pressable>
-);
-
-export const MediaOverlayControls = ({
-    cameraEnabled,
-    screenShareEnabled,
-    switchCameraAvailable,
-    screenShareAvailable,
-    busy,
-    onToggleCamera,
-    onSwitchCamera,
-    onToggleScreenShare,
-}: {
-    cameraEnabled: boolean;
-    screenShareEnabled: boolean;
-    switchCameraAvailable: boolean;
-    screenShareAvailable: boolean;
-    busy: boolean;
-    onToggleCamera: () => Promise<void> | void;
-    onSwitchCamera: () => Promise<void> | void;
-    onToggleScreenShare: () => Promise<void> | void;
-}) => (
-    <View className="flex-row gap-2 rounded-full bg-black/25 p-1">
-        <OverlayButton
-            testID="call-media-camera"
-            icon={VideoCameraIcon}
-            label="Камера"
-            onPress={onToggleCamera}
-            isActive={cameraEnabled}
-            disabled={busy}
-        />
-        <OverlayButton
-            testID="call-media-switch-camera"
-            icon={ArrowsClockwiseIcon}
-            label="Сменить камеру"
-            onPress={onSwitchCamera}
-            disabled={busy || !cameraEnabled || !switchCameraAvailable}
-        />
-        <OverlayButton
-            testID="call-media-screen"
-            icon={ScreencastIcon}
-            label="Экран"
-            onPress={onToggleScreenShare}
-            isActive={screenShareEnabled}
-            disabled={busy || !screenShareAvailable}
-        />
+        {[10, 16, 12].map((height, index) => (
+            <View
+                key={index}
+                className="w-1 rounded-full bg-white animate-pulse"
+                style={{ height }}
+            />
+        ))}
     </View>
 );
 
@@ -246,28 +184,38 @@ export const SpeakingFrame = ({
                 : undefined
         }
     >
-        {isSpeaking ? (
-            <View className="absolute left-3 top-3 z-10 rounded-full bg-emerald-500/95 px-2 py-1">
-                <Text className="text-white text-[11px] font-semibold">Говорит</Text>
-            </View>
-        ) : null}
+        {isSpeaking ? <SpeakingIndicator /> : null}
         {children}
     </View>
 );
 
 export const CallControls = ({
     micEnabled,
+    cameraEnabled,
+    screenShareEnabled,
+    switchCameraAvailable,
+    screenShareAvailable,
     busy,
     isMobile,
     onToggleMicrophone,
+    onToggleCamera,
+    onSwitchCamera,
+    onToggleScreenShare,
     onOpenChat,
     onOpenParticipants,
     onLeave,
 }: {
     micEnabled: boolean;
+    cameraEnabled: boolean;
+    screenShareEnabled: boolean;
+    switchCameraAvailable: boolean;
+    screenShareAvailable: boolean;
     busy: boolean;
     isMobile: boolean;
     onToggleMicrophone: () => Promise<void>;
+    onToggleCamera: () => Promise<void> | void;
+    onSwitchCamera: () => Promise<void> | void;
+    onToggleScreenShare: () => Promise<void> | void;
     onOpenChat: () => void;
     onOpenParticipants: () => void;
     onLeave: () => void;
@@ -275,38 +223,68 @@ export const CallControls = ({
     const showLabel = !isMobile;
 
     return (
-        <View className="border-t border-white/10 px-3 pb-3 pt-2 flex-row gap-2 items-center justify-center">
-            <ControlButton
-                testID="call-control-mic"
-                icon={micEnabled ? MicrophoneIcon : MicrophoneSlashIcon}
-                label="Микрофон"
-                onPress={onToggleMicrophone}
-                isActive={micEnabled}
-                disabled={busy}
-                showLabel={showLabel}
-            />
-            <ControlButton
-                testID="call-control-chat"
-                icon={ChatCircleTextIcon}
-                label="Чат"
-                onPress={onOpenChat}
-                showLabel={showLabel}
-            />
-            <ControlButton
-                testID="call-control-more"
-                icon={DotsThreeVerticalIcon}
-                onPress={onOpenParticipants}
-                showLabel={false}
-            />
-            <ControlButton
-                testID="call-control-leave"
-                icon={PhoneDisconnectIcon}
-                label="Завершить"
-                onPress={onLeave}
-                danger
-                disabled={busy}
-                showLabel={showLabel}
-            />
+        <View className="px-3 pb-4 pt-2 items-center justify-center">
+            <View className="max-w-full rounded-[28px] border border-white/10 bg-app-card/95 p-2 flex-row gap-2 items-center justify-center">
+                <ControlButton
+                    testID="call-control-mic"
+                    icon={micEnabled ? MicrophoneIcon : MicrophoneSlashIcon}
+                    label="Микрофон"
+                    onPress={onToggleMicrophone}
+                    isActive={micEnabled}
+                    disabled={busy}
+                    showLabel={showLabel}
+                />
+                <ControlButton
+                    testID="call-control-camera"
+                    icon={VideoCameraIcon}
+                    label="Камера"
+                    onPress={onToggleCamera}
+                    isActive={cameraEnabled}
+                    disabled={busy}
+                    showLabel={showLabel}
+                />
+                {isMobile && switchCameraAvailable ? (
+                    <ControlButton
+                        testID="call-control-switch-camera"
+                        icon={ArrowsClockwiseIcon}
+                        label="Сменить камеру"
+                        onPress={onSwitchCamera}
+                        disabled={busy || !cameraEnabled}
+                        showLabel={showLabel}
+                    />
+                ) : null}
+                <ControlButton
+                    testID="call-control-screen"
+                    icon={ScreencastIcon}
+                    label="Экран"
+                    onPress={onToggleScreenShare}
+                    isActive={screenShareEnabled}
+                    disabled={busy || !screenShareAvailable}
+                    showLabel={showLabel}
+                />
+                <ControlButton
+                    testID="call-control-chat"
+                    icon={ChatCircleTextIcon}
+                    label="Чат"
+                    onPress={onOpenChat}
+                    showLabel={showLabel}
+                />
+                <ControlButton
+                    testID="call-control-more"
+                    icon={DotsThreeVerticalIcon}
+                    onPress={onOpenParticipants}
+                    showLabel={false}
+                />
+                <ControlButton
+                    testID="call-control-leave"
+                    icon={PhoneDisconnectIcon}
+                    label="Завершить"
+                    onPress={onLeave}
+                    danger
+                    disabled={busy}
+                    showLabel={showLabel}
+                />
+            </View>
         </View>
     );
 };
@@ -328,8 +306,10 @@ export const CallDrawer = ({
 
     return (
         <View
-            className={`absolute inset-y-0 right-0 ${
-                isMobile ? "w-full" : "w-96"
+            className={`absolute z-40 ${
+                isMobile
+                    ? "inset-x-0 top-0 bottom-24"
+                    : "inset-y-0 right-0 w-96"
             } bg-app-card border-l border-white/10`}
         >
             {panel === "participants" ? (

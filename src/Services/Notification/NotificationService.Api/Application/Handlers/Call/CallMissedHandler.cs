@@ -6,7 +6,9 @@ using Urfu.Link.Services.Notification.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Notification.Application.Handlers.Call;
 
-public sealed class CallMissedHandler : INotificationHandler<CallMissedEvent>
+public sealed class CallMissedHandler :
+    INotificationHandler<CallMissedEvent>,
+    INotificationHandler<CallMissedV2Event>
 {
     public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
         CallMissedEvent integrationEvent,
@@ -24,6 +26,44 @@ public sealed class CallMissedHandler : INotificationHandler<CallMissedEvent>
 
         var data = NotificationData.From(new Dictionary<string, string>(StringComparer.Ordinal)
         {
+            ["callId"] = integrationEvent.CallId.ToString("N", CultureInfo.InvariantCulture),
+            ["callerId"] = integrationEvent.CallerId.ToString("N", CultureInfo.InvariantCulture),
+            ["ringSeconds"] = ((int)integrationEvent.RingDuration.TotalSeconds).ToString(CultureInfo.InvariantCulture),
+        });
+
+        var draft = new NotificationIntent(
+            RecipientUserId: integrationEvent.RecipientId,
+            Category: NotificationCategory.CallMissed,
+            Severity: NotificationSeverity.Normal,
+            Content: content,
+            Data: data,
+            GroupKey: GroupKey.ForCall(integrationEvent.CallId),
+            SourceEventId: integrationEvent.EventId,
+            SourceEventType: integrationEvent.EventType,
+            SourceActionId: NotificationSourceActions.CallMissed(integrationEvent.CallId, integrationEvent.RecipientId),
+            Priority: NotificationPriority.ChatMessage,
+            Actor: new NotificationActor(integrationEvent.CallerId, null, null));
+
+        return Task.FromResult<IReadOnlyList<NotificationIntent>>([draft]);
+    }
+
+    public Task<IReadOnlyList<NotificationIntent>> PrepareAsync(
+        CallMissedV2Event integrationEvent,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(integrationEvent);
+        _ = cancellationToken;
+
+        var label = integrationEvent.CallType == CallType.Video ? "Видеозвонок" : "Звонок";
+        var content = NotificationContent.Create(
+            "Пропущенный звонок",
+            $"{label} остался без ответа",
+            imageUrl: null,
+            deepLink: $"urfulink://chat/conv/{integrationEvent.ConversationId}");
+
+        var data = NotificationData.From(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["conversationId"] = integrationEvent.ConversationId,
             ["callId"] = integrationEvent.CallId.ToString("N", CultureInfo.InvariantCulture),
             ["callerId"] = integrationEvent.CallerId.ToString("N", CultureInfo.InvariantCulture),
             ["ringSeconds"] = ((int)integrationEvent.RingDuration.TotalSeconds).ToString(CultureInfo.InvariantCulture),

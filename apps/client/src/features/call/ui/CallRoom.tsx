@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import {
     LiveKitRoom,
@@ -14,27 +14,32 @@ import {
     CallDrawer,
     CallErrorOverlay,
     CallLoadingOverlay,
-    MediaOverlayControls,
     type CallPanel,
     NoVideoPanel,
 } from "./CallRoomControls";
+import {
+    pickActiveScreenShare,
+    shouldDisableLocalScreenShareForRemoteOwner,
+    type ScreenShareCandidate,
+} from "./CallRoomMedia";
 
 type TrackRef = Parameters<typeof VideoTrack>[0]["trackRef"];
 type DefinedTrackRef = Exclude<TrackRef, null | undefined>;
 type CameraFacingMode = "user" | "environment";
+
+const getNativeScreenShareKey = (track: DefinedTrackRef) =>
+    `${track.participant.identity}:${track.publication?.trackSid ?? track.source}`;
 
 const NativeVideoPanel = ({
     isVideoAvailable,
     mainTrack,
     thumbnailTracks,
     mainPlaceholderLabel,
-    controls,
 }: {
     isVideoAvailable: boolean;
     mainTrack: DefinedTrackRef | null;
     thumbnailTracks: DefinedTrackRef[];
     mainPlaceholderLabel: string;
-    controls?: React.ReactNode;
 }) => {
     return (
         <View className="relative flex-1 bg-black/30">
@@ -63,7 +68,6 @@ const NativeVideoPanel = ({
                 </View>
             ) : null}
 
-            {controls ? <View className="absolute left-3 top-3">{controls}</View> : null}
         </View>
     );
 };
@@ -83,6 +87,7 @@ const NativeRoomContent = ({
 }: CallRoomProps) => {
     const [panel, setPanel] = useState<CallPanel>("none");
     const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
+    const [activeScreenShareOwnerId, setActiveScreenShareOwnerId] = useState<string | null>(null);
     const isVideoCall = call.callType === "Video";
     const isConnectedToCall = call.status === "Active";
 
@@ -91,6 +96,14 @@ const NativeRoomContent = ({
     const cameraTracks = useTracks([Track.Source.Camera], {
         onlySubscribed: true,
     });
+    const screenShareTracks = useTracks([Track.Source.ScreenShare], {
+        onlySubscribed: true,
+    });
+    const knownRemoteScreenShareKeysRef = useRef<Set<string>>(new Set());
+    const localUserId =
+        participantInfos.find((participant) => participant.isSelf)?.userId ??
+        localParticipant?.identity ??
+        null;
 
     const remoteCameraTracks = useMemo<DefinedTrackRef[]>(
         () =>
@@ -104,11 +117,90 @@ const NativeRoomContent = ({
         const local = cameraTracks.find((track) => track?.participant.isLocal);
         return (local as DefinedTrackRef | undefined) ?? null;
     }, [cameraTracks]);
+    const allScreenShareTracks = useMemo<DefinedTrackRef[]>(
+        () =>
+            screenShareTracks.filter(
+                (track): track is DefinedTrackRef =>
+                    track !== null && track !== undefined,
+            ),
+        [screenShareTracks],
+    );
+    const remoteScreenShareTracks = useMemo<DefinedTrackRef[]>(
+        () => allScreenShareTracks.filter((track) => !track.participant.isLocal),
+        [allScreenShareTracks],
+    );
+    const screenShareCandidates = useMemo<ScreenShareCandidate[]>(
+        () =>
+            allScreenShareTracks.map((track) => ({
+                ownerId: track.participant.identity,
+                key: getNativeScreenShareKey(track),
+                isLocal: track.participant.isLocal,
+            })),
+        [allScreenShareTracks],
+    );
+    const activeScreenShareCandidate = useMemo(
+        () =>
+            pickActiveScreenShare(
+                screenShareCandidates,
+                activeScreenShareOwnerId,
+                localUserId,
+            ),
+        [activeScreenShareOwnerId, localUserId, screenShareCandidates],
+    );
+    const activeScreenShareTrack = useMemo(
+        () =>
+            activeScreenShareCandidate
+                ? allScreenShareTracks.find(
+                    (track) => getNativeScreenShareKey(track) === activeScreenShareCandidate.key,
+                ) ?? null
+                : null,
+        [activeScreenShareCandidate, allScreenShareTracks],
+    );
 
-    const mainCameraTrack = remoteCameraTracks[0] ?? localCameraTrack;
+    useEffect(() => {
+        const nextOwnerId = activeScreenShareCandidate?.ownerId ?? null;
+        if (nextOwnerId !== activeScreenShareOwnerId) {
+            setActiveScreenShareOwnerId(nextOwnerId);
+        }
+    }, [activeScreenShareCandidate?.ownerId, activeScreenShareOwnerId]);
+
+    useEffect(() => {
+        const knownRemoteKeys = knownRemoteScreenShareKeysRef.current;
+        const latestNewRemote = [...remoteScreenShareTracks]
+            .reverse()
+            .find((track) => !knownRemoteKeys.has(getNativeScreenShareKey(track)));
+
+        knownRemoteScreenShareKeysRef.current = new Set(
+            remoteScreenShareTracks.map(getNativeScreenShareKey),
+        );
+
+        if (
+            latestNewRemote &&
+            localParticipant &&
+            shouldDisableLocalScreenShareForRemoteOwner(
+                localUserId,
+                latestNewRemote.participant.identity,
+                isScreenShareEnabled,
+            )
+        ) {
+            setActiveScreenShareOwnerId(latestNewRemote.participant.identity);
+            void localParticipant.setScreenShareEnabled(false).catch((error) => {
+                console.error("Failed to stop local screen share after remote owner changed", error);
+            });
+        }
+    }, [isScreenShareEnabled, localParticipant, localUserId, remoteScreenShareTracks]);
+
+    const mainCameraTrack = activeScreenShareTrack ?? remoteCameraTracks[0] ?? localCameraTrack;
     const thumbnailCameraTracks = useMemo(() => {
         if (!mainCameraTrack) {
             return [];
+        }
+
+        if (mainCameraTrack === activeScreenShareTrack) {
+            return [
+                ...remoteCameraTracks,
+                ...(localCameraTrack ? [localCameraTrack] : []),
+            ];
         }
 
         if (mainCameraTrack === localCameraTrack) {
@@ -116,7 +208,7 @@ const NativeRoomContent = ({
         }
 
         return localCameraTrack ? [...remoteCameraTracks.slice(1), localCameraTrack] : remoteCameraTracks.slice(1);
-    }, [remoteCameraTracks, localCameraTrack, mainCameraTrack]);
+    }, [activeScreenShareTrack, remoteCameraTracks, localCameraTrack, mainCameraTrack]);
 
     const toggleMicrophone = useCallback(async () => {
         if (!localParticipant) return;
@@ -166,11 +258,23 @@ const NativeRoomContent = ({
         if (!localParticipant || !isConnectedToCall) return;
 
         try {
-            await localParticipant.setScreenShareEnabled(!isScreenShareEnabled);
+            const next = !isScreenShareEnabled;
+            await localParticipant.setScreenShareEnabled(next);
+            if (next) {
+                setActiveScreenShareOwnerId(localUserId);
+            } else if (activeScreenShareOwnerId === localUserId) {
+                setActiveScreenShareOwnerId(null);
+            }
         } catch (error) {
             console.error("Failed to toggle screen share", error);
         }
-    }, [isScreenShareEnabled, isConnectedToCall, localParticipant]);
+    }, [
+        activeScreenShareOwnerId,
+        isConnectedToCall,
+        isScreenShareEnabled,
+        localParticipant,
+        localUserId,
+    ]);
 
     return (
         <View className="flex-1">
@@ -189,29 +293,22 @@ const NativeRoomContent = ({
                         mainTrack={mainCameraTrack}
                         thumbnailTracks={thumbnailCameraTracks}
                         mainPlaceholderLabel={callTitle}
-                        controls={
-                            isConnectedToCall ? (
-                                <MediaOverlayControls
-                                    cameraEnabled={isCameraEnabled}
-                                    screenShareEnabled={isScreenShareEnabled}
-                                    switchCameraAvailable={isCameraEnabled}
-                                    screenShareAvailable={isConnectedToCall}
-                                    busy={isLeaving}
-                                    onToggleCamera={toggleCamera}
-                                    onSwitchCamera={switchCamera}
-                                    onToggleScreenShare={toggleScreenShare}
-                                />
-                            ) : null
-                        }
                     />
                 )}
             </View>
 
             <CallControls
                 micEnabled={isMicrophoneEnabled}
+                cameraEnabled={isCameraEnabled}
+                screenShareEnabled={isScreenShareEnabled}
+                switchCameraAvailable={isCameraEnabled}
+                screenShareAvailable={isConnectedToCall}
                 busy={isLeaving}
                 isMobile={isMobile}
                 onToggleMicrophone={toggleMicrophone}
+                onToggleCamera={toggleCamera}
+                onSwitchCamera={switchCamera}
+                onToggleScreenShare={toggleScreenShare}
                 onOpenChat={() => setPanel(panel === "chat" ? "none" : "chat")}
                 onOpenParticipants={() =>
                     setPanel(panel === "participants" ? "none" : "participants")

@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import {
     CallControls,
-    MediaOverlayControls,
     SpeakingFrame,
 } from "../CallRoomControls";
 
@@ -42,13 +41,23 @@ jest.mock("../CallChatPanel", () => ({
 }));
 
 describe("CallRoomControls", () => {
-    it("keeps video controls out of the bottom bar", () => {
+    it("renders media controls in the bottom bar", () => {
+        const onToggleCamera = jest.fn();
+        const onToggleScreenShare = jest.fn();
+
         render(
             <CallControls
                 micEnabled
+                cameraEnabled={false}
+                screenShareEnabled={false}
+                switchCameraAvailable={false}
+                screenShareAvailable
                 busy={false}
                 isMobile={false}
                 onToggleMicrophone={jest.fn()}
+                onToggleCamera={onToggleCamera}
+                onSwitchCamera={jest.fn()}
+                onToggleScreenShare={onToggleScreenShare}
                 onOpenChat={jest.fn()}
                 onOpenParticipants={jest.fn()}
                 onLeave={jest.fn()}
@@ -56,42 +65,44 @@ describe("CallRoomControls", () => {
         );
 
         expect(screen.getByTestId("call-control-mic")).toBeTruthy();
+        expect(screen.getByTestId("call-control-camera")).toBeTruthy();
+        expect(screen.getByTestId("call-control-screen")).toBeTruthy();
         expect(screen.getByTestId("call-control-chat")).toBeTruthy();
         expect(screen.getByTestId("call-control-more")).toBeTruthy();
         expect(screen.getByTestId("call-control-leave")).toBeTruthy();
-        expect(screen.queryByTestId("call-control-camera")).toBeNull();
         expect(screen.queryByTestId("call-control-switch-camera")).toBeNull();
-        expect(screen.queryByTestId("call-control-screen")).toBeNull();
-        expect(screen.queryByText("Камера")).toBeNull();
+        expect(screen.getByText("Камера")).toBeTruthy();
+        expect(screen.getByText("Экран")).toBeTruthy();
         expect(screen.queryByText("Сменить камеру")).toBeNull();
-        expect(screen.queryByText("Экран")).toBeNull();
+
+        fireEvent.press(screen.getByTestId("call-control-camera"));
+        fireEvent.press(screen.getByTestId("call-control-screen"));
+
+        expect(onToggleCamera).toHaveBeenCalledTimes(1);
+        expect(onToggleScreenShare).toHaveBeenCalledTimes(1);
     });
 
-    it("renders camera actions as icon-only overlay controls", () => {
-        const onToggleCamera = jest.fn();
-        const onSwitchCamera = jest.fn();
-        const onToggleScreenShare = jest.fn();
-
+    it("renders switch camera only for mobile controls", () => {
         render(
-            <MediaOverlayControls
+            <CallControls
+                micEnabled
                 cameraEnabled
                 screenShareEnabled={false}
                 switchCameraAvailable
                 screenShareAvailable
                 busy={false}
-                onToggleCamera={onToggleCamera}
-                onSwitchCamera={onSwitchCamera}
-                onToggleScreenShare={onToggleScreenShare}
+                isMobile
+                onToggleMicrophone={jest.fn()}
+                onToggleCamera={jest.fn()}
+                onSwitchCamera={jest.fn()}
+                onToggleScreenShare={jest.fn()}
+                onOpenChat={jest.fn()}
+                onOpenParticipants={jest.fn()}
+                onLeave={jest.fn()}
             />,
         );
 
-        fireEvent.press(screen.getByTestId("call-media-camera"));
-        fireEvent.press(screen.getByTestId("call-media-switch-camera"));
-        fireEvent.press(screen.getByTestId("call-media-screen"));
-
-        expect(onToggleCamera).toHaveBeenCalledTimes(1);
-        expect(onSwitchCamera).toHaveBeenCalledTimes(1);
-        expect(onToggleScreenShare).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId("call-control-switch-camera")).toBeTruthy();
         expect(screen.queryByText("Камера")).toBeNull();
         expect(screen.queryByText("Сменить камеру")).toBeNull();
         expect(screen.queryByText("Экран")).toBeNull();
@@ -112,6 +123,7 @@ describe("CallRoomControls", () => {
             </SpeakingFrame>,
         );
 
-        expect(screen.getByText("Говорит")).toBeTruthy();
+        expect(screen.queryByText("Говорит")).toBeNull();
+        expect(screen.getByLabelText("Сейчас говорит")).toBeTruthy();
     });
 });
