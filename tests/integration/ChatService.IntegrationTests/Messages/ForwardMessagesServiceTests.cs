@@ -126,7 +126,9 @@ public class ForwardMessagesServiceTests : IAsyncLifetime
         var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
         var targetDraft = await open.OpenAsync(caller, targetPeer, default);
 
-        var forward = scope.ServiceProvider.GetRequiredService<ForwardMessagesService>();
+        var forward = ActivatorUtilities.CreateInstance<ForwardMessagesService>(
+            scope.ServiceProvider,
+            _factory.ChatBroadcaster);
         var produced = await forward.ForwardAsync(
             new ForwardMessagesRequest(targetDraft.Id, caller, new[] { sourceDto.Id }, PeerUserId: targetPeer), default);
 
