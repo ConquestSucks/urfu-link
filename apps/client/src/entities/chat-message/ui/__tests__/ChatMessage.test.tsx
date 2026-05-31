@@ -148,6 +148,46 @@ describe("ChatMessage read indicator", () => {
         expect(onAuthorPress).toHaveBeenCalledTimes(1);
     });
 
+    it("calls the author press handler from incoming group avatars", () => {
+        const onAuthorPress = jest.fn();
+
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+                onAuthorPress={onAuthorPress}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("chat-message-avatar-message-1"));
+
+        expect(onAuthorPress).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the message bubble cursor default when author controls are clickable", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+                onAuthorPress={jest.fn()}
+            />,
+        );
+
+        expect(screen.getByTestId("chat-message-bubble-message-1").props.className).toContain(
+            "cursor-default",
+        );
+    });
+
     it("uses a defined light color for incoming group sender names", () => {
         render(
             <ChatMessage
