@@ -20,7 +20,6 @@ describe("current-user bootstrap", () => {
                 aboutMe: null,
             },
             privacy: {
-                showOnlineStatus: true,
                 showLastVisitTime: true,
             },
             notifications: {
@@ -85,7 +84,7 @@ describe("current-user bootstrap", () => {
                       ...current,
                       privacy: {
                           ...current.privacy,
-                          showOnlineStatus: false,
+                          showLastVisitTime: false,
                       },
                   }
                 : current,
@@ -94,7 +93,7 @@ describe("current-user bootstrap", () => {
         await expect(resolveCurrentUser()).resolves.toEqual(
             expect.objectContaining({
                 privacy: expect.objectContaining({
-                    showOnlineStatus: false,
+                    showLastVisitTime: false,
                 }),
             }),
         );

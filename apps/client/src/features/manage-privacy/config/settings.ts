@@ -1,13 +1,8 @@
 export const PRIVACY_SETTINGS = [
   {
-    key: "showOnlineStatus",
-    label: "Показывать статус онлайн",
-    description: "Другие пользователи смогут видеть, когда вы в сети",
-  },
-  {
     key: "showLastVisitTime",
-    label: "Показывать время последнего визита",
-    description: "Отображение времени последней активности",
+    label: "Скрывать время последнего визита",
+    description: "Вместо точного времени будет отображаться «Был недавно»",
   },
 ] as const;
 

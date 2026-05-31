@@ -10,7 +10,6 @@ export type UserAccount = {
 };
 
 export type UserPrivacy = {
-  showOnlineStatus: boolean;
   showLastVisitTime: boolean;
 };
 
@@ -51,7 +50,6 @@ export type UpdateAccountDto = {
 };
 
 export type UpdatePrivacyDto = {
-  showOnlineStatus: boolean;
   showLastVisitTime: boolean;
 };
 

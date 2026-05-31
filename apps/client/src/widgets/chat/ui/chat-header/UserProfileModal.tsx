@@ -99,15 +99,15 @@ export const UserProfileModal = ({
                             <Text className="text-sm text-success-500 font-medium">
                                 {presenceStatusToLabel(displayUser.status)}
                             </Text>
-                        ) : displayUser.lastSeenAt ? (
+                        ) : displayUser.status === "Away" || displayUser.status === "DoNotDisturb" ? (
+                            <Text className="text-sm text-text-muted font-medium">
+                                {presenceStatusToLabel(displayUser.status)}
+                            </Text>
+                        ) : (
                             <LastSeenLabel
                                 lastSeenAt={displayUser.lastSeenAt}
                                 className="text-sm text-text-muted font-medium"
                             />
-                        ) : (
-                            <Text className="text-sm text-text-muted font-medium">
-                                {displayUser.status ? presenceStatusToLabel(displayUser.status) : "Не в сети"}
-                            </Text>
                         )}
                     </View>
                 </View>

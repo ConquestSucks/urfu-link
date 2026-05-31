@@ -4,7 +4,6 @@ namespace UserService.Api.Domain.Events;
 
 public sealed record UserPrivacySettingsChangedEvent(
     Guid UserId,
-    bool ShowOnlineStatus,
     bool ShowLastVisitTime) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();

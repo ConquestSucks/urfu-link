@@ -195,17 +195,19 @@ export const ChatHeader = ({
                                         />
                                     );
                                 }
-                                if (indicatorStatus === "online" && statusLabel) {
+                                if (indicatorStatus !== "offline" && statusLabel) {
                                     return (
                                         <Text
                                             numberOfLines={1}
-                                            className="leading-none text-xs font-medium text-success-600"
+                                            className={`leading-none text-xs font-medium ${
+                                                indicatorStatus === "online" ? "text-success-600" : "text-text-muted"
+                                            }`}
                                         >
                                             {statusLabel}
                                         </Text>
                                     );
                                 }
-                                if (peerPresence?.lastSeenAt) {
+                                if (peerPresence) {
                                     return (
                                         <LastSeenLabel
                                             lastSeenAt={peerPresence.lastSeenAt}
@@ -218,7 +220,7 @@ export const ChatHeader = ({
                                         numberOfLines={1}
                                         className="leading-none text-xs font-medium text-text-muted"
                                     >
-                                        {statusLabel ?? "Не в сети"}
+                                        {statusLabel ?? "Был недавно"}
                                     </Text>
                                 );
                             })()}

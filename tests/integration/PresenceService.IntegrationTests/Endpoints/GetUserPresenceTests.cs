@@ -65,7 +65,7 @@ public class GetUserPresenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_WithLastSeen_PassesLastSeenThrough()
+    public async Task Get_WithLastSeen_DefaultPrivacyReturnsNullLastSeen()
     {
         var requesterId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
@@ -82,11 +82,11 @@ public class GetUserPresenceTests : IAsyncLifetime
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
         var body = await response.Content.ReadFromJsonAsync<PresenceInfoResponse>();
-        body!.LastSeenAt.Should().BeCloseTo(ts, TimeSpan.FromSeconds(1));
+        body!.LastSeenAt.Should().BeNull();
     }
 
     [Fact]
-    public async Task Get_PrivacyHidesOnlineStatus_ReturnsOffline()
+    public async Task Get_PrivacyDoesNotHideOnlineStatus()
     {
         var requesterId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
@@ -99,13 +99,13 @@ public class GetUserPresenceTests : IAsyncLifetime
                 targetId, "d1", Platform.Web, PresenceStatus.Online,
                 null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow), CancellationToken.None);
         }
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showOnlineStatus: false, showLastVisitTime: true);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: true);
 
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
         var body = await response.Content.ReadFromJsonAsync<PresenceInfoResponse>();
-        body!.Status.Should().Be(PresenceStatus.Offline);
-        body.Platforms.Should().BeEmpty();
+        body!.Status.Should().Be(PresenceStatus.Online);
+        body.Platforms.Should().Equal(Platform.Web);
     }
 
     [Fact]
@@ -121,12 +121,34 @@ public class GetUserPresenceTests : IAsyncLifetime
             ctx.LastSeens.Add(LastSeen.Create(targetId, Platform.Mobile, DateTimeOffset.UtcNow));
             await ctx.SaveChangesAsync();
         }
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showOnlineStatus: true, showLastVisitTime: false);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: true);
 
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
         var body = await response.Content.ReadFromJsonAsync<PresenceInfoResponse>();
         body!.LastSeenAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Get_PrivacyAllowsLastVisit_ReturnsLastSeen()
+    {
+        var requesterId = Guid.NewGuid();
+        var targetId = Guid.NewGuid();
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.MakeUser(requesterId);
+        var ts = DateTimeOffset.UtcNow.AddMinutes(-5);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var ctx = scope.ServiceProvider.GetRequiredService<Urfu.Link.Services.Presence.Infrastructure.Persistence.PresenceDbContext>();
+            ctx.LastSeens.Add(LastSeen.Create(targetId, Platform.Mobile, ts));
+            await ctx.SaveChangesAsync();
+        }
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: false);
+
+        var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
+
+        var body = await response.Content.ReadFromJsonAsync<PresenceInfoResponse>();
+        body!.LastSeenAt.Should().BeCloseTo(ts, TimeSpan.FromSeconds(1));
     }
 
     [Fact]

@@ -54,11 +54,11 @@ public sealed class UserProfile
         _domainEvents.Add(new UserAvatarChangedEvent(Id, null));
     }
 
-    public void UpdatePrivacy(bool showOnlineStatus, bool showLastVisitTime)
+    public void UpdatePrivacy(bool showLastVisitTime)
     {
-        Privacy = new PrivacySettings(showOnlineStatus, showLastVisitTime);
+        Privacy = new PrivacySettings(showLastVisitTime);
         Touch();
-        _domainEvents.Add(new UserPrivacySettingsChangedEvent(Id, showOnlineStatus, showLastVisitTime));
+        _domainEvents.Add(new UserPrivacySettingsChangedEvent(Id, showLastVisitTime));
     }
 
     /// <summary>
