@@ -3,6 +3,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import type { AttachmentType } from "@urfu-link/api-client";
 import { FunnelIcon, XIcon } from "@/shared/ui/phosphor";
 import { SearchFilterValues } from "../model/search-store";
+import { glow } from "@/shared/ui/glow";
 
 interface SearchFiltersBarProps {
     value: SearchFilterValues;
@@ -68,11 +69,12 @@ export const SearchFiltersBar = ({ value, onChange }: SearchFiltersBarProps) => 
     };
 
     return (
-        <View className="px-3 py-2 border-b border-white/5 bg-app-card">
+        <View className="px-3 py-2 border-b border-white/5 bg-app-card" style={activeCount > 0 ? glow.brandSubtle : undefined}>
             <View className="flex-row items-center gap-2">
                 <Pressable
                     onPress={() => setExpanded((v) => !v)}
                     className="flex-row items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 active:bg-white/10"
+                    style={expanded || activeCount > 0 ? glow.brandSubtle : undefined}
                 >
                     <FunnelIcon size={14} className="text-text-subtle" />
                     <Text className="text-text-subtle text-xs font-medium">
@@ -173,6 +175,7 @@ const Chip = ({
     <Pressable
         onPress={onPress}
         className={`px-3 py-1.5 rounded-full ${active ? "bg-brand-500/30 border border-brand-400" : "bg-white/5 border border-transparent"} active:opacity-70`}
+        style={active ? glow.brandSubtle : undefined}
     >
         <Text
             className={`text-xs font-medium ${active ? "text-brand-200" : "text-text-subtle"}`}
@@ -203,7 +206,7 @@ const DateField = ({
         autoCapitalize="none"
         autoCorrect={false}
         maxLength={10}
-        style={noFocusOutline}
+        style={[noFocusOutline, value.length > 0 ? glow.inputFocus : undefined]}
     />
 );
 

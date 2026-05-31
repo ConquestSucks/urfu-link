@@ -3,6 +3,7 @@ import { AnimatedView } from "@/shared/lib/nativewind-interop";
 import { ProfileCard } from "@/shared/ui";
 import { CaretLeftIcon, GearIcon } from "@/shared/ui/phosphor";
 import { Pressable, Text, View } from "react-native";
+import { glow } from "@/shared/ui/glow";
 
 export interface ProfileProps {
   textAnimatedStyle: any;
@@ -27,6 +28,7 @@ export const Profile = ({
     <View className="p-4 border-t border-white/5 gap-3">
       <Pressable
         className="flex-row justify-between items-center bg-app-card rounded-2xl p-[7.5px] transition-colors active:bg-white/10 hover:bg-white/5"
+        style={glow.surface}
         onPress={onSettingsPress}
       >
         {({ pressed, hovered }) => (
@@ -54,6 +56,7 @@ export const Profile = ({
 
       <Pressable
         className={`text-text-placeholder px-[18.5] py-[11px] flex-row items-center gap-2 rounded-xl`}
+        style={glow.brandSubtle}
         onPress={handleToggle}
       >
         <AnimatedView style={chevronAnimatedStyle}>

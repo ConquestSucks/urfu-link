@@ -3,6 +3,7 @@ import { Pressable, Text, TextInput, View } from "react-native";
 import { ModalOverlay } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useComposerStore } from "../model/composer-store";
+import { glow } from "@/shared/ui/glow";
 
 export const EditMessageModal = () => {
     const editing = useComposerStore((s) => s.editing);
@@ -51,7 +52,7 @@ export const EditMessageModal = () => {
                 multiline
                 autoFocus
                 className="bg-white/5 rounded-xl px-3 py-2 text-white text-[15px] min-h-[80px]"
-                style={{ textAlignVertical: "top" }}
+                style={[{ textAlignVertical: "top" }, body.length > 0 ? glow.inputFocus : undefined]}
             />
             <View className="flex-row justify-end gap-2 mt-4">
                 <Pressable
@@ -64,6 +65,7 @@ export const EditMessageModal = () => {
                     onPress={onSave}
                     disabled={saving}
                     className={`px-4 py-2 rounded-xl ${saving ? "bg-brand-650/50" : "bg-brand-650 active:opacity-80"}`}
+                    style={body.trim() && body.trim() !== editing.body ? glow.brandSoft : undefined}
                 >
                     <Text className="text-white font-medium">Сохранить</Text>
                 </Pressable>

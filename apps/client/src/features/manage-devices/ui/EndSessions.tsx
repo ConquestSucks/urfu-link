@@ -1,10 +1,11 @@
 import { Button } from "@/shared/ui";
 import { Text, View } from "react-native";
+import { glow } from "@/shared/ui/glow";
 interface EndSessionsProps {
     onPress: () => void;
 }
 export const EndSessions = ({ onPress }: EndSessionsProps) => {
-    return (<View className="gap-4 bg-app-bg border border-danger-500/20 rounded-2xl p-5">
+    return (<View className="gap-4 bg-app-bg border border-danger-500/20 rounded-2xl p-5" style={glow.danger}>
       <View className="gap-2">
         <Text className="text-sm text-white text-medium">
           Завершить все сеансы

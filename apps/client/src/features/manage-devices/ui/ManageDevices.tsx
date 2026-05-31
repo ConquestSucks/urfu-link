@@ -1,12 +1,13 @@
 import { useDevices, useTerminateAllDevices, useTerminateDevice } from "@/entities/user";
 import { EmptyState, Skeleton } from "@/shared/ui";
 import { DeviceMobileIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 import { ScrollView, View } from "react-native";
 import { DeviceCard } from "./DeviceCard";
 import { EndSessions } from "./EndSessions";
 
 const DeviceCardSkeleton = () => (
-  <View className="flex-row items-center justify-between bg-app-bg border border-white/5 rounded-2xl p-5">
+  <View className="flex-row items-center justify-between bg-app-bg border border-white/5 rounded-2xl p-5" style={glow.surface}>
     <View className="flex-row gap-4 items-center flex-1">
       <Skeleton className="h-12 w-12 rounded-xl bg-white/5" />
       <View className="gap-2 flex-1">
@@ -31,7 +32,7 @@ export const ManageDevices = () => {
           <DeviceCardSkeleton />
           <DeviceCardSkeleton />
         </View>
-        <View className="gap-4 bg-app-bg border border-danger-500/20 rounded-2xl p-5">
+        <View className="gap-4 bg-app-bg border border-danger-500/20 rounded-2xl p-5" style={glow.danger}>
           <View className="gap-2">
             <Skeleton className="h-3.5 w-40 rounded" />
             <Skeleton className="h-3 w-full rounded bg-white/5" />

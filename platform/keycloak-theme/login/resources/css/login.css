@@ -15,11 +15,13 @@
   --accent: #3b82f6;
   --accent-hover: #5b9aff;
   --accent-glow: rgba(59, 130, 246, 0.2);
+  --accent-glow-strong: rgba(59, 130, 246, 0.34);
   --border: rgba(255, 255, 255, 0.06);
   --border-input: rgba(255, 255, 255, 0.08);
   --border-input-focus: rgba(59, 130, 246, 0.5);
-  --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4);
-  --shadow-input-focus: 0 0 0 3px var(--accent-glow);
+  --shadow-card: 0 18px 48px rgba(0, 0, 0, 0.42), 0 0 36px rgba(59, 130, 246, 0.1);
+  --shadow-input-focus: 0 0 0 3px var(--accent-glow), 0 0 20px rgba(59, 130, 246, 0.16);
+  --shadow-primary-action: 0 0 22px var(--accent-glow-strong), 0 10px 26px rgba(0, 0, 0, 0.24);
   --error-bg: rgba(239, 68, 68, 0.1);
   --error-border: rgba(239, 68, 68, 0.2);
   --error-text: #f87171;
@@ -82,6 +84,7 @@ body {
 .login-logo img {
   height: 40px;
   width: auto;
+  filter: drop-shadow(0 0 18px rgba(59, 130, 246, 0.24));
 }
 
 /* --- Card --- */
@@ -126,6 +129,7 @@ body {
 
 .login-footer-link:hover {
   color: var(--accent);
+  text-shadow: 0 0 12px var(--accent-glow-strong);
 }
 
 /* --- Form --- */
@@ -202,6 +206,7 @@ body {
   height: 14px;
   accent-color: var(--accent);
   cursor: pointer;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.18));
 }
 
 .form-checkbox-wrapper label {
@@ -222,6 +227,7 @@ body {
 
 .form-link:hover {
   color: var(--accent-hover);
+  text-shadow: 0 0 12px var(--accent-glow-strong);
 }
 
 /* --- Primary Button --- */
@@ -236,12 +242,13 @@ body {
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.18);
   transition: background var(--transition), transform 100ms ease, box-shadow var(--transition);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 20px var(--accent-glow);
+  box-shadow: var(--shadow-primary-action);
 }
 
 .btn-primary:active { transform: scale(0.98); }
@@ -265,6 +272,7 @@ body {
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.06);
 }
 
 .btn-group { display: flex; gap: 10px; }
@@ -280,10 +288,10 @@ body {
   border: 1px solid;
 }
 
-.alert-error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); }
-.alert-success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); }
-.alert-warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); }
-.alert-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); }
+.alert-error { background: var(--error-bg); border-color: var(--error-border); color: var(--error-text); box-shadow: 0 0 18px rgba(239, 68, 68, 0.16); }
+.alert-success { background: var(--success-bg); border-color: var(--success-border); color: var(--success-text); box-shadow: 0 0 18px rgba(34, 197, 94, 0.16); }
+.alert-warning { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning-text); box-shadow: 0 0 18px rgba(234, 179, 8, 0.16); }
+.alert-info { background: var(--info-bg); border-color: var(--info-border); color: var(--info-text); box-shadow: 0 0 18px rgba(59, 130, 246, 0.16); }
 
 /* --- Info Block --- */
 .login-info {
@@ -298,6 +306,11 @@ body {
 .login-info a {
   color: var(--accent);
   text-decoration: none;
+}
+
+.login-info a:hover {
+  color: var(--accent-hover);
+  text-shadow: 0 0 12px var(--accent-glow-strong);
 }
 
 /* --- Footer --- */
@@ -329,15 +342,15 @@ body {
   transition: border-color var(--transition);
 }
 
-.otp-credential:hover { border-color: rgba(255, 255, 255, 0.12); }
+.otp-credential:hover { border-color: rgba(255, 255, 255, 0.12); box-shadow: 0 0 14px rgba(255, 255, 255, 0.05); }
 .otp-credential input[type="radio"] { accent-color: var(--accent); }
-.otp-credential.selected { border-color: var(--accent); }
+.otp-credential.selected { border-color: var(--accent); box-shadow: 0 0 20px rgba(59, 130, 246, 0.2); }
 .otp-credential-label { font-size: 0.875rem; color: var(--text-primary); }
 
 /* --- TOTP --- */
 .totp-setup { text-align: center; }
-.totp-qr { display: inline-block; padding: 12px; background: #fff; border-radius: var(--radius-sm); margin: 12px 0; }
-.totp-secret { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); padding: 8px 12px; word-break: break-all; margin: 10px 0; }
+.totp-qr { display: inline-block; padding: 12px; background: #fff; border-radius: var(--radius-sm); margin: 12px 0; box-shadow: 0 0 24px rgba(59, 130, 246, 0.16); }
+.totp-secret { font-family: "SF Mono", "Fira Code", monospace; font-size: 0.8125rem; color: var(--text-primary); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); padding: 8px 12px; word-break: break-all; margin: 10px 0; box-shadow: 0 0 16px rgba(59, 130, 246, 0.1); }
 .totp-params { font-size: 0.75rem; color: var(--text-muted); margin: 6px 0; }
 
 .instruction { font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; }

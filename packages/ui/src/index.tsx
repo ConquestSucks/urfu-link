@@ -93,7 +93,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1e293b",
     backgroundColor: "rgba(2, 6, 23, 0.82)",
-    padding: 20
+    padding: 20,
+    boxShadow: "0 18px 48px rgba(0, 0, 0, 0.36), 0 0 32px rgba(59, 130, 246, 0.1)"
   },
   cardHeader: {
     gap: 4
@@ -118,7 +119,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12
   },
   buttonPrimary: {
-    backgroundColor: "#3b82f6"
+    backgroundColor: "#3b82f6",
+    boxShadow: "0 0 22px rgba(59, 130, 246, 0.34), 0 10px 26px rgba(0, 0, 0, 0.22)"
   },
   buttonSecondary: {
     borderWidth: 1,
@@ -146,10 +148,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#1e293b"
   },
   badgeSuccess: {
-    backgroundColor: "rgba(16, 185, 129, 0.15)"
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    boxShadow: "0 0 16px rgba(16, 185, 129, 0.24)"
   },
   badgeWarning: {
-    backgroundColor: "rgba(245, 158, 11, 0.15)"
+    backgroundColor: "rgba(245, 158, 11, 0.15)",
+    boxShadow: "0 0 16px rgba(245, 158, 11, 0.24)"
   },
   badgeText: {
     fontSize: 11,

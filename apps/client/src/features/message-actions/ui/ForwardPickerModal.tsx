@@ -6,6 +6,7 @@ import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { apiClient } from "@/shared/lib/api";
+import { glow } from "@/shared/ui/glow";
 import type {
     ConversationParticipantDto,
     ConversationPreview,
@@ -125,6 +126,7 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                     placeholder="Найти пользователя"
                     placeholderTextColor="#90A1B9"
                     className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white"
+                    style={query.length > 0 ? glow.inputFocus : undefined}
                 />
             </View>
             <FlatList
@@ -144,6 +146,7 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                                     testID={`forward-user-${user.id}`}
                                     onPress={() => void handlePickUser(user)}
                                     className="flex-row items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5 active:bg-white/5"
+                                    style={glow.surface}
                                 >
                                     <Avatar size={36} src={user.avatarUrl ?? ""} name={user.displayName} />
                                     <View className="flex-1 min-w-0">
@@ -176,6 +179,7 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                             testID={`forward-conversation-${item.id}`}
                             onPress={() => handlePick(item.id)}
                             className="flex-row items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5 active:bg-white/5"
+                            style={glow.surface}
                         >
                             <Avatar size={36} src={avatarUrl} name={name} />
                             <View className="flex-1 min-w-0">

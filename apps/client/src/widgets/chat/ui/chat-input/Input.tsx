@@ -29,6 +29,7 @@ import { findMentionAtCursor, MentionSuggestions } from "@/features/mentions";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { ConversationParticipantDto } from "@urfu-link/api-client";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
+import { glow } from "@/shared/ui/glow";
 import {
     useVoiceRecorder,
     VoiceDraftPreview,
@@ -116,6 +117,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [inputHeight, setInputHeight] = useState(MIN_INPUT_CONTENT_HEIGHT);
+    const [isComposerFocused, setIsComposerFocused] = useState(false);
     const [selectedMentions, setSelectedMentions] = useState<SelectedMention[]>([]);
     // Курсор: позиция точки вставки в тексте. Нужен для детекта @-токена.
     const [selection, setSelection] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
@@ -434,7 +436,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
     };
 
     return (
-        <View className="border-t border-white/5 bg-app-card p-4">
+        <View className="border-t border-white/5 bg-app-card p-4" style={glow.surface}>
             <MentionSuggestions items={mentionSuggestions} onSelect={handleSelectMention} />
             {composerHint && (
                 <View className="flex-row items-start gap-2 mb-2 pl-2 border-l-2 border-brand-400">
@@ -505,12 +507,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         setIsFilesModalVisible(true);
                     }}
                     className={`mb-2 ${attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting || voiceRecorder.isStarting ? "opacity-30" : "active:opacity-60"}`}
+                    style={attachments.length > 0 ? glow.brandSubtle : undefined}
                     disabled={attachments.length >= MAX_FILES_LIMIT || !!editing || isSubmitting || voiceRecorder.isStarting}
                 >
                     <PlusCircleIcon size={28} className="text-text-subtle" />
                 </Pressable>
 
-                <View className="flex-1 flex-row items-center bg-white/5 rounded-2xl px-4">
+                <View
+                    className={`flex-1 flex-row items-center rounded-2xl px-4 border transition-colors duration-200 ${
+                        isComposerFocused || query.length > 0
+                            ? "bg-white/[0.075] border-brand-300/30"
+                            : "bg-white/5 border-white/[0.03]"
+                    }`}
+                    style={isComposerFocused || query.length > 0 ? glow.inputFocus : undefined}
+                >
                     <TextInput
                         ref={inputRef}
                         testID="chat-input-text"
@@ -530,7 +540,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             // пользователю перемещать курсор.
                             if (pendingSelection) setPendingSelection(null);
                         }}
-                        onFocus={() => isEmojiVisible && animate(false)}
+                        onFocus={() => {
+                            setIsComposerFocused(true);
+                            if (isEmojiVisible) animate(false);
+                        }}
+                        onBlur={() => setIsComposerFocused(false)}
                         multiline
                         onContentSizeChange={(e) =>
                             handleInputContentSizeChange(e.nativeEvent.contentSize.height)
@@ -556,7 +570,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             animate(willShow);
                         }}
                         className={`py-2.5 ml-2 ${isSubmitting ? "opacity-40" : ""}`}
-                        style={{ alignSelf: "flex-end" }}
+                        style={[{ alignSelf: "flex-end" }, isEmojiVisible ? glow.brandSubtle : undefined]}
                     >
                         <SmileyIcon
                             size={24}
@@ -574,6 +588,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         className={`w-11 h-11 rounded-full items-center justify-center ${
                             canRecordVoice ? "bg-brand-650 active:opacity-80" : "bg-brand-650/30"
                         }`}
+                        style={canRecordVoice ? glow.brand : undefined}
                     >
                         {voiceRecorder.isStarting ? (
                             <ActivityIndicator testID="chat-input-voice-spinner" size="small" className="text-white" />
@@ -591,6 +606,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         onPress={submitComposer}
                         disabled={!canSend}
                         className={`w-11 h-11 rounded-full items-center justify-center ${isSubmitting ? "bg-brand-650/80" : canSend ? "bg-brand-650 active:opacity-80" : "bg-brand-650/30"}`}
+                        style={canSend ? glow.brand : undefined}
                     >
                         {isSubmitting ? (
                             <ActivityIndicator testID="chat-input-send-spinner" size="small" className="text-white" />

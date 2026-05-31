@@ -6,6 +6,7 @@ import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-nati
 import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
 import { MOBILE_TABS } from "../config/tabs";
 import { MobileBottomTabItem } from "./MobileBottomTabItem";
+import { glow } from "@/shared/ui/glow";
 
 const TIMING_MS = 320;
 
@@ -71,7 +72,7 @@ export const MobileBottomTabs = () => {
             <AnimatedView style={rowStyle}>
                 <View
                     className="flex-row bg-app-bg border-t border-effects-white05 pb-[2px]"
-                    style={{ height: MOBILE_TAB_BAR_HEIGHT }}
+                    style={{ height: MOBILE_TAB_BAR_HEIGHT, ...glow.surface }}
                 >
                     <TabItems pathname={pathname} />
                 </View>

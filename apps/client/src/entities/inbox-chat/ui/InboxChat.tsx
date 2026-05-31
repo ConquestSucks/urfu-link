@@ -4,6 +4,7 @@ import { TypingEllipsis } from "@/shared/ui/TypingEllipsis";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { InboxChatProps } from "../model/types";
+import { glow } from "@/shared/ui/glow";
 
 const InboxTypingPreview = ({
     message,
@@ -62,6 +63,7 @@ export const InboxChat = ({
         <Pressable className="select-none" onPress={onPress}>
             <View
                 className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-brand-600/10 transition-all duration-300 ${containerClass}`}
+                style={isActive ? glow.brandSubtle : hasUnread || showTypingPreview ? glow.unread : undefined}
             >
                 <Avatar size={48} src={avatarUrl} name={name} />
 
@@ -107,7 +109,7 @@ export const InboxChat = ({
                             )}
                         </View>
                         {hasUnread && (
-                            <View className="bg-brand-650 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0">
+                            <View className="bg-brand-650 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0" style={glow.brandSoft}>
                                 <Text className="text-white text-[10px] font-bold">
                                     {unreadCount > 99 ? "99+" : String(unreadCount)}
                                 </Text>

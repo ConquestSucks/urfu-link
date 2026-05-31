@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { ChecksIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 
 interface NotificationListToolbarProps {
     unreadCount: number;
@@ -17,7 +18,7 @@ export const NotificationListToolbar = ({
 
     return (
         <View className="px-3">
-            <View className="flex-row items-center justify-between gap-3 rounded-lg border border-white/[0.05] bg-white/[0.025] px-3 py-2">
+            <View className="flex-row items-center justify-between gap-3 rounded-lg border border-white/[0.05] bg-white/[0.025] px-3 py-2" style={glow.surface}>
                 <Text
                     numberOfLines={1}
                     className="text-xs font-medium text-text-subtle flex-1"
@@ -38,6 +39,7 @@ export const NotificationListToolbar = ({
                             ? "bg-brand-650 hover:bg-brand-500 active:bg-brand-700"
                             : "bg-white/[0.04] opacity-60"
                     }`}
+                    style={canMarkAll ? glow.brandSubtle : undefined}
                 >
                     <ChecksIcon
                         size={16}

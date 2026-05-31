@@ -24,6 +24,7 @@ import { usePresenceStore } from "@/entities/presence";
 import { useCallStore } from "@/entities/call";
 import { apiClient } from "@/shared/lib/api";
 import type { CallType, ConversationParticipantDto } from "@urfu-link/api-client";
+import { glow } from "@/shared/ui/glow";
 
 const roleLabel = (role: ConversationParticipantDto["role"]) =>
     role === "Teacher" ? "Преподаватель" : role === "Student" ? "Студент" : "Участник";
@@ -205,7 +206,7 @@ export const SubjectHeader = ({
 
     return (
         <>
-            <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2">
+            <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2" style={glow.surface}>
                 <View className="flex-row gap-1 items-center flex-1 min-w-0">
                     {isMobile && (
                         <Pressable onPress={() => safeGoBack("/subjects")} hitSlop={8} className="p-2 rounded-xl">
@@ -213,7 +214,9 @@ export const SubjectHeader = ({
                         </Pressable>
                     )}
                     <View className="flex-row gap-3 items-center min-w-0 flex-1">
-                        <Avatar size={38} src={subjectAvatarUrl} name={subjectName}/>
+                        <View style={onlineCount > 0 ? glow.success : glow.brandSubtle}>
+                            <Avatar size={38} src={subjectAvatarUrl} name={subjectName}/>
+                        </View>
                         <View className="justify-center flex-1 gap-1.5 min-w-0">
                             <Text numberOfLines={1} className="text-white leading-none text-base font-semibold">
                                 {subjectName}

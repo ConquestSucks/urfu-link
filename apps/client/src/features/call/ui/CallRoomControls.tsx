@@ -30,6 +30,7 @@ import {
 import type { IconProps } from "@/shared/ui/phosphor";
 import type { ParticipantInfo } from "./CallRoom.types";
 import { CallChatPanel } from "./CallChatPanel";
+import { glow } from "@/shared/ui/glow";
 
 export type CallPanel = "none" | "participants" | "chat";
 
@@ -149,14 +150,15 @@ const ControlButton = ({
         entering={ZoomIn.duration(150)}
         exiting={ZoomOut.duration(120)}
         layout={LinearTransition.duration(180)}
-        style={
+        style={[
             showLabel
                 ? undefined
                 : {
                       width: iconOnlySize,
                       height: iconOnlySize,
-                  }
-        }
+                  },
+            !disabled && danger ? glow.danger : !disabled && isActive ? glow.brandSoft : undefined,
+        ]}
         className={`h-12 rounded-xl items-center justify-center gap-2 ${
             showLabel ? "px-4 min-w-[82px] flex-row" : "w-12"
         } ${
@@ -203,6 +205,7 @@ const StatusIconBadge = ({
                 ? "border-brand-300/60 bg-brand-650/90"
                 : "border-white/10 bg-black/65"
         }`}
+        style={active ? glow.brandSubtle : undefined}
     >
         {children}
     </AnimatedView>
@@ -298,16 +301,7 @@ export const SpeakingFrame = ({
         className={`relative flex-1 min-h-0 rounded-2xl overflow-hidden border bg-black/35 ${
             isSpeaking ? "border-emerald-400" : "border-white/10"
         }`}
-        style={
-            isSpeaking
-                ? {
-                      shadowColor: "#34d399",
-                      shadowOpacity: 0.45,
-                      shadowRadius: 14,
-                      shadowOffset: { width: 0, height: 0 },
-                  }
-                : undefined
-        }
+        style={isSpeaking ? glow.success : undefined}
     >
         {isSpeaking ? <SpeakingIndicator /> : null}
         {children}
@@ -358,7 +352,7 @@ export const CallControls = ({
                 testID="call-controls-dock"
                 entering={ZoomIn.duration(180)}
                 layout={LinearTransition.duration(220)}
-                style={isMobile ? { flexWrap: "wrap", maxWidth: 336 } : undefined}
+                style={[isMobile ? { flexWrap: "wrap", maxWidth: 336 } : undefined, glow.surfaceStrong]}
                 className={`max-w-full rounded-[28px] border border-white/10 bg-app-card/95 p-2 flex-row ${
                     isMobile ? "gap-1.5" : "gap-2"
                 } items-center justify-center`}

@@ -18,6 +18,7 @@ import {
 } from "@/shared/ui/phosphor";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { VoiceMessagePlayer } from "@/features/voice-message";
+import { glow } from "@/shared/ui/glow";
 
 const renderBodyWithMentions = (text: string) => {
     const parts = text.split(/(@[A-Za-zА-Яа-я0-9_.-]+)/g);
@@ -188,7 +189,7 @@ export const ChatMessage = ({
             !!onJoinCall;
         return (
             <View className="px-2 items-center">
-                <View className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
+                <View className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10" style={canJoinCall ? glow.brandSubtle : glow.surface}>
                     <View className="flex-row items-center gap-2">
                         {systemCall?.callType === "Video" ? (
                             <VideoCameraIcon size={12} className="text-text-muted" />
@@ -216,6 +217,7 @@ export const ChatMessage = ({
                             testID={`system-call-join-${id}`}
                             onPress={() => onJoinCall(systemCall.callId)}
                             className="mt-2 self-center rounded-full bg-brand-600 px-3 py-1.5 active:opacity-80"
+                            style={glow.brandSoft}
                         >
                             <Text className="text-[12px] font-semibold text-white">Войти</Text>
                         </Pressable>
@@ -243,7 +245,7 @@ export const ChatMessage = ({
         return (
             <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
                 {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} name={authorName} />}
-                <View className="max-w-[85%] px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2">
+                <View className="max-w-[85%] px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2" style={glow.surface}>
                     <TrashIcon size={14} className="text-text-muted" />
                     <Text className="text-text-muted text-[13px] italic">Сообщение удалено</Text>
                 </View>
@@ -275,11 +277,14 @@ export const ChatMessage = ({
                 onLongPress={onLongPress}
                 delayLongPress={350}
                 {...contextMenuProps}
-                style={{ opacity: isOptimistic ? 0.6 : 1 }}
                 testID={`chat-message-bubble-${id}`}
                 className={`max-w-[85%] gap-1 px-3 py-3 rounded-2xl border border-transparent ${
                     isOwn ? "bg-brand-650" : "bg-white/5"
                 }`}
+                style={[
+                    { opacity: isOptimistic ? 0.6 : 1 },
+                    isFailed ? glow.danger : isOwn ? glow.brandSoft : glow.surface,
+                ]}
             >
                 {forwardedFrom && (
                     <View className="flex-row items-center gap-1 mb-1 opacity-80">
@@ -360,6 +365,7 @@ export const ChatMessage = ({
                                     className={`flex-row items-center px-3 py-2.5 rounded-xl gap-2 active:opacity-60 ${
                                         isOwn ? "bg-white/20" : "bg-white/10"
                                     }`}
+                                    style={glow.brandSubtle}
                                 >
                                     <FileIcon size={20} className="text-white" />
                                     <Text
@@ -397,6 +403,7 @@ export const ChatMessage = ({
                                     className={`flex-row items-center gap-1 px-2 py-0.5 rounded-full ${
                                         reactedByMe ? "bg-brand-500/30" : "bg-white/10"
                                     } ${onReactionPress ? "active:opacity-70" : ""}`}
+                                    style={reactedByMe ? glow.brandSubtle : undefined}
                                 >
                                     <Text className="text-[12px]">{emoji}</Text>
                                     <Text className="text-[11px] text-white">

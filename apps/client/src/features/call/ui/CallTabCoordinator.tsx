@@ -5,6 +5,7 @@ import { useCallStore } from "@/entities/call";
 import { getCallClientInstanceId } from "@/entities/call/model/call-client-instance";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { PhoneIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 
 const channelName = "urfu-link:call-tabs";
 const activeCallStorageKey = "urfu-link:active-call-tab";
@@ -201,11 +202,11 @@ export const CallTabCoordinator = () => {
     return (
         <View
             testID="call-tab-coordinator"
-            className="absolute left-4 right-4 bottom-5 rounded-2xl border border-white/10 bg-app-card/95 px-4 py-3 shadow-lg"
-            style={{ zIndex: 30, elevation: 30 }}
+            className="absolute left-4 right-4 bottom-5 rounded-2xl border border-white/10 bg-app-card/95 px-4 py-3"
+            style={{ zIndex: 30, elevation: 30, ...glow.surfaceStrong }}
         >
             <View className="flex-row items-start gap-3">
-                <View className="h-9 w-9 rounded-xl bg-brand-650/15 items-center justify-center">
+                <View className="h-9 w-9 rounded-xl bg-brand-650/15 items-center justify-center" style={glow.brandSubtle}>
                     <PhoneIcon size={18} className="text-brand-300" />
                 </View>
                 <View className="flex-1">
@@ -223,6 +224,7 @@ export const CallTabCoordinator = () => {
                     className="flex-1 rounded-xl bg-brand-650 px-3 py-2.5 items-center active:opacity-80"
                     onPress={handleTakeover}
                     testID="call-tab-takeover"
+                    style={glow.brandSoft}
                 >
                     <Text className="text-sm font-semibold text-white">
                         Перехватить

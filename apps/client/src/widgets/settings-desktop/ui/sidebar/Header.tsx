@@ -1,13 +1,14 @@
 import { XIcon } from "@/shared/ui/phosphor";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
+import { glow } from "@/shared/ui/glow";
 interface HeaderProps {
     onClose: () => void;
 }
 const Header = ({ onClose }: HeaderProps) => {
     return (<View className="flex-row items-center justify-between">
       <Text className="text-white text-xl leading-none">Настройки</Text>
-      <Pressable className="p-2" onPress={onClose}>
+      <Pressable className="p-2 rounded-xl" onPress={onClose} style={glow.brandSubtle}>
         <XIcon size={20} className="text-text-muted"/>
       </Pressable>
     </View>);
