@@ -11,13 +11,14 @@ const {
 
 const readClientFile = (...segments: string[]) =>
     readFileSync(path.join(process.cwd(), ...segments), "utf8");
+const normalizeLineEndings = (content: string) => content.replace(/\r\n/g, "\n");
 
 describe("static web assets", () => {
     it("ships a valid robots.txt instead of falling back to the SPA shell", () => {
         const robotsPath = path.join(process.cwd(), "public", "robots.txt");
 
         expect(existsSync(robotsPath)).toBe(true);
-        expect(readClientFile("public", "robots.txt")).toBe("User-agent: *\nAllow: /\n");
+        expect(normalizeLineEndings(readClientFile("public", "robots.txt"))).toBe("User-agent: *\nAllow: /\n");
     });
 
     it("declares a Lighthouse-visible meta description in the root HTML shell", () => {

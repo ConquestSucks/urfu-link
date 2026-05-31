@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { apiClient } from "@/shared/lib/api";
@@ -32,14 +32,21 @@ export const VoiceMessagePlayer = ({
     const [playbackUri, setPlaybackUri] = useState<string | null>(sourceUri ?? null);
     const [isResolving, setIsResolving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const player = useAudioPlayer(playbackUri ? { uri: playbackUri } : null);
+    const loadedUriRef = useRef<string | null>(null);
+    const player = useAudioPlayer(null);
     const status = useAudioPlayerStatus(player);
 
+    const replacePlaybackSource = useCallback((uri: string) => {
+        if (uri === loadedUriRef.current) return;
+        loadedUriRef.current = uri;
+        player.replace({ uri });
+    }, [player]);
+
     useEffect(() => {
-        if (!sourceUri || sourceUri === playbackUri) return;
+        if (!sourceUri) return;
         setPlaybackUri(sourceUri);
-        player.replace({ uri: sourceUri });
-    }, [player, playbackUri, sourceUri]);
+        replacePlaybackSource(sourceUri);
+    }, [replacePlaybackSource, sourceUri]);
 
     const totalSeconds = useMemo(() => {
         const metadataDuration = durationSeconds && durationSeconds > 0 ? durationSeconds : 0;
@@ -55,19 +62,22 @@ export const VoiceMessagePlayer = ({
     const hasFinished = totalSeconds > 0 && currentSeconds >= totalSeconds - 0.05 && !status.playing;
 
     const ensurePlaybackUri = useCallback(async () => {
-        if (playbackUri) return playbackUri;
+        if (playbackUri) {
+            replacePlaybackSource(playbackUri);
+            return playbackUri;
+        }
         if (!mediaAssetId) throw new Error("Voice message has no media asset id.");
 
         setIsResolving(true);
         try {
             const { downloadUrl } = await apiClient.media.getAssetDownloadUrl(mediaAssetId);
             setPlaybackUri(downloadUrl);
-            player.replace({ uri: downloadUrl });
+            replacePlaybackSource(downloadUrl);
             return downloadUrl;
         } finally {
             setIsResolving(false);
         }
-    }, [mediaAssetId, playbackUri, player]);
+    }, [mediaAssetId, playbackUri, replacePlaybackSource]);
 
     const togglePlayback = useCallback(async () => {
         setError(null);
