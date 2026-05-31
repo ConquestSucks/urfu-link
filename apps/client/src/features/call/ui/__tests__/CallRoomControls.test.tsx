@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 jest.mock("react-native-reanimated", () => {
     const { Text, View } = require("react-native");
@@ -20,6 +21,9 @@ jest.mock("react-native-reanimated", () => {
         FadeInRight: animationBuilder,
         FadeOut: animationBuilder,
         LinearTransition: animationBuilder,
+        useAnimatedStyle: (styleFactory: () => unknown) => styleFactory(),
+        useSharedValue: (value: unknown) => ({ value }),
+        withSpring: (value: unknown) => value,
         ZoomIn: animationBuilder,
         ZoomOut: animationBuilder,
     };
@@ -67,7 +71,7 @@ jest.mock("../CallChatPanel", () => ({
 }));
 
 describe("CallRoomControls", () => {
-    it("renders media controls in the bottom bar", () => {
+    it("renders media controls in the bottom bar", async () => {
         const onToggleCamera = jest.fn();
         const onToggleScreenShare = jest.fn();
 
@@ -101,8 +105,14 @@ describe("CallRoomControls", () => {
         expect(screen.getByText("Экран")).toBeTruthy();
         expect(screen.queryByText("Сменить камеру")).toBeNull();
 
-        fireEvent.press(screen.getByTestId("call-control-camera"));
-        fireEvent.press(screen.getByTestId("call-control-screen"));
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("call-control-camera"));
+            await Promise.resolve();
+        });
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("call-control-screen"));
+            await Promise.resolve();
+        });
 
         expect(onToggleCamera).toHaveBeenCalledTimes(1);
         expect(onToggleScreenShare).toHaveBeenCalledTimes(1);
@@ -154,15 +164,70 @@ describe("CallRoomControls", () => {
             />,
         );
 
-        expect(screen.getByTestId("call-controls-dock").props.style).toEqual(
+        expect(StyleSheet.flatten(screen.getByTestId("call-controls-dock").props.style)).toEqual(
             expect.objectContaining({ flexWrap: "wrap" }),
         );
-        expect(screen.getByTestId("call-control-mic").props.style).toEqual(
+        expect(StyleSheet.flatten(screen.getByTestId("call-control-mic").props.style)).toEqual(
             expect.objectContaining({ width: 44, height: 44 }),
         );
         expect(screen.queryByText("Микрофон")).toBeNull();
         expect(screen.queryByText("Камера")).toBeNull();
         expect(screen.queryByText("Экран")).toBeNull();
+    });
+
+    it("shows a spinner while a media control action is pending", async () => {
+        let resolveMicrophoneToggle: () => void = () => undefined;
+        const onToggleMicrophone = jest.fn(
+            () =>
+                new Promise<void>((resolve) => {
+                    resolveMicrophoneToggle = resolve;
+                }),
+        );
+        const onToggleCamera = jest.fn();
+
+        render(
+            <CallControls
+                micEnabled
+                cameraEnabled={false}
+                screenShareEnabled={false}
+                switchCameraAvailable={false}
+                screenShareAvailable
+                busy={false}
+                isMobile={false}
+                onToggleMicrophone={onToggleMicrophone}
+                onToggleCamera={onToggleCamera}
+                onSwitchCamera={jest.fn()}
+                onToggleScreenShare={jest.fn()}
+                onOpenChat={jest.fn()}
+                onOpenParticipants={jest.fn()}
+                onLeave={jest.fn()}
+            />,
+        );
+
+        act(() => {
+            fireEvent.press(screen.getByTestId("call-control-mic"));
+        });
+
+        expect(onToggleMicrophone).toHaveBeenCalledTimes(1);
+        expect(screen.getByTestId("call-control-mic-spinner")).toBeTruthy();
+        expect(screen.getByTestId("call-control-camera").props.accessibilityState.disabled).toBe(
+            true,
+        );
+
+        act(() => {
+            fireEvent.press(screen.getByTestId("call-control-mic"));
+        });
+
+        expect(onToggleMicrophone).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            resolveMicrophoneToggle();
+        });
+
+        expect(screen.queryByTestId("call-control-mic-spinner")).toBeNull();
+        expect(screen.getByTestId("call-control-camera").props.accessibilityState.disabled).toBe(
+            false,
+        );
     });
 
     it("renders participant media states as icons without long compact text badges", () => {
