@@ -1,73 +1,56 @@
 # URFU Link
 
-URFU Link is a monorepo for a university communication platform. It contains an
-ASP.NET backend, an Expo web/mobile client, shared frontend packages, Kubernetes
-deployment manifests, platform automation, and tests.
-
-The repository is intended to be public. Do not commit production IP addresses,
-SSH targets, kubeconfigs, Vault keys, tokens, real passwords, or private
-environment files. Runtime secrets must live in CI secrets, Vault/External
-Secrets, or local ignored files.
+URFU Link is a monorepo for a university communication platform. The backend is
+built as a set of ASP.NET services behind an API Gateway. The client is an Expo
+application for web and mobile. Deployment is based on Kubernetes, Helm, Argo CD
+and GitHub Actions.
 
 ## English
 
-### What Is Inside
+### Repository Layout
 
-- `src/BuildingBlocks` - shared backend primitives: contracts, auth,
-  observability, idempotency, outbox, service defaults, and session revocation.
-- `src/Gateway/ApiGateway` - ASP.NET gateway built on YARP. It owns edge
-  routing, authentication, CORS, rate limits, and downstream health checks.
-- `src/Services/*` - domain services:
-  - `UserService` - accounts, profiles, devices, privacy, notification settings.
-  - `DisciplineService` - courses, enrollments, and teacher/student membership.
-  - `ChatService` - conversations, messages, threads, reactions, pins, reads.
-  - `PresenceService` - online state, typing state, privacy projection,
-    last-seen history.
-  - `NotificationService` - notification storage, delivery, badge counters,
-    email templates.
-  - `MediaService` - media metadata, upload sessions, grants, MinIO access.
-  - `CallService` - call lifecycle and LiveKit session orchestration.
-- `apps/client` - Expo Router application for web, iOS, and Android.
-- `packages/api-client` and `packages/ui` - shared frontend packages.
-- `deploy/helm` - reusable Helm chart and per-service environment values.
-- `deploy/k8s/platform` - platform manifests for ingress, identity, stateful
-  services, observability, Linkerd, Argo CD, and media.
-- `platform/dev` and `scripts` - local development stack and helper scripts.
-- `docs/architecture` - C4 docs, ADRs, domain boundaries, data conventions,
-  eventing conventions, and runbook templates.
-- `tests` - unit, integration, contract, smoke, and e2e test projects.
+- `src/BuildingBlocks` - shared backend packages: contracts, auth,
+  observability, idempotency, outbox, service defaults and session revocation.
+- `src/Gateway/ApiGateway` - public API entry point based on YARP.
+- `src/Services` - backend services split by domain.
+- `apps/client` - Expo Router application for web, iOS and Android.
+- `packages/api-client` - shared TypeScript API client.
+- `packages/ui` - shared UI package.
+- `deploy/helm` - reusable Helm chart and per-service values.
+- `deploy/k8s/platform` - platform manifests for Kubernetes infrastructure.
+- `platform/dev` - local Docker Compose and kind dependencies.
+- `scripts` - local development and deployment helper scripts.
+- `docs` - architecture notes, ADRs and delivery documentation.
+- `tests` - unit, integration, contract, smoke and e2e tests.
 
-### Architecture
+### Backend Services
 
-Clients talk to the API Gateway only. Internal synchronous communication uses
-gRPC, asynchronous communication uses Kafka topics, and service-to-service
-traffic is designed to run through Linkerd mTLS in Kubernetes.
+- `ApiGateway` routes public traffic to internal services.
+- `UserService` owns profiles, devices, preferences and user search projection.
+- `DisciplineService` owns courses, enrollments and membership roles.
+- `ChatService` owns conversations, messages, threads, pins and reactions.
+- `PresenceService` owns online status, typing state and last-seen history.
+- `NotificationService` owns notifications, delivery state and email templates.
+- `MediaService` owns media metadata, upload sessions and access grants.
+- `CallService` owns call lifecycle and LiveKit session orchestration.
 
-The main data stores are PostgreSQL, MongoDB, Redis, and MinIO. OpenTelemetry is
-used for traces, metrics, and logs. Web releases use the same Helm/Argo CD flow
-as backend services; mobile delivery is handled separately through EAS.
+### Runtime Model
 
-Useful docs:
-
-- `docs/architecture/c4-context.md`
-- `docs/architecture/c4-container.md`
-- `docs/architecture/domain-boundaries.md`
-- `docs/architecture/data-conventions.md`
-- `docs/architecture/eventing-conventions.md`
-- `docs/delivery/github-actions-and-argocd.md`
-- `docs/architecture/frontend-expo.md`
+Clients call only the API Gateway. Internal synchronous calls use gRPC. Async
+integration uses Kafka topics. Data is stored in PostgreSQL, MongoDB, Redis and
+MinIO depending on the owning service. OpenTelemetry is used for traces, metrics
+and logs.
 
 ### Requirements
 
-- .NET SDK `10.0.201` or a compatible newer feature band.
-- Node.js `>=22.14.0`.
-- pnpm `>=10.18.0` (`pnpm@11.0.9` is pinned in `package.json`).
-- Docker with Docker Compose for the local dependency stack.
-- PowerShell for the repository helper scripts.
-- For Kubernetes workflows: `kubectl`, `kind`, Helm, and access to the target
-  cluster.
+- .NET SDK `10.0.201`
+- Node.js `>=22.14.0`
+- pnpm `>=10.18.0`
+- Docker and Docker Compose
+- PowerShell
+- For Kubernetes flows: `kubectl`, `kind` and Helm
 
-### First Setup
+### Setup
 
 ```powershell
 pnpm install
@@ -82,13 +65,13 @@ Start the local stack:
 .\scripts\dev-up.ps1 -Build
 ```
 
-Build the backend:
+Build the solution:
 
 ```powershell
 dotnet build .\Urfu.Link.slnx -c Release
 ```
 
-Run the Expo client:
+Run the web client:
 
 ```powershell
 pnpm client:web
@@ -100,7 +83,7 @@ Stop the local stack:
 .\scripts\dev-down.ps1
 ```
 
-### Useful Commands
+### Checks
 
 ```powershell
 dotnet test .\Urfu.Link.slnx
@@ -109,7 +92,7 @@ pnpm client:typecheck
 pnpm client:web:build
 ```
 
-The `Makefile` also wraps common Docker Compose actions for local development:
+The `Makefile` also exposes common Docker Compose shortcuts:
 
 ```bash
 make up-infra
@@ -118,77 +101,18 @@ make logs
 make down
 ```
 
-### Deployment Notes
+### Deployment
 
-The production model is GitOps-first:
+Backend services and the web client are deployed through the same GitOps path:
 
-1. CI validates code and builds images.
-2. A promotion workflow updates the target Helm values file.
-3. Argo CD syncs the target application.
+1. CI validates the change and builds images.
+2. Promotion updates the target Helm values file.
+3. Argo CD syncs the application.
 4. Argo Rollouts handles blue/green rollout where enabled.
 
-Operational scripts must receive private infrastructure details from parameters
-or environment variables. Do not hardcode production node addresses in this
-repository.
+Mobile builds are handled separately through EAS.
 
-### Security Hygiene
-
-- Keep real secrets out of tracked files.
-- Keep production IP addresses and SSH targets out of docs and scripts.
-- Use placeholders in examples and document which variable must be provided.
-- Store production credentials in Vault/External Secrets or CI secret storage.
-- Treat generated `kubeconfig`, `vault-keys.json`, `.env`, and log dumps as
-  private local artifacts.
-
-## Русский
-
-URFU Link - монорепозиторий платформы коммуникаций для университета. Внутри
-находятся ASP.NET backend, Expo-клиент для web/mobile, общие frontend-пакеты,
-Kubernetes-манифесты, автоматизация платформы и тесты.
-
-Репозиторий рассчитан на публичную публикацию. Нельзя коммитить production IP,
-SSH targets, kubeconfig, ключи Vault, токены, реальные пароли и приватные
-environment-файлы. Runtime-секреты должны храниться в CI secrets,
-Vault/External Secrets или локальных ignored-файлах.
-
-### Что Внутри
-
-- `src/BuildingBlocks` - общие backend-примитивы: контракты, auth,
-  observability, idempotency, outbox, service defaults, session revocation.
-- `src/Gateway/ApiGateway` - ASP.NET gateway на YARP. Он отвечает за edge
-  routing, authentication, CORS, rate limits и health checks downstream-сервисов.
-- `src/Services/*` - доменные сервисы:
-  - `UserService` - аккаунты, профили, устройства, privacy, настройки
-    уведомлений.
-  - `DisciplineService` - учебные курсы, enrollments, роли teacher/student.
-  - `ChatService` - диалоги, сообщения, threads, reactions, pins, read receipts.
-  - `PresenceService` - online state, typing state, privacy projection,
-    last-seen history.
-  - `NotificationService` - хранение уведомлений, доставка, badge counters,
-    email templates.
-  - `MediaService` - metadata медиа, upload sessions, access grants, MinIO.
-  - `CallService` - жизненный цикл звонков и orchestration LiveKit-сессий.
-- `apps/client` - Expo Router приложение для web, iOS и Android.
-- `packages/api-client` и `packages/ui` - общие frontend-пакеты.
-- `deploy/helm` - reusable Helm chart и values по сервисам/окружениям.
-- `deploy/k8s/platform` - манифесты платформы: ingress, identity, stateful
-  сервисы, observability, Linkerd, Argo CD и media.
-- `platform/dev` и `scripts` - локальный стек и helper scripts.
-- `docs/architecture` - C4, ADR, границы доменов, data conventions, eventing
-  conventions и шаблоны runbook.
-- `tests` - unit, integration, contract, smoke и e2e тесты.
-
-### Архитектура
-
-Клиенты ходят только в API Gateway. Внутренние синхронные вызовы идут по gRPC,
-асинхронная интеграция идет через Kafka topics, а service-to-service traffic в
-Kubernetes рассчитан на Linkerd mTLS.
-
-Основные хранилища: PostgreSQL, MongoDB, Redis и MinIO. Для traces, metrics и
-logs используется OpenTelemetry. Web-релизы идут тем же Helm/Argo CD путем, что
-и backend-сервисы; mobile delivery вынесен отдельно в EAS.
-
-Полезные документы:
+### Useful Docs
 
 - `docs/architecture/c4-context.md`
 - `docs/architecture/c4-container.md`
@@ -198,16 +122,59 @@ logs используется OpenTelemetry. Web-релизы идут тем ж
 - `docs/delivery/github-actions-and-argocd.md`
 - `docs/architecture/frontend-expo.md`
 
+## Русский
+
+URFU Link - монорепозиторий платформы коммуникаций для университета. Backend
+собран как набор ASP.NET сервисов за API Gateway. Клиентская часть сделана на
+Expo для web и mobile. Доставка построена на Kubernetes, Helm, Argo CD и GitHub
+Actions.
+
+### Структура Репозитория
+
+- `src/BuildingBlocks` - общие backend-пакеты: contracts, auth, observability,
+  idempotency, outbox, service defaults и session revocation.
+- `src/Gateway/ApiGateway` - публичная точка входа API на YARP.
+- `src/Services` - backend-сервисы, разделенные по доменам.
+- `apps/client` - Expo Router приложение для web, iOS и Android.
+- `packages/api-client` - общий TypeScript API client.
+- `packages/ui` - общий UI-пакет.
+- `deploy/helm` - reusable Helm chart и values для сервисов.
+- `deploy/k8s/platform` - Kubernetes-манифесты платформы.
+- `platform/dev` - локальные Docker Compose и kind зависимости.
+- `scripts` - helper scripts для локальной разработки и деплоя.
+- `docs` - архитектурные заметки, ADR и delivery-документация.
+- `tests` - unit, integration, contract, smoke и e2e тесты.
+
+### Backend-Сервисы
+
+- `ApiGateway` маршрутизирует публичный трафик во внутренние сервисы.
+- `UserService` отвечает за профили, устройства, настройки и user search
+  projection.
+- `DisciplineService` отвечает за курсы, enrollments и роли участников.
+- `ChatService` отвечает за диалоги, сообщения, threads, pins и reactions.
+- `PresenceService` отвечает за online status, typing state и last-seen history.
+- `NotificationService` отвечает за уведомления, delivery state и email
+  templates.
+- `MediaService` отвечает за media metadata, upload sessions и access grants.
+- `CallService` отвечает за lifecycle звонков и LiveKit session orchestration.
+
+### Runtime-Модель
+
+Клиенты ходят только в API Gateway. Внутренние синхронные вызовы идут через
+gRPC. Асинхронная интеграция идет через Kafka topics. Данные хранятся в
+PostgreSQL, MongoDB, Redis и MinIO в зависимости от сервиса-владельца. Для
+traces, metrics и logs используется OpenTelemetry.
+
 ### Требования
 
-- .NET SDK `10.0.201` или совместимый newer feature band.
-- Node.js `>=22.14.0`.
-- pnpm `>=10.18.0` (`pnpm@11.0.9` закреплен в `package.json`).
-- Docker с Docker Compose для локального dependency stack.
-- PowerShell для helper scripts.
-- Для Kubernetes workflows: `kubectl`, `kind`, Helm и доступ к target cluster.
+- .NET SDK `10.0.201`
+- Node.js `>=22.14.0`
+- pnpm `>=10.18.0`
+- Docker и Docker Compose
+- PowerShell
+- Для Kubernetes flow: `kubectl`, `kind` и Helm
 
-### Первый Запуск
+### Установка
 
 ```powershell
 pnpm install
@@ -222,13 +189,13 @@ dotnet restore .\Urfu.Link.slnx
 .\scripts\dev-up.ps1 -Build
 ```
 
-Собрать backend:
+Собрать solution:
 
 ```powershell
 dotnet build .\Urfu.Link.slnx -c Release
 ```
 
-Запустить Expo client:
+Запустить web client:
 
 ```powershell
 pnpm client:web
@@ -240,7 +207,7 @@ pnpm client:web
 .\scripts\dev-down.ps1
 ```
 
-### Полезные Команды
+### Проверки
 
 ```powershell
 dotnet test .\Urfu.Link.slnx
@@ -249,8 +216,7 @@ pnpm client:typecheck
 pnpm client:web:build
 ```
 
-`Makefile` также оборачивает частые Docker Compose действия для локальной
-разработки:
+В `Makefile` есть короткие команды для Docker Compose:
 
 ```bash
 make up-infra
@@ -261,24 +227,21 @@ make down
 
 ### Deployment
 
-Production-модель построена вокруг GitOps:
+Backend-сервисы и web client деплоятся через один GitOps-путь:
 
-1. CI валидирует код и собирает images.
-2. Promotion workflow обновляет target Helm values file.
-3. Argo CD синхронизирует нужное приложение.
+1. CI валидирует изменение и собирает images.
+2. Promotion обновляет target Helm values file.
+3. Argo CD синхронизирует приложение.
 4. Argo Rollouts выполняет blue/green rollout там, где он включен.
 
-Операционные скрипты должны получать приватные данные инфраструктуры через
-параметры или environment variables. Не хардкодьте адреса production-нод в этом
-репозитории.
+Mobile builds идут отдельно через EAS.
 
-### Безопасность Для Публичного Репозитория
+### Полезные Документы
 
-- Не храните реальные секреты в tracked files.
-- Не храните production IP и SSH targets в документации или скриптах.
-- Используйте placeholders в примерах и явно пишите, какую переменную надо
-  передать.
-- Production credentials должны жить в Vault/External Secrets или CI secret
-  storage.
-- Считайте `kubeconfig`, `vault-keys.json`, `.env` и log dumps приватными
-  локальными артефактами.
+- `docs/architecture/c4-context.md`
+- `docs/architecture/c4-container.md`
+- `docs/architecture/domain-boundaries.md`
+- `docs/architecture/data-conventions.md`
+- `docs/architecture/eventing-conventions.md`
+- `docs/delivery/github-actions-and-argocd.md`
+- `docs/architecture/frontend-expo.md`
