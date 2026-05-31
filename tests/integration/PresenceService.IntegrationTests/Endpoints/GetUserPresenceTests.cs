@@ -65,7 +65,7 @@ public class GetUserPresenceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Get_WithLastSeen_DefaultPrivacyReturnsNullLastSeen()
+    public async Task Get_WithLastSeen_DefaultPrivacyReturnsLastSeen()
     {
         var requesterId = Guid.NewGuid();
         var targetId = Guid.NewGuid();
@@ -82,7 +82,7 @@ public class GetUserPresenceTests : IAsyncLifetime
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
         var body = await response.Content.ReadFromJsonAsync<PresenceInfoResponse>();
-        body!.LastSeenAt.Should().BeNull();
+        body!.LastSeenAt.Should().BeCloseTo(ts, TimeSpan.FromSeconds(1));
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public class GetUserPresenceTests : IAsyncLifetime
                 targetId, "d1", Platform.Web, PresenceStatus.Online,
                 null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow), CancellationToken.None);
         }
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: true);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: false);
 
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
@@ -121,7 +121,7 @@ public class GetUserPresenceTests : IAsyncLifetime
             ctx.LastSeens.Add(LastSeen.Create(targetId, Platform.Mobile, DateTimeOffset.UtcNow));
             await ctx.SaveChangesAsync();
         }
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: true);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: false);
 
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
@@ -143,7 +143,7 @@ public class GetUserPresenceTests : IAsyncLifetime
             ctx.LastSeens.Add(LastSeen.Create(targetId, Platform.Mobile, ts));
             await ctx.SaveChangesAsync();
         }
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: false);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, showLastVisitTime: true);
 
         var response = await _factory.CreateClient().GetAsync($"/api/v1/presence/users/{targetId}");
 
