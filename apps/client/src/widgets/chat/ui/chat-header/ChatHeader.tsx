@@ -70,6 +70,9 @@ export const ChatHeader = ({
             muteNotifications.mutate(chatId);
         }
     }, [chatId, muteNotifications, notificationsMuted, unmuteNotifications]);
+    const handleOpenCurrentChat = React.useCallback(() => {
+        setIsProfileOpen(false);
+    }, []);
 
     // Для direct-чата peerUserId — тот, кто не равен currentUserId.
     // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
@@ -252,7 +255,7 @@ export const ChatHeader = ({
                     lastSeenAt: peerPresence?.lastSeenAt,
                 }}
                 onStartAudioCall={conversation.type === "Direct" ? onStartAudioCall : undefined}
-                onStartVideoCall={conversation.type === "Direct" ? onStartVideoCall : undefined}
+                onOpenChat={conversation.type === "Direct" ? handleOpenCurrentChat : undefined}
                 onToggleNotifications={handleToggleNotifications}
                 notificationsMuted={notificationsMuted}
                 notificationsPending={notificationsPending}

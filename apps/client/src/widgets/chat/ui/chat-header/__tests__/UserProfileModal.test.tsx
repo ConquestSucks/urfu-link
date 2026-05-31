@@ -21,9 +21,9 @@ jest.mock("@/shared/ui/phosphor", () => {
     return {
         BellIcon: makeIcon("bell-on-icon"),
         BellSlashIcon: makeIcon("bell-icon"),
+        ChatCircleTextIcon: makeIcon("chat-icon"),
         EnvelopeIcon: makeIcon("mail-icon"),
         PhoneIcon: makeIcon("phone-icon"),
-        VideoCameraIcon: makeIcon("video-icon"),
         XIcon: makeIcon("close-icon"),
     };
 });
@@ -64,7 +64,7 @@ describe("UserProfileModal", () => {
     it("calls profile action handlers", () => {
         const onClose = jest.fn();
         const onStartAudioCall = jest.fn();
-        const onStartVideoCall = jest.fn();
+        const onOpenChat = jest.fn();
         const onToggleNotifications = jest.fn();
 
         render(
@@ -73,17 +73,20 @@ describe("UserProfileModal", () => {
                 onClose={onClose}
                 user={{ name: "Peer" }}
                 onStartAudioCall={onStartAudioCall}
-                onStartVideoCall={onStartVideoCall}
+                onOpenChat={onOpenChat}
                 onToggleNotifications={onToggleNotifications}
             />,
         );
 
+        expect(screen.getByText("Чат")).toBeTruthy();
+        expect(screen.getByTestId("chat-icon")).toBeTruthy();
+
         fireEvent.press(screen.getByTestId("profile-action-audio"));
-        fireEvent.press(screen.getByTestId("profile-action-video"));
+        fireEvent.press(screen.getByTestId("profile-action-chat"));
         fireEvent.press(screen.getByTestId("profile-action-notifications"));
 
         expect(onStartAudioCall).toHaveBeenCalledTimes(1);
-        expect(onStartVideoCall).toHaveBeenCalledTimes(1);
+        expect(onOpenChat).toHaveBeenCalledTimes(1);
         expect(onToggleNotifications).toHaveBeenCalledTimes(1);
         expect(onClose).toHaveBeenCalledTimes(2);
     });
