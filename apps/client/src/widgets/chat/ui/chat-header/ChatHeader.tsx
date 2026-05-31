@@ -112,6 +112,7 @@ export const ChatHeader = ({
 
     const isDirectPresenceLoading =
         conversation.type === "Direct" && (isDirectIdentityLoading || (!!peer?.userId && !peerPresence));
+    const canOpenPeerProfile = conversation.type === "Direct" && !isDirectIdentityLoading;
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
         ? presenceStatusToLabel(peerPresence.status)
@@ -130,7 +131,14 @@ export const ChatHeader = ({
                             <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
                         </Pressable>
                     )}
-                    <View className="flex-row gap-3 items-center">
+                    <Pressable
+                        testID="chat-header-profile-trigger"
+                        onPress={() => setIsProfileOpen(true)}
+                        disabled={!canOpenPeerProfile}
+                        className={`flex-row gap-3 items-center flex-1 min-w-0 rounded-xl ${
+                            canOpenPeerProfile ? "active:opacity-80 cursor-pointer" : "cursor-default"
+                        }`}
+                    >
                         <View className="relative z-1 p-0.5">
                             {isDirectIdentityLoading ? (
                                 <Skeleton
@@ -225,7 +233,7 @@ export const ChatHeader = ({
                                 );
                             })()}
                         </View>
-                    </View>
+                    </Pressable>
                 </View>
 
                 <ChatHeaderActions

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactNode } from "react";
 
 import { ChatHeader } from "../ChatHeader";
@@ -103,7 +103,10 @@ jest.mock("../ChatHeaderActions", () => ({
 }));
 
 jest.mock("../UserProfileModal", () => ({
-    UserProfileModal: () => null,
+    UserProfileModal: ({ isOpen }: { isOpen: boolean }) => {
+        const { Text } = require("react-native");
+        return isOpen ? <Text>profile modal open</Text> : null;
+    },
 }));
 
 describe("ChatHeader presence state", () => {
@@ -152,5 +155,20 @@ describe("ChatHeader presence state", () => {
 
         expect(screen.queryByTestId("chat-header-presence-skeleton")).toBeNull();
         expect(screen.getByText("Был недавно")).toBeTruthy();
+    });
+
+    it("opens the profile modal from the direct chat identity block", () => {
+        mockPeerPresence = {
+            userId: mockPeerUserId,
+            status: "Online",
+            platforms: [],
+            lastSeenAt: null,
+        };
+
+        render(<ChatHeader chatId="chat-1" />);
+
+        fireEvent.press(screen.getByTestId("chat-header-profile-trigger"));
+
+        expect(screen.getByText("profile modal open")).toBeTruthy();
     });
 });
