@@ -1,4 +1,4 @@
-import { renderHook } from "@testing-library/react-native";
+import { renderHook, waitFor } from "@testing-library/react-native";
 import { AppState } from "react-native";
 
 import { useCallHub } from "../useCallHub";
@@ -26,6 +26,11 @@ jest.mock("@microsoft/signalr", () => ({
 
 jest.mock("@/shared/lib/signalr", () => ({
     createHubConnection: jest.fn(() => mockConnection),
+    HUB_CONNECTION_STATE: {
+        Connected: "Connected",
+        Connecting: "Connecting",
+        Disconnected: "Disconnected",
+    },
 }));
 
 jest.mock("@/entities/call/model/call-store", () => ({
@@ -75,8 +80,9 @@ describe("useCallHub", () => {
         jest.restoreAllMocks();
     });
 
-    it("handles ringing direct calls as incoming calls", () => {
+    it("handles ringing direct calls as incoming calls", async () => {
         renderHook(() => useCallHub());
+        await waitFor(() => expect(handlers.IncomingCall).toEqual(expect.any(Function)));
 
         handlers.IncomingCall({
             id: "call-1",
@@ -92,8 +98,9 @@ describe("useCallHub", () => {
         });
     });
 
-    it("ignores already active discipline group calls so joined users do not hear ringtone", () => {
+    it("ignores already active discipline group calls so joined users do not hear ringtone", async () => {
         renderHook(() => useCallHub());
+        await waitFor(() => expect(handlers.IncomingCall).toEqual(expect.any(Function)));
 
         handlers.IncomingCall({
             id: "call-1",
@@ -105,8 +112,9 @@ describe("useCallHub", () => {
         expect(mockPlayMessageSound).not.toHaveBeenCalled();
     });
 
-    it("stops the connection before bfcache and reconnects when restored", () => {
+    it("stops the connection before bfcache and reconnects when restored", async () => {
         renderHook(() => useCallHub());
+        await waitFor(() => expect(pagehideHandler).toEqual(expect.any(Function)));
         mockConnection.start.mockClear();
         mockConnection.state = "Disconnected";
 

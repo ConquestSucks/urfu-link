@@ -10,6 +10,11 @@ jest.mock("@/shared/lib/config", () => ({
 
 jest.mock("@/shared/lib/signalr", () => ({
     createHubConnection: jest.fn(),
+    HUB_CONNECTION_STATE: {
+        Connected: "Connected",
+        Connecting: "Connecting",
+        Disconnected: "Disconnected",
+    },
 }));
 
 jest.mock("@/shared/lib/api", () => ({

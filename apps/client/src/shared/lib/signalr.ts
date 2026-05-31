@@ -1,7 +1,25 @@
-import * as signalR from "@microsoft/signalr";
 import { appConfig } from "./config";
 import { useAuthStore } from "@/shared/store/auth-store";
 import { Platform } from "react-native";
+
+type SignalRModule = typeof import("@microsoft/signalr");
+
+export type HubConnection = import("@microsoft/signalr").HubConnection;
+
+export const HUB_CONNECTION_STATE = {
+    Connected: "Connected",
+    Connecting: "Connecting",
+    Disconnected: "Disconnected",
+    Disconnecting: "Disconnecting",
+    Reconnecting: "Reconnecting",
+} as const;
+
+let signalRModulePromise: Promise<SignalRModule> | null = null;
+
+const getSignalRModule = () => {
+    signalRModulePromise ??= import("@microsoft/signalr");
+    return signalRModulePromise;
+};
 
 const createPresenceDeviceId = () => {
     const randomUuid = globalThis.crypto?.randomUUID?.();
@@ -22,7 +40,8 @@ const appendQuery = (url: string, params: Record<string, string>) => {
     return `${url}${url.includes("?") ? "&" : "?"}${query}`;
 };
 
-export const createHubConnection = (hubPath: string) => {
+export const createHubConnection = async (hubPath: string): Promise<HubConnection> => {
+    const signalR = await getSignalRModule();
     const baseUrl = getBaseUrl();
 
     const url = hubPath === "/hubs/presence"

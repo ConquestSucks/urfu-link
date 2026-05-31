@@ -1,5 +1,6 @@
 import { useCurrentUser, useUpdateSoundVideo } from "@/entities/user";
-import { LabeledCard, Select } from "@/shared/ui";
+import { LabeledCard } from "@/shared/ui";
+import { Select } from "@/shared/ui/Select";
 import { ScrollView } from "react-native";
 import { useMediaDevices } from "../lib/useMediaDevices";
 

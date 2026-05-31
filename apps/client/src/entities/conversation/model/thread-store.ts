@@ -3,7 +3,7 @@ import type { ActiveThreadDto, MessageDto } from "@urfu-link/api-client";
 import { apiClient } from "@/shared/lib/api";
 import { playMessageSound } from "@/shared/lib/message-sounds";
 import { useChatStore } from "./chat-store";
-import { HubConnectionState } from "@microsoft/signalr";
+import { HUB_CONNECTION_STATE } from "@/shared/lib/signalr";
 
 type ThreadState = {
     rootsById: Record<string, MessageDto | undefined>;
@@ -118,7 +118,7 @@ export const useThreadStore = create<ThreadState>((set, get) => {
 
         subscribeThread: async (rootMessageId) => {
             const { connection } = useChatStore.getState();
-            if (connection?.state === HubConnectionState.Connected) {
+            if (connection?.state === HUB_CONNECTION_STATE.Connected) {
                 try {
                     await connection.invoke("JoinThread", rootMessageId);
                 } catch (e) {
@@ -140,7 +140,7 @@ export const useThreadStore = create<ThreadState>((set, get) => {
 
         unsubscribeThread: async (rootMessageId) => {
             const { connection } = useChatStore.getState();
-            if (connection?.state === HubConnectionState.Connected) {
+            if (connection?.state === HUB_CONNECTION_STATE.Connected) {
                 try {
                     await connection.invoke("LeaveThread", rootMessageId);
                 } catch (e) {
@@ -162,7 +162,7 @@ export const useThreadStore = create<ThreadState>((set, get) => {
 
         replyInThread: async (rootMessageId, body, attachmentAssetIds = [], replyToMessageId) => {
             const { connection } = useChatStore.getState();
-            if (connection?.state === HubConnectionState.Connected) {
+            if (connection?.state === HUB_CONNECTION_STATE.Connected) {
                 await connection.invoke("ReplyInThread", {
                     rootMessageId,
                     body,
