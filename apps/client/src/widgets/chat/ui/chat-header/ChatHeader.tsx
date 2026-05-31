@@ -115,6 +115,7 @@ export const ChatHeader = ({
 
     const isDirectPresenceLoading =
         conversation.type === "Direct" && (isDirectIdentityLoading || (!!peer?.userId && !peerPresence));
+    const canOpenPeerProfile = conversation.type === "Direct" && !isDirectIdentityLoading;
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
         ? presenceStatusToLabel(peerPresence.status)
@@ -133,7 +134,14 @@ export const ChatHeader = ({
                             <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
                         </Pressable>
                     )}
-                    <View className="flex-row gap-3 items-center">
+                    <Pressable
+                        testID="chat-header-profile-trigger"
+                        onPress={() => setIsProfileOpen(true)}
+                        disabled={!canOpenPeerProfile}
+                        className={`flex-row gap-3 items-center flex-1 min-w-0 rounded-xl ${
+                            canOpenPeerProfile ? "active:opacity-80 cursor-pointer" : "cursor-default"
+                        }`}
+                    >
                         <View className="relative z-1 p-0.5">
                             {isDirectIdentityLoading ? (
                                 <Skeleton
@@ -198,17 +206,19 @@ export const ChatHeader = ({
                                         />
                                     );
                                 }
-                                if (indicatorStatus === "online" && statusLabel) {
+                                if (indicatorStatus !== "offline" && statusLabel) {
                                     return (
                                         <Text
                                             numberOfLines={1}
-                                            className="leading-none text-xs font-medium text-success-600"
+                                            className={`leading-none text-xs font-medium ${
+                                                indicatorStatus === "online" ? "text-success-600" : "text-text-muted"
+                                            }`}
                                         >
                                             {statusLabel}
                                         </Text>
                                     );
                                 }
-                                if (peerPresence?.lastSeenAt) {
+                                if (peerPresence) {
                                     return (
                                         <LastSeenLabel
                                             lastSeenAt={peerPresence.lastSeenAt}
@@ -221,12 +231,12 @@ export const ChatHeader = ({
                                         numberOfLines={1}
                                         className="leading-none text-xs font-medium text-text-muted"
                                     >
-                                        {statusLabel ?? "Не в сети"}
+                                        {statusLabel ?? "Был недавно"}
                                     </Text>
                                 );
                             })()}
                         </View>
-                    </View>
+                    </Pressable>
                 </View>
 
                 <ChatHeaderActions

@@ -115,6 +115,18 @@ describe("OutgoingCallModal", () => {
         await waitFor(() => expect(mockStartCallRingtone).toHaveBeenCalledWith("outgoing"));
     });
 
+    it("does not start outgoing ringtone for an already active call", async () => {
+        useCallStore.getState().setOutgoingCall(makeCall({
+            status: "Active",
+            acceptedAtUtc: "2026-05-30T10:00:00.000Z",
+        }));
+
+        render(<OutgoingCallModal />);
+
+        await waitFor(() => expect(mockStopCallRingtone).toHaveBeenCalledWith("outgoing"));
+        expect(mockStartCallRingtone).not.toHaveBeenCalled();
+    });
+
     it("cancels outgoing call and stops ringtone", async () => {
         mockCalls.cancel.mockResolvedValue(
             makeCall({ status: "Ended", endReason: "CancelledByCaller" }),

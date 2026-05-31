@@ -50,6 +50,7 @@ jest.mock("@/entities/chat-message", () => ({
         authorName,
         isHighlighted,
         replyTo,
+        onAuthorPress,
         onReplyPress,
         onJoinCall,
         showJoinCallAction,
@@ -60,6 +61,7 @@ jest.mock("@/entities/chat-message", () => ({
         authorName?: string;
         isHighlighted?: boolean;
         replyTo?: { messageId: string; preview: string } | null;
+        onAuthorPress?: () => void;
         onReplyPress?: () => void;
         onJoinCall?: (callId: string) => void;
         showJoinCallAction?: boolean;
@@ -72,6 +74,7 @@ jest.mock("@/entities/chat-message", () => ({
             authorName,
             isHighlighted,
             replyTo,
+            onAuthorPress,
             onReplyPress,
             onJoinCall,
             showJoinCallAction,
@@ -81,7 +84,11 @@ jest.mock("@/entities/chat-message", () => ({
                 <Text testID={`message-${id}`}>
                     {text}:{isHighlighted ? "highlighted" : "plain"}
                 </Text>
-                {authorName ? <Text testID={`message-author-${id}`}>{authorName}</Text> : null}
+                {authorName ? (
+                    <Text testID={`message-author-${id}`} onPress={onAuthorPress}>
+                        {authorName}
+                    </Text>
+                ) : null}
                 {avatarUrl ? <Text testID={`message-avatar-${id}`}>{avatarUrl}</Text> : null}
                 {replyTo ? (
                     <Text testID={`reply-preview-${id}`} onPress={onReplyPress}>
@@ -290,6 +297,51 @@ describe("MessagesList loading state", () => {
         expect(screen.getByTestId("message-avatar-message-1").props.children).toBe(
             "https://cdn.test/teacher.png",
         );
+    });
+
+    it("opens a subject participant profile from a message author press", () => {
+        const onAuthorPress = jest.fn();
+        mockParticipants = {
+            "subject-1": {
+                items: [
+                    {
+                        userId: "teacher-1",
+                        displayName: "Teacher One",
+                        avatarUrl: "https://cdn.test/teacher.png",
+                    },
+                ],
+            },
+        };
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "subject-1": [
+                    {
+                        id: "message-1",
+                        body: "lesson",
+                        senderId: "teacher-1",
+                        readAt: null,
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "subject-1": true },
+        };
+
+        render(
+            <MessagesList
+                chatId="subject-1"
+                type="subject"
+                onAuthorPress={onAuthorPress}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("message-author-message-1"));
+
+        expect(onAuthorPress).toHaveBeenCalledWith({
+            userId: "teacher-1",
+            displayName: "Teacher One",
+            avatarUrl: "https://cdn.test/teacher.png",
+        });
     });
 
     it("falls back to sender id when a subject participant is not cached", () => {

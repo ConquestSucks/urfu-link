@@ -112,26 +112,44 @@ const NativeRoomContent = ({
         participantInfos.find((participant) => participant.isSelf)?.userId ??
         localParticipant?.identity ??
         null;
+    const connectedParticipantIds = useMemo(
+        () =>
+            new Set(
+                participantInfos
+                    .filter((participant) => participant.isConnected)
+                    .map((participant) => participant.userId),
+            ),
+        [participantInfos],
+    );
 
     const remoteCameraTracks = useMemo<DefinedTrackRef[]>(
         () =>
             cameraTracks.filter(
                 (track): track is DefinedTrackRef =>
-                    track !== null && track !== undefined && !track.participant.isLocal,
+                    track !== null &&
+                    track !== undefined &&
+                    !track.participant.isLocal &&
+                    connectedParticipantIds.has(track.participant.identity),
             ),
-        [cameraTracks],
+        [cameraTracks, connectedParticipantIds],
     );
     const localCameraTrack = useMemo<DefinedTrackRef | null>(() => {
-        const local = cameraTracks.find((track) => track?.participant.isLocal);
+        const local = cameraTracks.find(
+            (track) =>
+                track?.participant.isLocal &&
+                connectedParticipantIds.has(track.participant.identity),
+        );
         return (local as DefinedTrackRef | undefined) ?? null;
-    }, [cameraTracks]);
+    }, [cameraTracks, connectedParticipantIds]);
     const allScreenShareTracks = useMemo<DefinedTrackRef[]>(
         () =>
             screenShareTracks.filter(
                 (track): track is DefinedTrackRef =>
-                    track !== null && track !== undefined,
+                    track !== null &&
+                    track !== undefined &&
+                    connectedParticipantIds.has(track.participant.identity),
             ),
-        [screenShareTracks],
+        [connectedParticipantIds, screenShareTracks],
     );
     const remoteScreenShareTracks = useMemo<DefinedTrackRef[]>(
         () => allScreenShareTracks.filter((track) => !track.participant.isLocal),

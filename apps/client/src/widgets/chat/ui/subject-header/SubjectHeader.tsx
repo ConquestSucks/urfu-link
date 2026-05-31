@@ -28,21 +28,42 @@ import type { CallType, ConversationParticipantDto } from "@urfu-link/api-client
 const roleLabel = (role: ConversationParticipantDto["role"]) =>
     role === "Teacher" ? "Преподаватель" : role === "Student" ? "Студент" : "Участник";
 
+interface SubjectHeaderProps {
+    subjectId: string;
+    onOpenPinned?: () => void;
+    onOpenSearch?: () => void;
+    onStartGroupAudioCall?: () => void;
+    onStartGroupVideoCall?: () => void;
+    onBeforeStartCall?: () => void;
+    profileUserId?: string | null;
+    onProfileUserIdChange?: (userId: string | null) => void;
+}
+
 export const SubjectHeader = ({
     subjectId,
     onOpenPinned,
     onOpenSearch,
     onStartGroupAudioCall,
     onStartGroupVideoCall,
-}: {
-    subjectId: string;
-    onOpenPinned?: () => void;
-    onOpenSearch?: () => void;
-    onStartGroupAudioCall?: () => void;
-    onStartGroupVideoCall?: () => void;
-}) => {
+    onBeforeStartCall,
+    profileUserId: controlledProfileUserId,
+    onProfileUserIdChange,
+}: SubjectHeaderProps) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
-    const [profileUserId, setProfileUserId] = useState<string | null>(null);
+    const [internalProfileUserId, setInternalProfileUserId] = useState<string | null>(null);
+    const isProfileControlled = controlledProfileUserId !== undefined;
+    const profileUserId = isProfileControlled ? controlledProfileUserId : internalProfileUserId;
+    const setProfileUserId = useCallback(
+        (userId: string | null) => {
+            if (isProfileControlled) {
+                onProfileUserIdChange?.(userId);
+                return;
+            }
+
+            setInternalProfileUserId(userId);
+        },
+        [isProfileControlled, onProfileUserIdChange],
+    );
     const router = useRouter();
     const { isMobile } = useWindowSize();
     const conversation = useChatStore((s) =>
@@ -102,6 +123,10 @@ export const SubjectHeader = ({
             return null;
         }
 
+        setIsMembersOpen(false);
+        setProfileUserId(null);
+        onBeforeStartCall?.();
+
         const direct = await apiClient.chat.openDirectConversation(selectedParticipant.userId);
         updateConversation(direct);
 
@@ -127,7 +152,7 @@ export const SubjectHeader = ({
         saveDirectDraftConversation(direct, directParticipants);
 
         return direct.id;
-    }, [currentUserId, primeParticipants, profile, selectedParticipant, updateConversation]);
+    }, [currentUserId, onBeforeStartCall, primeParticipants, profile, selectedParticipant, setProfileUserId, updateConversation]);
 
     const handleStartDirectCallFromProfile = useCallback(async (callType: CallType) => {
         const conversationId = await openDirectConversationFromProfile();

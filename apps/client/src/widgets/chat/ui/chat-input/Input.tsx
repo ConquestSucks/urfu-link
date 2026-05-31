@@ -92,6 +92,7 @@ interface ChatInputProps {
 
 export type ChatInputHandle = {
     addFilesAndOpenModal: (files: File[]) => void;
+    closeModals: () => void;
 };
 
 type SelectedMention = {
@@ -259,6 +260,10 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 setSubmitError(null);
                 animate(false);
                 addAttachments(files, { openModal: true });
+            },
+            closeModals: () => {
+                setIsFilesModalVisible(false);
+                animate(false);
             },
         }),
         [addAttachments, animate, editing, hasVoiceDraft, voiceRecorder.isRecording],

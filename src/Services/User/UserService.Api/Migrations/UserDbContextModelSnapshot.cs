@@ -142,10 +142,6 @@ namespace UserService.Api.Migrations
                                 .HasColumnType("boolean")
                                 .HasColumnName("show_last_visit_time");
 
-                            b1.Property<bool>("ShowOnlineStatus")
-                                .HasColumnType("boolean")
-                                .HasColumnName("show_online_status");
-
                             b1.HasKey("UserProfileId");
 
                             b1.ToTable("user_profiles", "users");

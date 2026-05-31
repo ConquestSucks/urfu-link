@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ChatHeader } from "./chat-header/ChatHeader";
 import { ChatInput, type ChatInputHandle } from "./chat-input/Input";
-import { MessagesList, type MessagesListHandle } from "./MessagesList";
+import { MessagesList, type MessageAuthorProfile, type MessagesListHandle } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
@@ -54,6 +54,7 @@ export const ChatView = () => {
     const [forwardIds, setForwardIds] = useState<string[] | null>(null);
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
     const [isPinnedModalOpen, setIsPinnedModalOpen] = useState(false);
+    const [subjectProfileUserId, setSubjectProfileUserId] = useState<string | null>(null);
     const [isDocumentVisible, setIsDocumentVisible] = useState(() =>
         typeof document === "undefined" || document.visibilityState === "visible",
     );
@@ -66,15 +67,32 @@ export const ChatView = () => {
     const chatId = params.id as string;
     const handleSend = useConversationSend(chatId);
 
+    const closeCallModals = useCallback(() => {
+        setIsSearching(false);
+        setActionsTarget(null);
+        setActionsAnchor(null);
+        setReadStatusLabel(null);
+        setIsReadStatusLoading(false);
+        setReactionTargetId(null);
+        setForwardIds(null);
+        setOpenThreadRootId(null);
+        setIsPinnedModalOpen(false);
+        inputRef.current?.closeModals();
+    }, []);
+
     const handleStartConversationCall = useCallback(async (callType: "Audio" | "Video") => {
         if (!conversation || isStartingCall) return;
+        closeCallModals();
         try {
             setIsStartingCall(true);
-            await startCall(conversation.id, callType);
+            const call = await startCall(conversation.id, callType);
+            if (call.status === "Active") {
+                router.push(`/call/${call.id}` as never);
+            }
         } finally {
             setIsStartingCall(false);
         }
-    }, [conversation, isStartingCall, startCall]);
+    }, [closeCallModals, conversation, isStartingCall, router, startCall]);
 
     const handleStartAudioCall = useCallback(
         () => void handleStartConversationCall("Audio"),
@@ -97,6 +115,14 @@ export const ChatView = () => {
     const routeMessageId = typeof params.message === "string" ? params.message : null;
     const routeThreadRootId = typeof params.thread === "string" ? params.thread : null;
     const type = currentTab === "chats" ? "chat" : "subject";
+    const handleAuthorPress = useCallback(
+        (author: MessageAuthorProfile) => {
+            if (type === "subject") {
+                setSubjectProfileUserId(author.userId);
+            }
+        },
+        [type],
+    );
     const isDirectDraft = isDirectDraftConversation(conversation);
     const isUnknownDirectDraft = type === "chat" && !conversation && isDirectDraftId(chatId);
     const shouldSkipRemoteConversationLoads = isDirectDraft || isUnknownDirectDraft;
@@ -133,6 +159,10 @@ export const ChatView = () => {
             setPendingScrollToMessageId(routeMessageId);
         }
     }, [routeMessageId, routeThreadRootId, setPendingScrollToMessageId]);
+
+    useEffect(() => {
+        setSubjectProfileUserId(null);
+    }, [chatId, type]);
 
     useEffect(() => {
         if (type !== "chat" || conversation || !isDirectDraftId(chatId)) {
@@ -320,6 +350,9 @@ export const ChatView = () => {
                     onOpenPinned={() => setIsPinnedModalOpen(true)}
                     onStartGroupAudioCall={handleStartAudioCall}
                     onStartGroupVideoCall={handleStartVideoCall}
+                    onBeforeStartCall={closeCallModals}
+                    profileUserId={subjectProfileUserId}
+                    onProfileUserIdChange={setSubjectProfileUserId}
                 />
             )}
 
@@ -338,6 +371,7 @@ export const ChatView = () => {
                 skipInitialLoad={shouldSkipRemoteConversationLoads}
                 onMessageLongPress={(message) => openActionsMenu(message)}
                 onMessageContextMenu={openActionsMenu}
+                onAuthorPress={type === "subject" ? handleAuthorPress : undefined}
                 onThreadOpen={setOpenThreadRootId}
                 onFilesDropped={(files) => inputRef.current?.addFilesAndOpenModal(files)}
                 onSystemCallJoin={(callId) => void handleSystemCallJoin(callId)}

@@ -29,9 +29,9 @@ jest.mock("@/shared/ui/phosphor", () => {
 });
 
 jest.mock("@/entities/presence", () => ({
-    LastSeenLabel: ({ lastSeenAt }: { lastSeenAt: string }) => {
+    LastSeenLabel: ({ lastSeenAt }: { lastSeenAt?: string | null }) => {
         const { Text } = require("react-native");
-        return <Text>{lastSeenAt}</Text>;
+        return <Text>{lastSeenAt ?? "Был недавно"}</Text>;
     },
     presenceStatusToLabel: (status: string) => status,
 }));

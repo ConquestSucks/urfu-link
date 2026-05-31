@@ -27,7 +27,7 @@ export const SearchBar = ({ placeholder = "Поиск...", value, onChange }: Se
             <MagnifyingGlassIcon size={20} className="text-text-subtle" weight="bold" />
 
             <TextInput
-                className="text-white outline-none text-sm h-full grow placeholder:text-text-subtle selection:text-text-subtle caret-text-subtle"
+                className="text-white outline-none text-sm h-full grow placeholder:text-text-subtle selection:bg-brand-600/40 selection:text-white caret-text-subtle"
                 placeholder={placeholder}
                 value={query}
                 onChangeText={handleChangeText}
