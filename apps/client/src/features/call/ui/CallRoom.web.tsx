@@ -46,6 +46,10 @@ import {
     type ScreenShareCandidate,
     type StageMediaItem,
 } from "./CallRoomMedia";
+import {
+    getCurrentBrowserDeviceInfo,
+    isMobileBrowserDevice,
+} from "./CallRoomPlatform";
 
 type CameraFacingMode = "user" | "environment";
 
@@ -795,6 +799,9 @@ export const CallRoom = ({
     const [isScreenShareFullscreen, setIsScreenShareFullscreen] = useState(false);
     const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
     const [videoInputCount, setVideoInputCount] = useState(0);
+    const [isMobileBrowser, setIsMobileBrowser] = useState(() =>
+        isMobileBrowserDevice(getCurrentBrowserDeviceInfo()),
+    );
     const knownRemoteScreenShareKeysRef = useRef<Set<string>>(new Set());
     const browserFullscreenActiveRef = useRef(false);
 
@@ -806,8 +813,12 @@ export const CallRoom = ({
             Boolean(navigator.mediaDevices?.getDisplayMedia),
         [],
     );
-    const canSwitchCamera = isMobile && videoInputCount > 1;
+    const canSwitchCamera = isMobileBrowser && videoInputCount > 1;
     const localUserId = participantInfos.find((participant) => participant.isSelf)?.userId ?? null;
+
+    useEffect(() => {
+        setIsMobileBrowser(isMobileBrowserDevice(getCurrentBrowserDeviceInfo()));
+    }, []);
 
     const refreshVideoInputs = useCallback(async () => {
         try {
@@ -1249,7 +1260,8 @@ export const CallRoom = ({
             !room ||
             !isConnectedToCall ||
             !room.localParticipant.isCameraEnabled ||
-            !canSwitchCamera
+            !canSwitchCamera ||
+            !isMobileBrowserDevice(getCurrentBrowserDeviceInfo())
         ) {
             return;
         }
