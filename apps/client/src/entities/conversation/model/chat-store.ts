@@ -84,6 +84,7 @@ type ChatState = {
     pinnedLoadingByConversation: Record<string, boolean>;
     isLoading: boolean;
     pendingScrollToMessageId: string | null;
+    pendingReadByConversation: Record<string, string>;
     threadEventListeners: Set<ThreadEventHandler>;
 
     connect: () => Promise<void>;
@@ -106,6 +107,7 @@ type ChatState = {
 
     editMessage: (messageId: string, body: string) => Promise<void>;
     deleteMessage: (messageId: string, mode: DeleteMode) => Promise<void>;
+    flushPendingReads: () => Promise<void>;
     forwardMessages: (targetConversationId: string, messageIds: string[]) => Promise<void>;
     addReaction: (messageId: string, emoji: string) => Promise<void>;
     removeReaction: (messageId: string, emoji: string) => Promise<void>;
@@ -420,6 +422,36 @@ const markIncomingReadInState = (
     };
 };
 
+const selectNewestReadAnchor = (
+    messages: MessageDto[] | undefined,
+    currentMessageId: string | undefined,
+    nextMessageId: string,
+) => {
+    if (!messages || !currentMessageId) return nextMessageId;
+
+    const currentIndex = messages.findIndex((message) => message.id === currentMessageId);
+    const nextIndex = messages.findIndex((message) => message.id === nextMessageId);
+    if (currentIndex === -1) return nextMessageId;
+    if (nextIndex === -1) return currentMessageId;
+
+    return nextIndex < currentIndex ? nextMessageId : currentMessageId;
+};
+
+const queuePendingReadInState = (
+    state: Pick<ChatState, "messagesByConversation" | "pendingReadByConversation">,
+    conversationId: string,
+    messageId: string,
+) => ({
+    pendingReadByConversation: {
+        ...state.pendingReadByConversation,
+        [conversationId]: selectNewestReadAnchor(
+            state.messagesByConversation[conversationId],
+            state.pendingReadByConversation[conversationId],
+            messageId,
+        ),
+    },
+});
+
 export const useChatStore = create<ChatState>((set, get) => ({
     connection: null,
     isConnected: false,
@@ -435,6 +467,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pinnedLoadingByConversation: {},
     isLoading: false,
     pendingScrollToMessageId: null,
+    pendingReadByConversation: {},
     threadEventListeners: new Set<ThreadEventHandler>(),
 
     connect: async () => {
@@ -657,6 +690,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             // курсоры и hasMore, чтобы следующий loadMessages(reset=true) подтянул
             // свежий снэпшот.
             set({ cursors: {}, hasMoreByConversation: {}, isConnected: true });
+            void get().flushPendingReads();
         });
 
         newConnection.onreconnecting((err) => {
@@ -667,6 +701,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         try {
             await newConnection.start();
             set({ connection: newConnection, isConnected: true });
+            await get().flushPendingReads();
         } catch (e) {
             console.error("Failed to connect to ChatHub", e);
             set({ isConnected: false });
@@ -926,12 +961,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     markRead: async (chatId, messageId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
-            await connection.invoke("MarkRead", chatId, messageId);
-            const currentUserId = useAuthStore.getState().userId;
+        const currentUserId = useAuthStore.getState().userId;
+        const applyLocalRead = () => {
             set((state) =>
                 markIncomingReadInState(state, chatId, messageId, currentUserId ?? null),
             );
+        };
+
+        if (connection?.state === HubConnectionState.Connected) {
+            applyLocalRead();
+            try {
+                await connection.invoke("MarkRead", chatId, messageId);
+                return;
+            } catch (error) {
+                console.warn("Failed to mark chat messages read; queued for retry", error);
+            }
+        }
+
+        set((state) => ({
+            ...markIncomingReadInState(state, chatId, messageId, currentUserId ?? null),
+            ...queuePendingReadInState(state, chatId, messageId),
+        }));
+    },
+
+    flushPendingReads: async () => {
+        const { connection, pendingReadByConversation } = get();
+        if (connection?.state !== HubConnectionState.Connected) return;
+
+        const entries = Object.entries(pendingReadByConversation);
+        for (const [conversationId, messageId] of entries) {
+            try {
+                await connection.invoke("MarkRead", conversationId, messageId);
+                set((state) => {
+                    if (state.pendingReadByConversation[conversationId] !== messageId) {
+                        return state;
+                    }
+
+                    const nextPending = { ...state.pendingReadByConversation };
+                    delete nextPending[conversationId];
+                    return { pendingReadByConversation: nextPending };
+                });
+            } catch (error) {
+                console.warn("Failed to flush pending chat read marker", error);
+                return;
+            }
         }
     },
 

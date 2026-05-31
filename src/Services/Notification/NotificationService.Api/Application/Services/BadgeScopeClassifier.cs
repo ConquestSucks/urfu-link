@@ -6,6 +6,8 @@ internal sealed record BadgeScopeInput(NotificationCategory Category, string? Co
 
 internal static class BadgeScopeClassifier
 {
+    private const string DisciplineConversationPrefix = "discipline:";
+
     private static readonly HashSet<NotificationCategory> DisciplineCategories =
     [
         NotificationCategory.ChatMessageDiscipline,
@@ -34,7 +36,8 @@ internal static class BadgeScopeClassifier
             }
 
             if (!string.IsNullOrWhiteSpace(input.ConversationId) &&
-                disciplineConversationIds.Contains(input.ConversationId))
+                (disciplineConversationIds.Contains(input.ConversationId) ||
+                 input.ConversationId.StartsWith(DisciplineConversationPrefix, StringComparison.OrdinalIgnoreCase)))
             {
                 disciplines++;
                 continue;

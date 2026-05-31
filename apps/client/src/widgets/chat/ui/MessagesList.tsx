@@ -112,6 +112,38 @@ const getMessageListItemKey = (item: MessageListItem) => item.id;
 
 const waitForListUpdate = () => new Promise((resolve) => setTimeout(resolve, 50));
 
+const getJoinableSystemCallIds = (messages: MessageDto[]): Set<string> => {
+    const latestByCallId = new Map<string, { status: string; timestamp: number; index: number }>();
+
+    messages.forEach((message, index) => {
+        const systemCall = message.kind === "SystemCall" ? message.systemCall : null;
+        if (!systemCall?.callId) return;
+
+        const parsed = Date.parse(message.createdAt);
+        const timestamp = Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+        const current = latestByCallId.get(systemCall.callId);
+        if (
+            !current ||
+            timestamp > current.timestamp ||
+            (timestamp === current.timestamp && index < current.index)
+        ) {
+            latestByCallId.set(systemCall.callId, {
+                status: systemCall.status,
+                timestamp,
+                index,
+            });
+        }
+    });
+
+    const joinable = new Set<string>();
+    latestByCallId.forEach((value, callId) => {
+        if (value.status === "Started") {
+            joinable.add(callId);
+        }
+    });
+    return joinable;
+};
+
 const styles = StyleSheet.create({
     dateSeparator: {
         marginTop: 24,
@@ -329,6 +361,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         const shouldShowAvatars = type === "subject";
         const isInitialLoading = isLoading && !isLoaded && messages.length === 0;
+        const joinableSystemCallIds = useMemo(
+            () => (type === "subject" ? getJoinableSystemCallIds(messages) : new Set<string>()),
+            [messages, type],
+        );
 
         const handleViewableItemsChanged = React.useRef(
             ({
@@ -422,6 +458,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     const view = mapMessageToProps(message, currentUserId);
                     const sender = participantsByUserId.get(message.senderId);
                     const isSystemMessage = message.kind === "SystemCall";
+                    const canJoinSystemCall =
+                        isSystemMessage &&
+                        !!view.systemCall?.callId &&
+                        joinableSystemCallIds.has(view.systemCall.callId);
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
                     const itemAbove = listItems[index + 1];
@@ -506,7 +546,8 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                                 : undefined
                                               )
                                     }
-                                    onJoinCall={isSystemMessage ? onSystemCallJoin : undefined}
+                                    showJoinCallAction={canJoinSystemCall}
+                                    onJoinCall={canJoinSystemCall ? onSystemCallJoin : undefined}
                                     onThreadOpen={
                                         message.threadReplyCount && message.threadReplyCount > 0
                                             ? () => onThreadOpen?.(message.id)
@@ -520,6 +561,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             [
                 currentUserId,
                 highlightedMessageId,
+                joinableSystemCallIds,
                 listItems,
                 participantsByUserId,
                 shouldShowAvatars,
