@@ -2,7 +2,7 @@ import type { NotificationBadgeDto } from "@urfu-link/api-client";
 
 export type NotificationScope = "chats" | "disciplines";
 
-const chatFallbackCategories = [1, 4, 5, 6, 7, 8, 10, 11, 40, 41, 50, 51, 52, 53];
+const chatFallbackCategories = [1, 4, 5, 6, 8, 10, 11, 40, 41, 50, 51, 52, 53];
 const disciplineFallbackCategories = [3, 20, 21, 22, 23, 24, 25, 26];
 
 export const getNotificationScopeUnreadCount = (

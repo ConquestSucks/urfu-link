@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 import { Platform } from "react-native";
 
 import { useMediaDevices } from "../useMediaDevices";
@@ -46,6 +46,10 @@ describe("useMediaDevices", () => {
     });
 
     it("shows a saved device before browser device labels are available", () => {
+        (navigator.mediaDevices.enumerateDevices as jest.Mock).mockReturnValue(
+            new Promise(() => undefined),
+        );
+
         const { result } = renderHook(() => useMediaDevices("audioinput", "stored-mic"));
 
         expect(result.current.selectedValue).toBe("stored-mic");
@@ -66,5 +70,18 @@ describe("useMediaDevices", () => {
             { label: "Studio Mic", value: "stored-mic" },
             { label: "Backup Mic", value: "other-mic" },
         ]);
+    });
+
+    it("resolves a saved device label on mount when browser labels are already available", async () => {
+        const { result } = renderHook(() => useMediaDevices("audioinput", "stored-mic"));
+
+        await waitFor(() => {
+            expect(result.current.options).toEqual([
+                { label: "Studio Mic", value: "stored-mic" },
+                { label: "Backup Mic", value: "other-mic" },
+            ]);
+        });
+        expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+        expect(result.current.selectedValue).toBe("stored-mic");
     });
 });
