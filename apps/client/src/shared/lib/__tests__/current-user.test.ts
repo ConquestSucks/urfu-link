@@ -74,4 +74,40 @@ describe("current-user bootstrap", () => {
         expect(userId).toBe("user-1");
         expect(getMe).toHaveBeenCalledTimes(1);
     });
+
+    it("updates the module cache after optimistic profile mutations", async () => {
+        const { resolveCurrentUser, setCurrentUserCache, getMe } = await loadModule();
+
+        await resolveCurrentUser({ forceRefresh: true });
+        setCurrentUserCache((current) =>
+            current
+                ? {
+                      ...current,
+                      privacy: {
+                          ...current.privacy,
+                          showOnlineStatus: false,
+                      },
+                  }
+                : current,
+        );
+
+        await expect(resolveCurrentUser()).resolves.toEqual(
+            expect.objectContaining({
+                privacy: expect.objectContaining({
+                    showOnlineStatus: false,
+                }),
+            }),
+        );
+        expect(getMe).toHaveBeenCalledTimes(1);
+    });
+
+    it("refetches after the module cache is cleared", async () => {
+        const { resolveCurrentUser, clearCurrentUserCache, getMe } = await loadModule();
+
+        await resolveCurrentUser({ forceRefresh: true });
+        clearCurrentUserCache();
+        await resolveCurrentUser();
+
+        expect(getMe).toHaveBeenCalledTimes(2);
+    });
 });

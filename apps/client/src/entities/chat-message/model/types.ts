@@ -49,4 +49,5 @@ export interface ChatMessageProps {
     onReplyPress?: () => void;
     onThreadOpen?: () => void;
     onReactionPress?: (emoji: string) => void;
+    onJoinCall?: (callId: string) => void;
 }

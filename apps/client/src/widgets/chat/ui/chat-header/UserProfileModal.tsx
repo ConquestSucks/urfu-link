@@ -1,5 +1,6 @@
 import { Avatar, ModalOverlay } from "@/shared/ui";
 import {
+    BellIcon,
     BellSlashIcon,
     EnvelopeIcon,
     PhoneIcon,
@@ -27,6 +28,7 @@ interface UserProfileModalProps {
     onStartAudioCall?: () => void;
     onStartVideoCall?: () => void;
     onToggleNotifications?: () => void;
+    notificationsMuted?: boolean;
     notificationsPending?: boolean;
 }
 
@@ -37,6 +39,7 @@ export const UserProfileModal = ({
     onStartAudioCall,
     onStartVideoCall,
     onToggleNotifications,
+    notificationsMuted = false,
     notificationsPending = false,
 }: UserProfileModalProps) => {
     const stableUserRef = useRef<ProfileUser>(user);
@@ -48,6 +51,20 @@ export const UserProfileModal = ({
     }, [isOpen, user]);
 
     const displayUser = isOpen ? user : stableUserRef.current;
+    const NotificationIcon = notificationsMuted ? BellIcon : BellSlashIcon;
+    const notificationLabel = notificationsMuted ? "Включить" : "Отключить";
+    const handleStartAudioCall = onStartAudioCall
+        ? () => {
+              onClose();
+              onStartAudioCall();
+          }
+        : undefined;
+    const handleStartVideoCall = onStartVideoCall
+        ? () => {
+              onClose();
+              onStartVideoCall();
+          }
+        : undefined;
 
     return (
         <ModalOverlay
@@ -57,7 +74,7 @@ export const UserProfileModal = ({
             contentClassName="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-full max-w-[420px]"
         >
             <View className="flex-row justify-between items-center px-8 pt-7 pb-4 border-b border-white/5">
-                <Text className="text-lg text-white font-bold">ÐŸÑ€Ð¾Ñ„Ð¸Ð»ÑŒ</Text>
+                <Text className="text-lg text-white font-bold">Профиль</Text>
                 <Pressable
                     onPress={onClose}
                     className="p-2 -mr-2 rounded-xl active:bg-white/10 transition-colors"
@@ -89,7 +106,7 @@ export const UserProfileModal = ({
                             />
                         ) : (
                             <Text className="text-sm text-text-muted font-medium">
-                                {displayUser.status ? presenceStatusToLabel(displayUser.status) : "ÐÐµ Ð² ÑÐµÑ‚Ð¸"}
+                                {displayUser.status ? presenceStatusToLabel(displayUser.status) : "Не в сети"}
                             </Text>
                         )}
                     </View>
@@ -98,19 +115,19 @@ export const UserProfileModal = ({
                     <ActionBtn
                         testID="profile-action-audio"
                         icon={PhoneIcon}
-                        label="Ð’Ñ‹Ð·Ð¾Ð²"
-                        onPress={onStartAudioCall}
+                        label="Вызов"
+                        onPress={handleStartAudioCall}
                     />
                     <ActionBtn
                         testID="profile-action-video"
                         icon={VideoCameraIcon}
-                        label="Ð’Ð¸Ð´ÐµÐ¾"
-                        onPress={onStartVideoCall}
+                        label="Видео"
+                        onPress={handleStartVideoCall}
                     />
                     <ActionBtn
                         testID="profile-action-notifications"
-                        icon={BellSlashIcon}
-                        label="Ð£Ð²ÐµÐ´Ð¾Ð¼Ð»ÐµÐ½Ð¸Ñ"
+                        icon={NotificationIcon}
+                        label={notificationLabel}
                         onPress={onToggleNotifications}
                         disabled={notificationsPending}
                     />
@@ -119,11 +136,11 @@ export const UserProfileModal = ({
                 {(displayUser.phone || displayUser.email) && (
                     <View className="w-full border border-white/5 bg-white/5 rounded-2xl overflow-hidden">
                         {displayUser.phone && (
-                            <InfoRow icon={PhoneIcon} label="Ð¢ÐµÐ»ÐµÑ„Ð¾Ð½" value={displayUser.phone} />
+                            <InfoRow icon={PhoneIcon} label="Телефон" value={displayUser.phone} />
                         )}
                         {displayUser.phone && displayUser.email && <View className="h-[1px] w-full bg-white/5 ml-14" />}
                         {displayUser.email && (
-                            <InfoRow icon={EnvelopeIcon} label="ÐŸÐ¾Ñ‡Ñ‚Ð°" value={displayUser.email} />
+                            <InfoRow icon={EnvelopeIcon} label="Почта" value={displayUser.email} />
                         )}
                     </View>
                 )}

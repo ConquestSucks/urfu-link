@@ -1,5 +1,13 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
 
+const mockPush = jest.fn();
+
+jest.mock("expo-router", () => ({
+    useRouter: () => ({
+        push: mockPush,
+    }),
+}));
+
 jest.mock("@/entities/call/model/call-client-instance", () => ({
     getCallClientInstanceId: jest.fn(() => "client-1"),
 }));
@@ -66,6 +74,7 @@ const installBrowserApis = () => {
 
 describe("CallTabCoordinator", () => {
     beforeEach(() => {
+        mockPush.mockClear();
         storage.clear();
         MockBroadcastChannel.messages = [];
         installBrowserApis();
@@ -89,5 +98,21 @@ describe("CallTabCoordinator", () => {
             type: "focus-request",
             targetClientInstanceId: "client-2",
         });
+    });
+
+    it("opens the remote call in this tab for takeover", async () => {
+        storage.set("urfu-link:active-call-tab", JSON.stringify({
+            callId: "call-1",
+            clientInstanceId: "client-2",
+            updatedAt: Date.now(),
+        }));
+
+        const screen = render(<CallTabCoordinator />);
+
+        await waitFor(() => expect(screen.getByTestId("call-tab-coordinator")).toBeTruthy());
+
+        fireEvent.press(screen.getByTestId("call-tab-takeover"));
+
+        expect(mockPush).toHaveBeenCalledWith("/call/call-1");
     });
 });

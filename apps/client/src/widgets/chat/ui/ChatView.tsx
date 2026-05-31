@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import { useRouter } from "expo-router";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ChatHeader } from "./chat-header/ChatHeader";
 import { ChatInput, type ChatInputHandle } from "./chat-input/Input";
@@ -36,8 +37,10 @@ import { useConversationSend } from "../lib/use-conversation-send";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
+    const router = useRouter();
     const { setPendingScrollToMessageId } = useChatStore();
     const startCall = useCallStore((state) => state.startCall);
+    const joinCall = useCallStore((state) => state.joinCall);
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === (params.id as string)),
     );
@@ -81,6 +84,14 @@ export const ChatView = () => {
     const handleStartVideoCall = useCallback(
         () => void handleStartConversationCall("Video"),
         [handleStartConversationCall],
+    );
+
+    const handleSystemCallJoin = useCallback(
+        async (callId: string) => {
+            await joinCall(callId);
+            router.push(`/call/${callId}` as never);
+        },
+        [joinCall, router],
     );
 
     const routeMessageId = typeof params.message === "string" ? params.message : null;
@@ -329,6 +340,7 @@ export const ChatView = () => {
                 onMessageContextMenu={openActionsMenu}
                 onThreadOpen={setOpenThreadRootId}
                 onFilesDropped={(files) => inputRef.current?.addFilesAndOpenModal(files)}
+                onSystemCallJoin={(callId) => void handleSystemCallJoin(callId)}
             />
             {!isUnknownDirectDraft && (
                 <ChatInput

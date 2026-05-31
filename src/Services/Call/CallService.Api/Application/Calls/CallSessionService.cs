@@ -72,8 +72,12 @@ public sealed class CallSessionService(
             cancellationToken).ConfigureAwait(false);
 
         var dto = CallSessionDto.FromDomain(session);
-        var recipients = session.ParticipantIds.Where(id => id != callerId).ToList();
-        await broadcaster.NotifyIncomingAsync(recipients, dto, cancellationToken).ConfigureAwait(false);
+        if (!startsAsActiveGroup)
+        {
+            var recipients = session.ParticipantIds.Where(id => id != callerId).ToList();
+            await broadcaster.NotifyIncomingAsync(recipients, dto, cancellationToken).ConfigureAwait(false);
+        }
+
         return dto;
     }
 

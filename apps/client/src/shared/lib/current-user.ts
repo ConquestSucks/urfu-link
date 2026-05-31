@@ -35,6 +35,25 @@ export const resolveCurrentUser = async ({
     return currentUserPromise;
 };
 
+export const getCachedCurrentUser = () => currentUserCache;
+
+export const setCurrentUserCache = (
+    next:
+        | UserProfile
+        | null
+        | ((current: UserProfile | null) => UserProfile | null),
+) => {
+    currentUserCache = typeof next === "function" ? next(currentUserCache) : next;
+    if (currentUserCache) {
+        useAuthStore.getState().setUserId(currentUserCache.userId);
+    }
+    return currentUserCache;
+};
+
+export const clearCurrentUserCache = () => {
+    currentUserCache = null;
+};
+
 export const resolveCurrentUserId = async (
     { forceRefresh = false }: ResolveCurrentUserIdOptions = {},
 ): Promise<string> => {

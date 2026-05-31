@@ -626,6 +626,133 @@ describe("chat store direct draft sending", () => {
         expect(state.unreadByConversation["direct-read"]).toBeUndefined();
     });
 
+    it("merges typed conversation loads instead of dropping inactive tab conversations", async () => {
+        (apiClient.chat.getConversations as jest.Mock)
+            .mockResolvedValueOnce({
+                items: [
+                    {
+                        id: "direct-1",
+                        type: "Direct",
+                        participants: ["peer-1", "user-1"],
+                        createdAtUtc: "2026-05-24T09:59:00.000Z",
+                        lastMessageAtUtc: "2026-05-24T10:03:00.000Z",
+                        lastMessagePreview: null,
+                        unreadCount: 2,
+                    },
+                ],
+                nextCursor: null,
+            })
+            .mockResolvedValueOnce({
+                items: [
+                    {
+                        id: "discipline-1",
+                        type: "Group",
+                        groupSubtype: "Discipline",
+                        participants: ["teacher-1", "user-1"],
+                        createdAtUtc: "2026-05-24T09:58:00.000Z",
+                        lastMessageAtUtc: "2026-05-24T10:04:00.000Z",
+                        lastMessagePreview: null,
+                        unreadCount: 4,
+                    },
+                ],
+                nextCursor: null,
+            });
+
+        await useChatStore.getState().loadConversations("Direct");
+        await useChatStore.getState().loadConversations("Discipline");
+
+        const state = useChatStore.getState();
+        expect(state.conversations.map((item) => item.id).sort()).toEqual([
+            "direct-1",
+            "discipline-1",
+        ]);
+        expect(state.unreadByConversation["direct-1"]).toBe(2);
+        expect(state.unreadByConversation["discipline-1"]).toBe(4);
+    });
+
+    it("uses local unread when a stale conversation preview still has zero unread", () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T10:03:00.000Z",
+                    lastMessagePreview: null,
+                    unreadCount: 0,
+                },
+            ],
+        });
+
+        useChatStore.getState().addMessage({
+            id: "message-2",
+            conversationId: "direct-1",
+            senderId: "peer-1",
+            body: "new incoming",
+            attachments: [],
+            state: "Sent",
+            createdAt: "2026-05-24T10:03:00.000Z",
+            deliveredAt: null,
+            readAt: null,
+        });
+
+        expect(useChatStore.getState().unreadByConversation["direct-1"]).toBe(1);
+    });
+
+    it("forwards messages through REST and adds returned messages immediately", async () => {
+        const invoke = jest.fn();
+        (apiClient.chat.forwardMessages as jest.Mock).mockResolvedValue([
+            {
+                id: "forwarded-1",
+                conversationId: "direct-2",
+                senderId: "user-1",
+                body: "forwarded",
+                attachments: [],
+                state: "Sent",
+                createdAtUtc: "2026-05-24T10:05:00.000Z",
+                deliveredAtUtc: null,
+                readAtUtc: null,
+                clientMessageId: null,
+                editedAtUtc: null,
+                replyTo: null,
+                reactionsSummary: {},
+                mentions: [],
+                forwardedFrom: {
+                    messageId: "message-1",
+                    senderId: "peer-1",
+                    sentAtUtc: "2026-05-24T10:00:00.000Z",
+                },
+            },
+        ]);
+        useChatStore.setState({
+            connection: { state: "Connected", invoke } as never,
+            isConnected: true,
+            conversations: [
+                {
+                    id: "direct-2",
+                    type: "Direct",
+                    participants: ["peer-2", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().forwardMessages("direct-2", ["message-1"]);
+
+        expect(invoke).not.toHaveBeenCalled();
+        expect(apiClient.chat.forwardMessages).toHaveBeenCalledWith("direct-2", ["message-1"]);
+        expect(useChatStore.getState().messagesByConversation["direct-2"][0]).toEqual(
+            expect.objectContaining({
+                id: "forwarded-1",
+                body: "forwarded",
+                createdAt: "2026-05-24T10:05:00.000Z",
+            }),
+        );
+    });
+
     it("clears local unread state when marking incoming messages as read", async () => {
         const invoke = jest.fn(async () => "message-2");
         useChatStore.setState({
