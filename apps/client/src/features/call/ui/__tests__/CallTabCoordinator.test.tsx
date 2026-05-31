@@ -12,6 +12,17 @@ jest.mock("@/entities/call/model/call-client-instance", () => ({
     getCallClientInstanceId: jest.fn(() => "client-1"),
 }));
 
+jest.mock("@/shared/lib/useWindowSize", () => ({
+    useWindowSize: jest.fn(() => ({ width: 1024, isDesktop: true, isMobile: false })),
+}));
+
+jest.mock("@/shared/ui/phosphor", () => {
+    const { Text } = require("react-native");
+    return {
+        PhoneIcon: () => <Text>phone-icon</Text>,
+    };
+});
+
 jest.mock("@/shared/lib/api", () => ({
     apiClient: {
         calls: {
@@ -27,6 +38,7 @@ jest.mock("@/shared/lib/api", () => ({
 }));
 
 const { useCallStore } = require("@/entities/call/model/call-store");
+const { useWindowSize } = require("@/shared/lib/useWindowSize");
 const { CallTabCoordinator } = require("../CallTabCoordinator");
 
 class MockBroadcastChannel {
@@ -77,11 +89,12 @@ describe("CallTabCoordinator", () => {
         mockPush.mockClear();
         storage.clear();
         MockBroadcastChannel.messages = [];
+        useWindowSize.mockReturnValue({ width: 1024, isDesktop: true, isMobile: false });
         installBrowserApis();
         useCallStore.getState().clearCallCache();
     });
 
-    it("shows remote active call banner and sends focus request", async () => {
+    it("shows remote active call banner without focus action", async () => {
         storage.set("urfu-link:active-call-tab", JSON.stringify({
             callId: "call-1",
             clientInstanceId: "client-2",
@@ -92,12 +105,8 @@ describe("CallTabCoordinator", () => {
 
         await waitFor(() => expect(screen.getByTestId("call-tab-coordinator")).toBeTruthy());
 
-        fireEvent.press(screen.getByTestId("call-tab-focus"));
-
-        expect(MockBroadcastChannel.messages).toContainEqual({
-            type: "focus-request",
-            targetClientInstanceId: "client-2",
-        });
+        expect(screen.getByText("Звонок идет в другой вкладке")).toBeTruthy();
+        expect(screen.queryByTestId("call-tab-focus")).toBeNull();
     });
 
     it("opens the remote call in this tab for takeover", async () => {
@@ -114,5 +123,20 @@ describe("CallTabCoordinator", () => {
         fireEvent.press(screen.getByTestId("call-tab-takeover"));
 
         expect(mockPush).toHaveBeenCalledWith("/call/call-1");
+    });
+
+    it("uses device wording on mobile", async () => {
+        useWindowSize.mockReturnValue({ width: 390, isDesktop: false, isMobile: true });
+        storage.set("urfu-link:active-call-tab", JSON.stringify({
+            callId: "call-1",
+            clientInstanceId: "client-2",
+            updatedAt: Date.now(),
+        }));
+
+        const screen = render(<CallTabCoordinator />);
+
+        await waitFor(() => {
+            expect(screen.getByText("Звонок идет на другом устройстве")).toBeTruthy();
+        });
     });
 });
