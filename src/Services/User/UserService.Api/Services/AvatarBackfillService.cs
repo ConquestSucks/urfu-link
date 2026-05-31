@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using UserService.Api.Domain;
 using UserService.Api.Domain.Interfaces;
 
 namespace UserService.Api.Services;
@@ -95,7 +96,7 @@ public sealed class AvatarBackfillService(
         }
 
         await using var identifyStream = new MemoryStream(current.Content.ToArray(), writable: false);
-        if (HasCanonicalVariantUrl(candidate.AvatarUrl) &&
+        if (HasCurrentCanonicalVariantUrl(candidate.AvatarUrl) &&
             await avatarImageProcessor
                 .IsNormalizedAsync(identifyStream, current.ContentType, cancellationToken)
                 .ConfigureAwait(false))
@@ -125,12 +126,12 @@ public sealed class AvatarBackfillService(
         return true;
     }
 
-    private static bool HasCanonicalVariantUrl(string avatarUrl)
+    private static bool HasCurrentCanonicalVariantUrl(string avatarUrl)
     {
         var path = Uri.TryCreate(avatarUrl, UriKind.Absolute, out var uri)
             ? uri.AbsolutePath
             : avatarUrl;
 
-        return path.EndsWith("-256.webp", StringComparison.OrdinalIgnoreCase);
+        return path.EndsWith(AvatarVariantNaming.CurrentCanonicalSuffix, StringComparison.OrdinalIgnoreCase);
     }
 }

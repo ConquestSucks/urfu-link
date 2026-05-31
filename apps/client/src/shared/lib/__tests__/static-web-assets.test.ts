@@ -2,9 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const {
+    BOOT_SHELL_STYLE_ID,
     META_DESCRIPTION,
     patchIndexHtml,
 } = require("../../../../scripts/patch-web-index.js") as {
+    BOOT_SHELL_STYLE_ID: string;
     META_DESCRIPTION: string;
     patchIndexHtml: (html: string) => string;
 };
@@ -39,6 +41,8 @@ describe("static web assets", () => {
         expect(patched).toContain('<html lang="ru">');
         expect(patched).toContain(`<meta name="description" content="${META_DESCRIPTION}" />`);
         expect(patched).toContain('<meta name="theme-color" content="#080D1D" />');
+        expect(patched).toContain(`id="${BOOT_SHELL_STYLE_ID}"`);
+        expect(patched).toContain('class="app-boot-shell"');
         expect(patchIndexHtml(patched)).toBe(patched);
     });
 

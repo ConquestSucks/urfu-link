@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using UserService.Api.Domain;
 using UserService.Api.Services;
 
 namespace UserService.Api.Infrastructure.Persistence;
@@ -15,7 +16,7 @@ public sealed class EfAvatarBackfillRepository(UserDbContext dbContext) : IAvata
             .AsNoTracking()
             .Where(user =>
                 user.Account.AvatarUrl != null &&
-                !EF.Functions.ILike(user.Account.AvatarUrl, "%-256.webp"))
+                !EF.Functions.ILike(user.Account.AvatarUrl, $"%{AvatarVariantNaming.CurrentCanonicalSuffix}"))
             .OrderBy(user => user.Id)
             .Take(normalizedLimit)
             .Select(user => new AvatarBackfillCandidate(user.Id, user.Account.AvatarUrl!))
