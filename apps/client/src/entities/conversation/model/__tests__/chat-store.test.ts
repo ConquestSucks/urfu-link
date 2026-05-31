@@ -124,6 +124,7 @@ describe("chat store direct draft sending", () => {
             pinnedLoadingByConversation: {},
             isLoading: false,
             pendingScrollToMessageId: null,
+            pendingReadByConversation: {},
             threadEventListeners: new Set(),
         });
     });
@@ -797,6 +798,57 @@ describe("chat store direct draft sending", () => {
                 .messagesByConversation["direct-1"]
                 .every((message) => message.readAt !== null),
         ).toBe(true);
+    });
+
+    it("queues read markers while the chat hub is disconnected and flushes them after connect", async () => {
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T10:03:00.000Z",
+                    lastMessagePreview: {
+                        messageId: "message-2",
+                        senderId: "peer-1",
+                        body: "new incoming",
+                        sentAtUtc: "2026-05-24T10:03:00.000Z",
+                        readAtUtc: null,
+                    },
+                    unreadCount: 1,
+                },
+            ],
+            unreadByConversation: { "direct-1": 1 },
+            messagesByConversation: {
+                "direct-1": [
+                    {
+                        id: "message-2",
+                        conversationId: "direct-1",
+                        senderId: "peer-1",
+                        body: "new incoming",
+                        attachments: [],
+                        state: "Sent",
+                        createdAt: "2026-05-24T10:03:00.000Z",
+                        deliveredAt: null,
+                        readAt: null,
+                    },
+                ],
+            },
+        });
+
+        await useChatStore.getState().markRead("direct-1", "message-2");
+
+        expect(hubConnection.invoke).not.toHaveBeenCalled();
+        expect(useChatStore.getState().pendingReadByConversation["direct-1"]).toBe("message-2");
+        expect(useChatStore.getState().unreadByConversation["direct-1"]).toBeUndefined();
+        expect(useChatStore.getState().conversations[0].unreadCount).toBe(0);
+        expect(useChatStore.getState().messagesByConversation["direct-1"][0].readAt).not.toBeNull();
+
+        await useChatStore.getState().connect();
+
+        expect(hubConnection.invoke).toHaveBeenCalledWith("MarkRead", "direct-1", "message-2");
+        expect(useChatStore.getState().pendingReadByConversation["direct-1"]).toBeUndefined();
     });
 
     it("does not mark own messages as read when the current user is the reader", async () => {

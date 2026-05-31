@@ -90,36 +90,8 @@ export const SubjectHeader = ({
         }
     }, [muteNotifications, notificationsMuted, subjectId, unmuteNotifications]);
 
-    if (!conversation) return null;
-
-    const subjectName = conversation.disciplineChatKind === "Subgroup"
-        ? `${conversation.disciplineTitle ?? "Дисциплина"} · ${conversation.disciplineSubgroupName ?? conversation.title ?? "Подгруппа"}`
-        : `${conversation.disciplineTitle ?? conversation.title ?? "Дисциплина"} · Общий чат`;
-    const subjectAvatarUrl = "";
-    const onlineCount = participants.filter((participant) =>
-        presenceByUser[participant.userId]?.status === "Online"
-    ).length;
-    const totalCount = participants.length;
-    const membersData: SubjectMember[] = participants.map((participant) => ({
-        id: participant.userId,
-        name: participant.displayName || "Участник",
-        avatarUrl: participant.avatarUrl,
-        role: roleLabel(participant.role),
-        isOnline: presenceByUser[participant.userId]?.status === "Online",
-    }));
     const selectedParticipant = participants.find((participant) => participant.userId === profileUserId) ?? null;
     const selectedPresence = profileUserId ? presenceByUser[profileUserId] : undefined;
-    const currentRole = currentUserId ? conversation.participantRoles?.[currentUserId] : undefined;
-    const canStartDisciplineCall =
-        conversation.groupSubtype === "Discipline" && currentRole === "Teacher";
-    const canStartGroupAudioCall =
-        conversation.capabilities?.canStartGroupAudioCall ??
-        conversation.capabilities?.canStartGroupCall ??
-        canStartDisciplineCall;
-    const canStartGroupVideoCall =
-        conversation.capabilities?.canStartGroupVideoCall ??
-        conversation.capabilities?.canStartGroupCall ??
-        canStartDisciplineCall;
     const isSelectedSelf = selectedParticipant?.userId === currentUserId;
 
     const handleStartDirectCallFromProfile = useCallback(async (callType: CallType) => {
@@ -150,6 +122,35 @@ export const SubjectHeader = ({
         ]);
         await startCall(direct.id, callType);
     }, [currentUserId, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
+
+    if (!conversation) return null;
+
+    const subjectName = conversation.disciplineChatKind === "Subgroup"
+        ? `${conversation.disciplineTitle ?? "Дисциплина"} · ${conversation.disciplineSubgroupName ?? conversation.title ?? "Подгруппа"}`
+        : `${conversation.disciplineTitle ?? conversation.title ?? "Дисциплина"} · Общий чат`;
+    const subjectAvatarUrl = "";
+    const onlineCount = participants.filter((participant) =>
+        presenceByUser[participant.userId]?.status === "Online"
+    ).length;
+    const totalCount = participants.length;
+    const membersData: SubjectMember[] = participants.map((participant) => ({
+        id: participant.userId,
+        name: participant.displayName || "Участник",
+        avatarUrl: participant.avatarUrl,
+        role: roleLabel(participant.role),
+        isOnline: presenceByUser[participant.userId]?.status === "Online",
+    }));
+    const currentRole = currentUserId ? conversation.participantRoles?.[currentUserId] : undefined;
+    const canStartDisciplineCall =
+        conversation.groupSubtype === "Discipline" && currentRole === "Teacher";
+    const canStartGroupAudioCall =
+        conversation.capabilities?.canStartGroupAudioCall ??
+        conversation.capabilities?.canStartGroupCall ??
+        canStartDisciplineCall;
+    const canStartGroupVideoCall =
+        conversation.capabilities?.canStartGroupVideoCall ??
+        conversation.capabilities?.canStartGroupCall ??
+        canStartDisciplineCall;
 
     return (
         <>

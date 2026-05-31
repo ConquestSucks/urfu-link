@@ -21,6 +21,22 @@ const fallbackDeviceLabel = (kind: DeviceKind, index: number) => {
     return `Микрофон ${index + 1}`;
 };
 
+const mapDeviceOptions = (devices: MediaDeviceInfo[], kind: DeviceKind) =>
+    devices
+        .filter((device) => device.kind === kind)
+        .map((device, index) => ({
+            label: device.label || fallbackDeviceLabel(kind, index),
+            value: device.deviceId,
+        }));
+
+const mergeSavedDeviceOption = (
+    options: { label: string; value: string }[],
+    deviceId?: string | null,
+) =>
+    deviceId && !options.some((device) => device.value === deviceId)
+        ? [savedDeviceOption(deviceId), ...options]
+        : options;
+
 export const useMediaDevices = (kind: DeviceKind, initialDeviceId?: string | null) => {
     const [options, setOptions] = useState<{ label: string; value: string }[]>(() =>
         initialDeviceId ? [savedDeviceOption(initialDeviceId)] : [],
@@ -43,6 +59,38 @@ export const useMediaDevices = (kind: DeviceKind, initialDeviceId?: string | nul
         );
     }, [initialDeviceId]);
 
+    useEffect(() => {
+        if (
+            !initialDeviceId ||
+            Platform.OS !== "web" ||
+            !navigator.mediaDevices?.enumerateDevices
+        ) {
+            return;
+        }
+
+        let cancelled = false;
+        void navigator.mediaDevices
+            .enumerateDevices()
+            .then((devices) => {
+                if (cancelled) return;
+                const nextOptions = mergeSavedDeviceOption(
+                    mapDeviceOptions(devices, kind),
+                    initialDeviceId,
+                );
+                setOptions(nextOptions);
+                setSelectedValue((current) =>
+                    nextOptions.some((device) => device.value === current)
+                        ? current
+                        : initialDeviceId,
+                );
+            })
+            .catch(() => undefined);
+
+        return () => {
+            cancelled = true;
+        };
+    }, [kind, initialDeviceId]);
+
     const requestAccess = useCallback(async () => {
         if (permissionStatus === "granted") return;
         setIsLoading(true);
@@ -54,17 +102,10 @@ export const useMediaDevices = (kind: DeviceKind, initialDeviceId?: string | nul
                 };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 const allDevices = await navigator.mediaDevices.enumerateDevices();
-                const filteredDevices = allDevices
-                    .filter((device) => device.kind === kind)
-                    .map((device, index) => ({
-                        label: device.label || fallbackDeviceLabel(kind, index),
-                        value: device.deviceId,
-                    }));
-                const nextOptions =
-                    initialDeviceId &&
-                    !filteredDevices.some((device) => device.value === initialDeviceId)
-                        ? [savedDeviceOption(initialDeviceId), ...filteredDevices]
-                        : filteredDevices;
+                const nextOptions = mergeSavedDeviceOption(
+                    mapDeviceOptions(allDevices, kind),
+                    initialDeviceId,
+                );
                 setOptions(nextOptions);
                 // Pre-select stored device if available, else first device
                 setSelectedValue((current) => {

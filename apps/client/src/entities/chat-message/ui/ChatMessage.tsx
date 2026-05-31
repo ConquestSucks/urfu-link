@@ -169,6 +169,7 @@ export const ChatMessage = ({
     onReplyPress,
     onThreadOpen,
     onReactionPress,
+    showJoinCallAction,
     onJoinCall,
 }: ChatMessageProps) => {
     const currentUserId = useCurrentUserId();
@@ -179,7 +180,11 @@ export const ChatMessage = ({
         const systemText = buildSystemCallLabel(systemCall);
         const timeLabel = buildSystemCallTimeLabel(systemCall?.status, time);
         const duration = formatDuration(systemCall?.duration);
-        const canJoinCall = systemCall?.status === "Started" && !!systemCall.callId && !!onJoinCall;
+        const canJoinCall =
+            showJoinCallAction &&
+            systemCall?.status === "Started" &&
+            !!systemCall.callId &&
+            !!onJoinCall;
         return (
             <View className="px-2 items-center">
                 <View className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
@@ -285,7 +290,7 @@ export const ChatMessage = ({
                 )}
 
                 {!isOwn && authorName ? (
-                    <Text className="text-[12px] font-semibold text-brand-200" numberOfLines={1}>
+                    <Text className="text-[12px] font-semibold text-brand-300" numberOfLines={1}>
                         {authorName}
                     </Text>
                 ) : null}

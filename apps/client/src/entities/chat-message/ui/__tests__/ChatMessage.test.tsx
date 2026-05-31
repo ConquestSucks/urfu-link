@@ -127,6 +127,24 @@ describe("ChatMessage read indicator", () => {
         expect(screen.getByText("Ivan Petrov")).toBeTruthy();
     });
 
+    it("uses a defined light color for incoming group sender names", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        const author = screen.getByText("Ivan Petrov");
+        expect(author.props.className).toContain("text-brand-300");
+        expect(author.props.className).not.toContain("text-brand-200");
+    });
+
     it("passes the sender name to incoming message avatars", () => {
         render(
             <ChatMessage
@@ -437,6 +455,7 @@ describe("ChatMessage read indicator", () => {
                     duration: null,
                     endReason: null,
                 }}
+                showJoinCallAction
                 onJoinCall={onJoinCall}
             />,
         );
@@ -445,6 +464,32 @@ describe("ChatMessage read indicator", () => {
 
         expect(screen.getByText("Войти")).toBeTruthy();
         expect(onJoinCall).toHaveBeenCalledWith("call-1");
+    });
+
+    it("does not render a join action when the system call action is not allowed", () => {
+        const onJoinCall = jest.fn();
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Started",
+                    callerId: "user-1",
+                    duration: null,
+                    endReason: null,
+                }}
+                onJoinCall={onJoinCall}
+            />,
+        );
+
+        expect(screen.queryByTestId("system-call-join-message-1")).toBeNull();
+        expect(screen.queryByText("Ð’Ð¾Ð¹Ñ‚Ð¸")).toBeNull();
     });
 
     it("shows completed system call end time and duration", () => {

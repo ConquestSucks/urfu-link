@@ -32,18 +32,16 @@ describe("getNotificationScopeUnreadCount", () => {
         ).toBe(0);
     });
 
-    it("keeps pinned chat notifications visible when backend scopes are absent", () => {
-        expect(
-            getNotificationScopeUnreadCount(
-                {
-                    total: 1,
-                    perCategory: { 7: 1 },
-                    totalUnseen: 1,
-                    urgentUnread: 0,
-                    perType: null,
-                },
-                "chats",
-            ),
-        ).toBe(1);
+    it("does not guess ambiguous pinned notifications as direct chats without backend scopes", () => {
+        const badge = {
+            total: 1,
+            perCategory: { 7: 1 },
+            totalUnseen: 1,
+            urgentUnread: 0,
+            perType: null,
+        };
+
+        expect(getNotificationScopeUnreadCount(badge, "chats")).toBe(0);
+        expect(getNotificationScopeUnreadCount(badge, "disciplines")).toBe(0);
     });
 });

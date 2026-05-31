@@ -1,6 +1,7 @@
 import { AnimatedViewStyle } from "@/shared/types";
 import { SidebarItem } from "@/shared/ui";
 import { Link, usePathname } from "expo-router";
+import { useEffect } from "react";
 import { MENU_ITEMS } from "../config/menu";
 import {
     getConversationUnreadCount,
@@ -15,9 +16,16 @@ export const Menu = ({ textAnimatedStyle, }: {
     const pathname = usePathname();
     const conversations = useChatStore((s) => s.conversations);
     const unreadByConversation = useChatStore((s) => s.unreadByConversation);
+    const loadConversations = useChatStore((s) => s.loadConversations);
     const { data } = useNotificationBadge();
     const liveBadge = useNotificationStore((s) => s.badge);
     const badge = liveBadge ?? data;
+
+    useEffect(() => {
+        void loadConversations("Direct");
+        void loadConversations("Discipline");
+    }, [loadConversations]);
+
     const chatUnread = conversations
         .filter((conversation) => conversation.type === "Direct")
         .reduce(
