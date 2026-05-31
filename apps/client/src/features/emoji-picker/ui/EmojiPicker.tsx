@@ -230,6 +230,7 @@ export const EmojiPicker = memo(({ onPick }: { onPick: (emoji: string) => void }
             <FlatList
                 testID="emoji-picker-grid"
                 key={`emoji-grid-${columns}`}
+                style={styles.grid}
                 data={visibleEmojis}
                 keyExtractor={keyExtractor}
                 renderItem={renderEmoji}
@@ -294,8 +295,10 @@ export const EmojiPicker = memo(({ onPick }: { onPick: (emoji: string) => void }
 
 const styles = StyleSheet.create({
     root: {
+        flex: 1,
         minHeight: 0,
         minWidth: 0,
+        overflow: "hidden",
     },
     searchContainer: {
         minHeight: 40,
@@ -308,6 +311,7 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
+        flexShrink: 0,
     },
     searchInput: {
         flex: 1,
@@ -320,6 +324,11 @@ const styles = StyleSheet.create({
     gridContent: {
         paddingHorizontal: GRID_HORIZONTAL_PADDING,
         paddingBottom: 8,
+    },
+    grid: {
+        flex: 1,
+        minHeight: 0,
+        alignSelf: "stretch",
     },
     sectionTitle: {
         marginTop: 8,
@@ -349,6 +358,7 @@ const styles = StyleSheet.create({
         borderTopWidth: StyleSheet.hairlineWidth,
         borderTopColor: "rgba(255, 255, 255, 0.08)",
         flexGrow: 0,
+        flexShrink: 0,
     },
     categoryBarContent: {
         minHeight: 48,

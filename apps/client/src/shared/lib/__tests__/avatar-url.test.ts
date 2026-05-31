@@ -13,6 +13,12 @@ describe("avatar variant urls", () => {
         );
     });
 
+    it("rewrites versioned canonical variant URLs", () => {
+        expect(getAvatarVariantUrl("https://cdn.test/avatar-v2-256.webp", 40)).toBe(
+            "https://cdn.test/avatar-v2-64.webp",
+        );
+    });
+
     it("does not rewrite legacy URLs", () => {
         expect(getAvatarVariantUrl("https://cdn.test/avatar.png", 40)).toBe(
             "https://cdn.test/avatar.png",

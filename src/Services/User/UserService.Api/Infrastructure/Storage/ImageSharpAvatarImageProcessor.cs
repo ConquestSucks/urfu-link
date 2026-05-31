@@ -9,7 +9,9 @@ public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
 {
     public const int AvatarSize = 256;
     public static readonly int[] AvatarVariantSizes = [64, 128, AvatarSize];
-    public const int WebpQuality = 82;
+    public const int SmallWebpQuality = 68;
+    public const int MediumWebpQuality = 72;
+    public const int LargeWebpQuality = 76;
     public const string WebpContentType = "image/webp";
 
     public async Task<ProcessedAvatar> ProcessAsync(
@@ -40,7 +42,7 @@ public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
             await using var output = new MemoryStream();
             await resized.SaveAsWebpAsync(
                 output,
-                new WebpEncoder { Quality = WebpQuality },
+                CreateEncoder(size),
                 cancellationToken).ConfigureAwait(false);
 
             variants.Add(new ProcessedAvatarVariant(size, output.ToArray(), WebpContentType));
@@ -64,4 +66,16 @@ public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
         var info = await Image.IdentifyAsync(fileStream, cancellationToken).ConfigureAwait(false);
         return info is not null && info.Width <= AvatarSize && info.Height <= AvatarSize;
     }
+
+    private static WebpEncoder CreateEncoder(int size) => new()
+    {
+        FileFormat = WebpFileFormatType.Lossy,
+        Method = WebpEncodingMethod.BestQuality,
+        Quality = size switch
+        {
+            <= 64 => SmallWebpQuality,
+            <= 128 => MediumWebpQuality,
+            _ => LargeWebpQuality,
+        },
+    };
 }
