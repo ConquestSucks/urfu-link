@@ -107,7 +107,7 @@ public sealed class MinioAvatarStorage(
 
     private static IEnumerable<string> GetObjectKeysToDelete(string key)
     {
-        var extensionIndex = key.LastIndexOf('.', StringComparison.Ordinal);
+        var extensionIndex = key.LastIndexOf('.');
         if (extensionIndex < 0 || !key.EndsWith(".webp", StringComparison.OrdinalIgnoreCase))
         {
             yield return key;
@@ -115,7 +115,7 @@ public sealed class MinioAvatarStorage(
         }
 
         var nameWithoutExtension = key[..extensionIndex];
-        var suffixIndex = nameWithoutExtension.LastIndexOf('-', StringComparison.Ordinal);
+        var suffixIndex = nameWithoutExtension.LastIndexOf('-');
         if (suffixIndex < 0)
         {
             yield return key;
