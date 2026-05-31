@@ -1,10 +1,10 @@
 import { TabType } from "@/entities/tab";
 import { ViewType } from "@/entities/view";
-import { useGlobalSearchParams, usePathname } from "expo-router";
+import { useLocalSearchParams, usePathname } from "expo-router";
 
 export const useInboxRouting = () => {
     const pathname = usePathname();
-    const params = useGlobalSearchParams<{
+    const params = useLocalSearchParams<{
         view?: ViewType;
         id?: string;
         message?: string;
