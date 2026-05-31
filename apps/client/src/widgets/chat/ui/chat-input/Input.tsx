@@ -589,8 +589,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                             setIsEmojiVisible(willShow);
                             animate(willShow);
                         }}
-                        className={`py-2.5 ml-2 ${isSubmitting ? "opacity-40" : ""}`}
-                        style={[{ alignSelf: "flex-end" }, isEmojiVisible ? glow.brandSubtle : undefined]}
+                        className={`py-2.5 ml-2 outline-none focus:outline-none ${isSubmitting ? "opacity-40" : ""}`}
+                        style={{ alignSelf: "flex-end", outlineWidth: 0 }}
                     >
                         <SmileyIcon
                             size={24}

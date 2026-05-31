@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
-import { Platform, Pressable, StyleSheet, Text } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, Text } from "react-native";
 import type { ReactElement, ReactNode } from "react";
 import { ChatInput } from "../Input";
 import { useTypingIndicator } from "@/shared/lib/useTypingIndicator";
@@ -283,6 +283,33 @@ describe("ChatInput", () => {
         const style = StyleSheet.flatten(emojiButton.props.style);
 
         expect(style.alignSelf).toBe("flex-end");
+    });
+
+    it("does not draw a selected backdrop behind the emoji button", async () => {
+        const animation = {
+            start: (callback?: (result: { finished: boolean }) => void) =>
+                callback?.({ finished: true }),
+            stop: jest.fn(),
+            reset: jest.fn(),
+        } as unknown as Animated.CompositeAnimation;
+        const timingSpy = jest.spyOn(Animated, "timing").mockReturnValue(animation);
+
+        try {
+            render(<ChatInput conversationId="conversation-1" onSend={jest.fn()} />);
+
+            await act(async () => {
+                fireEvent.press(screen.getByTestId("chat-input-emoji-button"));
+                await Promise.resolve();
+            });
+
+            const emojiButton = screen.getByTestId("chat-input-emoji-button");
+            const style = StyleSheet.flatten(emojiButton.props.style);
+
+            expect(style.boxShadow).toBeUndefined();
+            expect(style.outlineWidth).toBe(0);
+        } finally {
+            timingSpy.mockRestore();
+        }
     });
 
     it("expands immediately when an empty composer receives a line break", () => {
