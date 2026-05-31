@@ -171,7 +171,7 @@ public class MessageRepositoryThreadsTests : IClassFixture<MongoFixture>, IAsync
             createdAtUtc: DateTimeOffset.UtcNow.AddSeconds(-30), threadRootId: root.Id);
         await _repo.InsertAsync(reply, default);
 
-        await _repo.MarkReadUpToAsync(conv, root.Id, DateTimeOffset.UtcNow, default);
+        await _repo.MarkReadUpToAsync(conv, Guid.NewGuid(), root.Id, DateTimeOffset.UtcNow, default);
 
         var loadedReply = await _repo.GetByIdAsync(reply.Id, default);
         // Reply must remain in Sent state — main-flow read does not touch thread replies.
