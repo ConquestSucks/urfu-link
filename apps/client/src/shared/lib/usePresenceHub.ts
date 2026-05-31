@@ -66,14 +66,18 @@ export function usePresenceHub() {
     useEffect(() => {
         connectAndStartHeartbeat();
 
-        const handlePageExit = () => {
+        const handlePageHide = () => {
             notifyPresenceDisconnect();
             disconnectAndStopHeartbeat();
         };
 
+        const handlePageShow = () => {
+            connectAndStartHeartbeat();
+        };
+
         if (typeof window !== "undefined") {
-            window.addEventListener("pagehide", handlePageExit);
-            window.addEventListener("beforeunload", handlePageExit);
+            window.addEventListener("pagehide", handlePageHide);
+            window.addEventListener("pageshow", handlePageShow);
         }
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
@@ -86,8 +90,8 @@ export function usePresenceHub() {
 
         return () => {
             if (typeof window !== "undefined") {
-                window.removeEventListener("pagehide", handlePageExit);
-                window.removeEventListener("beforeunload", handlePageExit);
+                window.removeEventListener("pagehide", handlePageHide);
+                window.removeEventListener("pageshow", handlePageShow);
             }
             disconnectAndStopHeartbeat();
             subscription.remove();

@@ -52,6 +52,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     const iosAppGroupIdentifier =
         process.env.EXPO_IOS_APP_GROUP_IDENTIFIER ??
         `group.${iosBundleIdentifier}.screenshare`;
+    const pluginsWithoutExpoRouter = (config.plugins ?? []).filter((plugin) => {
+        if (plugin === "expo-router") return false;
+        return !(Array.isArray(plugin) && plugin[0] === "expo-router");
+    });
+
     return {
         ...config,
         name: appEnv === "prod" ? "URFU Link" : "URFU Link Dev",
@@ -68,7 +73,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             typedRoutes: true
         },
         plugins: [
-            ...(config.plugins ?? []),
+            ...pluginsWithoutExpoRouter,
+            [
+                "expo-router",
+                {
+                    asyncRoutes: {
+                        web: true,
+                        default: "development",
+                    },
+                },
+            ],
             "expo-web-browser",
             "expo-image-picker",
             "expo-font",

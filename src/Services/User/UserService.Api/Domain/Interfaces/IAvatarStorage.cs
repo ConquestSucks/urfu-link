@@ -4,7 +4,7 @@ public sealed record AvatarObject(ReadOnlyMemory<byte> Content, string ContentTy
 
 public interface IAvatarStorage
 {
-    Task<string> UploadAsync(Guid userId, Stream fileStream, string contentType, CancellationToken cancellationToken = default);
+    Task<string> UploadAsync(Guid userId, ProcessedAvatar avatar, CancellationToken cancellationToken = default);
     Task<AvatarObject?> DownloadAsync(string objectUrl, CancellationToken cancellationToken = default);
     Task DeleteAsync(string objectUrl, CancellationToken cancellationToken = default);
 }

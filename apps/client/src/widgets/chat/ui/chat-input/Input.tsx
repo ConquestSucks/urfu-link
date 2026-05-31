@@ -1,5 +1,7 @@
 import React, {
     forwardRef,
+    lazy,
+    Suspense,
     useCallback,
     useEffect,
     useImperativeHandle,
@@ -16,7 +18,6 @@ import {
     SmileyIcon,
     XIcon,
 } from "@/shared/ui/phosphor";
-import { EmojiPicker } from "@/features/emoji-picker";
 import type { DocumentPickerAsset } from "expo-document-picker";
 
 import { useAttachments, FilesModal } from "@/features/attach-file";
@@ -44,6 +45,9 @@ const INPUT_VERTICAL_PADDING = 10;
 const MAX_INPUT_CONTENT_HEIGHT = SCREEN_HEIGHT * 0.35;
 const MAX_FILES_LIMIT = 10;
 const WEB_STALE_MEASUREMENT_THRESHOLD = INPUT_LINE_HEIGHT * 4;
+const EmojiPicker = lazy(() =>
+    import("@/features/emoji-picker").then((module) => ({ default: module.EmojiPicker })),
+);
 
 const getComposerInputHeight = (contentHeight: number) =>
     Math.max(MIN_INPUT_CONTENT_HEIGHT, Math.min(contentHeight, MAX_INPUT_CONTENT_HEIGHT)) +
@@ -628,7 +632,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 <Animated.View
                     style={{ height: 320, width: "100%", transform: [{ translateY: slideAnim }] }}
                 >
-                    <EmojiPicker onPick={handlePickEmoji} />
+                    <Suspense fallback={null}>
+                        <EmojiPicker onPick={handlePickEmoji} />
+                    </Suspense>
                 </Animated.View>
             </Animated.View>
 

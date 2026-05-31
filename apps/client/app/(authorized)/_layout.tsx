@@ -1,19 +1,14 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { SidebarDesktop } from "@/widgets/sidebar-desktop";
 import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
-import { SettingsDesktop } from "@/widgets/settings-desktop";
 import { Slot, useSegments } from "expo-router";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { usePresenceHub } from "@/shared/lib/usePresenceHub";
 import { useChatHub } from "@/shared/lib/useChatHub";
-import { useNotificationHub } from "@/features/notifications";
 import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
-import { useCallHub } from "@/shared/lib/useCallHub";
-import { CallTabCoordinator, IncomingCallModal, OutgoingCallModal } from "@/features/call";
 import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
 import { configureCallSounds } from "@/shared/lib/call-sounds";
 import { glow } from "@/shared/ui/glow";
@@ -36,19 +31,12 @@ const scheduleAfterFirstPaint = (callback: () => void) => {
     return () => clearTimeout(handle);
 };
 
-const DeferredRealtime = () => {
-    usePresenceHub();
-    useNotificationHub();
-    useCallHub();
-
-    return (
-        <>
-            <IncomingCallModal />
-            <OutgoingCallModal />
-            <CallTabCoordinator />
-        </>
-    );
-};
+const DeferredRealtime = lazy(() => import("@/features/realtime/DeferredRealtime"));
+const SettingsDesktop = lazy(() =>
+    import("@/widgets/settings-desktop").then((module) => ({
+        default: module.SettingsDesktop,
+    })),
+);
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
@@ -116,11 +104,17 @@ export default function AuthLayout() {
                 </View>
             )}
 
-            {isDesktop && (
-                <SettingsDesktop isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-            )}
+            {isDesktop && isSettingsOpen ? (
+                <Suspense fallback={null}>
+                    <SettingsDesktop isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+                </Suspense>
+            ) : null}
 
-            {isRealtimeReady ? <DeferredRealtime /> : null}
+            {isRealtimeReady ? (
+                <Suspense fallback={null}>
+                    <DeferredRealtime />
+                </Suspense>
+            ) : null}
         </SafeAreaView>
     );
 }
