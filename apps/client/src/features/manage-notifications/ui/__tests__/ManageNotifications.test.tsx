@@ -1,7 +1,13 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { Platform } from "react-native";
 import { ManageNotifications } from "../ManageNotifications";
 
 const mockMutate = jest.fn();
+const mockRequestBrowserNotificationPermission = jest.fn();
+const mockSetBrowserNotificationsEnabled = jest.fn();
+let mockBrowserPermission: NotificationPermission | "unsupported" = "unsupported";
+let mockBrowserNotificationsEnabled = true;
+const originalPlatformOS = Platform.OS;
 
 jest.mock("@/entities/user", () => ({
     useCurrentUser: () => ({
@@ -23,8 +29,11 @@ jest.mock("@/entities/user", () => ({
 }));
 
 jest.mock("@/shared/lib/browser-notifications", () => ({
-    getBrowserNotificationPermission: () => "unsupported",
-    requestBrowserNotificationPermission: jest.fn(),
+    getBrowserNotificationPermission: () => mockBrowserPermission,
+    getBrowserNotificationsEnabled: () => mockBrowserNotificationsEnabled,
+    requestBrowserNotificationPermission: () => mockRequestBrowserNotificationPermission(),
+    setBrowserNotificationsEnabled: (enabled: boolean) =>
+        mockSetBrowserNotificationsEnabled(enabled),
 }));
 
 jest.mock("@/shared/ui", () => {
@@ -45,7 +54,11 @@ jest.mock("@/shared/ui", () => {
             onValueChange: (value: boolean) => void;
             disabled?: boolean;
         }) => (
-            <Pressable disabled={disabled} onPress={() => onValueChange(!value)}>
+            <Pressable
+                testID={`switch-card-${label}`}
+                disabled={disabled}
+                onPress={() => onValueChange(!value)}
+            >
                 <Text>{label}</Text>
                 <Text>{description}</Text>
             </Pressable>
@@ -56,6 +69,15 @@ jest.mock("@/shared/ui", () => {
 describe("ManageNotifications", () => {
     beforeEach(() => {
         mockMutate.mockClear();
+        mockRequestBrowserNotificationPermission.mockReset();
+        mockSetBrowserNotificationsEnabled.mockClear();
+        mockBrowserPermission = "unsupported";
+        mockBrowserNotificationsEnabled = true;
+        Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatformOS });
+    });
+
+    afterAll(() => {
+        Object.defineProperty(Platform, "OS", { configurable: true, value: originalPlatformOS });
     });
 
     it("does not render the removed direct message toggle", () => {
@@ -65,5 +87,35 @@ describe("ManageNotifications", () => {
         expect(screen.getByText("Звук уведомлений")).toBeTruthy();
         expect(screen.getByText("Сообщения в чатах дисциплин")).toBeTruthy();
         expect(screen.getByText("Упоминания")).toBeTruthy();
+    });
+
+    it("keeps the browser notification toggle visible after permission is granted", async () => {
+        Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
+        mockBrowserPermission = "granted";
+        mockBrowserNotificationsEnabled = true;
+
+        render(<ManageNotifications />);
+
+        expect(await screen.findByText("Браузерные уведомления")).toBeTruthy();
+
+        fireEvent.press(screen.getByTestId("switch-card-Браузерные уведомления"));
+
+        expect(mockSetBrowserNotificationsEnabled).toHaveBeenCalledWith(false);
+    });
+
+    it("requests browser permission before enabling browser notifications", async () => {
+        Object.defineProperty(Platform, "OS", { configurable: true, value: "web" });
+        mockBrowserPermission = "default";
+        mockBrowserNotificationsEnabled = true;
+        mockRequestBrowserNotificationPermission.mockResolvedValue("granted");
+
+        render(<ManageNotifications />);
+
+        fireEvent.press(await screen.findByTestId("switch-card-Браузерные уведомления"));
+
+        await waitFor(() => {
+            expect(mockRequestBrowserNotificationPermission).toHaveBeenCalledTimes(1);
+        });
+        expect(mockSetBrowserNotificationsEnabled).toHaveBeenCalledWith(true);
     });
 });
