@@ -32,6 +32,7 @@ interface SubjectHeaderProps {
     onOpenSearch?: () => void;
     onStartGroupAudioCall?: () => void;
     onStartGroupVideoCall?: () => void;
+    onBeforeStartCall?: () => void;
     profileUserId?: string | null;
     onProfileUserIdChange?: (userId: string | null) => void;
 }
@@ -42,6 +43,7 @@ export const SubjectHeader = ({
     onOpenSearch,
     onStartGroupAudioCall,
     onStartGroupVideoCall,
+    onBeforeStartCall,
     profileUserId: controlledProfileUserId,
     onProfileUserIdChange,
 }: SubjectHeaderProps) => {
@@ -118,6 +120,10 @@ export const SubjectHeader = ({
             return;
         }
 
+        setIsMembersOpen(false);
+        setProfileUserId(null);
+        onBeforeStartCall?.();
+
         const direct = await apiClient.chat.openDirectConversation(selectedParticipant.userId);
         updateConversation(direct);
 
@@ -140,7 +146,7 @@ export const SubjectHeader = ({
             },
         ]);
         await startCall(direct.id, callType);
-    }, [currentUserId, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
+    }, [currentUserId, onBeforeStartCall, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
 
     if (!conversation) return null;
 
