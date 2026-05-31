@@ -177,6 +177,24 @@ export const ChatMessage = ({
     const currentUserId = useCurrentUserId();
     const isOptimistic = localStatus === "sending";
     const isFailed = localStatus === "failed";
+    const renderAuthorAvatar = () => {
+        if (isOwn || !showAvatar) return null;
+
+        const avatar = <Avatar size={40} src={avatarUrl} name={authorName} />;
+        if (!onAuthorPress) return avatar;
+
+        return (
+            <Pressable
+                testID={`chat-message-avatar-${id}`}
+                onPress={onAuthorPress}
+                hitSlop={4}
+                accessibilityRole="button"
+                className="shrink-0 cursor-pointer active:opacity-70"
+            >
+                {avatar}
+            </Pressable>
+        );
+    };
 
     if (kind === "SystemCall") {
         const systemText = buildSystemCallLabel(systemCall);
@@ -244,7 +262,7 @@ export const ChatMessage = ({
     if (isDeleted) {
         return (
             <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
-                {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} name={authorName} />}
+                {renderAuthorAvatar()}
                 <View className="max-w-[85%] px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2" style={glow.surface}>
                     <TrashIcon size={14} className="text-text-muted" />
                     <Text className="text-text-muted text-[13px] italic">Сообщение удалено</Text>
@@ -271,14 +289,14 @@ export const ChatMessage = ({
 
     return (
         <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
-            {!isOwn && showAvatar && <Avatar size={40} src={avatarUrl} name={authorName} />}
+            {renderAuthorAvatar()}
 
             <Pressable
                 onLongPress={onLongPress}
                 delayLongPress={350}
                 {...contextMenuProps}
                 testID={`chat-message-bubble-${id}`}
-                className={`max-w-[85%] gap-1 px-3 py-3 rounded-2xl border border-transparent ${
+                className={`max-w-[85%] cursor-default gap-1 px-3 py-3 rounded-2xl border border-transparent ${
                     isOwn ? "bg-brand-650" : "bg-white/5"
                 }`}
                 style={[
@@ -301,7 +319,8 @@ export const ChatMessage = ({
                             testID={`chat-message-author-${id}`}
                             onPress={onAuthorPress}
                             hitSlop={4}
-                            className="self-start active:opacity-70"
+                            accessibilityRole="button"
+                            className="self-start cursor-pointer active:opacity-70"
                         >
                             <Text
                                 className="text-[12px] font-semibold text-brand-300"
