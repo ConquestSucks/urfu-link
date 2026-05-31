@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { setAudioModeAsync } from "expo-audio";
+import { setAudioModeAsync, useAudioPlayer } from "expo-audio";
 import { apiClient } from "@/shared/lib/api";
 import { VoiceMessagePlayer } from "../VoiceMessagePlayer";
 
@@ -82,6 +82,10 @@ describe("VoiceMessagePlayer", () => {
             });
             expect(mockPlayer.play).toHaveBeenCalledTimes(1);
         });
+        expect(useAudioPlayer).toHaveBeenCalledWith(null);
+        expect(useAudioPlayer).not.toHaveBeenCalledWith({
+            uri: "https://media.example/voice.m4a",
+        });
         expect(setAudioModeAsync).toHaveBeenCalledWith(
             expect.objectContaining({ allowsRecording: false, playsInSilentMode: true }),
         );
@@ -106,6 +110,28 @@ describe("VoiceMessagePlayer", () => {
         });
 
         expect(mockPlayer.pause).toHaveBeenCalledTimes(1);
+        expect(apiClient.media.getAssetDownloadUrl).not.toHaveBeenCalled();
+    });
+
+    it("keeps the player stable when playing a local source URI", async () => {
+        render(
+            <VoiceMessagePlayer
+                sourceUri="file://voice.m4a"
+                durationSeconds={17}
+            />,
+        );
+        mockPlayer.replace.mockClear();
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("voice-message-play-button"));
+        });
+
+        expect(useAudioPlayer).toHaveBeenCalledWith(null);
+        expect(useAudioPlayer).not.toHaveBeenCalledWith({
+            uri: "file://voice.m4a",
+        });
+        expect(mockPlayer.replace).not.toHaveBeenCalled();
+        expect(mockPlayer.play).toHaveBeenCalledTimes(1);
         expect(apiClient.media.getAssetDownloadUrl).not.toHaveBeenCalled();
     });
 
