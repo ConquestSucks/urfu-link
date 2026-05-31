@@ -17,6 +17,7 @@ import {
     UploadSimpleIcon,
     XIcon,
 } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 
 interface FilesModalProps {
     visible: boolean;
@@ -72,6 +73,7 @@ export const FilesModal = ({
                         styles.panel,
                         isMobile ? styles.mobilePanel : null,
                         { width: panelWidth },
+                        glow.surfaceStrong,
                     ]}
                 >
                     <View
@@ -105,9 +107,10 @@ export const FilesModal = ({
                             style={[
                                 styles.dropZone,
                                 isDragging ? styles.dropZoneActive : null,
+                                isDragging ? glow.brand : glow.surface,
                             ]}
                         >
-                            <View className="items-center justify-center mb-4" style={styles.uploadIconTile}>
+                            <View className="items-center justify-center mb-4" style={[styles.uploadIconTile, isDragging ? glow.brandSoft : glow.brandSubtle]}>
                                 <UploadSimpleIcon size={26} className="text-text-muted" />
                             </View>
                             <Text className="text-white text-[18px] font-semibold text-center">
@@ -138,7 +141,7 @@ export const FilesModal = ({
                                     <View
                                         key={`${file.uri}-${index}`}
                                         className="flex-row items-center border border-white/5"
-                                        style={styles.fileRow}
+                                        style={[styles.fileRow, glow.surface]}
                                     >
                                         <View
                                             className="items-center justify-center mr-4"
@@ -196,7 +199,7 @@ export const FilesModal = ({
                             onPress={onSubmit}
                             disabled={!canSubmit}
                             className={`items-center justify-center ${isSubmitting ? "bg-brand-650/70" : canSubmit ? "bg-brand-650 active:opacity-85" : "bg-brand-650/40"}`}
-                            style={styles.submitButton}
+                            style={[styles.submitButton, canSubmit ? glow.brandSoft : undefined]}
                         >
                             {isSubmitting ? (
                                 <View className="flex-row items-center">

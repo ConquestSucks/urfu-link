@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { PushPinIcon, XIcon } from "@/shared/ui/phosphor";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import type { MessagesListHandle } from "./MessagesList";
+import { glow } from "@/shared/ui/glow";
 
 interface PinnedBarProps {
     conversationId: string;
@@ -52,6 +53,7 @@ export const PinnedBar = ({ conversationId, listRef, canManagePins = true }: Pin
         <Pressable
             onPress={handleJump}
             className="flex-row items-center gap-2 px-3 py-2 border-b border-white/5 bg-white/[0.02] active:bg-white/5"
+            style={glow.brandSubtle}
         >
             <PushPinIcon size={14} className="text-brand-400" weight="fill" />
             <View className="flex-1 min-w-0">

@@ -6,6 +6,7 @@ import { Text, View, ScrollView } from "react-native";
 import { Logout } from "@/features/logout";
 import { SETTINGS_ITEMS } from "@/shared/config";
 import { Href, router } from "expo-router";
+import { glow } from "@/shared/ui/glow";
 
 export const ProfileMobile = () => {
     const { data: profile, isLoading } = useCurrentUser();
@@ -53,9 +54,9 @@ export const ProfileMobile = () => {
             </View>
 
             <View className="gap-3">
-                <View className="bg-zinc-900 rounded-3xl p-5 gap-4">
+                <View className="bg-zinc-900 rounded-3xl p-5 gap-4 border border-white/5" style={glow.surface}>
                     <View className="flex-row items-center gap-4">
-                        <View className="w-10 h-10 bg-white/5 rounded-xl items-center justify-center">
+                        <View className="w-10 h-10 bg-brand-650/10 border border-brand-300/10 rounded-xl items-center justify-center" style={glow.brandSubtle}>
                             <AtIcon size={20} className="text-text-placeholder" />
                         </View>
                         <View>
@@ -69,7 +70,7 @@ export const ProfileMobile = () => {
                     </View>
 
                     <View className="flex-row items-center gap-4">
-                        <View className="w-10 h-10 bg-white/5 rounded-xl items-center justify-center">
+                        <View className="w-10 h-10 bg-brand-650/10 border border-brand-300/10 rounded-xl items-center justify-center" style={glow.brandSubtle}>
                             <EnvelopeSimpleIcon size={20} className="text-text-placeholder" />
                         </View>
                         <View>
@@ -83,7 +84,7 @@ export const ProfileMobile = () => {
                     </View>
                 </View>
 
-                <View className="bg-zinc-900 rounded-3xl rounded-b-xl">
+                <View className="bg-zinc-900 rounded-3xl rounded-b-xl border border-white/5 overflow-hidden" style={glow.surface}>
                     {SETTINGS_ITEMS.map(
                         (item, index) =>
                             item.key !== "account" && (

@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { SearchResultDto } from "@urfu-link/api-client";
 import { Avatar } from "@/shared/ui";
+import { glow } from "@/shared/ui/glow";
 
 interface SearchResultItemProps {
     item: SearchResultDto;
@@ -56,6 +57,7 @@ export const SearchResultItem = ({
         <Pressable
             onPress={() => onPress?.(item)}
             className="px-4 py-3 active:bg-white/5 flex-row gap-3"
+            style={glow.surface}
         >
             <Avatar size={40} src={preview?.avatarUrl} name={authorName} />
             <View className="flex-1 min-w-0">

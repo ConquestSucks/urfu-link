@@ -2,6 +2,7 @@ import React, { ComponentType, ReactNode } from "react";
 import { Text, View } from "react-native";
 import { twMerge } from "tailwind-merge";
 import type { IconProps } from "@/shared/ui/phosphor-types";
+import { glow } from "./glow";
 
 export interface EmptyStateProps {
     title: string;
@@ -50,11 +51,14 @@ export const EmptyState = ({
             )}
         >
             {Icon && (
-                <View className="w-24 h-24 rounded-full bg-white/5 items-center justify-center mb-5">
+                <View
+                    className="w-24 h-24 rounded-full bg-brand-650/10 border border-brand-300/10 items-center justify-center mb-5"
+                    style={glow.brandHalo}
+                >
                     <Icon
                         size={40}
                         weight="regular"
-                        className="text-text-disabled"
+                        className="text-brand-300"
                     />
                 </View>
             )}

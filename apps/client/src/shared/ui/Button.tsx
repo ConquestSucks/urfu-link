@@ -2,6 +2,7 @@ import React, { ReactNode } from "react";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { Pressable, Text, View } from "react-native";
 import { twMerge } from "tailwind-merge";
+import { glow } from "./glow";
 
 interface ButtonProps {
     onPress: () => void;
@@ -46,6 +47,7 @@ export const Button = ({
         <Pressable
             onPress={onPress}
             disabled={isDisabled}
+            style={!isDisabled && variant === "primary" ? glow.brandSoft : undefined}
             className={twMerge(
                 "flex-row items-center justify-center h-fit px-4 py-2 rounded-xl gap-2 transition-all",
                 variantStyles[variant],

@@ -5,6 +5,7 @@ import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { ModalOverlay } from "@/shared/ui";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { PushPinIcon, XIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 
 interface PinnedMessagesModalProps {
     visible: boolean;
@@ -56,7 +57,7 @@ export const PinnedMessagesModal = ({
             contentClassName="bg-app-card border border-white/10 rounded-2xl overflow-hidden w-full max-w-[420px]"
             backdropClassName="px-4"
         >
-            <View className="px-4 py-3 border-b border-white/5 flex-row items-center gap-2">
+            <View className="px-4 py-3 border-b border-white/5 flex-row items-center gap-2" style={glow.brandSubtle}>
                 <PushPinIcon size={18} className="text-brand-400" weight="fill" />
                 <Text className="text-white text-base font-semibold">Закрепленные</Text>
             </View>
@@ -78,6 +79,7 @@ export const PinnedMessagesModal = ({
                             key={message.id}
                             onPress={() => onJumpToMessage(message.id)}
                             className="mx-2 px-3 py-3 rounded-xl flex-row items-center gap-3 active:bg-white/5"
+                            style={glow.surface}
                         >
                             <View className="flex-1 min-w-0">
                                 <Text className="text-white text-sm" numberOfLines={2}>

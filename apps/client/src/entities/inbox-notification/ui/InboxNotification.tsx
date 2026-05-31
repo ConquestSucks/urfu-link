@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { InboxNotificationProps } from "../model/types";
 import { InfoIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 
 const HOVER_READ_DELAY_MS = 2_000;
 
@@ -64,6 +65,7 @@ export const InboxNotification = ({
             accessibilityRole={onPress ? "button" : undefined}
             accessibilityLabel={unread ? `${titleText}. Непрочитано` : titleText}
             accessibilityState={{ selected: unread }}
+            style={unread ? glow.unread : undefined}
             className={`flex-row gap-2.5 px-3 py-2.5 md:rounded-lg select-none border-b md:border transition-colors duration-200 ${
                 unread
                     ? "border-white/[0.08] bg-white/[0.07] hover:bg-white/[0.09]"
@@ -76,6 +78,7 @@ export const InboxNotification = ({
                         ? "bg-brand-600/15 border-brand-300/20"
                         : "bg-app-elevated border-white/[0.08]"
                 }`}
+                style={unread ? glow.brandSubtle : undefined}
             >
                 <InfoIcon
                     size={17}
@@ -91,6 +94,7 @@ export const InboxNotification = ({
                             <View
                                 testID="inbox-notification-unread-marker"
                                 className="h-1.5 w-1.5 rounded-full bg-brand-300 shrink-0"
+                                style={glow.brandHalo}
                             />
                         )}
                         <Text

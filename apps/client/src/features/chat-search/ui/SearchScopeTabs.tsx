@@ -1,6 +1,7 @@
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { GlobalSearchScope } from "../model/search-store";
+import { glow } from "@/shared/ui/glow";
 
 interface SearchScopeTabsProps {
     value: GlobalSearchScope;
@@ -25,6 +26,7 @@ export const SearchScopeTabs = ({ value, onChange }: SearchScopeTabsProps) => {
                             "px-3 py-1.5 rounded-full",
                             active ? "bg-brand-500" : "bg-white/5 active:bg-white/10",
                         ].join(" ")}
+                        style={active ? glow.brandSubtle : undefined}
                     >
                         <Text
                             className={[

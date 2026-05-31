@@ -8,6 +8,7 @@ import { ManagePrivacy } from "@/features/manage-privacy";
 import { ManageDevices } from "@/features/manage-devices";
 import { ManageNotifications } from "@/features/manage-notifications";
 import { ManageMedia } from "@/features/manage-media";
+import { glow } from "@/shared/ui/glow";
 
 interface ContentProps {
     activeTab: string;
@@ -27,7 +28,7 @@ const Content = ({ activeTab }: ContentProps) => {
         <LinearProgress isVisible={isPending}/>
 
         <View className="flex-1 px-8 pb-8 pt-7 gap-6">
-          <View className="gap-2">
+          <View className="gap-2 rounded-2xl border border-white/5 bg-white/[0.025] p-4" style={glow.surface}>
             <Text className="text-2xl text-white font-bold">
               {SETTINGS_ITEMS.find((item) => item.key === activeTab)?.label}
             </Text>

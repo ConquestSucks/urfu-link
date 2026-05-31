@@ -16,6 +16,7 @@ import type { MessageDto } from "@urfu-link/api-client";
 import { copyTextToClipboard } from "@/shared/lib/clipboard";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useComposerStore } from "../model/composer-store";
+import { glow } from "@/shared/ui/glow";
 
 type Action =
     | "reply"
@@ -173,7 +174,7 @@ export const MessageActionsMenu = ({
                 <Pressable className="flex-1 cursor-default" onPress={onClose}>
                     <Pressable
                         onPress={(e) => e.stopPropagation()}
-                        style={{ position: "absolute", left, top, width: menuWidth }}
+                        style={{ position: "absolute", left, top, width: menuWidth, ...glow.surfaceStrong }}
                         className="cursor-default bg-app-card border border-white/10 rounded-2xl overflow-hidden"
                     >
                         {content}

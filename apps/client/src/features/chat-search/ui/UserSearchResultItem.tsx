@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, Text, View, ActivityIndicator as RNActivityIndicator } from "react-native";
 import { SearchUserDto } from "@urfu-link/api-client";
 import { Avatar } from "@/shared/ui";
+import { glow } from "@/shared/ui/glow";
 
 interface UserSearchResultItemProps {
     item: SearchUserDto;
@@ -15,6 +16,7 @@ export const UserSearchResultItem = ({ item, isPending, onPress }: UserSearchRes
             disabled={isPending}
             onPress={() => onPress?.(item)}
             className="px-4 py-3 active:bg-white/5 flex-row gap-3 items-center"
+            style={isPending ? glow.brandSubtle : glow.surface}
         >
             <Avatar size={40} src={item.avatarUrl} name={item.displayName || item.username} />
             <View className="flex-1 min-w-0">

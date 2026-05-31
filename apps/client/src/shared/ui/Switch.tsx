@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
+import { glow } from "./glow";
 
 interface SwitchProps {
   value: boolean;
@@ -33,6 +34,7 @@ export const Switch = ({ value, onValueChange, disabled }: SwitchProps) => {
         justifyContent: "center",
         backgroundColor: localValue ? "#2B7FFF" : "rgba(255, 255, 255, 0.1)",
         opacity: disabled ? 0.5 : 1,
+        ...(localValue ? glow.brandSoft : {}),
         // @ts-ignore
         transition: "background-color 200ms ease",
       }}
@@ -44,6 +46,7 @@ export const Switch = ({ value, onValueChange, disabled }: SwitchProps) => {
           borderRadius: 10,
           backgroundColor: "white",
           transform: [{ translateX: localValue ? 24 : 0 }],
+          boxShadow: localValue ? "0 0 10px rgba(255, 255, 255, 0.48)" : undefined,
           // @ts-ignore
           transition: "transform 200ms ease",
         }}

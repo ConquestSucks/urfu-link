@@ -12,6 +12,7 @@ import { ChatInput } from "../chat-input/Input";
 import type { DocumentPickerAsset } from "expo-document-picker";
 import type { VoiceRecordingDraft } from "@/features/voice-message";
 import { uploadChatAttachments } from "../../lib/upload-chat-attachments";
+import { glow } from "@/shared/ui/glow";
 
 interface ThreadPanelProps {
     rootMessageId: string;
@@ -177,8 +178,8 @@ export const ThreadPanel = ({
     );
 
     return (
-        <View className="flex-1 bg-app-card border-l border-white/5">
-            <View className="flex-row items-center justify-between px-4 py-3 border-b border-white/5">
+        <View className="flex-1 bg-app-card border-l border-white/5" style={glow.surface}>
+            <View className="flex-row items-center justify-between px-4 py-3 border-b border-white/5" style={glow.surface}>
                 <View>
                     <Text className="text-white text-base font-semibold">Тред</Text>
                     {rootMsg && (
@@ -187,7 +188,7 @@ export const ThreadPanel = ({
                         </Text>
                     )}
                 </View>
-                <Pressable onPress={onClose} hitSlop={8} className="p-1">
+                <Pressable onPress={onClose} hitSlop={8} className="p-1 rounded-full" style={glow.brandSubtle}>
                     <XIcon size={20} className="text-text-subtle" />
                 </Pressable>
             </View>

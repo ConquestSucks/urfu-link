@@ -9,6 +9,7 @@ import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useCallStore } from "@/entities/call";
 import type { CallSessionDto } from "@urfu-link/api-client";
 import { startCallRingtone, stopCallRingtone } from "@/shared/lib/call-sounds";
+import { glow } from "@/shared/ui/glow";
 
 export const IncomingCallModal = () => {
     const router = useRouter();
@@ -100,11 +101,11 @@ export const IncomingCallModal = () => {
             className="absolute inset-0 z-50 justify-center items-center bg-black/70 px-4"
             style={{ position: "absolute" }}
         >
-            <View className="w-full max-w-[520px] rounded-3xl border border-white/15 bg-app-card p-4">
+            <View className="w-full max-w-[520px] rounded-3xl border border-white/15 bg-app-card p-4" style={glow.surfaceStrong}>
                 <View className="gap-3 mb-4">
                     <Text className="text-white text-xl font-semibold">Входящий {callLabel}</Text>
                     <View className="flex-row items-center gap-3">
-                        <View className="rounded-xl overflow-hidden">
+                        <View className="rounded-xl overflow-hidden bg-brand-650/10 p-3 border border-brand-300/10" style={glow.brandSubtle}>
                             {incomingCall.callType === "Video" ? (
                                 <VideoCameraIcon size={24} className="text-text-subtle" />
                             ) : (
@@ -128,6 +129,7 @@ export const IncomingCallModal = () => {
                         onPress={handleAccept}
                         disabled={isAccepting || isDeclining}
                         className="flex-1 rounded-xl py-2.5 items-center bg-brand-650 disabled:opacity-60"
+                        style={glow.brandSoft}
                     >
                         {isAccepting ? (
                             <ActivityIndicator size="small" color="#fff" />
@@ -140,6 +142,7 @@ export const IncomingCallModal = () => {
                         onPress={handleDecline}
                         disabled={isAccepting || isDeclining}
                         className="flex-1 rounded-xl py-2.5 items-center bg-red-600/80 disabled:opacity-60"
+                        style={glow.danger}
                     >
                         {isDeclining ? (
                             <ActivityIndicator size="small" color="#fff" />

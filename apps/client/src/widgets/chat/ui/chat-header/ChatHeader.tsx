@@ -23,6 +23,7 @@ import {
     useUserPresence,
 } from "@/entities/presence";
 import type { UserStatus } from "@/shared/ui/StatusIndicator";
+import { glow } from "@/shared/ui/glow";
 
 const presenceStatusToIndicator = (status?: string): UserStatus => {
     switch (status) {
@@ -123,7 +124,7 @@ export const ChatHeader = ({
 
     return (
         <>
-            <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2">
+            <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2" style={glow.surface}>
                 <View className="flex-row gap-1 items-center flex-1 min-w-0">
                     {isMobile && (
                         <Pressable
@@ -142,7 +143,7 @@ export const ChatHeader = ({
                             canOpenPeerProfile ? "active:opacity-80 cursor-pointer" : "cursor-default"
                         }`}
                     >
-                        <View className="relative z-1 p-0.5">
+                        <View className="relative z-1 p-0.5" style={indicatorStatus === "online" ? glow.success : undefined}>
                             {isDirectIdentityLoading ? (
                                 <Skeleton
                                     testID="chat-header-avatar-skeleton"
