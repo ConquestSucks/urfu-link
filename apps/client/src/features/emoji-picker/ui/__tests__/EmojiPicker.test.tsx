@@ -1,5 +1,6 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 const mockGetItem = jest.fn<string | null, [string]>(() => null);
 const mockSetItem = jest.fn<void, [string, string]>();
@@ -89,7 +90,12 @@ describe("EmojiPicker", () => {
     it("renders the emoji grid as the vertical scroller", async () => {
         await renderEmojiPicker();
 
-        expect(screen.getByTestId("emoji-picker-grid").props.horizontal).toBeFalsy();
+        const grid = screen.getByTestId("emoji-picker-grid");
+        const style = StyleSheet.flatten(grid.props.style);
+
+        expect(grid.props.horizontal).toBeFalsy();
+        expect(style?.flex).toBe(1);
+        expect(style?.minHeight).toBe(0);
     });
 
     it("filters emojis with the search field", async () => {
