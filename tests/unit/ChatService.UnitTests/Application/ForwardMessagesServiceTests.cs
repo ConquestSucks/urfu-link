@@ -137,6 +137,59 @@ public class ForwardMessagesServiceTests
     }
 
     [Fact]
+    public async Task ForwardAsync_DraftDirectTarget_CreatesConversationAndBroadcastsPreview()
+    {
+        var source = Conversation.Hydrate(
+            id: "group-source",
+            type: ConversationType.Group,
+            participants: new[] { Caller, SourcePeer },
+            createdAtUtc: _clock.GetUtcNow().AddMinutes(-5),
+            lastMessageAtUtc: _clock.GetUtcNow().AddMinutes(-5),
+            lastMessagePreview: null);
+        var targetDraft = Conversation.OpenDirect(Caller, TargetPeer, _clock.GetUtcNow());
+
+        _conversations.GetByIdAsync(targetDraft.Id, Arg.Any<CancellationToken>()).Returns((Conversation?)null);
+        _conversations.GetByIdAsync(source.Id, Arg.Any<CancellationToken>()).Returns(source);
+        _conversations.TryCreateAsync(Arg.Any<Conversation>(), Arg.Any<CancellationToken>()).Returns(true);
+
+        var msg = Message.Send(
+            id: Guid.NewGuid(),
+            conversationId: source.Id,
+            senderId: SourcePeer,
+            body: "from group",
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId: "c-source-group",
+            createdAtUtc: _clock.GetUtcNow().AddMinutes(-1));
+        _messages.GetManyAsync(
+                Arg.Is<IReadOnlyList<Guid>>(ids => ids.Contains(msg.Id)),
+                Arg.Any<CancellationToken>())
+            .Returns(new[] { msg });
+
+        var result = await Build().ForwardAsync(
+            new ForwardMessagesRequest(targetDraft.Id, Caller, new[] { msg.Id }, PeerUserId: TargetPeer),
+            default);
+
+        result.Should().ContainSingle();
+        await _conversations.Received(1).TryCreateAsync(
+            Arg.Is<Conversation>(c => c.Id == targetDraft.Id
+                && c.Participants.Contains(Caller)
+                && c.Participants.Contains(TargetPeer)),
+            Arg.Any<CancellationToken>());
+        await _conversations.Received(1).UpdateLastMessageAsync(
+            targetDraft.Id,
+            Arg.Is<MessagePreview>(p => p.SenderId == Caller && p.Body == "from group"),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>());
+        _outbox.Captured.OfType<ChatConversationCreatedEvent>()
+            .Should().ContainSingle()
+            .Which.ConversationId.Should().Be(targetDraft.Id);
+        await _broadcaster.Received(1).NotifyConversationUpdatedAsync(
+            Arg.Is<IReadOnlyList<Guid>>(ids => ids.Contains(Caller) && ids.Contains(TargetPeer)),
+            Arg.Is<ConversationDto>(c => c.Id == targetDraft.Id && c.LastMessagePreview!.Body == "from group"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ForwardAsync_WithAttachments_GrantsAccessForAllAttachmentsToTargetParticipants()
     {
         var target = Conversation.OpenDirect(Caller, TargetPeer, _clock.GetUtcNow());

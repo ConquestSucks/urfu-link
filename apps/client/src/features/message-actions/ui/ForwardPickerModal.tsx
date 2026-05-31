@@ -101,7 +101,7 @@ export const ForwardPickerModal = ({ messageIds, onClose }: ForwardPickerModalPr
                     avatarUrl: user.avatarUrl ?? "",
                 },
             ]);
-            await forwardMessages(conversation.id, messageIds);
+            await forwardMessages(conversation.id, messageIds, user.id);
         } catch (error) {
             console.error("Forward to user failed", error);
         }

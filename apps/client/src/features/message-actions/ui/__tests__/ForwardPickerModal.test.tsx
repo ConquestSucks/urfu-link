@@ -197,7 +197,11 @@ describe("ForwardPickerModal", () => {
         fireEvent.press(screen.getByTestId("forward-user-searched-user"));
 
         await waitFor(() =>
-            expect(mockForwardMessages).toHaveBeenCalledWith("opened-direct", ["message-1"]),
+            expect(mockForwardMessages).toHaveBeenCalledWith(
+                "opened-direct",
+                ["message-1"],
+                "searched-user",
+            ),
         );
         expect(mockOpenDirectConversation).toHaveBeenCalledWith("searched-user");
         expect(mockUpdateConversation).toHaveBeenCalledWith(

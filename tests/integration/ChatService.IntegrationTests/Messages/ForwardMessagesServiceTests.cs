@@ -99,6 +99,54 @@ public class ForwardMessagesServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ForwardAsync_FromGroupToDraftDirect_CreatesConversation()
+    {
+        var caller = Guid.NewGuid();
+        var groupMember = Guid.NewGuid();
+        var targetPeer = Guid.NewGuid();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var convRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        var groupConv = Conversation.Hydrate(
+            id: $"group-{Guid.NewGuid():N}",
+            type: ConversationType.Group,
+            participants: new[] { caller, groupMember },
+            createdAtUtc: DateTimeOffset.UtcNow,
+            lastMessageAtUtc: DateTimeOffset.UtcNow,
+            lastMessagePreview: null);
+        await convRepo.TryCreateAsync(groupConv, default);
+
+        var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
+        var sourceDto = await send.SendAsync(
+            new SendMessageRequest(groupConv.Id, groupMember, "from group", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+            default);
+        _factory.OutboxWriter.Clear();
+        _factory.ChatBroadcaster.Reset();
+
+        var open = scope.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+        var targetDraft = await open.OpenAsync(caller, targetPeer, default);
+
+        var forward = scope.ServiceProvider.GetRequiredService<ForwardMessagesService>();
+        var produced = await forward.ForwardAsync(
+            new ForwardMessagesRequest(targetDraft.Id, caller, new[] { sourceDto.Id }, PeerUserId: targetPeer), default);
+
+        produced.Should().ContainSingle();
+        produced[0].ConversationId.Should().Be(targetDraft.Id);
+        produced[0].ForwardedFrom.Should().NotBeNull();
+        produced[0].ForwardedFrom!.OriginalConversationId.Should().Be(groupConv.Id);
+
+        var persisted = await convRepo.GetByIdAsync(targetDraft.Id, default);
+        persisted.Should().NotBeNull();
+        persisted!.LastMessagePreview.Should().NotBeNull();
+
+        _factory.OutboxWriter.Published.Select(p => p.Payload)
+            .OfType<ChatConversationCreatedEvent>()
+            .Should().ContainSingle(e => e.ConversationId == targetDraft.Id);
+        _factory.ChatBroadcaster.ConversationUpdated.Should()
+            .ContainSingle(update => update.Conversation.Id == targetDraft.Id);
+    }
+
+    [Fact]
     public async Task ForwardAsync_WithAttachment_GrantsAccessToTargetParticipants()
     {
         var caller = Guid.NewGuid();

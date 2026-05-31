@@ -14,7 +14,8 @@ namespace Urfu.Link.Services.Chat.Application.Messages;
 public sealed record ForwardMessagesRequest(
     string TargetConversationId,
     Guid CallerUserId,
-    IReadOnlyList<Guid> MessageIds);
+    IReadOnlyList<Guid> MessageIds,
+    Guid? PeerUserId = null);
 
 public sealed class ForwardMessagesService(
     IConversationRepository conversations,
@@ -43,8 +44,8 @@ public sealed class ForwardMessagesService(
             throw new ChatForwardLimitExceededException(request.MessageIds.Count, opts.MaxForwardedMessages);
         }
 
-        var target = await conversations.GetByIdAsync(request.TargetConversationId, cancellationToken).ConfigureAwait(false)
-            ?? throw ConversationNotFoundException.For(request.TargetConversationId);
+        var (target, shouldCreateTarget) = await ResolveTargetConversationAsync(request, cancellationToken)
+            .ConfigureAwait(false);
 
         if (!target.IsParticipant(request.CallerUserId))
         {
@@ -84,9 +85,10 @@ public sealed class ForwardMessagesService(
         }
 
         var now = clock.GetUtcNow();
+        var producedMessages = new List<Message>(sources.Count);
         var produced = new List<MessageDto>(sources.Count);
         var lastPreview = (preview: (MessagePreview?)null, sentAt: now);
-        var grantTasks = new List<Task>();
+        var forwardedAttachmentIds = new List<Guid>();
         var grantees = target.Participants.Where(p => p != request.CallerUserId).ToList();
 
         var index = 0;
@@ -114,6 +116,7 @@ public sealed class ForwardMessagesService(
                 authorRole: target.RoleOf(request.CallerUserId));
 
             await messages.InsertAsync(newMessage, cancellationToken).ConfigureAwait(false);
+            producedMessages.Add(newMessage);
             produced.Add(MessageDto.FromDomain(newMessage));
 
             lastPreview = (
@@ -125,30 +128,24 @@ public sealed class ForwardMessagesService(
             {
                 foreach (var attachment in newMessage.Attachments)
                 {
-                    grantTasks.Add(mediaServiceClient.GrantConversationAccessAsync(
-                        attachment.MediaAssetId, grantees, target.Id, request.CallerUserId, cancellationToken));
+                    forwardedAttachmentIds.Add(attachment.MediaAssetId);
                 }
             }
-
-            await dispatcher.PublishAsync(
-                new ChatMessageSentEvent(
-                    target.Id,
-                    newMessage.Id,
-                    request.CallerUserId,
-                    grantees,
-                    BuildPreviewText(newMessage.Body, newMessage.HasAttachments),
-                    newMessage.HasAttachments,
-                    sentAt),
-                cancellationToken).ConfigureAwait(false);
-
-            await broadcaster.NotifyMessageReceivedAsync(
-                grantees, MessageDto.FromDomain(newMessage), cancellationToken).ConfigureAwait(false);
 
             index++;
         }
 
-        if (grantTasks.Count > 0)
+        if (shouldCreateTarget)
         {
+            target = await EnsureConversationCreatedAsync(target, now, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        if (forwardedAttachmentIds.Count > 0)
+        {
+            var grantTasks = forwardedAttachmentIds.Select(assetId =>
+                mediaServiceClient.GrantConversationAccessAsync(
+                    assetId, grantees, target.Id, request.CallerUserId, cancellationToken));
             await Task.WhenAll(grantTasks).ConfigureAwait(false);
         }
 
@@ -156,9 +153,87 @@ public sealed class ForwardMessagesService(
         {
             await conversations.UpdateLastMessageAsync(
                 target.Id, preview, lastPreview.sentAt, cancellationToken).ConfigureAwait(false);
+            target.RegisterMessage(preview, lastPreview.sentAt);
+        }
+
+        for (var i = 0; i < producedMessages.Count; i++)
+        {
+            var message = producedMessages[i];
+            await dispatcher.PublishAsync(
+                new ChatMessageSentEvent(
+                    target.Id,
+                    message.Id,
+                    request.CallerUserId,
+                    grantees,
+                    BuildPreviewText(message.Body, message.HasAttachments),
+                    message.HasAttachments,
+                    message.CreatedAtUtc),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        if (producedMessages.Count > 0)
+        {
+            await broadcaster.NotifyConversationUpdatedAsync(
+                target.Participants,
+                ConversationDto.FromDomain(target).WithLastMessageMetadata(producedMessages[^1]),
+                cancellationToken).ConfigureAwait(false);
+
+            foreach (var dto in produced)
+            {
+                await broadcaster.NotifyMessageReceivedAsync(
+                    grantees, dto, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         return produced;
+    }
+
+    private async Task<(Conversation Conversation, bool ShouldCreateConversation)> ResolveTargetConversationAsync(
+        ForwardMessagesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existing = await conversations.GetByIdAsync(request.TargetConversationId, cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return (existing, false);
+        }
+
+        if (request.PeerUserId is not { } peerUserId)
+        {
+            throw ConversationNotFoundException.For(request.TargetConversationId);
+        }
+
+        var draft = Conversation.OpenDirect(request.CallerUserId, peerUserId, clock.GetUtcNow());
+        if (!string.Equals(draft.Id, request.TargetConversationId, StringComparison.Ordinal))
+        {
+            throw ConversationNotFoundException.For(request.TargetConversationId);
+        }
+
+        return (draft, true);
+    }
+
+    private async Task<Conversation> EnsureConversationCreatedAsync(
+        Conversation conversation,
+        DateTimeOffset occurredAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var created = await conversations.TryCreateAsync(conversation, cancellationToken).ConfigureAwait(false);
+        if (!created)
+        {
+            return await conversations.GetByIdAsync(conversation.Id, cancellationToken).ConfigureAwait(false)
+                ?? throw ConversationNotFoundException.For(conversation.Id);
+        }
+
+        await dispatcher.PublishAsync(
+            new ChatConversationCreatedEvent(
+                conversation.Id,
+                conversation.Type,
+                conversation.Participants,
+                occurredAtUtc),
+            cancellationToken).ConfigureAwait(false);
+
+        return conversation;
     }
 
     private static string BuildPreviewText(string body, bool hasAttachments)
