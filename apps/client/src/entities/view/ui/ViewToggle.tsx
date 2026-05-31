@@ -10,6 +10,7 @@ import { Link } from "expo-router";
 import React from "react";
 import { Pressable, View } from "react-native";
 import { ViewType } from "../model/types";
+import { glow } from "@/shared/ui/glow";
 
 interface ViewToggleProps {
     currentView: ViewType;
@@ -63,11 +64,12 @@ export const ViewToggle = ({
                             accessibilityLabel={label}
                             accessibilityState={{ selected: isActive }}
                             className={buttonClasses}
+                            style={isActive ? glow.brandSoft : undefined}
                         >
                             <View className="relative">
                                 <Icon size={iconSize} weight={iconWeight} className={iconColor} />
                                 {hasBadge && unreadCount > 0 && (
-                                    <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" />
+                                    <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" style={glow.badge} />
                                 )}
                             </View>
                         </Pressable>

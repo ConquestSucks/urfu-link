@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, Text, View } from "react-native";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { StopCircleIcon, XIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 import { formatVoiceDuration } from "../lib/format";
 
 type VoiceRecorderBarProps = {
@@ -22,8 +23,9 @@ export const VoiceRecorderBar = ({
     <View
         testID="voice-recorder-bar"
         className="flex-row items-center gap-3 rounded-2xl border border-danger-400/25 bg-danger-500/10 px-3 py-2.5"
+        style={glow.danger}
     >
-        <View className="w-2.5 h-2.5 rounded-full bg-danger-400" />
+        <View className="w-2.5 h-2.5 rounded-full bg-danger-400" style={glow.danger} />
         <View className="flex-1 min-w-0">
             <Text className="text-white text-[14px] font-semibold">Запись голоса</Text>
             <Text className="text-text-subtle text-[12px] font-medium">
@@ -47,6 +49,7 @@ export const VoiceRecorderBar = ({
             className={`w-10 h-10 rounded-full items-center justify-center bg-danger-500 ${
                 isStopping ? "opacity-70" : "active:bg-danger-400"
             }`}
+            style={glow.danger}
         >
             {isStopping ? (
                 <ActivityIndicator size="small" className="text-white" />

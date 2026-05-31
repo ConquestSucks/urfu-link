@@ -8,6 +8,7 @@ import {
 import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getSubjectHeaderActions } from "../../config/headerActions";
+import { glow } from "@/shared/ui/glow";
 
 interface SubjectHeaderActionsProps {
     canStartGroupCall?: boolean;
@@ -63,7 +64,8 @@ export const SubjectHeaderActions = ({
             {audioEnabled && (
                 <Pressable
                     testID="subject-header-audio-call"
-                    className="p-2 rounded-xl active:bg-white/10"
+                    className="p-2 rounded-xl bg-brand-650/10 active:bg-white/10"
+                    style={glow.brandSubtle}
                     onPress={onStartGroupAudioCall ?? onStartGroupCall}
                 >
                     <PhoneIcon size={24} className="text-text-muted" weight="regular" />
@@ -72,7 +74,8 @@ export const SubjectHeaderActions = ({
             {videoEnabled && (
                 <Pressable
                     testID="subject-header-video-call"
-                    className="p-2 rounded-xl active:bg-white/10"
+                    className="p-2 rounded-xl bg-brand-650/10 active:bg-white/10"
+                    style={glow.brandSubtle}
                     onPress={onStartGroupVideoCall}
                 >
                     <VideoCameraIcon size={24} className="text-text-muted" weight="regular" />

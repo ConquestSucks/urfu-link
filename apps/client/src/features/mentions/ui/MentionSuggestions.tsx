@@ -2,6 +2,7 @@ import React from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import type { ConversationParticipantDto } from "@urfu-link/api-client";
 import { Avatar } from "@/shared/ui";
+import { glow } from "@/shared/ui/glow";
 
 interface MentionSuggestionsProps {
     items: ConversationParticipantDto[];
@@ -15,7 +16,7 @@ export const MentionSuggestions = ({ items, onSelect }: MentionSuggestionsProps)
     if (items.length === 0) return null;
 
     return (
-        <View className="bg-app-card border border-white/10 rounded-2xl overflow-hidden mb-2 max-h-48">
+        <View className="bg-app-card border border-white/10 rounded-2xl overflow-hidden mb-2 max-h-48" style={glow.surfaceStrong}>
             <FlatList
                 data={items}
                 keyExtractor={(p) => p.userId}

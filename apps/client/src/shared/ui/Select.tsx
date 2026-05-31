@@ -4,6 +4,7 @@ import { CaretDownIcon, CheckIcon } from "@/shared/ui/phosphor";
 import React, { useEffect, useRef, useState } from "react";
 import { Dimensions, Modal, Pressable, ScrollView, Text, View, } from "react-native";
 import { FadeIn, useAnimatedStyle, withTiming, } from "react-native-reanimated";
+import { glow } from "./glow";
 interface Option {
     label: string;
     value: string | number;
@@ -58,7 +59,7 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
           transition-colors duration-300
           ${isOpen ? "border-brand-600" : "border-white/10"}
           ${disabled ? "opacity-50" : "hover:border-white/20"}
-        `}>
+        `} style={isOpen ? glow.inputFocus : undefined}>
         <Text className={`text-[15px] transition-colors duration-300 ${selectedOption ? "text-white" : "text-text-disabled"}`}>
           {selectedOption ? selectedOption.label : placeholder}
         </Text>
@@ -77,7 +78,7 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
             width: dropdownCoords.width,
             zIndex: 50,
         }}>
-            <View className="bg-app-card border border-white/10 rounded-xl overflow-hidden max-h-60">
+            <View className="bg-app-card border border-white/10 rounded-xl overflow-hidden max-h-60" style={glow.surfaceStrong}>
               <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
                 {loading ? (<View className="px-4 py-5 items-center justify-center">
                     <ActivityIndicator size="small" className="text-brand-600"/>
@@ -90,7 +91,7 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
             return (<Pressable key={option.value} onPress={() => {
                     onSelect(option.value);
                     setIsOpen(false);
-                }} className={`
+                }} style={isSelected ? glow.brandSubtle : undefined} className={`
                           flex-row items-center justify-between px-4 py-3.5
                           transition-colors duration-200
                           ${index !== options.length - 1 ? "border-b border-white/5" : ""}

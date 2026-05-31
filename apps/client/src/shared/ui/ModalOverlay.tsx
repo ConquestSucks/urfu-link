@@ -1,5 +1,6 @@
 import React from "react";
-import { Modal, Pressable } from "react-native";
+import { Modal, Pressable, StyleProp, ViewStyle } from "react-native";
+import { glow } from "./glow";
 
 interface ModalOverlayProps {
   visible: boolean;
@@ -9,6 +10,7 @@ interface ModalOverlayProps {
   backdropClassName?: string;
   /** Classes applied to the inner stop-propagation Pressable (the modal panel) */
   contentClassName?: string;
+  contentStyle?: StyleProp<ViewStyle>;
 }
 
 /**
@@ -28,6 +30,7 @@ export const ModalOverlay = ({
   children,
   backdropClassName,
   contentClassName,
+  contentStyle,
 }: ModalOverlayProps) => (
   <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
     <Pressable
@@ -37,6 +40,7 @@ export const ModalOverlay = ({
       {/* Inner Pressable stops touch events from reaching the backdrop */}
       <Pressable
         onPress={(e) => e.stopPropagation()}
+        style={[glow.surfaceStrong, contentStyle]}
         className={`cursor-default${contentClassName ? ` ${contentClassName}` : ""}`}
       >
         {children}

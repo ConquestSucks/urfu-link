@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, View } from "react-native";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { PaperPlaneRightIcon, TrashIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 import type { VoiceRecordingDraft } from "../model/types";
 import { VoiceMessagePlayer } from "./VoiceMessagePlayer";
 
@@ -21,6 +22,7 @@ export const VoiceDraftPreview = ({
     <View
         testID="voice-draft-preview"
         className="flex-row items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
+        style={glow.brandSubtle}
     >
         <VoiceMessagePlayer
             sourceUri={draft.uri}
@@ -44,6 +46,7 @@ export const VoiceDraftPreview = ({
             className={`w-11 h-11 rounded-full items-center justify-center bg-brand-650 ${
                 isSubmitting ? "opacity-70" : "active:opacity-80"
             }`}
+            style={glow.brandSoft}
         >
             {isSubmitting ? (
                 <ActivityIndicator size="small" className="text-white" />

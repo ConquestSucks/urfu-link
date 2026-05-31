@@ -1,6 +1,7 @@
 import { Button } from "@/shared/ui";
 import { DeviceMobileIcon, LaptopIcon } from "@/shared/ui/phosphor";
 import { Text, View } from "react-native";
+import { glow } from "@/shared/ui/glow";
 interface DeviceCardProps {
     platform: string;
     name: string;
@@ -10,9 +11,12 @@ interface DeviceCardProps {
     onPress: () => void;
 }
 export const DeviceCard = ({ platform, name, location, lastLogin, isActive, onPress, }: DeviceCardProps) => {
-    return (<View className="flex-row items-center justify-between bg-app-bg border border-white/5 rounded-2xl p-5">
+    return (<View
+      className={`flex-row items-center justify-between bg-app-bg border rounded-2xl p-5 ${isActive ? "border-success-500/20" : "border-white/5"}`}
+      style={isActive ? glow.success : glow.surface}
+    >
       <View className="flex-row gap-4 items-center">
-        <View className="p-[14px] items-center justify-center bg-slate-800/40 rounded-xl">
+        <View className="p-[14px] items-center justify-center bg-slate-800/40 rounded-xl" style={isActive ? glow.success : glow.brandSubtle}>
           {(platform === "Android" || platform === "iOS") && (<DeviceMobileIcon size={20} className="text-text-muted"/>)}
           {platform === "Web" && <LaptopIcon size={20} className="text-text-muted"/>}
         </View>
@@ -20,7 +24,7 @@ export const DeviceCard = ({ platform, name, location, lastLogin, isActive, onPr
         <View className="gap-[1.5px]">
           <View className="flex-row gap-2 items-center">
             <Text className="text-white text-sm font-semibold">{name}</Text>
-            {isActive && (<View className="px-2 py-0.5 pb-1 rounded-lg bg-success-600/20">
+            {isActive && (<View className="px-2 py-0.5 pb-1 rounded-lg bg-success-600/20" style={glow.success}>
                 <Text className="text-success-500 font-medium leading-none">
                   Текущее
                 </Text>

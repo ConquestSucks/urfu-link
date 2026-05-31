@@ -16,6 +16,7 @@ import { useCallHub } from "@/shared/lib/useCallHub";
 import { CallTabCoordinator, IncomingCallModal, OutgoingCallModal } from "@/features/call";
 import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
 import { configureCallSounds } from "@/shared/lib/call-sounds";
+import { glow } from "@/shared/ui/glow";
 
 type IdleWindow = Window & {
     requestIdleCallback?: (callback: () => void) => number;
@@ -92,6 +93,7 @@ export default function AuthLayout() {
                     style={{
                         zIndex: isThreadDetail ? 2 : 1,
                         elevation: isThreadDetail ? 12 : 0,
+                        ...(isThreadDetail ? glow.surfaceStrong : {}),
                     }}
                 >
                     <Slot />

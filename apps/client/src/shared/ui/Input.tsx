@@ -1,5 +1,6 @@
 import React from "react";
 import { Text, TextInput, TextInputProps, View } from "react-native";
+import { glow } from "./glow";
 interface InputProps extends TextInputProps {
     error?: string;
     value: string;
@@ -7,7 +8,7 @@ interface InputProps extends TextInputProps {
 }
 export const Input = ({ error, value, disabled, className, ...props }: InputProps) => {
     return (<View className={`gap-2 w-full ${className}`}>
-      <TextInput editable={!disabled} value={value} className={`
+      <TextInput editable={!disabled} value={value} style={error ? glow.danger : undefined} className={`
           bg-app-card border outline-none
           ${error ? "border-red-500/50" : "border-white/10"} 
           ${!disabled && "focus:border-brand-600"}

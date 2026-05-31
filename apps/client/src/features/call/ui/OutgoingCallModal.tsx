@@ -11,6 +11,7 @@ import { useCurrentUserId } from "@/shared/store/auth-store";
 import { startCallRingtone, stopCallRingtone } from "@/shared/lib/call-sounds";
 import { Avatar } from "@/shared/ui";
 import { PhoneDisconnectIcon, PhoneIcon, VideoCameraIcon } from "@/shared/ui/phosphor";
+import { glow } from "@/shared/ui/glow";
 
 export const OutgoingCallModal = () => {
     const router = useRouter();
@@ -95,9 +96,9 @@ export const OutgoingCallModal = () => {
             className="absolute inset-0 z-50 justify-center items-center bg-black/70 px-4"
             style={{ position: "absolute" }}
         >
-            <View className="w-full max-w-[420px] rounded-3xl border border-white/15 bg-app-card p-5">
+            <View className="w-full max-w-[420px] rounded-3xl border border-white/15 bg-app-card p-5" style={glow.surfaceStrong}>
                 <View className="items-center gap-3">
-                    <View className="h-12 w-12 rounded-2xl bg-white/10 items-center justify-center">
+                    <View className="h-12 w-12 rounded-2xl bg-brand-650/15 border border-brand-300/10 items-center justify-center" style={glow.brandSubtle}>
                         {outgoingCall.callType === "Video" ? (
                             <VideoCameraIcon size={24} className="text-white" />
                         ) : (
@@ -120,6 +121,7 @@ export const OutgoingCallModal = () => {
                     onPress={handleCancel}
                     disabled={isCancelling}
                     className="mt-5 h-12 rounded-2xl bg-red-600/90 items-center justify-center flex-row gap-2 disabled:opacity-60"
+                    style={glow.danger}
                 >
                     {isCancelling ? (
                         <ActivityIndicator size="small" color="#fff" />

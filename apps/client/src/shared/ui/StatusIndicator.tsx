@@ -1,5 +1,6 @@
 import React from "react";
 import { View } from "react-native";
+import { glow } from "./glow";
 
 export type UserStatus = "online" | "away" | "doNotDisturb" | "offline";
 
@@ -17,9 +18,18 @@ const STATUS_COLORS: Record<UserStatus, string> = {
 };
 
 export const StatusIndicator = ({ status, size = 12, className = "" }: StatusIndicatorProps) => {
+    const glowStyle =
+        status === "online"
+            ? glow.success
+            : status === "away"
+              ? glow.warning
+              : status === "doNotDisturb"
+                ? glow.danger
+                : undefined;
+
     return (
         <View
-            style={{ width: size, height: size }}
+            style={[{ width: size, height: size }, glowStyle]}
             className={`absolute rounded-full border-2 border-app-card ${STATUS_COLORS[status]} ${className}`}
         />
     );

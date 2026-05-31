@@ -11,6 +11,7 @@ import { NotificationListToolbar } from "./NotificationListToolbar";
 import { InboxListProps } from "../model/components";
 import { getInboxEmptyState } from "../lib/empty-state-config";
 import { GlobalSearchPanel, useSearchStore } from "@/features/chat-search";
+import { glow } from "@/shared/ui/glow";
 
 interface InboxProps<T> extends InboxListProps<T> {
     data: T[];
@@ -43,7 +44,7 @@ export const Inbox = <T,>({
         currentView === "notifications" && !isSearchActive && data.length > 0;
 
     return (
-        <View className="bg-app-panel w-[calc(384/1359*100vw)] h-full gap-4 border-r border-white/5">
+        <View className="bg-app-panel w-[calc(384/1359*100vw)] h-full gap-4 border-r border-white/5" style={glow.surface}>
             <Header title={title} />
 
             {showNotificationToolbar && (

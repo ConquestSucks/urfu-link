@@ -14,6 +14,7 @@ import { useLocalSearch } from "../model/use-search";
 import { SearchResultItem } from "./SearchResultItem";
 import { SearchFiltersBar } from "./SearchFiltersBar";
 import { SearchResultSkeletonList } from "./SearchResultSkeleton";
+import { glow } from "@/shared/ui/glow";
 
 interface LocalSearchPanelProps {
     conversationId: string;
@@ -44,9 +45,9 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
     };
 
     return (
-        <View className="border-b border-white/5 bg-app-card">
+        <View className="border-b border-white/5 bg-app-card" style={glow.surface}>
             {/* Search bar */}
-            <View className="flex-row items-center px-3 py-2 gap-2">
+            <View className="flex-row items-center px-3 py-2 gap-2" style={query.length > 0 ? glow.inputFocus : undefined}>
                 <MagnifyingGlassIcon size={18} className="text-text-muted" />
                 <TextInput
                     ref={inputRef}
@@ -91,6 +92,7 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                             <Pressable
                                 onPress={retry}
                                 className="mx-auto mt-1 px-3 py-1 rounded-full bg-brand-500/20 active:opacity-70"
+                                style={glow.brandSubtle}
                             >
                                 <Text className="text-brand-300 text-xs font-medium">
                                     Повторить
