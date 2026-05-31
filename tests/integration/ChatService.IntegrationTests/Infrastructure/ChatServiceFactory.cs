@@ -163,9 +163,6 @@ public sealed class ChatServiceFactory : WebApplicationFactory<Program>, IAsyncL
             services.RemoveAll<IPresenceServiceClient>();
             services.AddSingleton<IPresenceServiceClient>(PresenceServiceClient);
 
-            services.RemoveAll<IChatBroadcaster>();
-            services.AddSingleton<IChatBroadcaster>(ChatBroadcaster);
-
             ReplaceAuthWithTestScheme(services);
         });
     }
