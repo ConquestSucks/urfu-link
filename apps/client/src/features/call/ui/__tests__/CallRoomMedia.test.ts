@@ -191,7 +191,9 @@ describe("CallRoomMedia", () => {
         expect(layout.container).toEqual(
             expect.objectContaining({
                 alignSelf: "stretch",
+                flex: 1,
                 flexGrow: 1,
+                height: "100%",
                 minWidth: 0,
                 width: "100%",
             }),
@@ -199,8 +201,10 @@ describe("CallRoomMedia", () => {
         expect(layout.main).toEqual(
             expect.objectContaining({
                 alignSelf: "stretch",
+                flex: 1,
                 flexBasis: 0,
                 flexGrow: 1,
+                height: "100%",
                 minWidth: 0,
             }),
         );
@@ -208,7 +212,7 @@ describe("CallRoomMedia", () => {
             expect.objectContaining({
                 alignSelf: "stretch",
                 flexShrink: 0,
-                width: 176,
+                width: 220,
             }),
         );
     });
@@ -220,6 +224,6 @@ describe("CallRoomMedia", () => {
 
         expect(desktopScreenShare.width).toBeGreaterThan(desktopDefault.width);
         expect(desktopScreenShare.height).toBeGreaterThan(desktopDefault.height);
-        expect(mobileScreenShare).toEqual(expect.objectContaining({ width: 128, height: 108 }));
+        expect(mobileScreenShare).toEqual(expect.objectContaining({ width: 148, height: 124 }));
     });
 });
