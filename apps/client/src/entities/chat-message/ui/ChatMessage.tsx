@@ -345,7 +345,9 @@ export const ChatMessage = ({
                             onPress={onAuthorPress}
                             hitSlop={4}
                             accessibilityRole="button"
-                            className="self-start cursor-pointer active:opacity-70"
+                            className={`self-start cursor-pointer active:opacity-70 ${
+                                hasAttachments ? "mb-1" : ""
+                            }`}
                         >
                             <Text
                                 className="text-[12px] font-semibold text-brand-300"
@@ -355,7 +357,12 @@ export const ChatMessage = ({
                             </Text>
                         </Pressable>
                     ) : (
-                        <Text className="text-[12px] font-semibold text-brand-300" numberOfLines={1}>
+                        <Text
+                            className={`text-[12px] font-semibold text-brand-300 ${
+                                hasAttachments ? "mb-1" : ""
+                            }`}
+                            numberOfLines={1}
+                        >
                             {authorName}
                         </Text>
                     )

@@ -50,6 +50,14 @@ jest.mock("@/shared/ui/phosphor", () => {
     };
 });
 
+const getStyleHeight = (node: any) => {
+    const style = node.props.style;
+    if (Array.isArray(style)) {
+        return Object.assign({}, ...style).height;
+    }
+    return style?.height;
+};
+
 describe("VoiceMessagePlayer", () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -254,5 +262,94 @@ describe("VoiceMessagePlayer", () => {
         });
 
         expect(mockPlayer.seekTo).toHaveBeenCalledWith(5);
+    });
+
+    it("seeks from web timeline offset coordinates", async () => {
+        mockStatus = {
+            playing: false,
+            currentTime: 0,
+            duration: 20,
+        };
+
+        render(
+            <VoiceMessagePlayer
+                sourceUri="file://voice.m4a"
+                durationSeconds={20}
+            />,
+        );
+        const timeline = screen.getByTestId("voice-message-timeline");
+
+        fireEvent(timeline, "layout", {
+            nativeEvent: { layout: { width: 200 } },
+        });
+        await act(async () => {
+            fireEvent.press(timeline, { nativeEvent: { offsetX: 150 } });
+        });
+
+        expect(mockPlayer.seekTo).toHaveBeenCalledWith(15);
+    });
+
+    it("draws waveform bars from decoded audio samples when available", async () => {
+        const originalFetch = (globalThis as any).fetch;
+        const originalAudioContext = (globalThis as any).AudioContext;
+        const samples = new Float32Array(3700);
+        samples.fill(0.1, 0, samples.length / 2);
+        samples.fill(0.9, samples.length / 2);
+        const decodedAudio = {
+            length: samples.length,
+            numberOfChannels: 1,
+            getChannelData: jest.fn(() => samples),
+        };
+
+        Object.defineProperty(globalThis, "fetch", {
+            configurable: true,
+            value: jest.fn(async () => ({
+                arrayBuffer: jest.fn(async () => new ArrayBuffer(8)),
+            })),
+        });
+        Object.defineProperty(globalThis, "AudioContext", {
+            configurable: true,
+            value: class {
+                decodeAudioData(
+                    _data: ArrayBuffer,
+                    onSuccess?: (buffer: typeof decodedAudio) => void,
+                ) {
+                    onSuccess?.(decodedAudio);
+                    return Promise.resolve(decodedAudio);
+                }
+
+                close() {
+                    return Promise.resolve();
+                }
+            },
+        });
+
+        try {
+            render(
+                <VoiceMessagePlayer
+                    sourceUri="https://media.example/voice.m4a"
+                    durationSeconds={20}
+                />,
+            );
+
+            await waitFor(() => {
+                const heights = screen
+                    .getAllByTestId("voice-message-waveform-bar")
+                    .slice(0, 37)
+                    .map(getStyleHeight);
+
+                expect(Math.max(...heights)).toBeGreaterThan(25);
+                expect(Math.min(...heights)).toBeLessThan(16);
+            });
+        } finally {
+            Object.defineProperty(globalThis, "fetch", {
+                configurable: true,
+                value: originalFetch,
+            });
+            Object.defineProperty(globalThis, "AudioContext", {
+                configurable: true,
+                value: originalAudioContext,
+            });
+        }
     });
 });
