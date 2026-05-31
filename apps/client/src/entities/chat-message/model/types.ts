@@ -46,6 +46,7 @@ export interface ChatMessageProps {
     localStatus?: LocalDeliveryStatus;
     onLongPress?: () => void;
     onContextMenu?: (anchor: MessageContextMenuAnchor) => void;
+    onAuthorPress?: () => void;
     onReplyPress?: () => void;
     onThreadOpen?: () => void;
     onReactionPress?: (emoji: string) => void;
