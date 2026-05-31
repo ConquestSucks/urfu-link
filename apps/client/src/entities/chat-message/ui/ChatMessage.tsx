@@ -166,6 +166,7 @@ export const ChatMessage = ({
     localStatus,
     onLongPress,
     onContextMenu,
+    onAuthorPress,
     onReplyPress,
     onThreadOpen,
     onReactionPress,
@@ -290,9 +291,25 @@ export const ChatMessage = ({
                 )}
 
                 {!isOwn && authorName ? (
-                    <Text className="text-[12px] font-semibold text-brand-300" numberOfLines={1}>
-                        {authorName}
-                    </Text>
+                    onAuthorPress ? (
+                        <Pressable
+                            testID={`chat-message-author-${id}`}
+                            onPress={onAuthorPress}
+                            hitSlop={4}
+                            className="self-start active:opacity-70"
+                        >
+                            <Text
+                                className="text-[12px] font-semibold text-brand-300"
+                                numberOfLines={1}
+                            >
+                                {authorName}
+                            </Text>
+                        </Pressable>
+                    ) : (
+                        <Text className="text-[12px] font-semibold text-brand-300" numberOfLines={1}>
+                            {authorName}
+                        </Text>
+                    )
                 ) : null}
 
                 {replyTo && (

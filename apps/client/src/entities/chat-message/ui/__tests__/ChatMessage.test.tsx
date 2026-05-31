@@ -127,6 +127,27 @@ describe("ChatMessage read indicator", () => {
         expect(screen.getByText("Ivan Petrov")).toBeTruthy();
     });
 
+    it("calls the author press handler from incoming group sender names", () => {
+        const onAuthorPress = jest.fn();
+
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+                onAuthorPress={onAuthorPress}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("chat-message-author-message-1"));
+
+        expect(onAuthorPress).toHaveBeenCalledTimes(1);
+    });
+
     it("uses a defined light color for incoming group sender names", () => {
         render(
             <ChatMessage
