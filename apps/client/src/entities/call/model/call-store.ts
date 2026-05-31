@@ -37,6 +37,25 @@ const mergeParticipants = (
     return list;
 };
 
+const withParticipantConnection = (
+    call: CallSessionDto,
+    userId: string,
+    isConnected: boolean,
+): CallSessionDto => ({
+    ...call,
+    participants: mergeParticipants(call.participants, userId, isConnected),
+});
+
+const isDirectCall = (call: CallSessionDto) =>
+    call.participantIds.length === 2 && !call.conversationId.startsWith("discipline:");
+
+const completeCallLocally = (call: CallSessionDto): CallSessionDto => ({
+    ...call,
+    status: "Ended",
+    endedAtUtc: call.endedAtUtc ?? new Date(Date.now()).toISOString(),
+    endReason: call.endReason ?? "Completed",
+});
+
 const isTokenFresh = (token?: CallTokenDto | null): boolean => {
     if (!token?.expiresAtUtc) return false;
 
@@ -203,15 +222,12 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
                 return state;
             }
 
+            const disconnected = withParticipantConnection(state.activeCall, userId, false);
+
             return {
-                activeCall: {
-                    ...state.activeCall,
-                    participants: mergeParticipants(
-                        state.activeCall.participants,
-                        userId,
-                        false,
-                    ),
-                },
+                activeCall: isDirectCall(state.activeCall)
+                    ? completeCallLocally(disconnected)
+                    : disconnected,
             };
         }),
 
@@ -256,7 +272,7 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
         const call = await apiClient.calls.start(conversationId, callType);
         set({
             incomingCall: null,
-            outgoingCall: call,
+            outgoingCall: call.status === "Ringing" ? call : null,
             activeCall: call.status === "Active" ? call : null,
         });
         return call;

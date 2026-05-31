@@ -27,7 +27,7 @@ import {
     type NativeSyntheticEvent,
 } from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
-import type { MessageDto } from "@urfu-link/api-client";
+import type { ConversationParticipantDto, MessageDto } from "@urfu-link/api-client";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { TypingIndicator } from "@/entities/presence";
 import { formatMessageDateLabel, getMessageDayKey } from "../lib/message-date-labels";
@@ -43,6 +43,7 @@ interface MessagesListProps {
     skipInitialLoad?: boolean;
     onMessageLongPress?: (message: MessageDto) => void;
     onMessageContextMenu?: (message: MessageDto, anchor: MessageContextMenuAnchor) => void;
+    onAuthorPress?: (author: MessageAuthorProfile) => void;
     onThreadOpen?: (rootMessageId: string) => void;
     onFilesDropped?: (files: File[]) => void;
     onSystemCallJoin?: (callId: string) => void;
@@ -51,6 +52,11 @@ interface MessagesListProps {
 export interface MessagesListHandle {
     scrollToMessage: (messageId: string) => Promise<boolean>;
 }
+
+export type MessageAuthorProfile = Pick<
+    ConversationParticipantDto,
+    "userId" | "displayName" | "avatarUrl"
+>;
 
 const HIGHLIGHT_FADE_IN_MS = 140;
 const HIGHLIGHT_HOLD_MS = 1500;
@@ -191,6 +197,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             skipInitialLoad = false,
             onMessageLongPress,
             onMessageContextMenu,
+            onAuthorPress,
             onThreadOpen,
             onFilesDropped,
             onSystemCallJoin,
@@ -457,6 +464,18 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     const message = item.message;
                     const view = mapMessageToProps(message, currentUserId);
                     const sender = participantsByUserId.get(message.senderId);
+                    const authorName =
+                        shouldShowAvatars && !view.isOwn
+                            ? sender?.displayName?.trim() || message.senderId
+                            : undefined;
+                    const authorAvatarUrl = sender?.avatarUrl?.trim() || view.avatarUrl;
+                    const authorProfile = authorName && sender
+                        ? {
+                              userId: sender.userId,
+                              displayName: authorName,
+                              avatarUrl: authorAvatarUrl,
+                          }
+                        : null;
                     const isSystemMessage = message.kind === "SystemCall";
                     const canJoinSystemCall =
                         isSystemMessage &&
@@ -497,12 +516,8 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     isOwn={view.isOwn}
                                     seen={view.seen}
                                     time={view.time}
-                                    avatarUrl={sender?.avatarUrl?.trim() || view.avatarUrl}
-                                    authorName={
-                                        shouldShowAvatars && !view.isOwn
-                                            ? sender?.displayName?.trim() || message.senderId
-                                            : undefined
-                                    }
+                                    avatarUrl={authorAvatarUrl}
+                                    authorName={authorName}
                                     showAvatar={shouldShowAvatars}
                                     attachments={view.attachments}
                                     kind={view.kind}
@@ -522,6 +537,11 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                         isSystemMessage
                                             ? undefined
                                             : (anchor) => onMessageContextMenu?.(message, anchor)
+                                    }
+                                    onAuthorPress={
+                                        authorProfile && onAuthorPress
+                                            ? () => onAuthorPress?.(authorProfile)
+                                            : undefined
                                     }
                                     onReplyPress={
                                         message.replyTo?.messageId
@@ -567,6 +587,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 shouldShowAvatars,
                 onMessageLongPress,
                 onMessageContextMenu,
+                onAuthorPress,
                 onThreadOpen,
                 onSystemCallJoin,
                 addReaction,

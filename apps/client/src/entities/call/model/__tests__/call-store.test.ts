@@ -124,11 +124,14 @@ describe("useCallStore", () => {
         expect(useCallStore.getState().incomingCall).toBeNull();
     });
 
-    it("participant joined and left events update active call connection state", () => {
+    it("participant joined and left events update active group call connection state", () => {
         useCallStore.getState().setActiveCall(makeActiveCall({
+            conversationId: "discipline:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            participantIds: ["user-1", "user-2", "user-3"],
             participants: [
                 { userId: "user-1", isConnected: true },
                 { userId: "user-2", isConnected: false },
+                { userId: "user-3", isConnected: false },
             ],
         }));
 
@@ -139,6 +142,25 @@ describe("useCallStore", () => {
         });
 
         useCallStore.getState().handleCallParticipantLeft("call-1", "user-2");
+        expect(useCallStore.getState().activeCall?.participants).toContainEqual({
+            userId: "user-2",
+            isConnected: false,
+        });
+        expect(useCallStore.getState().activeCall?.status).toBe("Active");
+    });
+
+    it("participant left event completes an active direct call locally", () => {
+        useCallStore.getState().setActiveCall(makeActiveCall());
+
+        useCallStore.getState().handleCallParticipantLeft("call-1", "user-2");
+
+        expect(useCallStore.getState().activeCall).toEqual(
+            expect.objectContaining({
+                status: "Ended",
+                endedAtUtc: now,
+                endReason: "Completed",
+            }),
+        );
         expect(useCallStore.getState().activeCall?.participants).toContainEqual({
             userId: "user-2",
             isConnected: false,
@@ -156,6 +178,28 @@ describe("useCallStore", () => {
         expect(useCallStore.getState().outgoingCall).toEqual(ringing);
         expect(useCallStore.getState().activeCall).toBeNull();
         expect(useCallStore.getState().incomingCall).toBeNull();
+    });
+
+    it("startCall stores active group calls without outgoing ringtone state", async () => {
+        const active = makeActiveCall({
+            conversationId: "discipline:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            participantIds: ["user-1", "user-2", "user-3"],
+            participants: [
+                { userId: "user-1", isConnected: true },
+                { userId: "user-2", isConnected: false },
+                { userId: "user-3", isConnected: false },
+            ],
+        });
+        mockCalls.start.mockResolvedValue(active);
+
+        const result = await useCallStore.getState().startCall(
+            "discipline:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "Video",
+        );
+
+        expect(result).toEqual(active);
+        expect(useCallStore.getState().activeCall).toEqual(active);
+        expect(useCallStore.getState().outgoingCall).toBeNull();
     });
 
     it("uses the active call from another tab instead of creating a delayed outgoing call", async () => {

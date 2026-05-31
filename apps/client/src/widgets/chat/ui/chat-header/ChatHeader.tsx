@@ -70,6 +70,9 @@ export const ChatHeader = ({
             muteNotifications.mutate(chatId);
         }
     }, [chatId, muteNotifications, notificationsMuted, unmuteNotifications]);
+    const handleOpenCurrentChat = React.useCallback(() => {
+        setIsProfileOpen(false);
+    }, []);
 
     // Для direct-чата peerUserId — тот, кто не равен currentUserId.
     // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
@@ -112,6 +115,7 @@ export const ChatHeader = ({
 
     const isDirectPresenceLoading =
         conversation.type === "Direct" && (isDirectIdentityLoading || (!!peer?.userId && !peerPresence));
+    const canOpenPeerProfile = conversation.type === "Direct" && !isDirectIdentityLoading;
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
         ? presenceStatusToLabel(peerPresence.status)
@@ -130,7 +134,14 @@ export const ChatHeader = ({
                             <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
                         </Pressable>
                     )}
-                    <View className="flex-row gap-3 items-center">
+                    <Pressable
+                        testID="chat-header-profile-trigger"
+                        onPress={() => setIsProfileOpen(true)}
+                        disabled={!canOpenPeerProfile}
+                        className={`flex-row gap-3 items-center flex-1 min-w-0 rounded-xl ${
+                            canOpenPeerProfile ? "active:opacity-80 cursor-pointer" : "cursor-default"
+                        }`}
+                    >
                         <View className="relative z-1 p-0.5">
                             {isDirectIdentityLoading ? (
                                 <Skeleton
@@ -195,17 +206,19 @@ export const ChatHeader = ({
                                         />
                                     );
                                 }
-                                if (indicatorStatus === "online" && statusLabel) {
+                                if (indicatorStatus !== "offline" && statusLabel) {
                                     return (
                                         <Text
                                             numberOfLines={1}
-                                            className="leading-none text-xs font-medium text-success-600"
+                                            className={`leading-none text-xs font-medium ${
+                                                indicatorStatus === "online" ? "text-success-600" : "text-text-muted"
+                                            }`}
                                         >
                                             {statusLabel}
                                         </Text>
                                     );
                                 }
-                                if (peerPresence?.lastSeenAt) {
+                                if (peerPresence) {
                                     return (
                                         <LastSeenLabel
                                             lastSeenAt={peerPresence.lastSeenAt}
@@ -218,12 +231,12 @@ export const ChatHeader = ({
                                         numberOfLines={1}
                                         className="leading-none text-xs font-medium text-text-muted"
                                     >
-                                        {statusLabel ?? "Не в сети"}
+                                        {statusLabel ?? "Был недавно"}
                                     </Text>
                                 );
                             })()}
                         </View>
-                    </View>
+                    </Pressable>
                 </View>
 
                 <ChatHeaderActions
@@ -252,7 +265,7 @@ export const ChatHeader = ({
                     lastSeenAt: peerPresence?.lastSeenAt,
                 }}
                 onStartAudioCall={conversation.type === "Direct" ? onStartAudioCall : undefined}
-                onStartVideoCall={conversation.type === "Direct" ? onStartVideoCall : undefined}
+                onOpenChat={conversation.type === "Direct" ? handleOpenCurrentChat : undefined}
                 onToggleNotifications={handleToggleNotifications}
                 notificationsMuted={notificationsMuted}
                 notificationsPending={notificationsPending}

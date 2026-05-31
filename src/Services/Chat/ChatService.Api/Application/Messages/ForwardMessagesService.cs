@@ -90,6 +90,7 @@ public sealed class ForwardMessagesService(
         var lastPreview = (preview: (MessagePreview?)null, sentAt: now);
         var forwardedAttachmentIds = new List<Guid>();
         var grantees = target.Participants.Where(p => p != request.CallerUserId).ToList();
+        var realtimeRecipients = target.Participants.ToList();
 
         var index = 0;
         foreach (var src in sources)
@@ -174,14 +175,14 @@ public sealed class ForwardMessagesService(
         if (producedMessages.Count > 0)
         {
             await broadcaster.NotifyConversationUpdatedAsync(
-                target.Participants,
+                realtimeRecipients,
                 ConversationDto.FromDomain(target).WithLastMessageMetadata(producedMessages[^1]),
                 cancellationToken).ConfigureAwait(false);
 
             foreach (var dto in produced)
             {
                 await broadcaster.NotifyMessageReceivedAsync(
-                    grantees, dto, cancellationToken).ConfigureAwait(false);
+                    realtimeRecipients, dto, cancellationToken).ConfigureAwait(false);
             }
         }
 

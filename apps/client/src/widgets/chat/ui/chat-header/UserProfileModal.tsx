@@ -2,9 +2,9 @@ import { Avatar, ModalOverlay } from "@/shared/ui";
 import {
     BellIcon,
     BellSlashIcon,
+    ChatCircleTextIcon,
     EnvelopeIcon,
     PhoneIcon,
-    VideoCameraIcon,
     XIcon,
 } from "@/shared/ui/phosphor";
 import React, { useEffect, useRef } from "react";
@@ -26,7 +26,7 @@ interface UserProfileModalProps {
     onClose: () => void;
     user: ProfileUser;
     onStartAudioCall?: () => void;
-    onStartVideoCall?: () => void;
+    onOpenChat?: () => void;
     onToggleNotifications?: () => void;
     notificationsMuted?: boolean;
     notificationsPending?: boolean;
@@ -37,7 +37,7 @@ export const UserProfileModal = ({
     onClose,
     user,
     onStartAudioCall,
-    onStartVideoCall,
+    onOpenChat,
     onToggleNotifications,
     notificationsMuted = false,
     notificationsPending = false,
@@ -59,10 +59,10 @@ export const UserProfileModal = ({
               onStartAudioCall();
           }
         : undefined;
-    const handleStartVideoCall = onStartVideoCall
+    const handleOpenChat = onOpenChat
         ? () => {
               onClose();
-              onStartVideoCall();
+              onOpenChat();
           }
         : undefined;
 
@@ -99,15 +99,15 @@ export const UserProfileModal = ({
                             <Text className="text-sm text-success-500 font-medium">
                                 {presenceStatusToLabel(displayUser.status)}
                             </Text>
-                        ) : displayUser.lastSeenAt ? (
+                        ) : displayUser.status === "Away" || displayUser.status === "DoNotDisturb" ? (
+                            <Text className="text-sm text-text-muted font-medium">
+                                {presenceStatusToLabel(displayUser.status)}
+                            </Text>
+                        ) : (
                             <LastSeenLabel
                                 lastSeenAt={displayUser.lastSeenAt}
                                 className="text-sm text-text-muted font-medium"
                             />
-                        ) : (
-                            <Text className="text-sm text-text-muted font-medium">
-                                {displayUser.status ? presenceStatusToLabel(displayUser.status) : "Не в сети"}
-                            </Text>
                         )}
                     </View>
                 </View>
@@ -119,10 +119,10 @@ export const UserProfileModal = ({
                         onPress={handleStartAudioCall}
                     />
                     <ActionBtn
-                        testID="profile-action-video"
-                        icon={VideoCameraIcon}
-                        label="Видео"
-                        onPress={handleStartVideoCall}
+                        testID="profile-action-chat"
+                        icon={ChatCircleTextIcon}
+                        label="Чат"
+                        onPress={handleOpenChat}
                     />
                     <ActionBtn
                         testID="profile-action-notifications"

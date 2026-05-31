@@ -103,17 +103,21 @@ export const getCallStageLayoutStyles = (
 ): { container: ViewStyle; main: ViewStyle; rail: ViewStyle } => ({
     container: {
         alignSelf: "stretch",
+        flex: 1,
         flexGrow: 1,
         flexShrink: 1,
+        height: "100%",
         minHeight: 0,
         minWidth: 0,
         width: "100%",
     },
     main: {
         alignSelf: "stretch",
+        flex: 1,
         flexBasis: isMobile ? "auto" : 0,
         flexGrow: 1,
         flexShrink: 1,
+        height: "100%",
         minHeight: 0,
         minWidth: 0,
         width: "100%",
@@ -121,14 +125,14 @@ export const getCallStageLayoutStyles = (
     rail: isMobile
         ? {
               flexShrink: 0,
-              maxHeight: 132,
+              maxHeight: 156,
               width: "100%",
           }
         : {
               alignSelf: "stretch",
               flexShrink: 0,
               minHeight: 0,
-              width: 176,
+              width: 220,
           },
 });
 
@@ -138,11 +142,11 @@ export const getParticipantRailCardStyle = (
 ): ViewStyle & { width: number; height: number } => {
     if (isMobile) {
         return hasScreenShare
-            ? { width: 128, height: 108 }
-            : { width: 112, height: 96 };
+            ? { width: 148, height: 124 }
+            : { width: 132, height: 112 };
     }
 
     return hasScreenShare
-        ? { width: 176, height: 128 }
-        : { width: 160, height: 112 };
+        ? { width: 220, height: 148 }
+        : { width: 192, height: 132 };
 };
