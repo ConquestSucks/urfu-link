@@ -10,6 +10,8 @@ public sealed class ForwardMessagesRouteRequest
     public string Id { get; set; } = string.Empty;
 
     public IReadOnlyList<Guid> MessageIds { get; set; } = Array.Empty<Guid>();
+
+    public Guid? PeerUserId { get; set; }
 }
 
 public sealed class ForwardMessagesEndpoint(ForwardMessagesService service)
@@ -27,7 +29,7 @@ public sealed class ForwardMessagesEndpoint(ForwardMessagesService service)
         ArgumentNullException.ThrowIfNull(req);
         var caller = User.GetUserId();
         var dtos = await service.ForwardAsync(
-            new ForwardMessagesRequest(req.Id, caller, req.MessageIds ?? Array.Empty<Guid>()), ct)
+            new ForwardMessagesRequest(req.Id, caller, req.MessageIds ?? Array.Empty<Guid>(), req.PeerUserId), ct)
             .ConfigureAwait(false);
         await Send.OkAsync(dtos, ct).ConfigureAwait(false);
     }
