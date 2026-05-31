@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { apiClient } from "@/shared/lib/api";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
-import { PauseIcon, PlayIcon, WarningCircleIcon } from "@/shared/ui/phosphor";
+import { DownloadSimpleIcon, PauseIcon, PlayIcon, WarningCircleIcon } from "@/shared/ui/phosphor";
 import { formatVoiceDuration } from "../lib/format";
 
 type VoiceMessagePlayerProps = {
@@ -60,6 +60,7 @@ export const VoiceMessagePlayer = ({
     const currentSeconds = Math.max(0, Math.min(status.currentTime ?? 0, totalSeconds || Number.MAX_SAFE_INTEGER));
     const progress = totalSeconds > 0 ? Math.min(currentSeconds / totalSeconds, 1) : 0;
     const hasFinished = totalSeconds > 0 && currentSeconds >= totalSeconds - 0.05 && !status.playing;
+    const isReadyToPlay = Boolean(playbackUri);
 
     const ensurePlaybackUri = useCallback(async () => {
         if (playbackUri) {
@@ -87,6 +88,11 @@ export const VoiceMessagePlayer = ({
                 return;
             }
 
+            if (!isReadyToPlay) {
+                await ensurePlaybackUri();
+                return;
+            }
+
             await configurePlaybackMode();
             await ensurePlaybackUri();
             if (hasFinished) {
@@ -97,7 +103,7 @@ export const VoiceMessagePlayer = ({
             console.error("Failed to play voice message", playError);
             setError("Не удалось воспроизвести");
         }
-    }, [ensurePlaybackUri, hasFinished, player, status.playing]);
+    }, [ensurePlaybackUri, hasFinished, isReadyToPlay, player, status.playing]);
 
     return (
         <View
@@ -116,6 +122,8 @@ export const VoiceMessagePlayer = ({
                     <ActivityIndicator size="small" className="text-white" />
                 ) : status.playing ? (
                     <PauseIcon size={17} className="text-white" weight="fill" />
+                ) : !isReadyToPlay ? (
+                    <DownloadSimpleIcon size={17} className="text-white" weight="bold" />
                 ) : (
                     <PlayIcon size={17} className="text-white" weight="fill" />
                 )}
