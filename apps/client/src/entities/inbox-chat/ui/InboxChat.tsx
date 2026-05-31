@@ -16,13 +16,13 @@ const InboxTypingPreview = ({
     <View testID="inbox-typing-preview" className="flex-row items-center flex-1 min-w-0">
         <Text
             numberOfLines={1}
-            className={`leading-none text-sm flex-shrink min-w-0 ${className}`}
+            className={`leading-[18px] text-sm flex-shrink min-w-0 ${className}`}
         >
             {message}
         </Text>
         <TypingEllipsis
             testID="inbox-typing-dots"
-            className="ml-1 shrink-0 text-brand-300 text-sm font-bold leading-none"
+            className="ml-1 shrink-0 text-brand-300 text-sm font-bold leading-[18px]"
         />
     </View>
 );
@@ -62,8 +62,8 @@ export const InboxChat = ({
     return (
         <Pressable className="select-none" onPress={onPress}>
             <View
+                testID="inbox-chat-row"
                 className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-brand-600/10 transition-all duration-300 ${containerClass}`}
-                style={isActive ? glow.brandSubtle : hasUnread || showTypingPreview ? glow.unread : undefined}
             >
                 <Avatar size={48} src={avatarUrl} name={name} />
 
@@ -87,7 +87,7 @@ export const InboxChat = ({
                             ) : (
                                 <Text
                                     numberOfLines={1}
-                                    className={`leading-none text-sm flex-1 min-w-0 ${messageClass}`}
+                                    className={`leading-[18px] text-sm flex-1 min-w-0 ${messageClass}`}
                                 >
                                     {message}
                                 </Text>
