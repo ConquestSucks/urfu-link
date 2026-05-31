@@ -340,7 +340,8 @@ public sealed class CallSessionServiceTests
         ended.EndReason.Should().Be(CallEndReason.Completed);
         _outbox.Events.OfType<CallEndedV2Event>().Last().Duration.Should().Be(TimeSpan.FromMinutes(3));
         _broadcaster.Left.Should().ContainSingle(l => l.CallId == ringing.Id && l.UserId == CalleeId);
-        _broadcaster.Ended.Should().ContainSingle();
+        _broadcaster.Ended.Should().ContainSingle()
+            .Which.Recipients.Should().BeEquivalentTo([CallerId, CalleeId]);
     }
 
     [Fact]

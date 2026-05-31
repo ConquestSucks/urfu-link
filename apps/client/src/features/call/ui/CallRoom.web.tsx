@@ -976,6 +976,24 @@ export const CallRoom = ({
         [activeScreenShareCandidate, videoTracks],
     );
 
+    const connectedParticipantIds = useMemo(
+        () =>
+            new Set(
+                participantMediaInfos
+                    .filter((participant) => participant.isConnected)
+                    .map((participant) => participant.userId),
+            ),
+        [participantMediaInfos],
+    );
+
+    const visibleActiveScreenShareTrack = useMemo(
+        () =>
+            activeScreenShareTrack && connectedParticipantIds.has(activeScreenShareTrack.ownerId)
+                ? activeScreenShareTrack
+                : null,
+        [activeScreenShareTrack, connectedParticipantIds],
+    );
+
     const activeScreenShareAudioTracks = useMemo(
         () =>
             audioTracks.filter(
@@ -983,11 +1001,11 @@ export const CallRoom = ({
                     track.source === Track.Source.ScreenShareAudio &&
                     isActiveScreenShareAudio(
                         track.ownerId,
-                        activeScreenShareTrack?.ownerId ?? null,
+                        visibleActiveScreenShareTrack?.ownerId ?? null,
                         track.isLocal,
                     ),
             ),
-        [activeScreenShareTrack?.ownerId, audioTracks],
+        [audioTracks, visibleActiveScreenShareTrack?.ownerId],
     );
 
     const hasActiveScreenShareAudio = activeScreenShareAudioTracks.length > 0;
@@ -1002,34 +1020,36 @@ export const CallRoom = ({
     }, [activeScreenShareAudioTracks, playbackDeviceId, screenShareVolume]);
 
     const stageItems = useMemo<RenderedStageItem[]>(() => {
-        const participantItems = participantMediaInfos.map((participant) => ({
-            id: `participant:${participant.userId}`,
-            kind: "participant" as const,
-            ownerId: participant.userId,
-            hasCamera: Boolean(participant.cameraTrack),
-            isSpeaking: participant.isSpeaking,
-            isConnected: participant.isConnected,
-            participant,
-        }));
+        const participantItems = participantMediaInfos
+            .filter((participant) => participant.isConnected)
+            .map((participant) => ({
+                id: `participant:${participant.userId}`,
+                kind: "participant" as const,
+                ownerId: participant.userId,
+                hasCamera: Boolean(participant.cameraTrack),
+                isSpeaking: participant.isSpeaking,
+                isConnected: participant.isConnected,
+                participant,
+            }));
 
-        if (!activeScreenShareTrack) {
+        if (!visibleActiveScreenShareTrack) {
             return participantItems;
         }
 
         return [
             {
-                id: `screen:${activeScreenShareTrack.ownerId}:${activeScreenShareTrack.key}`,
+                id: `screen:${visibleActiveScreenShareTrack.ownerId}:${visibleActiveScreenShareTrack.key}`,
                 kind: "screen" as const,
-                ownerId: activeScreenShareTrack.ownerId,
-                trackKey: activeScreenShareTrack.key,
+                ownerId: visibleActiveScreenShareTrack.ownerId,
+                trackKey: visibleActiveScreenShareTrack.key,
                 hasCamera: false,
                 isSpeaking: false,
                 isConnected: true,
-                screenTrack: activeScreenShareTrack,
+                screenTrack: visibleActiveScreenShareTrack,
             },
             ...participantItems,
         ];
-    }, [activeScreenShareTrack, participantMediaInfos]);
+    }, [participantMediaInfos, visibleActiveScreenShareTrack]);
 
     const selectedStageItem = useMemo(
         () =>
@@ -1186,7 +1206,7 @@ export const CallRoom = ({
             call.status === "Active");
 
     const openScreenShareFullscreen = useCallback(() => {
-        if (!activeScreenShareTrack) return;
+        if (!visibleActiveScreenShareTrack) return;
 
         setPanel("none");
         setIsScreenShareFullscreen(true);
@@ -1200,7 +1220,7 @@ export const CallRoom = ({
                     browserFullscreenActiveRef.current = false;
                 });
         }
-    }, [activeScreenShareTrack]);
+    }, [visibleActiveScreenShareTrack]);
 
     const closeScreenShareFullscreen = useCallback(() => {
         setIsScreenShareFullscreen(false);
@@ -1237,10 +1257,10 @@ export const CallRoom = ({
     }, [closeScreenShareFullscreen, isScreenShareFullscreen]);
 
     useEffect(() => {
-        if (!activeScreenShareTrack && isScreenShareFullscreen) {
+        if (!visibleActiveScreenShareTrack && isScreenShareFullscreen) {
             closeScreenShareFullscreen();
         }
-    }, [activeScreenShareTrack, closeScreenShareFullscreen, isScreenShareFullscreen]);
+    }, [closeScreenShareFullscreen, isScreenShareFullscreen, visibleActiveScreenShareTrack]);
 
     return (
         <View className="flex-1 min-w-0 self-stretch">
@@ -1305,15 +1325,15 @@ export const CallRoom = ({
                 onClose={() => setPanel("none")}
             />
 
-            {isScreenShareFullscreen && activeScreenShareTrack ? (
+            {isScreenShareFullscreen && visibleActiveScreenShareTrack ? (
                 <AnimatedView
                     entering={FadeIn.duration(160)}
                     exiting={FadeOut.duration(120)}
                     className="absolute inset-0 z-50 bg-black"
                 >
                     <VideoElement
-                        track={activeScreenShareTrack.track}
-                        muted={activeScreenShareTrack.isLocal}
+                        track={visibleActiveScreenShareTrack.track}
+                        muted={visibleActiveScreenShareTrack.isLocal}
                         objectFit="contain"
                     />
                     <AnimatedPressable

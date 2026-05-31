@@ -70,11 +70,14 @@ export const ChatView = () => {
         if (!conversation || isStartingCall) return;
         try {
             setIsStartingCall(true);
-            await startCall(conversation.id, callType);
+            const call = await startCall(conversation.id, callType);
+            if (call.status === "Active") {
+                router.push(`/call/${call.id}` as never);
+            }
         } finally {
             setIsStartingCall(false);
         }
-    }, [conversation, isStartingCall, startCall]);
+    }, [conversation, isStartingCall, router, startCall]);
 
     const handleStartAudioCall = useCallback(
         () => void handleStartConversationCall("Audio"),
