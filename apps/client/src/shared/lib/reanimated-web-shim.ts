@@ -95,6 +95,10 @@ export const Easing = NativeEasing;
 export const FadeIn = createLayoutAnimationBuilder();
 export const FadeInDown = createLayoutAnimationBuilder();
 export const FadeInRight = createLayoutAnimationBuilder();
+export const FadeOut = createLayoutAnimationBuilder();
+export const LinearTransition = createLayoutAnimationBuilder();
+export const ZoomIn = createLayoutAnimationBuilder();
+export const ZoomOut = createLayoutAnimationBuilder();
 
 export const createAnimatedComponent = Animated.createAnimatedComponent;
 
