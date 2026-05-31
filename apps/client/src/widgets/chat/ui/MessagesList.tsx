@@ -75,19 +75,43 @@ type MessageListMessageItem = {
     message: MessageDto;
 };
 
-type MessageListItem = MessageListMessageItem;
+type MessageListDateItem = {
+    type: "date";
+    id: string;
+    dayKey: string;
+    createdAt: string;
+};
 
-const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] =>
-    messages.map((message) => ({
-        type: "message",
-        id: message.id,
-        message,
-    }));
+type MessageListItem = MessageListMessageItem | MessageListDateItem;
+
+const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] => {
+    const items: MessageListItem[] = [];
+
+    messages.forEach((message, index) => {
+        items.push({
+            type: "message",
+            id: message.id,
+            message,
+        });
+
+        const currentDay = getMessageDayKey(message.createdAt);
+        const nextDay = getMessageDayKey(messages[index + 1]?.createdAt);
+        if (!currentDay || currentDay === nextDay) return;
+
+        items.push({
+            type: "date",
+            id: `date-${currentDay}-${index}`,
+            dayKey: currentDay,
+            createdAt: message.createdAt,
+        });
+    });
+
+    return items;
+};
 
 const getMessageListItemKey = (item: MessageListItem) => item.id;
 
-const MessageDateSeparator = ({ createdAt }: { createdAt: string }) => {
-    const dayKey = getMessageDayKey(createdAt);
+const MessageDateSeparator = ({ dayKey, createdAt }: { dayKey: string; createdAt: string }) => {
     const label = formatMessageDateLabel(createdAt);
 
     if (!dayKey || !label) return null;
@@ -138,14 +162,6 @@ const getJoinableSystemCallIds = (messages: MessageDto[]): Set<string> => {
 };
 
 const styles = StyleSheet.create({
-    floatingDate: {
-        position: "absolute",
-        top: 12,
-        left: 0,
-        right: 0,
-        alignItems: "center",
-        zIndex: 10,
-    },
     highlightOutline: {
         position: "absolute",
         top: 0,
@@ -220,13 +236,8 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const isLoaded = messagesLoadedByConversation[chatId] || false;
         const hasMore = hasMoreByConversation[chatId] || false;
         const listItems = useMemo(() => buildMessageListItems(messages), [messages]);
-        const listItemIndexById = useMemo(
-            () => new Map(listItems.map((item, index) => [item.id, index])),
-            [listItems],
-        );
         const listRef = useRef<FlatList<MessageListItem>>(null);
         const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
-        const [visibleDateCreatedAt, setVisibleDateCreatedAt] = useState<string | null>(null);
         const [showScrollToBottom, setShowScrollToBottom] = useState(false);
         const highlightOpacity = useRef(new Animated.Value(0)).current;
         const highlightAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
@@ -253,29 +264,14 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             enabled: !!onFilesDropped,
             onFiles: handleFilesDropped,
         });
-        const visibleDateLabel = useMemo(
-            () => formatMessageDateLabel(visibleDateCreatedAt),
-            [visibleDateCreatedAt],
-        );
-
         useEffect(() => {
             readContextRef.current = { chatId, currentUserId, markRead };
         }, [chatId, currentUserId, markRead]);
 
         useEffect(() => {
-            setVisibleDateCreatedAt(null);
             setShowScrollToBottom(false);
             lastScrollOffsetRef.current = null;
         }, [chatId]);
-
-        useEffect(() => {
-            if (messages.length === 0) {
-                setVisibleDateCreatedAt(null);
-                return;
-            }
-
-            setVisibleDateCreatedAt((current) => current ?? messages[0]?.createdAt ?? null);
-        }, [messages]);
 
         useEffect(() => {
             if (skipInitialLoad) return;
@@ -411,6 +407,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
                 const unreadItems = viewableItems.filter(
                     (v): v is { item: MessageListMessageItem; index: number | null } =>
+                        v.item.type === "message" &&
                         v.item.message.senderId !== activeCurrentUserId &&
                         v.item.message.readAt === null,
                 );
@@ -421,16 +418,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     activeMarkRead(activeChatId, newestUnread.item.message.id);
                 }
 
-                const topVisibleMessage = viewableItems.reduce<
-                    { item: MessageListMessageItem; index: number } | null
-                >((top, current) => {
-                    if (current.index === null) return top;
-                    if (top && current.index <= top.index) return top;
-                    return { item: current.item, index: current.index };
-                }, null);
-                if (topVisibleMessage?.item.message.createdAt) {
-                    setVisibleDateCreatedAt(topVisibleMessage.item.message.createdAt);
-                }
             },
         ).current;
 
@@ -473,10 +460,9 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             suppressEndReachedAfterScrollRef.current = false;
             userDraggingAfterProgrammaticScrollRef.current = false;
             lastScrollOffsetRef.current = 0;
-            setVisibleDateCreatedAt(messages[0]?.createdAt ?? null);
             setShowScrollToBottom(false);
             listRef.current?.scrollToOffset({ offset: 0, animated: true });
-        }, [messages]);
+        }, []);
 
         const handleEndReached = useCallback(() => {
             if (suppressEndReachedAfterScrollRef.current) return;
@@ -486,6 +472,15 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const renderItem = useMemo(
             () =>
                 ({ item, index }: { item: MessageListItem; index: number }) => {
+                    if (item.type === "date") {
+                        return (
+                            <MessageDateSeparator
+                                dayKey={item.dayKey}
+                                createdAt={item.createdAt}
+                            />
+                        );
+                    }
+
                     const message = item.message;
                     const view = mapMessageToProps(message, currentUserId);
                     const sender = participantsByUserId.get(message.senderId);
@@ -508,18 +503,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         joinableSystemCallIds.has(view.systemCall.callId);
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
-                    const itemIndex = listItemIndexById.get(item.id) ?? -1;
-                    const itemAbove = itemIndex >= 0 ? listItems[itemIndex + 1] : undefined;
-                    const currentDay = getMessageDayKey(message.createdAt);
-                    const itemAboveDay = getMessageDayKey(itemAbove?.message.createdAt);
-                    const shouldShowDateSeparator = Boolean(currentDay) && currentDay !== itemAboveDay;
-                    const messageSpacing = itemAbove ? styles.messageAfterMessage : null;
+                    const itemAbove = listItems[index + 1];
+                    const messageSpacing =
+                        itemAbove?.type === "message" ? styles.messageAfterMessage : null;
 
                     return (
                         <View style={messageSpacing}>
-                            {shouldShowDateSeparator ? (
-                                <MessageDateSeparator createdAt={message.createdAt} />
-                            ) : null}
                             <View
                                 testID={`message-row-${view.id}`}
                                 className="-mx-2 rounded-2xl px-2 py-1 overflow-hidden"
@@ -613,7 +602,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 currentUserId,
                 highlightedMessageId,
                 joinableSystemCallIds,
-                listItemIndexById,
                 listItems,
                 participantsByUserId,
                 shouldShowAvatars,
@@ -714,19 +702,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         ) : null
                     }
                 />
-                {visibleDateLabel ? (
-                    <View
-                        pointerEvents="none"
-                        testID="message-floating-date"
-                        style={styles.floatingDate}
-                    >
-                        <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
-                            <Text className="text-[12px] font-semibold text-text-subtle">
-                                {visibleDateLabel}
-                            </Text>
-                        </View>
-                    </View>
-                ) : null}
                 {showScrollToBottom ? (
                     <Pressable
                         accessibilityLabel="Scroll to newest messages"
