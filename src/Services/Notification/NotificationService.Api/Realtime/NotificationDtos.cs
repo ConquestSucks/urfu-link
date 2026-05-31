@@ -42,4 +42,5 @@ public sealed record BadgeSnapshotDto(
     IReadOnlyDictionary<int, int> PerCategory,
     int TotalUnseen = 0,
     int UrgentUnread = 0,
-    IReadOnlyDictionary<string, int>? PerType = null);
+    IReadOnlyDictionary<string, int>? PerType = null,
+    IReadOnlyDictionary<string, int>? Scopes = null);

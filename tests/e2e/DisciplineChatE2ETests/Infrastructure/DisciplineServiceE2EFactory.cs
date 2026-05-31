@@ -1,0 +1,174 @@
+extern alias DisciplineApi;
+
+using DisciplineChatE2ETests.Infrastructure;
+using DotNet.Testcontainers.Images;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using NSubstitute;
+using StackExchange.Redis;
+using Testcontainers.PostgreSql;
+using Urfu.Link.BuildingBlocks.Auth;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
+using Urfu.Link.BuildingBlocks.Idempotency;
+using Urfu.Link.BuildingBlocks.Outbox;
+using Discipline = DisciplineApi::DisciplineService.Api.Domain.Aggregates.Discipline;
+using DisciplineDbContext = DisciplineApi::DisciplineService.Api.Infrastructure.Persistence.DisciplineDbContext;
+using IDisciplineRepository = DisciplineApi::DisciplineService.Api.Domain.Interfaces.IDisciplineRepository;
+
+namespace DisciplineChatE2ETests.Infrastructure;
+
+public sealed class DisciplineServiceE2EFactory : WebApplicationFactory<DisciplineApi::Program>, IAsyncLifetime
+{
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
+        .WithImage("postgres:16-alpine")
+        .WithImagePullPolicy(PullPolicy.Missing)
+        .Build();
+
+    public FakeOutboxWriter OutboxWriter { get; } = new();
+
+    public InMemoryIdempotencyStore IdempotencyStore { get; } = new();
+
+    public async Task InitializeAsync()
+    {
+        await _postgres.StartAsync();
+        await ApplyMigrationsAsync();
+    }
+
+    public new async Task DisposeAsync()
+    {
+        await base.DisposeAsync();
+        await _postgres.DisposeAsync();
+    }
+
+    public void ResetCapturedState()
+    {
+        OutboxWriter.Clear();
+        IdempotencyStore.Clear();
+        TestAuthHandler.CurrentPrincipal = null;
+    }
+
+    public async Task ResetDataAsync()
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var ctx = scope.ServiceProvider.GetRequiredService<DisciplineDbContext>();
+        await ctx.Database.ExecuteSqlRawAsync(
+            "TRUNCATE TABLE disciplines.enrollments, disciplines.disciplines, disciplines.outbox_messages RESTART IDENTITY CASCADE");
+        ResetCapturedState();
+    }
+
+    public async Task<SeededDiscipline> SeedDisciplineAsync(Guid ownerTeacherId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDisciplineRepository>();
+        var discipline = Discipline.CreateNew(
+            $"E2E-{Guid.NewGuid():N}"[..12],
+            "E2E Discipline",
+            "Discipline seeded by cross-service E2E test.",
+            "2026-spring",
+            ownerTeacherId,
+            coverAssetId: null,
+            initiatedBy: ownerTeacherId);
+        var subgroup = discipline.CreateSubgroup("Practice E2E");
+
+        repository.Add(discipline);
+        await repository.SaveChangesAsync(CancellationToken.None);
+        return new SeededDiscipline(discipline.Id, subgroup.Id, subgroup.Name);
+    }
+
+    public async Task SeedEnrollmentAsync(
+        Guid disciplineId,
+        Guid enrolledBy,
+        Guid userId,
+        DisciplineRole role,
+        Guid? subgroupId)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDisciplineRepository>();
+        var discipline = await repository.GetByIdAsync(disciplineId, CancellationToken.None)
+            ?? throw new InvalidOperationException($"Discipline '{disciplineId}' was not found.");
+
+        discipline.Enroll(userId, role, subgroupId, enrolledBy);
+        await repository.SaveChangesAsync(CancellationToken.None);
+    }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.ConfigureAppConfiguration((_, config) =>
+        {
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Auth:Authority"] = "http://localhost:9999/realms/test",
+                ["Observability:Otlp:Endpoint"] = "http://localhost:9999",
+                ["ConnectionStrings:Primary"] = _postgres.GetConnectionString(),
+                ["ConnectionStrings:Redis"] = "localhost:9999,abortConnect=false",
+                ["Kafka:BootstrapServers"] = "localhost:9999",
+                ["Outbox:ConnectionString"] = "test-placeholder",
+            });
+        });
+
+        builder.UseEnvironment("Development");
+        builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IHostedService>();
+
+            services.RemoveAll<IIdempotencyStore>();
+            services.AddSingleton<IIdempotencyStore>(IdempotencyStore);
+
+            services.RemoveAll<IConnectionMultiplexer>();
+            services.AddSingleton(Substitute.For<IConnectionMultiplexer>());
+
+            services.RemoveAll<IOutboxStore>();
+            services.RemoveAll<IOutboxWriter>();
+            services.AddSingleton<IOutboxWriter>(OutboxWriter);
+
+            ReplaceAuthWithTestScheme(services);
+        });
+    }
+
+    private async Task ApplyMigrationsAsync()
+    {
+        var options = new DbContextOptionsBuilder<DisciplineDbContext>()
+            .UseNpgsql(_postgres.GetConnectionString())
+            .Options;
+        await using var ctx = new DisciplineDbContext(options);
+        await ctx.Database.MigrateAsync();
+    }
+
+    private static void ReplaceAuthWithTestScheme(IServiceCollection services)
+    {
+        var authDescriptors = services
+            .Where(d => d.ServiceType == typeof(IConfigureOptions<AuthenticationOptions>)
+                || d.ServiceType == typeof(IPostConfigureOptions<AuthenticationOptions>)
+                || d.ServiceType == typeof(IConfigureOptions<JwtBearerOptions>)
+                || d.ServiceType == typeof(IPostConfigureOptions<JwtBearerOptions>)
+                || d.ServiceType == typeof(IOptionsChangeTokenSource<JwtBearerOptions>))
+            .ToList();
+        foreach (var d in authDescriptors)
+        {
+            services.Remove(d);
+        }
+
+        services.AddAuthentication(defaultScheme: TestAuthHandler.SchemeName)
+            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
+                TestAuthHandler.SchemeName,
+                _ => { });
+        services.AddAuthorization(options =>
+            options.AddPolicy(
+                AuthenticationExtensions.InternalGrpcPolicy,
+                policy => policy
+                    .AddAuthenticationSchemes(TestAuthHandler.SchemeName)
+                    .RequireAuthenticatedUser()));
+    }
+}
+
+public sealed record SeededDiscipline(Guid Id, Guid SubgroupId, string SubgroupName);

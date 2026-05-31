@@ -35,7 +35,7 @@ public sealed class ListMyAssetsEndpoint(IMediaAssetRepository assetRepository)
             .Select(a => new AssetMetadataResponse(
                 a.Id, a.OwnerId, a.Visibility, a.Kind, a.Size,
                 a.MimeType, a.OriginalFileName, a.State,
-                a.CreatedAtUtc, a.UploadedAtUtc))
+                a.CreatedAtUtc, a.UploadedAtUtc, a.DurationSeconds))
             .ToList();
 
         await HttpContext.Response.SendAsync(

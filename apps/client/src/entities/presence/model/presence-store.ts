@@ -3,7 +3,6 @@ import { useMemo } from "react";
 import type { Platform, PresenceInfo, PresenceStatus } from "@urfu-link/api-client";
 import { createHubConnection } from "@/shared/lib/signalr";
 import { HubConnection, HubConnectionState } from "@microsoft/signalr";
-import { lookupParticipantName } from "@/entities/conversation/model/participants-store";
 
 type TypingUser = {
     userId: string;
@@ -23,6 +22,7 @@ type PresenceState = {
     connect: () => Promise<void>;
     disconnect: () => Promise<void>;
     watchUserPresence: (userId: string) => Promise<void>;
+    loadBatchPresence: (userIds: string[]) => Promise<void>;
     unwatchUserPresence: (userId: string) => void;
     setViewingContexts: (contexts: string[]) => void;
 
@@ -199,14 +199,20 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 }
 
                 if (isTyping) {
-                    let displayName =
-                        lookupParticipantName(presenceConversationId, userId) ??
-                        lookupParticipantName(`${DISCIPLINE_PREFIX}${presenceConversationId}`, userId);
                     store.setTyping({
                         userId,
                         conversationId: presenceConversationId,
-                        displayName,
                     });
+                    void import("@/entities/conversation/model/participants-store")
+                        .then(({ lookupParticipantName }) => {
+                            const displayName =
+                                lookupParticipantName(presenceConversationId, userId) ??
+                                lookupParticipantName(`${DISCIPLINE_PREFIX}${presenceConversationId}`, userId);
+                            if (displayName) {
+                                store.setTyping({ userId, conversationId: presenceConversationId, displayName });
+                            }
+                        })
+                        .catch(() => undefined);
 
                     // Защита от потерянного StopTyping: чистим запись, если очередной
                     // StartTyping не подоспеет за TYPING_TIMEOUT_MS.
@@ -297,6 +303,27 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 warnUnlessConnectionClosingError("Presence subscribe failed", error),
             );
         }
+    },
+
+    loadBatchPresence: async (userIds) => {
+        const uniqueIds = Array.from(new Set(userIds.filter(isUuid)));
+        if (uniqueIds.length === 0) return;
+
+        const { apiClient } = await import("@/shared/lib/api");
+        const items = await apiClient.presence.getBatchUserPresence(uniqueIds);
+        set((state) => ({
+            presenceByUser: {
+                ...state.presenceByUser,
+                ...Object.fromEntries(items.map((info) => [
+                    info.userId,
+                    {
+                        ...info,
+                        status: normalizePresenceStatus(info.status),
+                        platforms: normalizePlatforms(info.platforms),
+                    },
+                ])),
+            },
+        }));
     },
 
     unwatchUserPresence: (userId) => {

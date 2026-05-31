@@ -71,7 +71,7 @@ export const InboxNotification = ({
             }`}
         >
             <View
-                className={`mt-0.5 flex-shrink-0 flex items-center justify-center border shadow-sm w-8 h-8 rounded-lg ${
+                className={`mt-0.5 flex-shrink-0 flex items-center justify-center border w-8 h-8 rounded-lg ${
                     unread
                         ? "bg-brand-600/15 border-brand-300/20"
                         : "bg-app-elevated border-white/[0.08]"

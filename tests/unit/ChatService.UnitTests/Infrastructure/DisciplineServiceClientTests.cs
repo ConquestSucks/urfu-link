@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Grpc.Core;
+using Urfu.Link.Services.Chat.Application.Disciplines;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Infrastructure.Grpc;
 using DisciplineGrpc = Urfu.Link.Services.Disciplines.Grpc;
@@ -111,11 +112,74 @@ public class DisciplineServiceClientTests
         result.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task ListDisciplineSnapshotsAsync_MapsSubgroupsAndMemberSubgroups()
+    {
+        var disciplineId = Guid.NewGuid();
+        var subgroupId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        var reply = new DisciplineGrpc.ListDisciplineSnapshotsReply
+        {
+            Disciplines =
+            {
+                new DisciplineGrpc.DisciplineSnapshotInfo
+                {
+                    DisciplineId = disciplineId.ToString("D"),
+                    Code = "CS101",
+                    Title = "Intro",
+                    Semester = "2026",
+                    OwnerTeacherId = teacherId.ToString("D"),
+                    CreatedAtUtc = now.ToString("O"),
+                    UpdatedAtUtc = now.ToString("O"),
+                    Subgroups =
+                    {
+                        new DisciplineGrpc.DisciplineSubgroupSnapshotInfo
+                        {
+                            SubgroupId = subgroupId.ToString("D"),
+                            Name = "Group A",
+                            CreatedAtUtc = now.ToString("O"),
+                            UpdatedAtUtc = now.ToString("O"),
+                        },
+                    },
+                    Members =
+                    {
+                        new DisciplineGrpc.MemberInfo
+                        {
+                            UserId = studentId.ToString("D"),
+                            Role = DisciplineGrpc.MembershipRole.Student,
+                            SubgroupId = subgroupId.ToString("D"),
+                        },
+                    },
+                },
+            },
+            NextPageToken = "100",
+        };
+        var sut = new DisciplineServiceClient(
+            new StubInternalApiClient(new DisciplineGrpc.ListUserDisciplinesReply(), reply),
+            new StubGrpcBearerTokenProvider(null));
+
+        var result = await sut.ListDisciplineSnapshotsAsync(null, 100, true, default);
+
+        result.NextPageToken.Should().Be("100");
+        var snapshot = result.Items.Should().ContainSingle().Subject;
+        snapshot.DisciplineId.Should().Be(disciplineId);
+        snapshot.OwnerTeacherId.Should().Be(teacherId);
+        snapshot.Subgroups.Should().ContainSingle().Which.SubgroupId.Should().Be(subgroupId);
+        snapshot.Members.Should().ContainSingle().Which.Should().Match<DisciplineMember>(m =>
+            m.UserId == studentId
+            && m.Role == ParticipantRole.Student
+            && m.SubgroupId == subgroupId);
+    }
+
     /// <summary>
     /// Subclasses the generated gRPC client and overrides the single method under test so the
     /// real <see cref="DisciplineServiceClient"/> can be exercised without any wire transport.
     /// </summary>
-    private sealed class StubInternalApiClient(DisciplineGrpc.ListUserDisciplinesReply reply)
+    private sealed class StubInternalApiClient(
+        DisciplineGrpc.ListUserDisciplinesReply userDisciplinesReply,
+        DisciplineGrpc.ListDisciplineSnapshotsReply? disciplineSnapshotsReply = null)
         : DisciplineGrpc.InternalApi.InternalApiClient
     {
         public Metadata? LastHeaders { get; private set; }
@@ -128,7 +192,22 @@ public class DisciplineServiceClientTests
         {
             LastHeaders = headers;
             return new AsyncUnaryCall<DisciplineGrpc.ListUserDisciplinesReply>(
-                    Task.FromResult(reply),
+                    Task.FromResult(userDisciplinesReply),
+                    Task.FromResult(new Metadata()),
+                    () => Status.DefaultSuccess,
+                    () => new Metadata(),
+                    () => { });
+        }
+
+        public override AsyncUnaryCall<DisciplineGrpc.ListDisciplineSnapshotsReply> ListDisciplineSnapshotsAsync(
+            DisciplineGrpc.ListDisciplineSnapshotsRequest request,
+            Metadata? headers = null,
+            DateTime? deadline = null,
+            CancellationToken cancellationToken = default)
+        {
+            LastHeaders = headers;
+            return new AsyncUnaryCall<DisciplineGrpc.ListDisciplineSnapshotsReply>(
+                    Task.FromResult(disciplineSnapshotsReply ?? new DisciplineGrpc.ListDisciplineSnapshotsReply()),
                     Task.FromResult(new Metadata()),
                     () => Status.DefaultSuccess,
                     () => new Metadata(),

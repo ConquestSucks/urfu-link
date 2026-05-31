@@ -1,9 +1,12 @@
-import type { ForwardedFromDto, ReactionsSummary, ReplyToDto } from "@urfu-link/api-client";
+import type { AttachmentType, ForwardedFromDto, ReactionsSummary, ReplyToDto } from "@urfu-link/api-client";
 
 export interface Attachment {
     name: string;
     url: string;
     mediaAssetId?: string;
+    type?: AttachmentType;
+    mimeType?: string;
+    durationSeconds?: number | null;
 }
 
 /** Локальный статус для optimistic UI: undefined для серверных, остальные — клиентские. */
@@ -17,9 +20,19 @@ export interface MessageContextMenuAnchor {
 export interface ChatMessageProps {
     id: string;
     text: string;
+    kind?: "User" | "SystemCall";
+    systemCall?: {
+        callId: string;
+        callType: "Audio" | "Video";
+        status: string;
+        callerId: string;
+        duration?: string | null;
+        endReason?: string | null;
+    } | null;
     isOwn: boolean;
     time: string;
     avatarUrl: string;
+    authorName?: string;
     showAvatar?: boolean;
     seen?: boolean;
     attachments?: Attachment[];
@@ -33,7 +46,10 @@ export interface ChatMessageProps {
     localStatus?: LocalDeliveryStatus;
     onLongPress?: () => void;
     onContextMenu?: (anchor: MessageContextMenuAnchor) => void;
+    onAuthorPress?: () => void;
     onReplyPress?: () => void;
     onThreadOpen?: () => void;
     onReactionPress?: (emoji: string) => void;
+    showJoinCallAction?: boolean;
+    onJoinCall?: (callId: string) => void;
 }

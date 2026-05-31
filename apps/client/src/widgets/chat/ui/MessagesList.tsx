@@ -27,11 +27,15 @@ import {
     type NativeSyntheticEvent,
 } from "react-native";
 import { ChatMessageSkeleton } from "@/entities/chat-message/ui/ChatMessageSkeleton";
-import type { MessageDto } from "@urfu-link/api-client";
+import type { ConversationParticipantDto, MessageDto } from "@urfu-link/api-client";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { TypingIndicator } from "@/entities/presence";
 import { formatMessageDateLabel, getMessageDayKey } from "../lib/message-date-labels";
 import { useWebFileDrop } from "@/shared/lib/useWebFileDrop";
+import {
+    useConversationParticipants,
+    useParticipantsStore,
+} from "@/entities/conversation/model/participants-store";
 
 interface MessagesListProps {
     chatId: string;
@@ -39,13 +43,20 @@ interface MessagesListProps {
     skipInitialLoad?: boolean;
     onMessageLongPress?: (message: MessageDto) => void;
     onMessageContextMenu?: (message: MessageDto, anchor: MessageContextMenuAnchor) => void;
+    onAuthorPress?: (author: MessageAuthorProfile) => void;
     onThreadOpen?: (rootMessageId: string) => void;
     onFilesDropped?: (files: File[]) => void;
+    onSystemCallJoin?: (callId: string) => void;
 }
 
 export interface MessagesListHandle {
     scrollToMessage: (messageId: string) => Promise<boolean>;
 }
+
+export type MessageAuthorProfile = Pick<
+    ConversationParticipantDto,
+    "userId" | "displayName" | "avatarUrl"
+>;
 
 const HIGHLIGHT_FADE_IN_MS = 140;
 const HIGHLIGHT_HOLD_MS = 1500;
@@ -107,6 +118,38 @@ const getMessageListItemKey = (item: MessageListItem) => item.id;
 
 const waitForListUpdate = () => new Promise((resolve) => setTimeout(resolve, 50));
 
+const getJoinableSystemCallIds = (messages: MessageDto[]): Set<string> => {
+    const latestByCallId = new Map<string, { status: string; timestamp: number; index: number }>();
+
+    messages.forEach((message, index) => {
+        const systemCall = message.kind === "SystemCall" ? message.systemCall : null;
+        if (!systemCall?.callId) return;
+
+        const parsed = Date.parse(message.createdAt);
+        const timestamp = Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+        const current = latestByCallId.get(systemCall.callId);
+        if (
+            !current ||
+            timestamp > current.timestamp ||
+            (timestamp === current.timestamp && index < current.index)
+        ) {
+            latestByCallId.set(systemCall.callId, {
+                status: systemCall.status,
+                timestamp,
+                index,
+            });
+        }
+    });
+
+    const joinable = new Set<string>();
+    latestByCallId.forEach((value, callId) => {
+        if (value.status === "Started") {
+            joinable.add(callId);
+        }
+    });
+    return joinable;
+};
+
 const styles = StyleSheet.create({
     dateSeparator: {
         marginTop: 24,
@@ -154,8 +197,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             skipInitialLoad = false,
             onMessageLongPress,
             onMessageContextMenu,
+            onAuthorPress,
             onThreadOpen,
             onFilesDropped,
+            onSystemCallJoin,
         },
         ref,
     ) => {
@@ -187,6 +232,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const lastScrollOffsetRef = useRef<number | null>(null);
 
         const currentUserId = useCurrentUserId();
+        const participants = useConversationParticipants(chatId);
+        const loadParticipants = useParticipantsStore((s) => s.load);
+        const participantsByUserId = useMemo(
+            () => new Map(participants.map((participant) => [participant.userId, participant])),
+            [participants],
+        );
         const readContextRef = useRef({ chatId, currentUserId, markRead });
         const handleFilesDropped = useCallback(
             (files: File[]) => {
@@ -207,6 +258,11 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             if (skipInitialLoad) return;
             loadMessages(chatId, type, true);
         }, [chatId, type, skipInitialLoad, loadMessages]);
+
+        useEffect(() => {
+            if (type !== "subject" || participants.length > 0) return;
+            loadParticipants(chatId).catch(() => undefined);
+        }, [chatId, loadParticipants, participants.length, type]);
 
         useEffect(() => {
             return () => {
@@ -312,6 +368,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
         const shouldShowAvatars = type === "subject";
         const isInitialLoading = isLoading && !isLoaded && messages.length === 0;
+        const joinableSystemCallIds = useMemo(
+            () => (type === "subject" ? getJoinableSystemCallIds(messages) : new Set<string>()),
+            [messages, type],
+        );
 
         const handleViewableItemsChanged = React.useRef(
             ({
@@ -403,6 +463,24 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
                     const message = item.message;
                     const view = mapMessageToProps(message, currentUserId);
+                    const sender = participantsByUserId.get(message.senderId);
+                    const authorName =
+                        shouldShowAvatars && !view.isOwn
+                            ? sender?.displayName?.trim() || message.senderId
+                            : undefined;
+                    const authorAvatarUrl = sender?.avatarUrl?.trim() || view.avatarUrl;
+                    const authorProfile = authorName && sender
+                        ? {
+                              userId: sender.userId,
+                              displayName: authorName,
+                              avatarUrl: authorAvatarUrl,
+                          }
+                        : null;
+                    const isSystemMessage = message.kind === "SystemCall";
+                    const canJoinSystemCall =
+                        isSystemMessage &&
+                        !!view.systemCall?.callId &&
+                        joinableSystemCallIds.has(view.systemCall.callId);
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
                     const itemAbove = listItems[index + 1];
@@ -438,9 +516,12 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     isOwn={view.isOwn}
                                     seen={view.seen}
                                     time={view.time}
-                                    avatarUrl={view.avatarUrl}
+                                    avatarUrl={authorAvatarUrl}
+                                    authorName={authorName}
                                     showAvatar={shouldShowAvatars}
                                     attachments={view.attachments}
+                                    kind={view.kind}
+                                    systemCall={view.systemCall}
                                     replyTo={message.replyTo ?? null}
                                     reactions={message.reactions}
                                     editedAtUtc={message.editedAtUtc}
@@ -449,9 +530,18 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                     isHighlighted={isHighlighted}
                                     threadReplyCount={message.threadReplyCount ?? 0}
                                     localStatus={localStatus}
-                                    onLongPress={() => onMessageLongPress?.(message)}
-                                    onContextMenu={(anchor) =>
-                                        onMessageContextMenu?.(message, anchor)
+                                    onLongPress={
+                                        isSystemMessage ? undefined : () => onMessageLongPress?.(message)
+                                    }
+                                    onContextMenu={
+                                        isSystemMessage
+                                            ? undefined
+                                            : (anchor) => onMessageContextMenu?.(message, anchor)
+                                    }
+                                    onAuthorPress={
+                                        authorProfile && onAuthorPress
+                                            ? () => onAuthorPress?.(authorProfile)
+                                            : undefined
                                     }
                                     onReplyPress={
                                         message.replyTo?.messageId
@@ -461,17 +551,23 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                             : undefined
                                     }
                                     onReactionPress={
+                                        isSystemMessage
+                                            ? undefined
+                                            : (
                                         currentUserId
-                                            ? (emoji) => {
-                                                  const reacters = message.reactions?.[emoji] ?? [];
-                                                  if (reacters.includes(currentUserId)) {
-                                                      removeReaction(message.id, emoji);
-                                                  } else {
-                                                      addReaction(message.id, emoji);
+                                                ? (emoji) => {
+                                                      const reacters = message.reactions?.[emoji] ?? [];
+                                                      if (reacters.includes(currentUserId)) {
+                                                          removeReaction(message.id, emoji);
+                                                      } else {
+                                                          addReaction(message.id, emoji);
+                                                      }
                                                   }
-                                              }
-                                            : undefined
+                                                : undefined
+                                              )
                                     }
+                                    showJoinCallAction={canJoinSystemCall}
+                                    onJoinCall={canJoinSystemCall ? onSystemCallJoin : undefined}
                                     onThreadOpen={
                                         message.threadReplyCount && message.threadReplyCount > 0
                                             ? () => onThreadOpen?.(message.id)
@@ -485,11 +581,15 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             [
                 currentUserId,
                 highlightedMessageId,
+                joinableSystemCallIds,
                 listItems,
+                participantsByUserId,
                 shouldShowAvatars,
                 onMessageLongPress,
                 onMessageContextMenu,
+                onAuthorPress,
                 onThreadOpen,
+                onSystemCallJoin,
                 addReaction,
                 removeReaction,
                 scrollToMessage,

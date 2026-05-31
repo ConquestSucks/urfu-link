@@ -27,7 +27,9 @@ public sealed record MessageDto(
     int? ThreadReplyCount = null,
     IReadOnlyList<Guid>? ThreadParticipants = null,
     DateTimeOffset? ThreadLastReplyAtUtc = null,
-    ParticipantRole AuthorRole = ParticipantRole.Member)
+    ParticipantRole AuthorRole = ParticipantRole.Member,
+    MessageKind Kind = MessageKind.User,
+    SystemCallDto? SystemCall = null)
 {
     public static MessageDto FromDomain(Message message)
     {
@@ -58,7 +60,9 @@ public sealed record MessageDto(
             ThreadReplyCount: message.ThreadReplyCount > 0 ? message.ThreadReplyCount : null,
             ThreadParticipants: message.ThreadParticipants.Count == 0 ? null : message.ThreadParticipants.ToList(),
             ThreadLastReplyAtUtc: message.ThreadLastReplyAtUtc,
-            AuthorRole: message.AuthorRole);
+            AuthorRole: message.AuthorRole,
+            Kind: message.Kind,
+            SystemCall: message.SystemCall is { } systemCall ? SystemCallDto.FromDomain(systemCall) : null);
     }
 
     private static Dictionary<string, IReadOnlyList<Guid>> BuildReactionsSummary(Message message)

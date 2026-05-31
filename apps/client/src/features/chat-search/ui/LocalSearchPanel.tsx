@@ -53,7 +53,7 @@ export const LocalSearchPanel = ({ conversationId, onResultPress, onClose }: Loc
                     autoFocus
                     className="flex-1 text-white text-[15px]"
                     placeholder="Поиск по переписке..."
-                    placeholderTextColor="#8B8FA8"
+                    placeholderTextColor="#90A1B9"
                     value={query}
                     onChangeText={onQueryChange}
                     returnKeyType="search"

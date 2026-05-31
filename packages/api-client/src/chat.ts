@@ -7,6 +7,15 @@ export type ConversationType = "Direct" | "Group";
 // Подтип группового чата: "Discipline" для чатов учебной дисциплины.
 // Соответствует ChatService.Api.Domain.Enums.GroupSubtype.
 export type GroupSubtype = "Discipline";
+export type DisciplineChatKind = "General" | "Subgroup";
+export type ParticipantRole = "Member" | "Teacher" | "Student";
+
+export type ConversationCapabilities = {
+  canStartGroupCall: boolean;
+  canStartGroupAudioCall?: boolean;
+  canStartGroupVideoCall?: boolean;
+  canManagePins?: boolean;
+};
 
 export type ConversationPreview = {
   id: string;
@@ -27,17 +36,36 @@ export type ConversationPreview = {
     sentAtUtc?: string;
     hasAttachments?: boolean;
     attachmentFileNames?: string[];
+    attachmentTypes?: AttachmentType[];
     readAt?: string | null;
     readAtUtc?: string | null;
   } | null;
   pinnedMessageIds?: string[];
   title?: string;
+  coverAssetId?: string | null;
+  disciplineId?: string | null;
   groupSubtype?: GroupSubtype | null;
+  disciplineChatKind?: DisciplineChatKind | null;
+  disciplineSubgroupId?: string | null;
+  disciplineTitle?: string | null;
+  disciplineSubgroupName?: string | null;
+  participantRoles?: Record<string, ParticipantRole> | null;
+  capabilities?: ConversationCapabilities | null;
   unreadCount?: number | null;
 };
 
 export type MessageState = "Sent" | "Delivered" | "Read" | "Deleted";
 export type AttachmentType = "Image" | "Video" | "Audio" | "Voice" | "Document";
+export type MessageKind = "User" | "SystemCall";
+export type SystemCallStatus = "Started" | "Missed" | "Completed" | "Declined" | "Cancelled" | "Failed";
+export type SystemCallInfo = {
+  callId: string;
+  callType: "Audio" | "Video";
+  status: SystemCallStatus;
+  callerId: string;
+  duration?: string | null;
+  endReason?: string | null;
+};
 
 export type ChatAttachment = {
   mediaAssetId: string;
@@ -46,6 +74,7 @@ export type ChatAttachment = {
   fileName: string;
   size: number;
   mimeType: string;
+  durationSeconds?: number | null;
 };
 
 export type ReplyToDto = {
@@ -86,6 +115,8 @@ export type MessageDto = {
   threadLastReplyAtUtc?: string | null;
   deletedAtUtc?: string | null;
   deletedMode?: DeleteMode | null;
+  kind?: MessageKind;
+  systemCall?: SystemCallInfo | null;
 };
 
 export type Paginated<T> = {
@@ -127,8 +158,6 @@ export type ActiveThreadDto = {
   lastActivityAtUtc: string;
   reason: ThreadSubscriptionReason;
 };
-
-export type ParticipantRole = "Owner" | "Member";
 
 export type ConversationParticipantDto = {
   userId: string;

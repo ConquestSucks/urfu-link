@@ -28,7 +28,11 @@ if (await MigrationCliRunner.TryRunMigrationsAsync<DisciplineDbContext>(
 }
 
 builder.Services.AddGrpc();
-builder.Services.AddFastEndpoints();
+builder.Services.AddFastEndpoints(o =>
+{
+    o.Assemblies = [typeof(Program).Assembly];
+    o.DisableAutoDiscovery = true;
+});
 builder.Services.SwaggerDocument(o =>
 {
     o.DocumentSettings = s =>
@@ -67,6 +71,8 @@ app.MapServiceDefaults();
 app.UseFastEndpoints(c =>
 {
     c.Endpoints.RoutePrefix = "api/v1";
+    c.Serializer.Options.Converters.Add(
+        new System.Text.Json.Serialization.JsonStringEnumConverter());
 });
 app.UseSwaggerGen();
 app.MapScalarApiReference(o =>

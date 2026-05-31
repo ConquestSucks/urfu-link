@@ -7,6 +7,8 @@ interface AvatarProps {
     src?: string | null;
     name?: string;
     className?: string;
+    accessibilityLabel?: string;
+    decorative?: boolean;
 }
 
 const AVATAR_COLORS = [
@@ -35,13 +37,34 @@ function getAvatarColor(name: string): string {
     return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-export const Avatar = ({ size = 40, src, name, className }: AvatarProps) => {
+const getAccessibilityLabel = (
+    name: string | undefined,
+    accessibilityLabel: string | undefined,
+    decorative: boolean | undefined,
+) => {
+    if (decorative) return "";
+    if (accessibilityLabel !== undefined) return accessibilityLabel;
+    return name ? `Аватар ${name}` : "Аватар пользователя";
+};
+
+export const Avatar = ({
+    size = 40,
+    src,
+    name,
+    className,
+    accessibilityLabel,
+    decorative,
+}: AvatarProps) => {
+    const label = getAccessibilityLabel(name, accessibilityLabel, decorative);
+
     if (!src) {
         if (name) {
             return (
                 <View
                     style={{ width: size, height: size, backgroundColor: getAvatarColor(name) }}
                     className={`rounded-xl shrink-0 items-center justify-center ${className ?? ""}`}
+                    accessibilityLabel={label}
+                    accessible={!decorative}
                 >
                     <Text style={{ fontSize: size * 0.35, color: "white", fontWeight: "600" }}>
                         {getInitials(name)}
@@ -53,6 +76,8 @@ export const Avatar = ({ size = 40, src, name, className }: AvatarProps) => {
             <View
                 style={{ width: size, height: size }}
                 className={`rounded-xl bg-slate-750 shrink-0 ${className ?? ""}`}
+                accessibilityLabel={label}
+                accessible={!decorative}
             />
         );
     }
@@ -61,6 +86,7 @@ export const Avatar = ({ size = 40, src, name, className }: AvatarProps) => {
             source={{ uri: src }}
             style={{ width: size, height: size }}
             className={`rounded-xl shrink-0 ${className ?? ""}`}
+            accessibilityLabel={label}
             contentFit="cover"
             transition={200}
         />

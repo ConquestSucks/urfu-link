@@ -31,6 +31,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="ChatService.UnitTests" />
     <InternalsVisibleTo Include="ChatService.IntegrationTests" />
+    <InternalsVisibleTo Include="DisciplineChatE2ETests" />
   </ItemGroup>
 
   <PropertyGroup>

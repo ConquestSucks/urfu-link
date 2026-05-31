@@ -11,6 +11,24 @@ const mockAddAttachments = jest.fn();
 const mockHandleAttachFiles = jest.fn();
 const mockRemoveAttachment = jest.fn();
 const mockClearAttachments = jest.fn();
+let mockVoiceRecorder: {
+    draft: null | {
+        uri: string;
+        fileName: string;
+        mimeType: string;
+        durationSeconds: number;
+    };
+    error: string | null;
+    isRecording: boolean;
+    isStarting: boolean;
+    isStopping: boolean;
+    durationSeconds: number;
+    maxDurationSeconds: number;
+    startRecording: jest.Mock;
+    stopRecording: jest.Mock;
+    cancelRecording: jest.Mock;
+    discardDraft: jest.Mock;
+};
 
 let mockConversationParticipants: Array<{
     userId: string;
@@ -100,6 +118,46 @@ jest.mock("@/features/emoji-picker", () => ({
     EmojiPicker: () => null,
 }));
 
+jest.mock("@/features/voice-message", () => {
+    const { Pressable, Text, View } = require("react-native");
+
+    return {
+        useVoiceRecorder: () => mockVoiceRecorder,
+        VoiceDraftPreview: ({
+            onSubmit,
+            onDelete,
+        }: {
+            onSubmit: () => void;
+            onDelete: () => void;
+        }) => (
+            <View testID="voice-draft-preview">
+                <Pressable testID="voice-draft-submit" onPress={onSubmit}>
+                    <Text>send voice</Text>
+                </Pressable>
+                <Pressable testID="voice-draft-delete" onPress={onDelete}>
+                    <Text>delete voice</Text>
+                </Pressable>
+            </View>
+        ),
+        VoiceRecorderBar: ({
+            onStop,
+            onCancel,
+        }: {
+            onStop: () => void;
+            onCancel: () => void;
+        }) => (
+            <View testID="voice-recorder-bar">
+                <Pressable testID="voice-recorder-stop" onPress={onStop}>
+                    <Text>stop</Text>
+                </Pressable>
+                <Pressable testID="voice-recorder-cancel" onPress={onCancel}>
+                    <Text>cancel</Text>
+                </Pressable>
+            </View>
+        ),
+    };
+});
+
 jest.mock("@/shared/ui/activity-indicator", () => ({
     ActivityIndicator: ({ testID }: { testID?: string }) => {
         const { Text } = require("react-native");
@@ -149,6 +207,7 @@ jest.mock("@/shared/ui/phosphor", () => {
 
     return {
         FileIcon: Icon,
+        MicrophoneIcon: Icon,
         PaperPlaneRightIcon: Icon,
         PencilSimpleIcon: Icon,
         PlusCircleIcon: Icon,
@@ -167,6 +226,19 @@ describe("ChatInput", () => {
         mockHandleAttachFiles.mockClear();
         mockRemoveAttachment.mockClear();
         mockClearAttachments.mockClear();
+        mockVoiceRecorder = {
+            draft: null,
+            error: null,
+            isRecording: false,
+            isStarting: false,
+            isStopping: false,
+            durationSeconds: 0,
+            maxDurationSeconds: 300,
+            startRecording: jest.fn(),
+            stopRecording: jest.fn(),
+            cancelRecording: jest.fn(),
+            discardDraft: jest.fn(),
+        };
         mockConversationParticipants = [];
         mockMentionToken = null;
         mockMentionSuggestions = () => null;
@@ -339,6 +411,59 @@ describe("ChatInput", () => {
 
         expect(preventDefault).not.toHaveBeenCalled();
         expect(onSend).not.toHaveBeenCalled();
+    });
+
+    it("starts voice recording from an empty composer", () => {
+        render(<ChatInput conversationId="conversation-1" onSend={jest.fn()} />);
+
+        fireEvent.press(screen.getByTestId("chat-input-voice-button"));
+
+        expect(mockVoiceRecorder.startRecording).toHaveBeenCalled();
+    });
+
+    it("submits a voice draft as a standalone message", async () => {
+        const draft = {
+            uri: "file://voice.m4a",
+            fileName: "voice.m4a",
+            mimeType: "audio/m4a",
+            durationSeconds: 12,
+        };
+        mockVoiceRecorder.draft = draft;
+        const onSend = jest.fn();
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("voice-draft-submit"));
+        });
+
+        expect(onSend).toHaveBeenCalledWith("", [], undefined, undefined, draft);
+        expect(mockVoiceRecorder.discardDraft).toHaveBeenCalled();
+    });
+
+    it("keeps a voice draft visible after a send failure", async () => {
+        const draft = {
+            uri: "file://voice.m4a",
+            fileName: "voice.m4a",
+            mimeType: "audio/m4a",
+            durationSeconds: 12,
+        };
+        mockVoiceRecorder.draft = draft;
+        const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const onSend = jest.fn(async () => {
+            throw new Error("network");
+        });
+
+        render(<ChatInput conversationId="conversation-1" onSend={onSend} />);
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("voice-draft-submit"));
+        });
+
+        expect(onSend).toHaveBeenCalledWith("", [], undefined, undefined, draft);
+        expect(screen.getByTestId("voice-draft-preview")).toBeTruthy();
+        expect(mockVoiceRecorder.discardDraft).not.toHaveBeenCalled();
+        consoleErrorSpy.mockRestore();
     });
 
     it("submits the current composer text and attachments from the files modal", async () => {

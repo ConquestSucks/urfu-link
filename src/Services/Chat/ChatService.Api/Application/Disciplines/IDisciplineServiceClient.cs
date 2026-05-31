@@ -11,14 +11,43 @@ public sealed record UserDisciplineSnapshot(
     Guid DisciplineId,
     string Code,
     string Title,
-    ParticipantRole Role);
+    ParticipantRole Role,
+    Guid? SubgroupId = null,
+    IReadOnlyList<Guid>? VisibleSubgroupIds = null);
 
 /// <summary>
 /// One member of a discipline (teacher or student). Returned by
 /// <see cref="IDisciplineServiceClient.ListMembersAsync"/> so the mention resolver can
 /// expand <c>@teachers</c> / <c>@students</c> into concrete user ids.
 /// </summary>
-public sealed record DisciplineMember(Guid UserId, ParticipantRole Role);
+public sealed record DisciplineMember(Guid UserId, ParticipantRole Role, Guid? SubgroupId = null);
+
+public sealed record DisciplineSubgroupSnapshot(
+    Guid SubgroupId,
+    string Name,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    DateTimeOffset? ArchivedAtUtc);
+
+public sealed record DisciplineSnapshot(
+    Guid DisciplineId,
+    string Code,
+    string Title,
+    string Semester,
+    Guid OwnerTeacherId,
+    Guid? CoverAssetId,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc,
+    DateTimeOffset? ArchivedAtUtc,
+    IReadOnlyList<DisciplineSubgroupSnapshot> Subgroups,
+    IReadOnlyList<DisciplineMember> Members)
+{
+    public bool IsArchived => ArchivedAtUtc.HasValue;
+}
+
+public sealed record DisciplineSnapshotPage(
+    IReadOnlyList<DisciplineSnapshot> Items,
+    string? NextPageToken);
 
 /// <summary>
 /// Inbound view of DisciplineService used by ChatService at SignalR connection time and
@@ -39,5 +68,11 @@ public interface IDisciplineServiceClient
     /// </summary>
     Task<IReadOnlyList<DisciplineMember>> ListMembersAsync(
         Guid disciplineId,
+        CancellationToken cancellationToken);
+
+    Task<DisciplineSnapshotPage> ListDisciplineSnapshotsAsync(
+        string? pageToken,
+        int pageSize,
+        bool includeArchived,
         CancellationToken cancellationToken);
 }

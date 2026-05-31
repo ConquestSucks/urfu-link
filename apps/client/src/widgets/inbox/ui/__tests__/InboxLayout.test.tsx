@@ -10,6 +10,22 @@ const mockSetPendingScrollToMessageId = jest.fn();
 const mockRouterPush = jest.fn();
 let mockCurrentView: "messages" | "notifications" = "messages";
 let mockCurrentTab: "chats" | "subjects" = "chats";
+let mockNotifications: any[] = [
+    {
+        id: "notification-1",
+        title: "Новое сообщение",
+        description: "Иван написал вам",
+        time: "12:10",
+        scope: "chats",
+        deepLink:
+            "urfulink://chat/conv/direct-1/msg/3f7d3e57b4f5481e93a1c8e9b4d70a11",
+        data: {
+            conversationId: "direct-1",
+            messageId: "3f7d3e57b4f5481e93a1c8e9b4d70a11",
+        },
+        isRead: false,
+    },
+];
 
 jest.mock("expo-router", () => ({
     router: {
@@ -77,18 +93,7 @@ jest.mock("@/entities/conversation/model/chat-store", () => ({
 jest.mock("@/shared/store/useInboxStore", () => ({
     useInboxStore: (selector: (state: unknown) => unknown) =>
         selector({
-            notifications: [
-                {
-                    id: "notification-1",
-                    title: "Новое сообщение",
-                    description: "Иван написал вам",
-                    time: "12:10",
-                    scope: "chats",
-                    deepLink:
-                        "urfulink://chat/conv/direct-1/msg/3f7d3e57b4f5481e93a1c8e9b4d70a11",
-                    isRead: false,
-                },
-            ],
+            notifications: mockNotifications,
             isNotificationsLoading: false,
             isMarkingAllNotificationsRead: false,
             fetchNotifications: mockFetchNotifications,
@@ -128,6 +133,22 @@ describe("InboxLayout navigation", () => {
         jest.clearAllMocks();
         mockCurrentView = "messages";
         mockCurrentTab = "chats";
+        mockNotifications = [
+            {
+                id: "notification-1",
+                title: "Новое сообщение",
+                description: "Иван написал вам",
+                time: "12:10",
+                scope: "chats",
+                deepLink:
+                    "urfulink://chat/conv/direct-1/msg/3f7d3e57b4f5481e93a1c8e9b4d70a11",
+                data: {
+                    conversationId: "direct-1",
+                    messageId: "3f7d3e57b4f5481e93a1c8e9b4d70a11",
+                },
+                isRead: false,
+            },
+        ];
     });
 
     it("reopens a chat even if the row is still marked active", () => {
@@ -152,5 +173,31 @@ describe("InboxLayout navigation", () => {
         expect(mockRouterPush).toHaveBeenCalledWith(
             "/chats/direct-1?message=3f7d3e57-b4f5-481e-93a1-c8e9b4d70a11",
         );
+    });
+
+    it("marks stale call notifications read without opening a call screen", () => {
+        mockCurrentView = "notifications";
+        mockNotifications = [
+            {
+                id: "notification-call",
+                title: "Пропущенный звонок",
+                description: "Звонок остался без ответа",
+                time: "12:10",
+                scope: "chats",
+                deepLink: "urfulink://call/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/missed",
+                data: {
+                    callId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                },
+                isRead: false,
+            },
+        ];
+
+        render(<InboxLayout />);
+
+        fireEvent.press(screen.getByTestId("inbox-notification-row"));
+
+        expect(mockMarkNotificationRead).toHaveBeenCalledWith("notification-call");
+        expect(mockSetPendingScrollToMessageId).not.toHaveBeenCalled();
+        expect(mockRouterPush).not.toHaveBeenCalled();
     });
 });

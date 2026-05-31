@@ -19,6 +19,9 @@ public sealed class DisciplineTests
             coverAssetId: null,
             initiatedBy: AdminId);
 
+    private static Guid DefaultSubgroupId(Discipline discipline)
+        => discipline.Subgroups.Single(s => !s.IsArchived).Id;
+
     [Fact]
     public void CreateNew_AssignsIdentityAndOwnerEnrollment()
     {
@@ -34,6 +37,8 @@ public sealed class DisciplineTests
         var owner = Assert.Single(discipline.Enrollments);
         Assert.Equal(OwnerId, owner.UserId);
         Assert.Equal(DisciplineRole.Teacher, owner.Role);
+        Assert.Single(discipline.Subgroups);
+        Assert.Equal(Discipline.DefaultSubgroupName, discipline.Subgroups[0].Name);
     }
 
     [Fact]
@@ -41,7 +46,7 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
 
-        Assert.Equal(2, discipline.DomainEvents.Count);
+        Assert.Equal(3, discipline.DomainEvents.Count);
         var created = Assert.IsType<DisciplineCreatedEvent>(discipline.DomainEvents[0]);
         Assert.Equal(discipline.Id, created.DisciplineId);
         Assert.Equal("CS101", created.Code);
@@ -50,6 +55,10 @@ public sealed class DisciplineTests
         var enrolled = Assert.IsType<UserEnrolledEvent>(discipline.DomainEvents[1]);
         Assert.Equal(OwnerId, enrolled.UserId);
         Assert.Equal(DisciplineRole.Teacher, enrolled.Role);
+
+        var subgroup = Assert.IsType<DisciplineSubgroupCreatedEvent>(discipline.DomainEvents[2]);
+        Assert.Equal(discipline.Id, subgroup.DisciplineId);
+        Assert.Contains(OwnerId, subgroup.TeacherUserIds);
     }
 
     [Fact]
@@ -155,15 +164,37 @@ public sealed class DisciplineTests
         discipline.ClearDomainEvents();
         var studentId = Guid.NewGuid();
 
-        var enrollment = discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        var enrollment = discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
 
         Assert.Equal(2, discipline.Enrollments.Count);
         Assert.Equal(studentId, enrollment.UserId);
         Assert.Equal(DisciplineRole.Student, enrollment.Role);
+        Assert.Equal(DefaultSubgroupId(discipline), enrollment.SubgroupId);
         Assert.Equal(AdminId, enrollment.EnrolledBy);
         var evt = Assert.IsType<UserEnrolledEvent>(Assert.Single(discipline.DomainEvents));
         Assert.Equal(studentId, evt.UserId);
         Assert.Equal(DisciplineRole.Student, evt.Role);
+        Assert.Equal(DefaultSubgroupId(discipline), evt.SubgroupId);
+    }
+
+    [Fact]
+    public void Enroll_StudentWithoutSubgroup_Throws()
+    {
+        var discipline = NewDiscipline();
+        var studentId = Guid.NewGuid();
+
+        Assert.Throws<StudentSubgroupRequiredException>(() =>
+            discipline.Enroll(studentId, DisciplineRole.Student, null, AdminId));
+    }
+
+    [Fact]
+    public void Enroll_TeacherWithSubgroup_Throws()
+    {
+        var discipline = NewDiscipline();
+        var teacherId = Guid.NewGuid();
+
+        Assert.Throws<TeacherSubgroupNotAllowedException>(() =>
+            discipline.Enroll(teacherId, DisciplineRole.Teacher, DefaultSubgroupId(discipline), AdminId));
     }
 
     [Fact]
@@ -171,11 +202,11 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var studentId = Guid.NewGuid();
-        discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
         discipline.ClearDomainEvents();
 
         Assert.Throws<EnrollmentExistsException>(() =>
-            discipline.Enroll(studentId, DisciplineRole.Student, AdminId));
+            discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId));
         Assert.Empty(discipline.DomainEvents);
     }
 
@@ -186,7 +217,7 @@ public sealed class DisciplineTests
         discipline.ClearDomainEvents();
 
         Assert.Throws<EnrollmentExistsException>(() =>
-            discipline.Enroll(OwnerId, DisciplineRole.Teacher, AdminId));
+            discipline.Enroll(OwnerId, DisciplineRole.Teacher, null, AdminId));
     }
 
     [Fact]
@@ -197,7 +228,7 @@ public sealed class DisciplineTests
         discipline.ClearDomainEvents();
 
         Assert.Throws<DisciplineArchivedException>(() =>
-            discipline.Enroll(Guid.NewGuid(), DisciplineRole.Student, AdminId));
+            discipline.Enroll(Guid.NewGuid(), DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId));
     }
 
     [Fact]
@@ -205,7 +236,7 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var studentId = Guid.NewGuid();
-        discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
         discipline.ClearDomainEvents();
 
         discipline.Unenroll(studentId);
@@ -214,6 +245,8 @@ public sealed class DisciplineTests
         Assert.DoesNotContain(discipline.Enrollments, e => e.UserId == studentId);
         var evt = Assert.IsType<UserUnenrolledEvent>(Assert.Single(discipline.DomainEvents));
         Assert.Equal(studentId, evt.UserId);
+        Assert.Equal(DisciplineRole.Student, evt.Role);
+        Assert.Equal(DefaultSubgroupId(discipline), evt.SubgroupId);
     }
 
     [Fact]
@@ -230,7 +263,7 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var coTeacher = Guid.NewGuid();
-        discipline.Enroll(coTeacher, DisciplineRole.Teacher, AdminId);
+        discipline.Enroll(coTeacher, DisciplineRole.Teacher, null, AdminId);
         // Transfer ownership virtually: archive removes owner then we still have one teacher.
         // Direct path: remove owner is forbidden, so the only way to hit "last teacher" while not owner
         // is via ChangeRole (covered separately). Here we just confirm ChangeRole happens to still keep
@@ -258,7 +291,7 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var studentId = Guid.NewGuid();
-        discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
         discipline.Archive();
         discipline.ClearDomainEvents();
 
@@ -270,16 +303,18 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var studentId = Guid.NewGuid();
-        discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
         discipline.ClearDomainEvents();
 
-        discipline.ChangeRole(studentId, DisciplineRole.Teacher);
+        discipline.ChangeRole(studentId, DisciplineRole.Teacher, null);
 
         var enrollment = discipline.Enrollments.Single(e => e.UserId == studentId);
         Assert.Equal(DisciplineRole.Teacher, enrollment.Role);
         var evt = Assert.IsType<EnrollmentRoleChangedEvent>(Assert.Single(discipline.DomainEvents));
         Assert.Equal(DisciplineRole.Student, evt.OldRole);
         Assert.Equal(DisciplineRole.Teacher, evt.NewRole);
+        Assert.Equal(DefaultSubgroupId(discipline), evt.OldSubgroupId);
+        Assert.Null(evt.NewSubgroupId);
     }
 
     [Fact]
@@ -289,7 +324,7 @@ public sealed class DisciplineTests
         discipline.ClearDomainEvents();
 
         Assert.Throws<OwnerRoleChangeException>(() =>
-            discipline.ChangeRole(OwnerId, DisciplineRole.Student));
+            discipline.ChangeRole(OwnerId, DisciplineRole.Student, DefaultSubgroupId(discipline)));
     }
 
     [Fact]
@@ -297,20 +332,20 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var coTeacher = Guid.NewGuid();
-        discipline.Enroll(coTeacher, DisciplineRole.Teacher, AdminId);
+        discipline.Enroll(coTeacher, DisciplineRole.Teacher, null, AdminId);
         // Demote the co-teacher; owner remains teacher so the action should be allowed.
-        discipline.ChangeRole(coTeacher, DisciplineRole.Student);
+        discipline.ChangeRole(coTeacher, DisciplineRole.Student, DefaultSubgroupId(discipline));
         // Now there is exactly one teacher (owner), and demoting another teacher should fail
         // — but owner cannot be demoted directly. Instead, attempt to demote a third teacher.
         var anotherTeacher = Guid.NewGuid();
-        discipline.Enroll(anotherTeacher, DisciplineRole.Teacher, AdminId);
+        discipline.Enroll(anotherTeacher, DisciplineRole.Teacher, null, AdminId);
         // Demote anotherTeacher → still owner remains teacher, so it should succeed.
-        discipline.ChangeRole(anotherTeacher, DisciplineRole.Student);
+        discipline.ChangeRole(anotherTeacher, DisciplineRole.Student, DefaultSubgroupId(discipline));
 
         // Now nobody else but owner is a teacher. Any further demotion of owner is blocked already.
         // Reverse scenario for last-teacher: try to demote owner directly to confirm Owner guard wins.
         Assert.Throws<OwnerRoleChangeException>(() =>
-            discipline.ChangeRole(OwnerId, DisciplineRole.Student));
+            discipline.ChangeRole(OwnerId, DisciplineRole.Student, DefaultSubgroupId(discipline)));
     }
 
     [Fact]
@@ -318,10 +353,10 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var studentId = Guid.NewGuid();
-        discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
         discipline.ClearDomainEvents();
 
-        discipline.ChangeRole(studentId, DisciplineRole.Student);
+        discipline.ChangeRole(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline));
 
         Assert.Empty(discipline.DomainEvents);
     }
@@ -333,7 +368,7 @@ public sealed class DisciplineTests
         discipline.ClearDomainEvents();
 
         Assert.Throws<EnrollmentNotFoundException>(() =>
-            discipline.ChangeRole(Guid.NewGuid(), DisciplineRole.Teacher));
+            discipline.ChangeRole(Guid.NewGuid(), DisciplineRole.Teacher, null));
     }
 
     [Fact]
@@ -349,7 +384,7 @@ public sealed class DisciplineTests
     {
         var discipline = NewDiscipline();
         var studentId = Guid.NewGuid();
-        discipline.Enroll(studentId, DisciplineRole.Student, AdminId);
+        discipline.Enroll(studentId, DisciplineRole.Student, DefaultSubgroupId(discipline), AdminId);
 
         Assert.True(discipline.HasMember(studentId));
         Assert.True(discipline.HasMember(OwnerId));
@@ -365,5 +400,50 @@ public sealed class DisciplineTests
         discipline.ClearDomainEvents();
 
         Assert.Empty(discipline.DomainEvents);
+    }
+
+    [Fact]
+    public void CreateSubgroup_RaisesEventWithCurrentTeachers()
+    {
+        var discipline = NewDiscipline();
+        var coTeacher = Guid.NewGuid();
+        discipline.Enroll(coTeacher, DisciplineRole.Teacher, null, AdminId);
+        discipline.ClearDomainEvents();
+
+        var subgroup = discipline.CreateSubgroup("ПИ-101");
+
+        Assert.Contains(subgroup, discipline.Subgroups);
+        var evt = Assert.IsType<DisciplineSubgroupCreatedEvent>(Assert.Single(discipline.DomainEvents));
+        Assert.Contains(OwnerId, evt.TeacherUserIds);
+        Assert.Contains(coTeacher, evt.TeacherUserIds);
+    }
+
+    [Fact]
+    public void ArchiveSubgroup_WithStudents_Throws()
+    {
+        var discipline = NewDiscipline();
+        var subgroupId = DefaultSubgroupId(discipline);
+        discipline.Enroll(Guid.NewGuid(), DisciplineRole.Student, subgroupId, AdminId);
+
+        Assert.Throws<DisciplineSubgroupNotEmptyException>(() => discipline.ArchiveSubgroup(subgroupId));
+    }
+
+    [Fact]
+    public void AssignStudentSubgroup_MovesStudentAndRaisesEvent()
+    {
+        var discipline = NewDiscipline();
+        var studentId = Guid.NewGuid();
+        var oldSubgroupId = DefaultSubgroupId(discipline);
+        var nextSubgroup = discipline.CreateSubgroup("ПИ-102");
+        discipline.Enroll(studentId, DisciplineRole.Student, oldSubgroupId, AdminId);
+        discipline.ClearDomainEvents();
+
+        discipline.AssignStudentSubgroup(studentId, nextSubgroup.Id);
+
+        var enrollment = discipline.Enrollments.Single(e => e.UserId == studentId);
+        Assert.Equal(nextSubgroup.Id, enrollment.SubgroupId);
+        var evt = Assert.IsType<EnrollmentSubgroupChangedEvent>(Assert.Single(discipline.DomainEvents));
+        Assert.Equal(oldSubgroupId, evt.OldSubgroupId);
+        Assert.Equal(nextSubgroup.Id, evt.NewSubgroupId);
     }
 }

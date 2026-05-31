@@ -30,6 +30,24 @@ public class MediaAssetTests
     }
 
     [Fact]
+    public void Initiate_StoresDurationSeconds_WhenProvided()
+    {
+        var asset = MediaAsset.Initiate(
+            id: Guid.NewGuid(),
+            ownerId: Guid.NewGuid(),
+            visibility: Visibility.Private,
+            kind: AssetKind.Voice,
+            bucket: "media-private",
+            objectKey: "owner/asset/voice.m4a",
+            size: 1024,
+            mimeType: "audio/m4a",
+            originalFileName: "voice.m4a",
+            durationSeconds: 42);
+
+        asset.DurationSeconds.Should().Be(42);
+    }
+
+    [Fact]
     public void Initiate_RejectsNonPositiveSize()
     {
         var act = () => MediaAsset.Initiate(

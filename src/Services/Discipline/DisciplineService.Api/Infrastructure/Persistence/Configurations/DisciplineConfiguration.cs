@@ -59,7 +59,14 @@ public sealed class DisciplineConfiguration : IEntityTypeConfiguration<Disciplin
             .HasForeignKey(e => e.DisciplineId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(d => d.Subgroups)
+            .WithOne()
+            .HasForeignKey(s => s.DisciplineId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         builder.Metadata.FindNavigation(nameof(Discipline.Enrollments))!
+            .SetPropertyAccessMode(PropertyAccessMode.Field);
+        builder.Metadata.FindNavigation(nameof(Discipline.Subgroups))!
             .SetPropertyAccessMode(PropertyAccessMode.Field);
 
         builder.Ignore(d => d.DomainEvents);

@@ -1,0 +1,1474 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ScrollView, Text, View } from "react-native";
+import {
+    FadeIn,
+    FadeInDown,
+    FadeInRight,
+    FadeOut,
+    LinearTransition,
+    ZoomIn,
+    ZoomOut,
+} from "react-native-reanimated";
+import {
+    ConnectionState,
+    isBrowserSupported,
+    LocalVideoTrack,
+    RemoteAudioTrack,
+    RemoteVideoTrack,
+    Room,
+    RoomEvent,
+    Track,
+} from "livekit-client";
+import { Avatar } from "@/shared/ui";
+import { playCallSound } from "@/shared/lib/call-sounds";
+import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
+import { SpeakerHighIcon } from "@/shared/ui/phosphor";
+import { useCurrentUser } from "@/entities/user";
+import type { CallRoomProps, ParticipantInfo } from "./CallRoom.types";
+import {
+    CallControls,
+    CallDrawer,
+    CallErrorOverlay,
+    CallLoadingOverlay,
+    ParticipantStatusIcons,
+    SpeakingFrame,
+    type CallPanel,
+} from "./CallRoomControls";
+import {
+    buildScreenShareAudioKey,
+    getCallStageLayoutStyles,
+    getParticipantRailCardStyle,
+    isActiveScreenShareAudio,
+    normalizeSelectedStageItem,
+    pickActiveScreenShare,
+    SCREEN_SHARE_CAPTURE_OPTIONS,
+    shouldDisableLocalScreenShareForRemoteOwner,
+    type ScreenShareCandidate,
+    type StageMediaItem,
+} from "./CallRoomMedia";
+import {
+    getCurrentBrowserDeviceInfo,
+    isMobileBrowserDevice,
+} from "./CallRoomPlatform";
+
+type CameraFacingMode = "user" | "environment";
+
+type WebVideoTrackRef = {
+    key: string;
+    ownerId: string;
+    source: Track.Source;
+    track: LocalVideoTrack | RemoteVideoTrack;
+    isLocal: boolean;
+};
+
+type WebAudioTrackRef = {
+    key: string;
+    ownerId: string;
+    source: Track.Source;
+    track: RemoteAudioTrack;
+    isLocal: boolean;
+};
+
+type ParticipantMediaInfo = ParticipantInfo & {
+    isMicrophoneEnabled: boolean;
+    isCameraEnabled: boolean;
+    isScreenShareEnabled: boolean;
+    isSpeaking: boolean;
+    cameraTrack: WebVideoTrackRef | null;
+    screenTrack: WebVideoTrackRef | null;
+};
+
+const PARTICIPANT_GRID_GAP = 12;
+
+const getParticipantGridColumns = (itemCount: number, isMobile: boolean) => {
+    if (isMobile || itemCount <= 1) return 1;
+    if (itemCount <= 4) return 2;
+    if (itemCount <= 6) return 3;
+    return 4;
+};
+
+const getParticipantGridItemStyle = (
+    itemCount: number,
+    isMobile: boolean,
+): React.CSSProperties => {
+    const columns = getParticipantGridColumns(itemCount, isMobile);
+    const rows = Math.max(1, Math.ceil(itemCount / columns));
+    const widthOffset = ((columns - 1) * PARTICIPANT_GRID_GAP) / columns;
+    const heightOffset = ((rows - 1) * PARTICIPANT_GRID_GAP) / rows;
+
+    return {
+        flex: `1 1 calc(${100 / columns}% - ${widthOffset}px)`,
+        height: `calc(${100 / rows}% - ${heightOffset}px)`,
+        minHeight: 0,
+        minWidth: 0,
+        overflow: "hidden",
+    };
+};
+
+const collectVideoTracks = (room: Room, participantInfos: ParticipantInfo[]) => {
+    const tracks: WebVideoTrackRef[] = [];
+    const localInfo = participantInfos.find((participant) => participant.isSelf);
+
+    room.remoteParticipants.forEach((participant) => {
+        participant.videoTrackPublications.forEach((publication) => {
+            const track = publication.videoTrack;
+            if (!track || publication.isMuted) return;
+            if (
+                publication.source !== Track.Source.Camera &&
+                publication.source !== Track.Source.ScreenShare
+            ) {
+                return;
+            }
+
+            tracks.push({
+                key: `${participant.sid}-${publication.trackSid}`,
+                ownerId: participant.identity,
+                source: publication.source,
+                track,
+                isLocal: false,
+            });
+        });
+    });
+
+    room.localParticipant.videoTrackPublications.forEach((publication) => {
+        const track = publication.videoTrack;
+        if (!track || publication.isMuted) return;
+        if (
+            publication.source !== Track.Source.Camera &&
+            publication.source !== Track.Source.ScreenShare
+        ) {
+            return;
+        }
+
+        tracks.push({
+            key: `local-${publication.trackSid}`,
+            ownerId: localInfo?.userId ?? room.localParticipant.identity,
+            source: publication.source,
+            track,
+            isLocal: true,
+        });
+    });
+
+    return tracks;
+};
+
+const collectRemoteAudioTracks = (room: Room) => {
+    const tracks: WebAudioTrackRef[] = [];
+
+    room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((publication) => {
+            const track = publication.audioTrack;
+            if (!track || publication.isMuted) return;
+            if (
+                publication.source !== Track.Source.Microphone &&
+                publication.source !== Track.Source.ScreenShareAudio
+            ) {
+                return;
+            }
+
+            tracks.push({
+                key:
+                    publication.source === Track.Source.ScreenShareAudio
+                        ? buildScreenShareAudioKey(participant.identity, publication.trackSid)
+                        : `${participant.sid}-${publication.trackSid}`,
+                ownerId: participant.identity,
+                source: publication.source,
+                track: track as RemoteAudioTrack,
+                isLocal: false,
+            });
+        });
+    });
+
+    return tracks;
+};
+
+const disposeAudioElement = (element: HTMLMediaElement) => {
+    element.pause();
+    element.srcObject = null;
+    element.remove();
+};
+
+const applyAudioOutputDevice = (element: HTMLMediaElement, deviceId?: string | null) => {
+    if (!deviceId || !("setSinkId" in element)) return;
+    void (element as HTMLMediaElement & { setSinkId: (sinkId: string) => Promise<void> })
+        .setSinkId(deviceId)
+        .catch((error) => {
+            console.warn("Failed to apply preferred audio output device", error);
+        });
+};
+
+const syncRemoteAudioTracks = (
+    tracks: WebAudioTrackRef[],
+    audioElements: React.MutableRefObject<Map<string, HTMLMediaElement>>,
+    volume = 1,
+    outputDeviceId?: string | null,
+) => {
+    const activeKeys = new Set<string>();
+
+    tracks.forEach((trackRef) => {
+        const key = trackRef.key;
+        activeKeys.add(key);
+
+        let element = audioElements.current.get(key);
+        if (!element) {
+            element = trackRef.track.attach();
+            element.autoplay = true;
+            element.hidden = true;
+            document.body.appendChild(element);
+            audioElements.current.set(key, element);
+        }
+
+        applyAudioOutputDevice(element, outputDeviceId);
+        element.volume = Math.max(0, Math.min(1, volume));
+        element.muted = volume <= 0;
+        void element.play().catch((error) => {
+            console.warn("LiveKit remote audio playback was blocked", error);
+        });
+    });
+
+    audioElements.current.forEach((element, key) => {
+        if (activeKeys.has(key)) {
+            return;
+        }
+
+        disposeAudioElement(element);
+        audioElements.current.delete(key);
+    });
+};
+
+const detachRemoteAudioTracks = (
+    audioElements: React.MutableRefObject<Map<string, HTMLMediaElement>>,
+) => {
+    audioElements.current.forEach(disposeAudioElement);
+    audioElements.current.clear();
+};
+
+const VideoElement = ({
+    track,
+    muted,
+    mirrored,
+    objectFit = "cover",
+}: {
+    track: LocalVideoTrack | RemoteVideoTrack;
+    muted?: boolean;
+    mirrored?: boolean;
+    objectFit?: "cover" | "contain";
+}) => {
+    const ref = useRef<HTMLVideoElement | null>(null);
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+
+        track.attach(element);
+        void element.play().catch((error) => {
+            console.warn("LiveKit video playback was blocked", error);
+        });
+
+        return () => {
+            track.detach(element);
+        };
+    }, [track]);
+
+    return React.createElement("video", {
+        ref,
+        autoPlay: true,
+        muted,
+        playsInline: true,
+        style: {
+            width: "100%",
+            height: "100%",
+            backgroundColor: "#000",
+            objectFit,
+            transform: mirrored ? "scaleX(-1)" : undefined,
+        },
+    });
+};
+
+type RenderedStageItem = StageMediaItem & {
+    participant?: ParticipantMediaInfo;
+    screenTrack?: WebVideoTrackRef;
+};
+
+const ScreenShareVolumeControl = ({
+    available,
+    volume,
+    onVolumeChange,
+}: {
+    available: boolean;
+    volume: number;
+    onVolumeChange: (volume: number) => void;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    if (!available) return null;
+
+    const percent = Math.round(volume * 100);
+
+    return (
+        <View className="relative">
+            <AnimatedPressable
+                testID="call-screen-audio-toggle"
+                accessibilityLabel={volume <= 0 ? "Включить звук демонстрации" : "Настроить звук демонстрации"}
+                onPress={() => setIsOpen((value) => !value)}
+                layout={LinearTransition.duration(180)}
+                className="h-9 w-9 rounded-full bg-white/12 items-center justify-center active:scale-95"
+            >
+                <SpeakerHighIcon size={16} className={volume <= 0 ? "text-white/45" : "text-white"} />
+            </AnimatedPressable>
+            {isOpen ? (
+                <AnimatedView
+                    entering={FadeInDown.duration(180)}
+                    exiting={FadeOut.duration(120)}
+                    layout={LinearTransition.duration(180)}
+                    className="absolute right-0 top-12 w-52 rounded-2xl border border-white/10 bg-black/85 p-3 gap-3"
+                >
+                    <View className="flex-row items-center justify-between">
+                        <Text className="text-white text-xs font-semibold">Звук экрана</Text>
+                        <Text className="text-white/70 text-xs">{percent}%</Text>
+                    </View>
+                    {React.createElement("input", {
+                        type: "range",
+                        min: 0,
+                        max: 100,
+                        value: percent,
+                        "aria-label": "Громкость демонстрации",
+                        onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
+                            onVolumeChange(Number(event.currentTarget.value) / 100);
+                        },
+                        style: {
+                            width: "100%",
+                            accentColor: "#2563eb",
+                        },
+                    })}
+                    <AnimatedPressable
+                        accessibilityLabel={volume <= 0 ? "Включить звук демонстрации" : "Выключить звук демонстрации"}
+                        onPress={() => onVolumeChange(volume <= 0 ? 1 : 0)}
+                        layout={LinearTransition.duration(180)}
+                        className="h-8 rounded-lg bg-white/10 items-center justify-center"
+                    >
+                        <Text className="text-white text-xs font-semibold">
+                            {volume <= 0 ? "Включить" : "Выключить"}
+                        </Text>
+                    </AnimatedPressable>
+                </AnimatedView>
+            ) : null}
+        </View>
+    );
+};
+
+const ParticipantTile = ({
+    participant,
+    isVideoCall,
+    localFacingMode,
+    compact = false,
+    onPress,
+}: {
+    participant: ParticipantMediaInfo;
+    isVideoCall: boolean;
+    localFacingMode: CameraFacingMode;
+    compact?: boolean;
+    onPress: () => void;
+}) => {
+    const visibleTrack = participant.cameraTrack;
+    const shouldMirror =
+        participant.isSelf &&
+        visibleTrack === participant.cameraTrack &&
+        localFacingMode === "user";
+
+    return (
+        <AnimatedPressable
+            testID="call-participant-tile"
+            accessibilityLabel={`Сделать главным: ${participant.displayName}`}
+            onPress={onPress}
+            entering={FadeIn.duration(160)}
+            exiting={FadeOut.duration(120)}
+            layout={LinearTransition.duration(220)}
+            style={{ width: "100%", height: "100%" }}
+            className="flex-1 min-h-0 active:scale-[0.99]"
+        >
+            <SpeakingFrame isSpeaking={participant.isSpeaking}>
+                <View className="flex-1 min-h-0">
+                    <View className="flex-1 items-center justify-center bg-black/30">
+                        {isVideoCall && visibleTrack ? (
+                            <VideoElement
+                                track={visibleTrack.track}
+                                muted={visibleTrack.isLocal}
+                                mirrored={shouldMirror}
+                            />
+                        ) : (
+                            <View className="items-center gap-3 px-3">
+                                <Avatar
+                                    size={compact ? 62 : 112}
+                                    src={participant.avatarUrl}
+                                    name={participant.displayName}
+                                />
+                                <Text
+                                    numberOfLines={1}
+                                    className={`${compact ? "text-xs" : "text-base"} text-white font-semibold text-center`}
+                                >
+                                    {participant.displayName}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+
+                    <View className="absolute left-3 right-3 bottom-3 gap-2">
+                        <View className="self-start max-w-full rounded-full bg-black/65 px-3 py-1">
+                            <Text numberOfLines={1} className="text-white text-xs font-semibold">
+                                {participant.displayName}
+                            </Text>
+                        </View>
+                        <ParticipantStatusIcons
+                            isConnected={participant.isConnected}
+                            isMicrophoneEnabled={participant.isMicrophoneEnabled}
+                            isCameraEnabled={participant.isCameraEnabled}
+                            isScreenShareEnabled={participant.isScreenShareEnabled}
+                            showCamera={isVideoCall}
+                        />
+                    </View>
+                </View>
+            </SpeakingFrame>
+        </AnimatedPressable>
+    );
+};
+
+const ScreenShareTile = ({
+    item,
+    owner,
+    isMain,
+    onPress,
+    onOpenScreenShareFullscreen,
+    screenShareAudioAvailable,
+    screenShareVolume,
+    onScreenShareVolumeChange,
+}: {
+    item: RenderedStageItem;
+    owner: ParticipantMediaInfo | undefined;
+    isMain: boolean;
+    onPress: () => void;
+    onOpenScreenShareFullscreen: () => void;
+    screenShareAudioAvailable: boolean;
+    screenShareVolume: number;
+    onScreenShareVolumeChange: (volume: number) => void;
+}) => {
+    const track = item.screenTrack;
+    const ownerName = owner?.displayName ?? "Пользователь";
+
+    return (
+        <AnimatedPressable
+            testID="call-screen-share-tile"
+            accessibilityLabel={`Сделать главной демонстрацию: ${ownerName}`}
+            onPress={onPress}
+            entering={FadeIn.duration(160)}
+            exiting={FadeOut.duration(120)}
+            layout={LinearTransition.duration(220)}
+            style={{ width: "100%", height: "100%" }}
+            className="flex-1 min-h-0 rounded-[28px] overflow-hidden border border-white/10 bg-black active:scale-[0.99]"
+        >
+            {track ? (
+                <VideoElement
+                    track={track.track}
+                    muted={track.isLocal}
+                    objectFit="contain"
+                />
+            ) : null}
+            <View className="absolute left-4 top-4 max-w-[55%] rounded-full bg-black/70 px-3 py-1.5">
+                <Text numberOfLines={1} className="text-white text-xs font-semibold">
+                    {ownerName} показывает экран
+                </Text>
+            </View>
+            {isMain ? (
+                <View className="absolute right-4 top-4 flex-row gap-2">
+                    <ScreenShareVolumeControl
+                        available={screenShareAudioAvailable}
+                        volume={screenShareVolume}
+                        onVolumeChange={onScreenShareVolumeChange}
+                    />
+                    <AnimatedPressable
+                        testID="call-screen-fullscreen"
+                        accessibilityLabel="Открыть демонстрацию на весь экран"
+                        onPress={onOpenScreenShareFullscreen}
+                        layout={LinearTransition.duration(180)}
+                        className="rounded-full bg-white/12 px-3 py-2 active:scale-95"
+                    >
+                        <Text className="text-white text-xs font-semibold">Во весь экран</Text>
+                    </AnimatedPressable>
+                </View>
+            ) : null}
+        </AnimatedPressable>
+    );
+};
+
+const StageItemTile = ({
+    item,
+    participants,
+    isMain,
+    isVideoCall,
+    localFacingMode,
+    onSelect,
+    onOpenScreenShareFullscreen,
+    screenShareAudioAvailable,
+    screenShareVolume,
+    onScreenShareVolumeChange,
+}: {
+    item: RenderedStageItem;
+    participants: ParticipantMediaInfo[];
+    isMain: boolean;
+    isVideoCall: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelect: (itemId: string) => void;
+    onOpenScreenShareFullscreen: () => void;
+    screenShareAudioAvailable: boolean;
+    screenShareVolume: number;
+    onScreenShareVolumeChange: (volume: number) => void;
+}) => {
+    if (item.kind === "screen") {
+        return (
+            <ScreenShareTile
+                item={item}
+                owner={participants.find((participant) => participant.userId === item.ownerId)}
+                isMain={isMain}
+                onPress={() => onSelect(item.id)}
+                onOpenScreenShareFullscreen={onOpenScreenShareFullscreen}
+                screenShareAudioAvailable={screenShareAudioAvailable}
+                screenShareVolume={screenShareVolume}
+                onScreenShareVolumeChange={onScreenShareVolumeChange}
+            />
+        );
+    }
+
+    if (!item.participant) return null;
+
+    return (
+        <ParticipantTile
+            participant={item.participant}
+            isVideoCall={isVideoCall}
+            localFacingMode={localFacingMode}
+            compact={!isMain}
+            onPress={() => onSelect(item.id)}
+        />
+    );
+};
+
+const ParticipantRail = ({
+    items,
+    participants,
+    isVideoCall,
+    isMobile,
+    hasScreenShare,
+    localFacingMode,
+    onSelectItem,
+}: {
+    items: RenderedStageItem[];
+    participants: ParticipantMediaInfo[];
+    isVideoCall: boolean;
+    isMobile: boolean;
+    hasScreenShare: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelectItem: (itemId: string) => void;
+}) => {
+    if (items.length === 0) return null;
+
+    const layoutStyles = getCallStageLayoutStyles(isMobile);
+    const cardStyle = getParticipantRailCardStyle(isMobile, hasScreenShare);
+
+    return (
+        <ScrollView
+            testID="call-participant-rail"
+            horizontal={isMobile}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            style={layoutStyles.rail}
+            contentContainerStyle={
+                isMobile
+                    ? { gap: 10, paddingRight: 4 }
+                    : { gap: 10, alignItems: "stretch" }
+            }
+        >
+            <View className={`gap-2.5 ${isMobile ? "flex-row" : ""}`}>
+                {items.map((item, index) => (
+                    <AnimatedView
+                        key={item.id}
+                        testID={item.kind === "screen" ? "call-screen-share-rail-card" : undefined}
+                        entering={(isMobile ? FadeInDown : FadeInRight).delay(index * 35).duration(180)}
+                        exiting={FadeOut.duration(120)}
+                        layout={LinearTransition.duration(220)}
+                        style={cardStyle}
+                        className="rounded-2xl overflow-hidden"
+                    >
+                        <StageItemTile
+                            item={item}
+                            participants={participants}
+                            isMain={false}
+                            isVideoCall={isVideoCall}
+                            localFacingMode={localFacingMode}
+                            onSelect={onSelectItem}
+                            onOpenScreenShareFullscreen={() => undefined}
+                            screenShareAudioAvailable={false}
+                            screenShareVolume={1}
+                            onScreenShareVolumeChange={() => undefined}
+                        />
+                    </AnimatedView>
+                ))}
+            </View>
+        </ScrollView>
+    );
+};
+
+const ParticipantGrid = ({
+    items,
+    participants,
+    isVideoCall,
+    isMobile,
+    localFacingMode,
+    onSelectItem,
+}: {
+    items: RenderedStageItem[];
+    participants: ParticipantMediaInfo[];
+    isVideoCall: boolean;
+    isMobile: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelectItem: (itemId: string) => void;
+}) => {
+    const itemStyle = getParticipantGridItemStyle(items.length, isMobile);
+
+    return React.createElement(
+        "div",
+        {
+            "data-testid": "call-participant-grid",
+            style: {
+                alignContent: "stretch",
+                display: "flex",
+                flex: 1,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: PARTICIPANT_GRID_GAP,
+                height: "100%",
+                minHeight: 0,
+                minWidth: 0,
+                width: "100%",
+            } satisfies React.CSSProperties,
+        },
+        items.map((item) =>
+            React.createElement(
+                "div",
+                {
+                    key: item.id,
+                    style: itemStyle,
+                },
+                <StageItemTile
+                    item={item}
+                    participants={participants}
+                    isMain
+                    isVideoCall={isVideoCall}
+                    localFacingMode={localFacingMode}
+                    onSelect={onSelectItem}
+                    onOpenScreenShareFullscreen={() => undefined}
+                    screenShareAudioAvailable={false}
+                    screenShareVolume={1}
+                    onScreenShareVolumeChange={() => undefined}
+                />,
+            ),
+        ),
+    );
+};
+
+const CallStage = ({
+    items,
+    participants,
+    selectedItem,
+    isVideoCall,
+    isMobile,
+    localFacingMode,
+    onSelectStageItem,
+    onOpenScreenShareFullscreen,
+    screenShareAudioAvailable,
+    screenShareVolume,
+    onScreenShareVolumeChange,
+}: {
+    items: RenderedStageItem[];
+    participants: ParticipantMediaInfo[];
+    selectedItem: RenderedStageItem | null;
+    isVideoCall: boolean;
+    isMobile: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelectStageItem: (itemId: string) => void;
+    onOpenScreenShareFullscreen: () => void;
+    screenShareAudioAvailable: boolean;
+    screenShareVolume: number;
+    onScreenShareVolumeChange: (volume: number) => void;
+}) => {
+    const mainItem = selectedItem ?? items[0] ?? null;
+    if (!mainItem) return <View className="flex-1 w-full self-stretch" />;
+
+    const railItems = items.filter((item) => item.id !== mainItem.id);
+    const layoutStyles = getCallStageLayoutStyles(isMobile);
+    const hasScreenShare = items.some((item) => item.kind === "screen");
+
+    return (
+        <AnimatedView
+            testID="call-stage"
+            entering={FadeIn.duration(180)}
+            layout={LinearTransition.duration(240)}
+            style={layoutStyles.container}
+            className={`flex-1 min-w-0 min-h-0 self-stretch gap-3 p-3 ${
+                isMobile ? "" : "flex-row"
+            }`}
+        >
+            {hasScreenShare ? (
+                <>
+                    <AnimatedView
+                        testID="call-stage-main"
+                        layout={LinearTransition.duration(240)}
+                        style={layoutStyles.main}
+                        className="flex-1 min-w-0 min-h-0 self-stretch"
+                    >
+                        <StageItemTile
+                            item={mainItem}
+                            participants={participants}
+                            isMain
+                            isVideoCall={isVideoCall}
+                            localFacingMode={localFacingMode}
+                            onSelect={onSelectStageItem}
+                            onOpenScreenShareFullscreen={onOpenScreenShareFullscreen}
+                            screenShareAudioAvailable={
+                                mainItem.kind === "screen" && screenShareAudioAvailable
+                            }
+                            screenShareVolume={screenShareVolume}
+                            onScreenShareVolumeChange={onScreenShareVolumeChange}
+                        />
+                    </AnimatedView>
+                    <ParticipantRail
+                        items={railItems}
+                        participants={participants}
+                        isVideoCall={isVideoCall}
+                        isMobile={isMobile}
+                        hasScreenShare={hasScreenShare}
+                        localFacingMode={localFacingMode}
+                        onSelectItem={onSelectStageItem}
+                    />
+                </>
+            ) : (
+                <ParticipantGrid
+                    items={items}
+                    participants={participants}
+                    isVideoCall={isVideoCall}
+                    isMobile={isMobile}
+                    localFacingMode={localFacingMode}
+                    onSelectItem={onSelectStageItem}
+                />
+            )}
+        </AnimatedView>
+    );
+};
+
+export const CallRoom = ({
+    call,
+    callToken,
+    isTokenLoading,
+    tokenError,
+    loadError,
+    isLeaving,
+    isMobile,
+    conversationId,
+    participantInfos,
+    onLeave,
+    onCloseError,
+}: CallRoomProps) => {
+    const { data: profile } = useCurrentUser();
+    const recordingDeviceId = profile?.soundVideo.recordingDeviceId;
+    const webcamDeviceId = profile?.soundVideo.webcamDeviceId;
+    const playbackDeviceId = profile?.soundVideo.playbackDeviceId;
+    const roomRef = useRef<Room | null>(null);
+    const remoteMicrophoneAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
+    const screenShareAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
+    const [panel, setPanel] = useState<CallPanel>("none");
+    const [connectionState, setConnectionState] = useState<ConnectionState>(
+        ConnectionState.Disconnected,
+    );
+    const [roomError, setRoomError] = useState<string | null>(null);
+    const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
+    const [isCameraEnabled, setIsCameraEnabled] = useState(false);
+    const [isScreenShareEnabled, setIsScreenShareEnabled] = useState(false);
+    const [videoTracks, setVideoTracks] = useState<WebVideoTrackRef[]>([]);
+    const [audioTracks, setAudioTracks] = useState<WebAudioTrackRef[]>([]);
+    const [activeSpeakerIds, setActiveSpeakerIds] = useState<Set<string>>(() => new Set());
+    const [activeScreenShareOwnerId, setActiveScreenShareOwnerId] = useState<string | null>(null);
+    const [selectedStageItemId, setSelectedStageItemId] = useState<string | null>(null);
+    const [screenShareVolume, setScreenShareVolume] = useState(1);
+    const [isScreenShareFullscreen, setIsScreenShareFullscreen] = useState(false);
+    const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
+    const [videoInputCount, setVideoInputCount] = useState(0);
+    const [isMobileBrowser, setIsMobileBrowser] = useState(() =>
+        isMobileBrowserDevice(getCurrentBrowserDeviceInfo()),
+    );
+    const knownRemoteScreenShareKeysRef = useRef<Set<string>>(new Set());
+    const browserFullscreenActiveRef = useRef(false);
+
+    const isVideoCall = call.callType === "Video";
+    const isConnectedToCall = call.status === "Active";
+    const canShareScreen = useMemo(
+        () =>
+            typeof navigator !== "undefined" &&
+            Boolean(navigator.mediaDevices?.getDisplayMedia),
+        [],
+    );
+    const canSwitchCamera = isMobileBrowser && videoInputCount > 1;
+    const localUserId = participantInfos.find((participant) => participant.isSelf)?.userId ?? null;
+
+    useEffect(() => {
+        setIsMobileBrowser(isMobileBrowserDevice(getCurrentBrowserDeviceInfo()));
+    }, []);
+
+    const refreshVideoInputs = useCallback(async () => {
+        try {
+            if (
+                typeof navigator === "undefined" ||
+                !navigator.mediaDevices?.enumerateDevices
+            ) {
+                setVideoInputCount(0);
+                return;
+            }
+
+            const devices = await navigator.mediaDevices?.enumerateDevices?.();
+            setVideoInputCount(
+                devices?.filter((device) => device.kind === "videoinput").length ?? 0,
+            );
+        } catch (error) {
+            console.warn("Failed to enumerate video inputs", error);
+            setVideoInputCount(0);
+        }
+    }, []);
+
+    useEffect(() => {
+        void refreshVideoInputs();
+
+        if (typeof navigator === "undefined") {
+            return undefined;
+        }
+
+        const mediaDevices = navigator.mediaDevices;
+        mediaDevices?.addEventListener?.("devicechange", refreshVideoInputs);
+
+        return () => {
+            mediaDevices?.removeEventListener?.("devicechange", refreshVideoInputs);
+        };
+    }, [refreshVideoInputs]);
+
+    const syncRoomState = useCallback((syncActiveSpeakers = true) => {
+        const room = roomRef.current;
+        if (!room) {
+            setConnectionState(ConnectionState.Disconnected);
+            setIsMicrophoneEnabled(false);
+            setIsCameraEnabled(false);
+            setIsScreenShareEnabled(false);
+            setVideoTracks([]);
+            setAudioTracks([]);
+            setActiveSpeakerIds(new Set());
+            return;
+        }
+
+        setConnectionState(room.state);
+        setIsMicrophoneEnabled(room.localParticipant.isMicrophoneEnabled);
+        setIsCameraEnabled(room.localParticipant.isCameraEnabled);
+        setIsScreenShareEnabled(room.localParticipant.isScreenShareEnabled);
+        setVideoTracks(collectVideoTracks(room, participantInfos));
+        const nextAudioTracks = collectRemoteAudioTracks(room);
+        setAudioTracks(nextAudioTracks);
+        if (syncActiveSpeakers) {
+            setActiveSpeakerIds(
+                new Set(room.activeSpeakers.map((speaker) => speaker.identity)),
+            );
+        }
+        syncRemoteAudioTracks(
+            nextAudioTracks.filter((track) => track.source === Track.Source.Microphone),
+            remoteMicrophoneAudioElementsRef,
+            1,
+            playbackDeviceId,
+        );
+    }, [participantInfos, playbackDeviceId]);
+
+    useEffect(() => {
+        if (!callToken?.serverUrl || !callToken.token || call.status !== "Active") {
+            return;
+        }
+
+        if (!isBrowserSupported()) {
+            setRoomError("Браузер не поддерживает WebRTC.");
+            return;
+        }
+
+        let isDisposed = false;
+        const room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+        });
+        roomRef.current = room;
+        setRoomError(null);
+
+        const onRoomChanged = () => {
+            if (!isDisposed) {
+                syncRoomState();
+            }
+        };
+        const onActiveSpeakersChanged = (
+            speakers: Array<{ identity: string }>,
+        ) => {
+            if (isDisposed) return;
+
+            setActiveSpeakerIds(new Set(speakers.map((speaker) => speaker.identity)));
+            syncRoomState(false);
+        };
+
+        room.on(RoomEvent.Connected, onRoomChanged);
+        room.on(RoomEvent.ConnectionStateChanged, onRoomChanged);
+        room.on(RoomEvent.ParticipantConnected, onRoomChanged);
+        room.on(RoomEvent.ParticipantDisconnected, onRoomChanged);
+        room.on(RoomEvent.TrackSubscribed, onRoomChanged);
+        room.on(RoomEvent.TrackUnsubscribed, onRoomChanged);
+        room.on(RoomEvent.TrackMuted, onRoomChanged);
+        room.on(RoomEvent.TrackUnmuted, onRoomChanged);
+        room.on(RoomEvent.LocalTrackPublished, onRoomChanged);
+        room.on(RoomEvent.LocalTrackUnpublished, onRoomChanged);
+        room.on(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged);
+        room.on(RoomEvent.Disconnected, onRoomChanged);
+
+        void (async () => {
+            try {
+                await room.connect(callToken.serverUrl, callToken.token, {
+                    autoSubscribe: true,
+                });
+                if (isDisposed) return;
+
+                await room.startAudio().catch((error) => {
+                    console.warn("LiveKit audio start was blocked", error);
+                });
+                const audioCaptureOptions = recordingDeviceId
+                    ? { deviceId: recordingDeviceId }
+                    : undefined;
+                const videoCaptureOptions = webcamDeviceId
+                    ? { deviceId: webcamDeviceId }
+                    : { facingMode };
+
+                await room.localParticipant.setMicrophoneEnabled(true, audioCaptureOptions).catch((error) => {
+                    console.error("Failed to enable microphone", error);
+                    setRoomError("Не удалось включить микрофон. Проверьте разрешения браузера.");
+                });
+
+                if (call.callType === "Video") {
+                    await room.localParticipant.setCameraEnabled(true, videoCaptureOptions).catch((error) => {
+                        console.error("Failed to enable camera", error);
+                        setRoomError("Не удалось включить камеру. Проверьте разрешения браузера.");
+                    });
+                    void refreshVideoInputs();
+                }
+
+                syncRoomState();
+            } catch (error) {
+                if (!isDisposed) {
+                    console.error("Failed to connect LiveKit room", error);
+                    setRoomError(
+                        error instanceof Error
+                            ? error.message
+                            : "Не удалось подключиться к звонку.",
+                    );
+                }
+            }
+        })();
+
+        return () => {
+            isDisposed = true;
+            room.off(RoomEvent.Connected, onRoomChanged);
+            room.off(RoomEvent.ConnectionStateChanged, onRoomChanged);
+            room.off(RoomEvent.ParticipantConnected, onRoomChanged);
+            room.off(RoomEvent.ParticipantDisconnected, onRoomChanged);
+            room.off(RoomEvent.TrackSubscribed, onRoomChanged);
+            room.off(RoomEvent.TrackUnsubscribed, onRoomChanged);
+            room.off(RoomEvent.TrackMuted, onRoomChanged);
+            room.off(RoomEvent.TrackUnmuted, onRoomChanged);
+            room.off(RoomEvent.LocalTrackPublished, onRoomChanged);
+            room.off(RoomEvent.LocalTrackUnpublished, onRoomChanged);
+            room.off(RoomEvent.ActiveSpeakersChanged, onActiveSpeakersChanged);
+            room.off(RoomEvent.Disconnected, onRoomChanged);
+            detachRemoteAudioTracks(remoteMicrophoneAudioElementsRef);
+            detachRemoteAudioTracks(screenShareAudioElementsRef);
+            void room.disconnect();
+            if (roomRef.current === room) {
+                roomRef.current = null;
+            }
+            syncRoomState();
+        };
+    }, [
+        call.callType,
+        call.id,
+        call.status,
+        callToken?.serverUrl,
+        callToken?.token,
+        facingMode,
+        recordingDeviceId,
+        refreshVideoInputs,
+        syncRoomState,
+        webcamDeviceId,
+    ]);
+
+    const participantMediaInfos = useMemo<ParticipantMediaInfo[]>(() => {
+        const room = roomRef.current;
+
+        return participantInfos.map((participant) => {
+            const liveParticipant = participant.isSelf
+                ? room?.localParticipant
+                : room?.remoteParticipants.get(participant.userId);
+            const cameraTrack =
+                videoTracks.find(
+                    (track) =>
+                        track.ownerId === participant.userId &&
+                        track.source === Track.Source.Camera,
+                ) ?? null;
+            const screenTrack =
+                videoTracks.find(
+                    (track) =>
+                        track.ownerId === participant.userId &&
+                        track.source === Track.Source.ScreenShare,
+                ) ?? null;
+
+            return {
+                ...participant,
+                isMicrophoneEnabled: participant.isSelf
+                    ? isMicrophoneEnabled
+                    : Boolean(liveParticipant?.isMicrophoneEnabled),
+                isCameraEnabled: participant.isSelf
+                    ? isCameraEnabled
+                    : Boolean(liveParticipant?.isCameraEnabled || cameraTrack),
+                isScreenShareEnabled: participant.isSelf
+                    ? isScreenShareEnabled
+                    : Boolean(liveParticipant?.isScreenShareEnabled || screenTrack),
+                isSpeaking: activeSpeakerIds.has(participant.userId) || Boolean(liveParticipant?.isSpeaking),
+                cameraTrack,
+                screenTrack,
+            };
+        });
+    }, [
+        activeSpeakerIds,
+        isCameraEnabled,
+        isMicrophoneEnabled,
+        isScreenShareEnabled,
+        participantInfos,
+        videoTracks,
+    ]);
+
+    const screenShareCandidates = useMemo<ScreenShareCandidate[]>(
+        () =>
+            videoTracks
+                .filter((track) => track.source === Track.Source.ScreenShare)
+                .map((track) => ({
+                    ownerId: track.ownerId,
+                    key: track.key,
+                    isLocal: track.isLocal,
+                })),
+        [videoTracks],
+    );
+
+    const activeScreenShareCandidate = useMemo(
+        () =>
+            pickActiveScreenShare(
+                screenShareCandidates,
+                activeScreenShareOwnerId,
+                localUserId,
+            ),
+        [activeScreenShareOwnerId, localUserId, screenShareCandidates],
+    );
+
+    const activeScreenShareTrack = useMemo(
+        () =>
+            activeScreenShareCandidate
+                ? videoTracks.find((track) => track.key === activeScreenShareCandidate.key) ?? null
+                : null,
+        [activeScreenShareCandidate, videoTracks],
+    );
+
+    const connectedParticipantIds = useMemo(
+        () =>
+            new Set(
+                participantMediaInfos
+                    .filter((participant) => participant.isConnected)
+                    .map((participant) => participant.userId),
+            ),
+        [participantMediaInfos],
+    );
+
+    const visibleActiveScreenShareTrack = useMemo(
+        () =>
+            activeScreenShareTrack && connectedParticipantIds.has(activeScreenShareTrack.ownerId)
+                ? activeScreenShareTrack
+                : null,
+        [activeScreenShareTrack, connectedParticipantIds],
+    );
+
+    const activeScreenShareAudioTracks = useMemo(
+        () =>
+            audioTracks.filter(
+                (track) =>
+                    track.source === Track.Source.ScreenShareAudio &&
+                    isActiveScreenShareAudio(
+                        track.ownerId,
+                        visibleActiveScreenShareTrack?.ownerId ?? null,
+                        track.isLocal,
+                    ),
+            ),
+        [audioTracks, visibleActiveScreenShareTrack?.ownerId],
+    );
+
+    const hasActiveScreenShareAudio = activeScreenShareAudioTracks.length > 0;
+
+    useEffect(() => {
+        syncRemoteAudioTracks(
+            activeScreenShareAudioTracks,
+            screenShareAudioElementsRef,
+            screenShareVolume,
+            playbackDeviceId,
+        );
+    }, [activeScreenShareAudioTracks, playbackDeviceId, screenShareVolume]);
+
+    const stageItems = useMemo<RenderedStageItem[]>(() => {
+        const participantItems = participantMediaInfos
+            .filter((participant) => participant.isConnected)
+            .map((participant) => ({
+                id: `participant:${participant.userId}`,
+                kind: "participant" as const,
+                ownerId: participant.userId,
+                hasCamera: Boolean(participant.cameraTrack),
+                isSpeaking: participant.isSpeaking,
+                isConnected: participant.isConnected,
+                participant,
+            }));
+
+        if (!visibleActiveScreenShareTrack) {
+            return participantItems;
+        }
+
+        return [
+            {
+                id: `screen:${visibleActiveScreenShareTrack.ownerId}:${visibleActiveScreenShareTrack.key}`,
+                kind: "screen" as const,
+                ownerId: visibleActiveScreenShareTrack.ownerId,
+                trackKey: visibleActiveScreenShareTrack.key,
+                hasCamera: false,
+                isSpeaking: false,
+                isConnected: true,
+                screenTrack: visibleActiveScreenShareTrack,
+            },
+            ...participantItems,
+        ];
+    }, [participantMediaInfos, visibleActiveScreenShareTrack]);
+
+    const selectedStageItem = useMemo(
+        () =>
+            normalizeSelectedStageItem(
+                selectedStageItemId,
+                stageItems,
+                activeSpeakerIds,
+            ) as RenderedStageItem | null,
+        [activeSpeakerIds, selectedStageItemId, stageItems],
+    );
+
+    useEffect(() => {
+        if (
+            selectedStageItemId &&
+            !stageItems.some((item) => item.id === selectedStageItemId)
+        ) {
+            setSelectedStageItemId(null);
+        }
+    }, [selectedStageItemId, stageItems]);
+
+    useEffect(() => {
+        const nextOwnerId = activeScreenShareCandidate?.ownerId ?? null;
+        if (nextOwnerId !== activeScreenShareOwnerId) {
+            setActiveScreenShareOwnerId(nextOwnerId);
+        }
+        if (!nextOwnerId) {
+            setIsScreenShareFullscreen(false);
+        }
+    }, [activeScreenShareCandidate?.ownerId, activeScreenShareOwnerId]);
+
+    useEffect(() => {
+        const remoteCandidates = screenShareCandidates.filter((candidate) => !candidate.isLocal);
+        const knownRemoteKeys = knownRemoteScreenShareKeysRef.current;
+        const latestNewRemote = [...remoteCandidates]
+            .reverse()
+            .find((candidate) => !knownRemoteKeys.has(candidate.key));
+
+        knownRemoteScreenShareKeysRef.current = new Set(
+            remoteCandidates.map((candidate) => candidate.key),
+        );
+
+        if (
+            latestNewRemote &&
+            shouldDisableLocalScreenShareForRemoteOwner(
+                localUserId,
+                latestNewRemote.ownerId,
+                isScreenShareEnabled,
+            )
+        ) {
+            setActiveScreenShareOwnerId(latestNewRemote.ownerId);
+            void roomRef.current?.localParticipant
+                .setScreenShareEnabled(false)
+                .catch((error) => {
+                    console.error("Failed to stop local screen share after remote owner changed", error);
+                });
+        }
+    }, [isScreenShareEnabled, localUserId, screenShareCandidates]);
+
+    const toggleMicrophone = useCallback(async () => {
+        const room = roomRef.current;
+        if (!room) return;
+
+        const next = !room.localParticipant.isMicrophoneEnabled;
+        try {
+            await room.localParticipant.setMicrophoneEnabled(
+                next,
+                recordingDeviceId ? { deviceId: recordingDeviceId } : undefined,
+            );
+            await playCallSound(next ? "micOn" : "micOff");
+            syncRoomState();
+        } catch (error) {
+            console.error("Failed to toggle microphone", error);
+        }
+    }, [recordingDeviceId, syncRoomState]);
+
+    const toggleCamera = useCallback(async () => {
+        const room = roomRef.current;
+        if (!room || !isConnectedToCall) return;
+
+        const next = !room.localParticipant.isCameraEnabled;
+        try {
+            await room.localParticipant.setCameraEnabled(
+                next,
+                webcamDeviceId ? { deviceId: webcamDeviceId } : { facingMode },
+            );
+            if (next) {
+                void refreshVideoInputs();
+            }
+            syncRoomState();
+        } catch (error) {
+            console.error("Failed to toggle camera", error);
+        }
+    }, [facingMode, isConnectedToCall, refreshVideoInputs, syncRoomState, webcamDeviceId]);
+
+    const switchCamera = useCallback(async () => {
+        const room = roomRef.current;
+        if (
+            !room ||
+            !isConnectedToCall ||
+            !room.localParticipant.isCameraEnabled ||
+            !canSwitchCamera ||
+            !isMobileBrowserDevice(getCurrentBrowserDeviceInfo())
+        ) {
+            return;
+        }
+
+        const nextFacingMode = facingMode === "user" ? "environment" : "user";
+        try {
+            const localTrack = videoTracks.find(
+                (track) => track.isLocal && track.source === Track.Source.Camera,
+            )?.track as LocalVideoTrack | undefined;
+
+            if (localTrack?.restartTrack) {
+                await localTrack.restartTrack({ facingMode: nextFacingMode });
+            } else {
+                await room.localParticipant.setCameraEnabled(true, {
+                    facingMode: nextFacingMode,
+                });
+            }
+
+            setFacingMode(nextFacingMode);
+            syncRoomState();
+        } catch (error) {
+            console.error("Failed to switch camera", error);
+        }
+    }, [canSwitchCamera, facingMode, isConnectedToCall, syncRoomState, videoTracks]);
+
+    const toggleScreenShare = useCallback(async () => {
+        const room = roomRef.current;
+        if (!room || !isConnectedToCall || !canShareScreen) return;
+
+        try {
+            const next = !room.localParticipant.isScreenShareEnabled;
+            await room.localParticipant.setScreenShareEnabled(
+                next,
+                next ? SCREEN_SHARE_CAPTURE_OPTIONS : undefined,
+            );
+            if (next) {
+                setActiveScreenShareOwnerId(localUserId);
+            } else if (activeScreenShareOwnerId === localUserId) {
+                setActiveScreenShareOwnerId(null);
+                setIsScreenShareFullscreen(false);
+            }
+            syncRoomState();
+        } catch (error) {
+            console.error("Failed to toggle screen share", error);
+        }
+    }, [activeScreenShareOwnerId, canShareScreen, isConnectedToCall, localUserId, syncRoomState]);
+
+    const connectionError = tokenError || loadError || roomError;
+    const isConnecting =
+        isTokenLoading ||
+        (!!callToken?.token &&
+            connectionState !== ConnectionState.Connected &&
+            call.status === "Active");
+
+    const openScreenShareFullscreen = useCallback(() => {
+        if (!visibleActiveScreenShareTrack) return;
+
+        setPanel("none");
+        setIsScreenShareFullscreen(true);
+        const requestFullscreen = document.documentElement.requestFullscreen;
+        if (requestFullscreen) {
+            void requestFullscreen.call(document.documentElement)
+                .then(() => {
+                    browserFullscreenActiveRef.current = true;
+                })
+                .catch(() => {
+                    browserFullscreenActiveRef.current = false;
+                });
+        }
+    }, [visibleActiveScreenShareTrack]);
+
+    const closeScreenShareFullscreen = useCallback(() => {
+        setIsScreenShareFullscreen(false);
+        const shouldExitBrowserFullscreen =
+            browserFullscreenActiveRef.current && document.fullscreenElement;
+        browserFullscreenActiveRef.current = false;
+        if (shouldExitBrowserFullscreen) {
+            void document.exitFullscreen?.().catch(() => undefined);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!isScreenShareFullscreen) return undefined;
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                closeScreenShareFullscreen();
+            }
+        };
+        const onFullscreenChange = () => {
+            if (browserFullscreenActiveRef.current && !document.fullscreenElement) {
+                browserFullscreenActiveRef.current = false;
+                setIsScreenShareFullscreen(false);
+            }
+        };
+
+        window.addEventListener("keydown", onKeyDown);
+        document.addEventListener("fullscreenchange", onFullscreenChange);
+
+        return () => {
+            window.removeEventListener("keydown", onKeyDown);
+            document.removeEventListener("fullscreenchange", onFullscreenChange);
+        };
+    }, [closeScreenShareFullscreen, isScreenShareFullscreen]);
+
+    useEffect(() => {
+        if (!visibleActiveScreenShareTrack && isScreenShareFullscreen) {
+            closeScreenShareFullscreen();
+        }
+    }, [closeScreenShareFullscreen, isScreenShareFullscreen, visibleActiveScreenShareTrack]);
+
+    return (
+        <View className="flex-1 min-w-0 self-stretch">
+            <View className="flex-1 min-w-0 relative self-stretch">
+                <CallErrorOverlay
+                    message={connectionError}
+                    isLeaving={isLeaving}
+                    onClose={onCloseError}
+                />
+
+                <CallStage
+                    items={stageItems}
+                    participants={participantMediaInfos}
+                    selectedItem={selectedStageItem}
+                    isVideoCall={isConnectedToCall}
+                    isMobile={isMobile}
+                    localFacingMode={facingMode}
+                    onSelectStageItem={setSelectedStageItemId}
+                    onOpenScreenShareFullscreen={openScreenShareFullscreen}
+                    screenShareAudioAvailable={hasActiveScreenShareAudio}
+                    screenShareVolume={screenShareVolume}
+                    onScreenShareVolumeChange={setScreenShareVolume}
+                />
+
+                {isConnecting ? <CallLoadingOverlay /> : null}
+
+                {connectionState === ConnectionState.Reconnecting ? (
+                    <AnimatedView
+                        entering={FadeInDown.duration(180)}
+                        exiting={FadeOut.duration(120)}
+                        className="absolute left-3 top-3 rounded-lg bg-black/60 px-3 py-2"
+                    >
+                        <Text className="text-white text-xs">Восстановление соединения...</Text>
+                    </AnimatedView>
+                ) : null}
+            </View>
+
+            <CallControls
+                micEnabled={isMicrophoneEnabled}
+                cameraEnabled={isCameraEnabled}
+                screenShareEnabled={isScreenShareEnabled}
+                switchCameraAvailable={canSwitchCamera}
+                screenShareAvailable={canShareScreen}
+                busy={isLeaving}
+                isMobile={isMobile}
+                onToggleMicrophone={toggleMicrophone}
+                onToggleCamera={toggleCamera}
+                onSwitchCamera={switchCamera}
+                onToggleScreenShare={toggleScreenShare}
+                onOpenChat={() => setPanel(panel === "chat" ? "none" : "chat")}
+                onOpenParticipants={() =>
+                    setPanel(panel === "participants" ? "none" : "participants")
+                }
+                onLeave={onLeave}
+            />
+
+            <CallDrawer
+                panel={panel}
+                isMobile={isMobile}
+                conversationId={conversationId}
+                participantInfos={participantInfos}
+                onClose={() => setPanel("none")}
+            />
+
+            {isScreenShareFullscreen && visibleActiveScreenShareTrack ? (
+                <AnimatedView
+                    entering={FadeIn.duration(160)}
+                    exiting={FadeOut.duration(120)}
+                    className="absolute inset-0 z-50 bg-black"
+                >
+                    <VideoElement
+                        track={visibleActiveScreenShareTrack.track}
+                        muted={visibleActiveScreenShareTrack.isLocal}
+                        objectFit="contain"
+                    />
+                    <AnimatedPressable
+                        accessibilityLabel="Закрыть полноэкранную демонстрацию"
+                        onPress={closeScreenShareFullscreen}
+                        entering={ZoomIn.duration(160)}
+                        exiting={ZoomOut.duration(120)}
+                        className="absolute right-4 top-4 rounded-full bg-white/15 px-4 py-2"
+                    >
+                        <Text className="text-white text-sm font-semibold">Закрыть</Text>
+                    </AnimatedPressable>
+                    <AnimatedView
+                        entering={FadeInRight.duration(180)}
+                        exiting={FadeOut.duration(120)}
+                        className="absolute right-4 top-16"
+                    >
+                        <ScreenShareVolumeControl
+                            available={hasActiveScreenShareAudio}
+                            volume={screenShareVolume}
+                            onVolumeChange={setScreenShareVolume}
+                        />
+                    </AnimatedView>
+                </AnimatedView>
+            ) : null}
+        </View>
+    );
+};

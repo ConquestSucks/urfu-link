@@ -17,6 +17,7 @@ public sealed class EnrollmentRepository(DisciplineDbContext dbContext) : IEnrol
         var query = dbContext.Disciplines
             .AsNoTracking()
             .Include(d => d.Enrollments)
+            .Include(d => d.Subgroups)
             .AsQueryable();
 
         if (!includeArchived)
@@ -59,7 +60,8 @@ public sealed class EnrollmentRepository(DisciplineDbContext dbContext) : IEnrol
                 d.Semester,
                 d.OwnerTeacherId,
                 d.CoverAssetId,
-                e.Role);
+                e.Role,
+                e.SubgroupId);
 
         return await query
             .ToListAsync(cancellationToken)

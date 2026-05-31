@@ -8,4 +8,5 @@ public sealed record Attachment(
     Guid? ThumbnailAssetId,
     string FileName,
     long Size,
-    string MimeType);
+    string MimeType,
+    int? DurationSeconds = null);

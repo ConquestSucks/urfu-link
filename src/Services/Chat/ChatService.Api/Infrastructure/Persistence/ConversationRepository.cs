@@ -191,12 +191,40 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
     }
 
     public async Task<Conversation?> GetByDisciplineIdAsync(Guid disciplineId, CancellationToken cancellationToken)
+        => await GetGeneralDisciplineAsync(disciplineId, cancellationToken).ConfigureAwait(false);
+
+    public async Task<Conversation?> GetGeneralDisciplineAsync(Guid disciplineId, CancellationToken cancellationToken)
     {
         var doc = await context.Conversations
-            .Find(c => c.DisciplineId == disciplineId)
+            .Find(c => c.DisciplineId == disciplineId
+                && (c.DisciplineChatKind == DisciplineChatKind.General || c.DisciplineChatKind == null)
+                && c.DisciplineSubgroupId == null)
             .FirstOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
         return doc?.ToDomain();
+    }
+
+    public async Task<Conversation?> GetByDisciplineSubgroupIdAsync(
+        Guid disciplineId,
+        Guid subgroupId,
+        CancellationToken cancellationToken)
+    {
+        var doc = await context.Conversations
+            .Find(c => c.DisciplineId == disciplineId && c.DisciplineSubgroupId == subgroupId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return doc?.ToDomain();
+    }
+
+    public async Task<IReadOnlyList<Conversation>> ListByDisciplineIdAsync(
+        Guid disciplineId,
+        CancellationToken cancellationToken)
+    {
+        var docs = await context.Conversations
+            .Find(c => c.DisciplineId == disciplineId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return docs.Select(d => d.ToDomain()).ToList();
     }
 
     public async Task<bool> AddParticipantAsync(
@@ -246,6 +274,42 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
             .UpdateOneAsync(freshFilter, addUpdate, cancellationToken: cancellationToken)
             .ConfigureAwait(false);
         return addResult.ModifiedCount > 0;
+    }
+
+    public async Task<bool> EnsureParticipantAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken)
+    {
+        var roleString = role.ToString();
+        var existingRoleFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Eq("participantRoles.userId", userId));
+        var repairExistingRole = Builders<ConversationDocument>.Update.Combine(
+            Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
+            Builders<ConversationDocument>.Update.Set("participantRoles.$.role", roleString));
+        var existingRoleResult = await context.Conversations
+            .UpdateOneAsync(existingRoleFilter, repairExistingRole, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        if (existingRoleResult.MatchedCount > 0)
+        {
+            return existingRoleResult.ModifiedCount > 0;
+        }
+
+        var missingRoleFilter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Ne("participantRoles.userId", userId));
+        var repairMissingRole = Builders<ConversationDocument>.Update.Combine(
+            Builders<ConversationDocument>.Update.AddToSet(c => c.Participants, userId),
+            Builders<ConversationDocument>.Update.Push(
+                "participantRoles",
+                new ParticipantRoleEntry(userId, role)));
+        var missingRoleResult = await context.Conversations
+            .UpdateOneAsync(missingRoleFilter, repairMissingRole, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return missingRoleResult.ModifiedCount > 0;
     }
 
     public async Task<bool> RemoveParticipantAsync(
@@ -320,6 +384,20 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         return result.ModifiedCount > 0;
     }
 
+    public async Task<bool> UnarchiveAsync(
+        string conversationId,
+        CancellationToken cancellationToken)
+    {
+        var filter = Builders<ConversationDocument>.Filter.And(
+            Builders<ConversationDocument>.Filter.Eq(c => c.Id, conversationId),
+            Builders<ConversationDocument>.Filter.Ne(c => c.ArchivedAtUtc, (DateTime?)null));
+        var update = Builders<ConversationDocument>.Update.Set(c => c.ArchivedAtUtc, null);
+        var result = await context.Conversations
+            .UpdateOneAsync(filter, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
     public async Task<bool> UpdateMetadataAsync(
         string conversationId,
         string? title,
@@ -329,6 +407,49 @@ internal sealed class ConversationRepository(ChatMongoContext context) : IConver
         var update = Builders<ConversationDocument>.Update
             .Set(c => c.Title, title)
             .Set(c => c.CoverAssetId, coverAssetId);
+        var result = await context.Conversations
+            .UpdateOneAsync(c => c.Id == conversationId, update, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> UpdateDisciplineMetadataAsync(
+        Guid disciplineId,
+        string? disciplineTitle,
+        Guid? coverAssetId,
+        CancellationToken cancellationToken)
+    {
+        var update = Builders<ConversationDocument>.Update
+            .Set(c => c.DisciplineTitle, disciplineTitle)
+            .Set(c => c.CoverAssetId, coverAssetId);
+        var result = await context.Conversations
+            .UpdateManyAsync(
+                c => c.DisciplineId == disciplineId,
+                update,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        var generalUpdate = Builders<ConversationDocument>.Update.Set(c => c.Title, disciplineTitle);
+        await context.Conversations
+            .UpdateOneAsync(
+                c => c.DisciplineId == disciplineId
+                    && (c.DisciplineChatKind == DisciplineChatKind.General || c.DisciplineChatKind == null)
+                    && c.DisciplineSubgroupId == null,
+                generalUpdate,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+
+        return result.ModifiedCount > 0;
+    }
+
+    public async Task<bool> UpdateSubgroupMetadataAsync(
+        string conversationId,
+        string subgroupName,
+        CancellationToken cancellationToken)
+    {
+        var update = Builders<ConversationDocument>.Update
+            .Set(c => c.Title, subgroupName)
+            .Set(c => c.DisciplineSubgroupName, subgroupName);
         var result = await context.Conversations
             .UpdateOneAsync(c => c.Id == conversationId, update, cancellationToken: cancellationToken)
             .ConfigureAwait(false);

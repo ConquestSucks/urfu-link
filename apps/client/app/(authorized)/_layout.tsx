@@ -12,20 +12,55 @@ import { useChatHub } from "@/shared/lib/useChatHub";
 import { useNotificationHub } from "@/features/notifications";
 import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
+import { useCallHub } from "@/shared/lib/useCallHub";
+import { CallTabCoordinator, IncomingCallModal, OutgoingCallModal } from "@/features/call";
 import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
+import { configureCallSounds } from "@/shared/lib/call-sounds";
+
+type IdleWindow = Window & {
+    requestIdleCallback?: (callback: () => void) => number;
+    cancelIdleCallback?: (handle: number) => void;
+};
+
+const scheduleAfterFirstPaint = (callback: () => void) => {
+    if (typeof window !== "undefined") {
+        const idleWindow = window as IdleWindow;
+        if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
+            const handle = idleWindow.requestIdleCallback(callback);
+            return () => idleWindow.cancelIdleCallback?.(handle);
+        }
+    }
+
+    const handle = setTimeout(callback, 0);
+    return () => clearTimeout(handle);
+};
+
+const DeferredRealtime = () => {
+    usePresenceHub();
+    useNotificationHub();
+    useCallHub();
+
+    return (
+        <>
+            <IncomingCallModal />
+            <OutgoingCallModal />
+            <CallTabCoordinator />
+        </>
+    );
+};
 
 export default function AuthLayout() {
     const segments = useSegments() as string[];
     const isThreadDetail =
         (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
+    const isCallRoute = segments.includes("call") && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isRealtimeReady, setIsRealtimeReady] = useState(false);
 
     // Подключаемся к ChatHub и PresenceHub на всё время авторизованной сессии.
     // Хуки сами обрабатывают AppState (background/foreground) и cleanup при unmount.
     useChatHub();
-    usePresenceHub();
-    useNotificationHub();
 
     const { data: profile } = useCurrentUser();
 
@@ -35,6 +70,7 @@ export default function AuthLayout() {
 
     useEffect(() => {
         configureMessageSounds(profile?.notifications);
+        configureCallSounds(profile?.notifications);
         configureBrowserNotifications(profile?.notifications);
     }, [profile?.notifications]);
 
@@ -42,10 +78,14 @@ export default function AuthLayout() {
         if (isMobile && isSettingsOpen) setIsSettingsOpen(false);
     }, [isMobile, isSettingsOpen]);
 
+    useEffect(() => scheduleAfterFirstPaint(() => setIsRealtimeReady(true)), []);
+
     return (
         <SafeAreaView className="flex-1 bg-app-bg" edges={safeAreaEdges}>
             <View className="flex-1 flex-row">
-                {isDesktop && <SidebarDesktop onSettingsPress={() => setIsSettingsOpen(true)} />}
+                {isDesktop && !isCallRoute && (
+                    <SidebarDesktop onSettingsPress={() => setIsSettingsOpen(true)} />
+                )}
 
                 <View
                     className="flex-1 min-w-0"
@@ -58,7 +98,7 @@ export default function AuthLayout() {
                 </View>
             </View>
 
-            {isMobile && (
+            {isMobile && !isCallRoute && (
                 <View
                     style={{
                         position: "absolute",
@@ -77,6 +117,8 @@ export default function AuthLayout() {
             {isDesktop && (
                 <SettingsDesktop isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
             )}
+
+            {isRealtimeReady ? <DeferredRealtime /> : null}
         </SafeAreaView>
     );
 }

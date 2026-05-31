@@ -203,19 +203,8 @@ services:
     ports:
       - "7880:7880"
       - "7881:7881"
-      - "60100-60150:60100-60150/udp"
-
-  coturn:
-    image: coturn/coturn:4.8.0-r0
-    container_name: urfu-coturn
-    command: ["-c", "/etc/coturn/turnserver.conf"]
-    volumes:
-      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
-    ports:
-      - "3478:3478"
       - "3478:3478/udp"
-      - "5349:5349"
-      - "5349:5349/udp"
+      - "60100-60150:60100-60150/udp"
 
   # ── .NET Services ──────────────────────────────────────────────────────────
 
@@ -490,6 +479,13 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
       Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      GrpcClients__InternalAuth__TokenEndpoint: http://keycloak:8080/realms/urfu-link/protocol/openid-connect/token
+      GrpcClients__InternalAuth__ClientId: chat-service-internal
+      GrpcClients__InternalAuth__ClientSecret: chat-service-internal-dev-secret
+      GrpcClients__ChatService__Address: http://chat-service:8081
+      LiveKit__ServerUrl: ws://localhost:7880
+      LiveKit__ApiKey: urfu-local-livekit-key
+      LiveKit__ApiSecret: urfu-local-livekit-secret-0123456789abcdef
     depends_on:
       redis:
         condition: service_healthy

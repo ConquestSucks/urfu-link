@@ -1,5 +1,3 @@
-using System.Net.Http.Json;
-using DisciplineService.Api.Application.Contracts.Requests;
 using DisciplineService.Api.Application.Contracts.Responses;
 using DisciplineService.IntegrationTests.Infrastructure;
 using FluentAssertions;
@@ -163,6 +161,59 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ListDisciplineSnapshots_ReturnsSubgroupsAndEnrollmentSubgroupIds()
+    {
+        var teacherId = Guid.NewGuid();
+        var studentId = Guid.NewGuid();
+        var disc = await CreateDisciplineAsync(teacherId);
+        await EnrollAsync(disc.Id, teacherId, [(studentId, DisciplineRole.Student)]);
+
+        var reply = await CreateClient().ListDisciplineSnapshotsAsync(new ListDisciplineSnapshotsRequest
+        {
+            IncludeArchived = true,
+            PageSize = 10,
+        });
+
+        var snapshot = reply.Disciplines.Should().ContainSingle(d => d.DisciplineId == disc.Id.ToString("D")).Subject;
+        snapshot.Subgroups.Should().ContainSingle(s => s.SubgroupId == disc.Subgroups[0].Id.ToString("D"));
+        snapshot.Members.Should().Contain(m =>
+            m.UserId == teacherId.ToString("D")
+            && m.Role == MembershipRole.Teacher
+            && string.IsNullOrEmpty(m.SubgroupId));
+        snapshot.Members.Should().Contain(m =>
+            m.UserId == studentId.ToString("D")
+            && m.Role == MembershipRole.Student
+            && m.SubgroupId == disc.Subgroups[0].Id.ToString("D"));
+    }
+
+    [Fact]
+    public async Task ListDisciplineSnapshots_PaginatesWithKeysetToken()
+    {
+        var first = await CreateDisciplineAsync(Guid.NewGuid());
+        var second = await CreateDisciplineAsync(Guid.NewGuid());
+
+        var page1 = await CreateClient().ListDisciplineSnapshotsAsync(new ListDisciplineSnapshotsRequest
+        {
+            IncludeArchived = true,
+            PageSize = 1,
+        });
+        page1.Disciplines.Should().ContainSingle();
+        page1.NextPageToken.Should().NotBeNullOrWhiteSpace();
+
+        var page2 = await CreateClient().ListDisciplineSnapshotsAsync(new ListDisciplineSnapshotsRequest
+        {
+            IncludeArchived = true,
+            PageSize = 1,
+            PageToken = page1.NextPageToken,
+        });
+
+        page2.Disciplines.Should().ContainSingle();
+        page2.Disciplines[0].DisciplineId.Should().NotBe(page1.Disciplines[0].DisciplineId);
+        var returnedIds = new[] { page1.Disciplines[0].DisciplineId, page2.Disciplines[0].DisciplineId };
+        returnedIds.Should().BeEquivalentTo(new[] { first.Id.ToString("D"), second.Id.ToString("D") });
+    }
+
+    [Fact]
     public async Task GetDiscipline_ReturnsExistingMetadata()
     {
         var teacherId = Guid.NewGuid();
@@ -190,37 +241,11 @@ public sealed class InternalApiServiceTests : IAsyncLifetime
     }
 
     private async Task<DisciplineResponse> CreateDisciplineAsync(Guid teacherId)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Admin();
-        var http = _factory.CreateClient();
-        http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        var resp = await http.PostAsJsonAsync(
-            "/api/v1/disciplines",
-            new CreateDisciplineRequest(
-                $"CS-{Guid.NewGuid():N}".Substring(0, 12),
-                "Intro",
-                null,
-                "2026-spring",
-                teacherId,
-                null));
-        resp.EnsureSuccessStatusCode();
-        return (await resp.Content.ReadFromJsonAsync<DisciplineResponse>())!;
-    }
+        => await _factory.SeedDisciplineAsync(teacherId, title: "Intro");
 
     private async Task EnrollAsync(
         Guid disciplineId,
         Guid teacherId,
         IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
-    {
-        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Teacher(teacherId);
-        var http = _factory.CreateClient();
-        http.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
-        var resp = await http.PostAsJsonAsync(
-            $"/api/v1/disciplines/{disciplineId}/enrollments",
-            new
-            {
-                Enrollments = users.Select(u => new EnrollmentInput(u.UserId, u.Role)).ToList(),
-            });
-        resp.EnsureSuccessStatusCode();
-    }
+        => await _factory.SeedEnrollmentsAsync(disciplineId, teacherId, users);
 }

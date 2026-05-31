@@ -26,7 +26,11 @@ internal sealed class AttachmentDocument
     [BsonElement("mimeType")]
     public string MimeType { get; set; } = string.Empty;
 
-    public Attachment ToDomain() => new(MediaAssetId, Type, ThumbnailAssetId, FileName, Size, MimeType);
+    [BsonElement("durationSeconds")]
+    [BsonIgnoreIfNull]
+    public int? DurationSeconds { get; set; }
+
+    public Attachment ToDomain() => new(MediaAssetId, Type, ThumbnailAssetId, FileName, Size, MimeType, DurationSeconds);
 
     public static AttachmentDocument FromDomain(Attachment attachment) => new()
     {
@@ -36,5 +40,6 @@ internal sealed class AttachmentDocument
         FileName = attachment.FileName,
         Size = attachment.Size,
         MimeType = attachment.MimeType,
+        DurationSeconds = attachment.DurationSeconds,
     };
 }

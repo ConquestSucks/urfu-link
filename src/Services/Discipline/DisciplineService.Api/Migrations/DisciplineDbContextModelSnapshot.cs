@@ -92,6 +92,46 @@ namespace DisciplineService.Api.Migrations
                     b.ToTable("disciplines", "disciplines");
                 });
 
+            modelBuilder.Entity("DisciplineService.Api.Domain.Aggregates.DisciplineSubgroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("ArchivedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("archived_at_utc");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<Guid>("DisciplineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("discipline_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ArchivedAtUtc")
+                        .HasFilter("archived_at_utc IS NULL");
+
+                    b.HasIndex("DisciplineId", "Name")
+                        .IsUnique()
+                        .HasFilter("archived_at_utc IS NULL");
+
+                    b.ToTable("subgroups", "disciplines");
+                });
+
             modelBuilder.Entity("DisciplineService.Api.Domain.Aggregates.Enrollment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -114,6 +154,10 @@ namespace DisciplineService.Api.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("role");
 
+                    b.Property<Guid?>("SubgroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subgroup_id");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uuid")
                         .HasColumnName("user_id");
@@ -125,6 +169,10 @@ namespace DisciplineService.Api.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("SubgroupId");
+
+                    b.HasIndex("DisciplineId", "SubgroupId");
 
                     b.HasIndex("DisciplineId", "UserId")
                         .IsUnique();
@@ -193,6 +241,15 @@ namespace DisciplineService.Api.Migrations
                     b.ToTable("outbox_messages", "disciplines");
                 });
 
+            modelBuilder.Entity("DisciplineService.Api.Domain.Aggregates.DisciplineSubgroup", b =>
+                {
+                    b.HasOne("DisciplineService.Api.Domain.Aggregates.Discipline", null)
+                        .WithMany("Subgroups")
+                        .HasForeignKey("DisciplineId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("DisciplineService.Api.Domain.Aggregates.Enrollment", b =>
                 {
                     b.HasOne("DisciplineService.Api.Domain.Aggregates.Discipline", null)
@@ -200,11 +257,18 @@ namespace DisciplineService.Api.Migrations
                         .HasForeignKey("DisciplineId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("DisciplineService.Api.Domain.Aggregates.DisciplineSubgroup", null)
+                        .WithMany()
+                        .HasForeignKey("SubgroupId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("DisciplineService.Api.Domain.Aggregates.Discipline", b =>
                 {
                     b.Navigation("Enrollments");
+
+                    b.Navigation("Subgroups");
                 });
 #pragma warning restore 612, 618
         }

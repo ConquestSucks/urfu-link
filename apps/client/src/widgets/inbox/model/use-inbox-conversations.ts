@@ -7,7 +7,7 @@ import {
 } from "@/entities/presence/model/presence-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import type { InboxChatProps } from "@/entities/inbox-chat";
-import type { ConversationPreview, MessageDto } from "@urfu-link/api-client";
+import type { AttachmentType, ConversationPreview, MessageDto } from "@urfu-link/api-client";
 
 const formatInboxTime = (value: string | null | undefined) => {
     if (!value) return "";
@@ -65,7 +65,10 @@ const formatFileCount = (count: number) => `${count} ${fileWord(count)}`;
 const formatAttachmentPreview = (
     fileNames: string[] | undefined,
     hasAttachments: boolean | undefined,
+    attachmentTypes?: AttachmentType[],
 ) => {
+    if (attachmentTypes?.includes("Voice")) return "Голосовое сообщение";
+
     const names = (fileNames ?? [])
         .map((name) => name.trim())
         .filter((name) => name.length > 0);
@@ -90,6 +93,7 @@ const formatLastMessagePreview = (
         return formatAttachmentPreview(
             attachments.map((a) => a.fileName),
             attachments.length > 0,
+            attachments.map((a) => a.type),
         );
     }
 
@@ -101,6 +105,7 @@ const formatLastMessagePreview = (
     return formatAttachmentPreview(
         preview.attachmentFileNames,
         preview.hasAttachments,
+        preview.attachmentTypes,
     );
 };
 
@@ -126,13 +131,20 @@ const mapConversation = (
         preview?.sentAtUtc ??
         preview?.sentAt ??
         (preview ? c.lastMessageAtUtc ?? c.lastMessageAt ?? null : null);
+    const isDisciplineGroup = c.type === "Group" && c.groupSubtype === "Discipline";
+    const disciplineRowName = isDisciplineGroup
+        ? c.disciplineChatKind === "Subgroup"
+            ? c.disciplineSubgroupName ?? c.title ?? "Подгруппа"
+            : "Общий чат"
+        : null;
     return {
         id: c.id,
         avatarUrl: peerAvatar ?? "",
         name:
+            disciplineRowName ??
             c.title ??
             peerName ??
-            (c.type === "Direct" ? "Личный чат" : "Чат предмета"),
+            (c.type === "Direct" ? "Личный чат" : "Чат дисциплины"),
         message: typingPreview ?? formatLastMessagePreview(latestMessage, preview),
         time: formatInboxTime(lastAt),
         unreadCount,
@@ -143,6 +155,10 @@ const mapConversation = (
                 : previewReadAt !== null
             : false,
         isTyping: typingPreview !== null,
+        disciplineId: c.disciplineId ?? null,
+        disciplineTitle: c.disciplineTitle ?? c.title ?? null,
+        disciplineChatKind: c.disciplineChatKind ?? null,
+        disciplineSubgroupName: c.disciplineSubgroupName ?? null,
     };
 };
 

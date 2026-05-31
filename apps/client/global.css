@@ -17,6 +17,13 @@ html {
 body {
   overscroll-behavior: none;
 }
+
+input::selection,
+textarea::selection {
+  background-color: rgba(43, 127, 255, 0.42);
+  color: #fff;
+}
+
 @supports (min-height: 100dvh) {
   html,
   body,

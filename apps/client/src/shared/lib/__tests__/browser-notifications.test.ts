@@ -1,6 +1,7 @@
 import {
     configureBrowserNotifications,
     getBrowserNotificationPermission,
+    setBrowserNotificationsEnabled,
     requestBrowserNotificationPermission,
     resetBrowserNotificationsForTests,
     setBrowserNotificationNavigationForTests,
@@ -98,6 +99,25 @@ describe("browser notifications", () => {
         expect(instances).toHaveLength(0);
     });
 
+    it("does not show messages when browser notifications are disabled in app settings", () => {
+        setBrowserNotificationsEnabled(false);
+
+        const shown = showMessageBrowserNotification({
+            id: "message-1",
+            conversationId: "direct-1",
+            senderId: "peer-1",
+            body: "hello",
+            attachments: [],
+            state: "Sent",
+            createdAt: "2026-05-24T10:03:00.000Z",
+            deliveredAt: null,
+            readAt: null,
+        });
+
+        expect(shown).toBe(false);
+        expect(instances).toHaveLength(0);
+    });
+
     it("shows hidden-tab message notifications and routes clicks", () => {
         const navigate = jest.fn();
         setBrowserNotificationNavigationForTests(navigate);
@@ -127,6 +147,35 @@ describe("browser notifications", () => {
         expect(getTestWindow().focus).toHaveBeenCalled();
         expect(navigate).toHaveBeenCalledWith("/chats/direct-1?message=message-1");
         expect(instances[0].close).toHaveBeenCalled();
+    });
+
+    it("uses the voice label for voice-only message notifications", () => {
+        const shown = showMessageBrowserNotification(
+            {
+                id: "message-voice",
+                conversationId: "direct-1",
+                senderId: "peer-1",
+                body: "",
+                attachments: [
+                    {
+                        mediaAssetId: "asset-1",
+                        type: "Voice",
+                        fileName: "voice.m4a",
+                        size: 2048,
+                        mimeType: "audio/m4a",
+                        durationSeconds: 17,
+                    },
+                ],
+                state: "Sent",
+                createdAt: "2026-05-24T10:03:00.000Z",
+                deliveredAt: null,
+                readAt: null,
+            },
+            { currentUserId: "user-1", title: "Peer" },
+        );
+
+        expect(shown).toBe(true);
+        expect(instances[0].options.body).toBe("Голосовое сообщение");
     });
 
     it("deduplicates and skips own or muted message notifications", () => {
@@ -267,5 +316,87 @@ describe("browser notifications", () => {
         expect(showServerBrowserNotification(notification)).toBe(false);
         expect(showServerBrowserNotification({ ...notification, id: "notification-2" })).toBe(false);
         expect(instances).toHaveLength(1);
+    });
+
+    it("routes server call notifications to the source chat when conversation data is available", () => {
+        const navigate = jest.fn();
+        setBrowserNotificationNavigationForTests(navigate);
+
+        const notification: NotificationDto = {
+            id: "notification-call",
+            recipientUserId: "user-1",
+            type: "call.missed",
+            category: 11,
+            severity: 1,
+            title: "Пропущенный звонок",
+            body: "Звонок остался без ответа",
+            imageUrl: null,
+            deepLink: "urfulink://call/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/missed",
+            data: {
+                conversationId: "direct-1",
+                callId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            actor: null,
+            entity: null,
+            actions: [],
+            groupKey: null,
+            occurrenceCount: 1,
+            createdAtUtc: "2026-05-24T10:03:00.000Z",
+            lastOccurrenceAtUtc: "2026-05-24T10:03:00.000Z",
+            readAtUtc: null,
+            seenAtUtc: null,
+            savedAtUtc: null,
+            doneAtUtc: null,
+            archivedAtUtc: null,
+            snoozedUntilUtc: null,
+            expiresAtUtc: null,
+        };
+
+        expect(showServerBrowserNotification(notification)).toBe(true);
+
+        instances[0].onclick?.();
+
+        expect(navigate).toHaveBeenCalledWith("/chats/direct-1");
+        expect(navigate).not.toHaveBeenCalledWith(expect.stringContaining("/call/"));
+    });
+
+    it("shows stale server call notifications without opening the call screen", () => {
+        const navigate = jest.fn();
+        setBrowserNotificationNavigationForTests(navigate);
+
+        const notification: NotificationDto = {
+            id: "notification-call",
+            recipientUserId: "user-1",
+            type: "call.missed",
+            category: 11,
+            severity: 1,
+            title: "Пропущенный звонок",
+            body: "Звонок остался без ответа",
+            imageUrl: null,
+            deepLink: "urfulink://call/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/missed",
+            data: {
+                callId: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+            actor: null,
+            entity: null,
+            actions: [],
+            groupKey: null,
+            occurrenceCount: 1,
+            createdAtUtc: "2026-05-24T10:03:00.000Z",
+            lastOccurrenceAtUtc: "2026-05-24T10:03:00.000Z",
+            readAtUtc: null,
+            seenAtUtc: null,
+            savedAtUtc: null,
+            doneAtUtc: null,
+            archivedAtUtc: null,
+            snoozedUntilUtc: null,
+            expiresAtUtc: null,
+        };
+
+        expect(showServerBrowserNotification(notification)).toBe(true);
+
+        instances[0].onclick?.();
+
+        expect(navigate).not.toHaveBeenCalled();
     });
 });

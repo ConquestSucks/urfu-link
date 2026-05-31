@@ -21,7 +21,7 @@ public sealed class GetConversationQuery(
             new[] { conversation.Id },
             callerUserId,
             cancellationToken).ConfigureAwait(false);
-        var dto = ConversationDto.FromDomain(conversation)
+        var dto = ConversationDto.FromDomain(conversation, callerUserId)
             .WithUnreadCount(unreadCounts.TryGetValue(conversation.Id, out var unreadCount) ? unreadCount : 0);
         if (conversation.LastMessagePreview is null)
         {

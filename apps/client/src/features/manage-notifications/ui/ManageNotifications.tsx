@@ -4,7 +4,9 @@ import { Platform, ScrollView, Text, View } from "react-native";
 import { useEffect, useState } from "react";
 import {
   getBrowserNotificationPermission,
+  getBrowserNotificationsEnabled,
   requestBrowserNotificationPermission,
+  setBrowserNotificationsEnabled,
 } from "@/shared/lib/browser-notifications";
 import { NOTIFICATIONS_SETTINGS, type NotificationField } from "../config/settings";
 
@@ -14,11 +16,15 @@ export const ManageNotifications = () => {
   const [browserPermission, setBrowserPermission] = useState<
     NotificationPermission | "unsupported"
   >("unsupported");
+  const [browserNotificationsEnabled, setBrowserNotificationsEnabledState] = useState(
+    getBrowserNotificationsEnabled,
+  );
   const [isPermissionRequesting, setIsPermissionRequesting] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
     setBrowserPermission(getBrowserNotificationPermission());
+    setBrowserNotificationsEnabledState(getBrowserNotificationsEnabled());
   }, []);
 
   if (isLoading) {
@@ -50,29 +56,53 @@ export const ManageNotifications = () => {
     });
   };
 
-  const handleBrowserPermissionRequest = async () => {
-    if (browserPermission !== "default") return;
+  const handleBrowserNotificationsToggle = async (enabled: boolean) => {
+    if (browserPermission === "granted") {
+      setBrowserNotificationsEnabled(enabled);
+      setBrowserNotificationsEnabledState(enabled);
+      return;
+    }
+
+    if (!enabled || browserPermission !== "default") return;
+
     setIsPermissionRequesting(true);
     try {
-      setBrowserPermission(await requestBrowserNotificationPermission());
+      const nextPermission = await requestBrowserNotificationPermission();
+      const nextEnabled = nextPermission === "granted";
+
+      setBrowserPermission(nextPermission);
+      setBrowserNotificationsEnabled(nextEnabled);
+      setBrowserNotificationsEnabledState(nextEnabled);
     } finally {
       setIsPermissionRequesting(false);
     }
   };
 
+  const showBrowserSettings = Platform.OS === "web" && browserPermission !== "unsupported";
+  const browserNotificationsValue =
+    browserPermission === "granted" && browserNotificationsEnabled;
+  const browserNotificationsDisabled =
+    isPermissionRequesting || browserPermission === "denied";
+  const browserNotificationsDescription =
+    browserPermission === "denied"
+      ? "Разрешение заблокировано в настройках браузера"
+      : browserPermission === "default"
+        ? "Разрешить уведомления, когда вкладка не активна"
+        : "Показывать уведомления, когда вкладка не активна";
+
   return (
     <ScrollView contentContainerClassName="gap-4" showsVerticalScrollIndicator={false}>
-      {Platform.OS === "web" && browserPermission === "default" && (
+      {showBrowserSettings && (
         <View className="gap-3">
           <Text className="text-text-placeholder text-xs font-semibold uppercase">
             Браузер
           </Text>
           <SwitchCard
             label="Браузерные уведомления"
-            description="Показывать уведомления, когда вкладка не активна"
-            value={false}
-            onValueChange={handleBrowserPermissionRequest}
-            disabled={isPermissionRequesting}
+            description={browserNotificationsDescription}
+            value={browserNotificationsValue}
+            onValueChange={handleBrowserNotificationsToggle}
+            disabled={browserNotificationsDisabled}
           />
         </View>
       )}

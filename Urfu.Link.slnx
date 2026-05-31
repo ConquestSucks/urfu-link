@@ -43,6 +43,7 @@
   <Folder Name="/tests/unit/">
     <Project Path="tests/unit/ApiGateway.UnitTests/ApiGateway.UnitTests.csproj" />
     <Project Path="tests/unit/BuildingBlocks.UnitTests/BuildingBlocks.UnitTests.csproj" />
+    <Project Path="tests/unit/CallService.UnitTests/CallService.UnitTests.csproj" />
     <Project Path="tests/unit/ChatService.UnitTests/ChatService.UnitTests.csproj" />
     <Project Path="tests/unit/DisciplineService.UnitTests/DisciplineService.UnitTests.csproj" />
     <Project Path="tests/unit/MediaService.UnitTests/MediaService.UnitTests.csproj" />
@@ -61,6 +62,9 @@
     <Project Path="tests/integration/NotificationService.IntegrationTests/NotificationService.IntegrationTests.csproj" />
     <Project Path="tests/integration/PresenceService.IntegrationTests/PresenceService.IntegrationTests.csproj" />
     <Project Path="tests/integration/UserService.IntegrationTests/UserService.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/e2e/">
+    <Project Path="tests/e2e/DisciplineChatE2ETests/DisciplineChatE2ETests.csproj" />
   </Folder>
   <Folder Name="/tests/smoke/">
     <Project Path="tests/smoke/SmokeTests/SmokeTests.csproj" />

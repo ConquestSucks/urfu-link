@@ -17,6 +17,7 @@ public sealed class DisciplineRepository(
     {
         return dbContext.Disciplines
             .Include(d => d.Enrollments)
+            .Include(d => d.Subgroups)
             .FirstOrDefaultAsync(d => d.Id == disciplineId, cancellationToken);
     }
 

@@ -14,6 +14,10 @@ service:
 env:
   ASPNETCORE_ENVIRONMENT: Development
   ASPNETCORE_URLS: http://+:8080
+  GrpcClients__InternalAuth__TokenEndpoint: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/token
+  GrpcClients__InternalAuth__ClientId: chat-service-internal
+  GrpcClients__InternalAuth__ClientSecret: chat-service-internal-dev-secret
+  GrpcClients__ChatService__Address: http://chat-service:8081
 
 secrets:
   enabled: true

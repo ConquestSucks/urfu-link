@@ -3,14 +3,18 @@
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" />
     <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Grpc.Net.Client" />
     <PackageReference Include="Grpc.Tools">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" />
+    <PackageReference Include="StackExchange.Redis" />
   </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="Protos\internal.proto" GrpcServices="Server" />
+    <Protobuf Include="..\..\Chat\ChatService.Api\Protos\internal.proto" GrpcServices="Client" Link="Protos\chat-internal.proto" />
   </ItemGroup>
 
   <ItemGroup>

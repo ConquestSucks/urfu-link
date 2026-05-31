@@ -7,6 +7,7 @@ using Urfu.Link.BuildingBlocks.Contracts.Integration;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.Services.Chat.Application.Disciplines;
+using Urfu.Link.Services.Chat.Domain.Aggregates;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.Interfaces;
 using Urfu.Link.Services.Chat.Messaging;
@@ -321,6 +322,35 @@ public sealed class DisciplineConversationFlowTests : IAsyncLifetime
                 && e.OwnerTeacherId == teacherId
                 && e.Title == "Pub"
                 && e.CoverAssetId == coverId);
+    }
+
+    [Fact]
+    public async Task SubgroupCreated_PublishesChatDisciplineConversationCreated()
+    {
+        var disciplineId = Guid.NewGuid();
+        var subgroupId = Guid.NewGuid();
+        var teacherId = Guid.NewGuid();
+        var service = ResolveService();
+
+        await service.HandleSubgroupCreatedAsync(
+            new DisciplineSubgroupCreatedEvent(
+                disciplineId,
+                subgroupId,
+                "Algorithms",
+                null,
+                "Group A",
+                [teacherId],
+                []),
+            CancellationToken.None);
+
+        _factory.OutboxWriter.Published
+            .Select(p => p.Payload)
+            .OfType<ChatDisciplineConversationCreatedEvent>()
+            .Should().ContainSingle()
+            .Which.Should().Match<ChatDisciplineConversationCreatedEvent>(e =>
+                e.DisciplineId == disciplineId
+                && e.ConversationId == Conversation.ComputeDisciplineSubgroupId(disciplineId, subgroupId)
+                && e.OwnerTeacherId == teacherId);
     }
 
     [Fact]

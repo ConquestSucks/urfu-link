@@ -33,12 +33,13 @@ public sealed class DeploymentContractTests
     public void ProductionPomeriumRoutesShouldProxyApiAndSignalRHubsToGateway()
     {
         var config = ReadRepoFile("deploy", "k8s", "platform", "identity", "pomerium-config.yaml");
+        var normalizedConfig = NormalizeLineEndings(config);
         var ingress = ReadRepoFile("deploy", "k8s", "platform", "ingress", "frontend-web-ingress.yaml");
 
         Assert.Contains("prefix: /api", config, StringComparison.Ordinal);
         Assert.Contains("prefix: /hubs", config, StringComparison.Ordinal);
         Assert.Contains("allow_websockets: true", config, StringComparison.Ordinal);
-        Assert.Contains("jwt_claims_headers:\n      X-Session-Id: sid\n\n    routes:", config, StringComparison.Ordinal);
+        Assert.Contains("jwt_claims_headers:\n      X-Session-Id: sid\n\n    routes:", normalizedConfig, StringComparison.Ordinal);
         Assert.Equal(1, CountOccurrences(config, "jwt_claims_headers:"));
         Assert.Contains("timeout: 12h", config, StringComparison.Ordinal);
         Assert.Contains("idle_timeout: 75s", config, StringComparison.Ordinal);
@@ -69,7 +70,9 @@ public sealed class DeploymentContractTests
         var gatewayValues = ReadRepoFile("deploy", "helm", "services", "api-gateway", "values-prod.yaml");
 
         Assert.Contains("EXPO_PUBLIC_API_URL: https://api.urfu-link.ghjc.ru", frontendValues, StringComparison.Ordinal);
+        Assert.Contains("EXPO_PUBLIC_KEYCLOAK_URL: https://id.ghjc.ru", frontendValues, StringComparison.Ordinal);
         Assert.Contains("\"EXPO_PUBLIC_API_URL\": \"https://api.urfu-link.ghjc.ru\"", easConfig, StringComparison.Ordinal);
+        Assert.Contains("\"EXPO_PUBLIC_KEYCLOAK_URL\": \"https://id.ghjc.ru\"", easConfig, StringComparison.Ordinal);
         Assert.Contains("ingress/api-gateway-ingress.yaml", platformKustomization, StringComparison.Ordinal);
         Assert.Contains("- ingress-nginx", gatewayValues, StringComparison.Ordinal);
     }
@@ -114,6 +117,34 @@ public sealed class DeploymentContractTests
         Assert.Contains("MINIO_API_CORS_ALLOW_ORIGIN", minioTenant, StringComparison.Ordinal);
         Assert.Contains("https://urfu-link.ghjc.ru", minioTenant, StringComparison.Ordinal);
         Assert.DoesNotContain("mc cors set", minioBucketsJob, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ProductionLiveKitShouldExposeBrowserReachableWebRtcAndTurnPorts()
+    {
+        var livekit = ReadRepoFile("deploy", "k8s", "platform", "media", "livekit.yaml");
+        var preflight = ReadRepoFile("deploy", "scripts", "prod-media-preflight.ps1");
+        var switchScript = ReadRepoFile("deploy", "scripts", "prod-media-switch.ps1");
+        var osPrep = ReadRepoFile("deploy", "ansible", "roles", "os_prep", "tasks", "main.yml");
+
+        Assert.Contains("hostNetwork: true", livekit, StringComparison.Ordinal);
+        Assert.Contains("use_external_ip: true", livekit, StringComparison.Ordinal);
+        Assert.Contains("tcp_port: 7881", livekit, StringComparison.Ordinal);
+        Assert.Contains("port_range_start: 50000", livekit, StringComparison.Ordinal);
+        Assert.Contains("port_range_end: 50100", livekit, StringComparison.Ordinal);
+        Assert.Contains("domain: turn.urfu-link.ghjc.ru", livekit, StringComparison.Ordinal);
+        Assert.Contains("udp_port: 3478", livekit, StringComparison.Ordinal);
+        Assert.Contains("tls_port: 5349", livekit, StringComparison.Ordinal);
+        Assert.Contains("relay_range_start: 50101", livekit, StringComparison.Ordinal);
+        Assert.Contains("relay_range_end: 50200", livekit, StringComparison.Ordinal);
+
+        Assert.Contains("UFW_50000_50100_UDP", preflight, StringComparison.Ordinal);
+        Assert.Contains("UFW_50101_50200_UDP", preflight, StringComparison.Ordinal);
+        foreach (var file in new[] { switchScript, osPrep })
+        {
+            Assert.Contains("50000:50100", file, StringComparison.Ordinal);
+            Assert.Contains("50101:50200", file, StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -336,6 +367,8 @@ public sealed class DeploymentContractTests
 
         return File.ReadAllText(Path.Combine([repoRoot, .. pathSegments]));
     }
+
+    private static string NormalizeLineEndings(string value) => value.ReplaceLineEndings("\n");
 
     private static string GetYamlDocumentByName(string manifest, string name)
     {

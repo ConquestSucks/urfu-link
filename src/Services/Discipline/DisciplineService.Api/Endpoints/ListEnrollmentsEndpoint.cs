@@ -73,7 +73,7 @@ public sealed class ListEnrollmentsEndpoint(
             new ListEnrollmentsResponse
             {
                 Items = page.Items
-                    .Select(e => new EnrollmentResponse(e.UserId, e.Role, e.EnrolledAtUtc, e.EnrolledBy))
+                    .Select(e => new EnrollmentResponse(e.UserId, e.Role, e.SubgroupId, e.EnrolledAtUtc, e.EnrolledBy))
                     .ToList(),
                 NextCursor = EnrollmentCursorCodec.Encode(page.NextCursor),
             },

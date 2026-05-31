@@ -1,4 +1,5 @@
 using Urfu.Link.BuildingBlocks.Contracts.Integration.Chat;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Call;
 using Urfu.Link.Services.Chat.Domain.Enums;
 using Urfu.Link.Services.Chat.Domain.ValueObjects;
 
@@ -40,7 +41,9 @@ public sealed class Message
         int threadReplyCount,
         IEnumerable<Guid>? threadParticipants,
         DateTimeOffset? threadLastReplyAtUtc,
-        ParticipantRole authorRole)
+        ParticipantRole authorRole,
+        MessageKind kind,
+        SystemCallInfo? systemCall)
     {
         Id = id;
         ConversationId = conversationId;
@@ -68,6 +71,8 @@ public sealed class Message
         _threadParticipants = threadParticipants?.ToList() ?? [];
         ThreadLastReplyAtUtc = threadLastReplyAtUtc;
         AuthorRole = authorRole;
+        Kind = kind;
+        SystemCall = systemCall;
     }
 
     public Guid Id { get; }
@@ -147,6 +152,10 @@ public sealed class Message
     /// </summary>
     public ParticipantRole AuthorRole { get; }
 
+    public MessageKind Kind { get; }
+
+    public SystemCallInfo? SystemCall { get; }
+
     public static Message Send(
         Guid id,
         string conversationId,
@@ -190,7 +199,9 @@ public sealed class Message
             threadReplyCount: 0,
             threadParticipants: null,
             threadLastReplyAtUtc: null,
-            authorRole: authorRole);
+            authorRole: authorRole,
+            kind: MessageKind.User,
+            systemCall: null);
     }
 
     /// <summary>
@@ -252,7 +263,57 @@ public sealed class Message
             threadReplyCount: 0,
             threadParticipants: null,
             threadLastReplyAtUtc: null,
-            authorRole: authorRole);
+            authorRole: authorRole,
+            kind: MessageKind.User,
+            systemCall: null);
+    }
+
+    public static Message CreateSystemCall(
+        Guid id,
+        string conversationId,
+        Guid senderId,
+        string body,
+        string clientMessageId,
+        DateTimeOffset createdAtUtc,
+        Guid callId,
+        CallType callType,
+        SystemCallStatus status,
+        Guid callerId,
+        TimeSpan? duration = null,
+        CallEndReason? endReason = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(conversationId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(clientMessageId);
+
+        return new Message(
+            id,
+            conversationId,
+            senderId,
+            body ?? string.Empty,
+            attachments: Array.Empty<Attachment>(),
+            clientMessageId,
+            MessageState.Sent,
+            createdAtUtc,
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            editedAtUtc: null,
+            editHistory: null,
+            deletedAtUtc: null,
+            deletedBy: null,
+            deleteMode: null,
+            hiddenFor: null,
+            reactions: null,
+            mentions: null,
+            replyTo: null,
+            forwardedFrom: null,
+            readBy: null,
+            threadRootId: null,
+            threadReplyCount: 0,
+            threadParticipants: null,
+            threadLastReplyAtUtc: null,
+            authorRole: ParticipantRole.Member,
+            kind: MessageKind.SystemCall,
+            systemCall: new SystemCallInfo(callId, callType, status, callerId, duration, endReason));
     }
 
     public static Message Hydrate(
@@ -281,7 +342,9 @@ public sealed class Message
         int threadReplyCount = 0,
         IEnumerable<Guid>? threadParticipants = null,
         DateTimeOffset? threadLastReplyAtUtc = null,
-        ParticipantRole authorRole = ParticipantRole.Member)
+        ParticipantRole authorRole = ParticipantRole.Member,
+        MessageKind kind = MessageKind.User,
+        SystemCallInfo? systemCall = null)
         => new(
             id,
             conversationId,
@@ -308,7 +371,9 @@ public sealed class Message
             threadReplyCount,
             threadParticipants,
             threadLastReplyAtUtc,
-            authorRole);
+            authorRole,
+            kind,
+            systemCall);
 
     public bool MarkDelivered(DateTimeOffset atUtc)
     {

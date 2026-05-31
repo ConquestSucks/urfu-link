@@ -29,7 +29,6 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
         Assert.Equal(freshUserId, profile.UserId);
         Assert.Null(profile.Account.AvatarUrl);
         Assert.Null(profile.Account.AboutMe);
-        Assert.True(profile.Privacy.ShowOnlineStatus);
         Assert.True(profile.Privacy.ShowLastVisitTime);
         Assert.True(profile.Notifications.NewMessages);
         Assert.True(profile.Notifications.NotificationSound);
@@ -102,13 +101,12 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
 
         var updateResponse = await client.PutAsJsonAsync(
             new Uri("/api/v1/me/privacy", UriKind.Relative),
-            new { ShowOnlineStatus = false, ShowLastVisitTime = false });
+            new { ShowLastVisitTime = false });
 
         Assert.Equal(HttpStatusCode.NoContent, updateResponse.StatusCode);
 
         var getResponse = await client.GetAsync(new Uri("/api/v1/me", UriKind.Relative));
         var profile = await getResponse.Content.ReadFromJsonAsync<UserProfileResponse>();
-        Assert.False(profile?.Privacy.ShowOnlineStatus);
         Assert.False(profile?.Privacy.ShowLastVisitTime);
     }
 

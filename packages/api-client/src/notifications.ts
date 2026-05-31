@@ -56,6 +56,10 @@ export type NotificationBadgeDto = {
   totalUnseen: number;
   urgentUnread: number;
   perType: Record<string, number> | null;
+  scopes?: {
+    chats: number;
+    disciplines: number;
+  } | null;
 };
 
 export type NotificationListStatus =

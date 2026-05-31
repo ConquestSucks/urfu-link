@@ -12,6 +12,7 @@ type ExpoAudioModule = typeof import("expo-audio");
 type AudioPlayer = import("expo-audio").AudioPlayer;
 type AudioSource = import("expo-audio").AudioSource;
 type AudioRuntime = Pick<ExpoAudioModule, "createAudioPlayer" | "setAudioModeAsync">;
+type PlayableAudioPlayer = AudioPlayer & { play: () => void | Promise<void> };
 
 const RECEIVE_THROTTLE_MS = 400;
 const DEFAULT_PREFERENCES: UserNotifications = {
@@ -89,6 +90,10 @@ const getPlayer = async (kind: SoundKind) => {
     return players[kind]!;
 };
 
+const playPlayer = async (player: AudioPlayer) => {
+    await Promise.resolve((player as PlayableAudioPlayer).play());
+};
+
 export const configureMessageSounds = (nextPreferences: UserNotifications | null | undefined) => {
     preferences = {
         ...(nextPreferences ?? DEFAULT_PREFERENCES),
@@ -106,7 +111,7 @@ export const playMessageSound = async (
         const player = await getPlayer(kind);
         if (player.playing) player.pause();
         await player.seekTo(0).catch(() => undefined);
-        player.play();
+        await playPlayer(player);
         return true;
     } catch {
         return false;

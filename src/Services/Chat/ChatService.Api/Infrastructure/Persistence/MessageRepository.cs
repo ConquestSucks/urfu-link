@@ -302,6 +302,7 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
 
     public async Task<IReadOnlyList<Guid>> MarkReadUpToAsync(
         string conversationId,
+        Guid readerUserId,
         Guid upToMessageId,
         DateTimeOffset readAtUtc,
         CancellationToken cancellationToken)
@@ -322,55 +323,81 @@ internal sealed class MessageRepository(ChatMongoContext context) : IMessageRepo
 
         var fb = Builders<MessageDocument>.Filter;
         var anchorTs = anchor.CreatedAtUtc;
-        var filter = fb.And(
+        var rangeFilter = fb.And(
             fb.Eq(m => m.ConversationId, conversationId),
             fb.Eq(m => m.ThreadRootId, (Guid?)null),
-            fb.Ne(m => m.State, MessageState.Read),
             fb.Ne(m => m.State, MessageState.Deleted),
             fb.Or(
                 fb.Lt(m => m.CreatedAtUtc, anchorTs),
                 fb.And(fb.Eq(m => m.CreatedAtUtc, anchorTs), fb.Lte(m => m.Id, upToMessageId))));
 
-        var transitioned = await context.Messages
-            .Find(filter)
+        var receiptMissingFilter = fb.And(
+            rangeFilter,
+            fb.Not(fb.ElemMatch(m => m.ReadBy, r => r.UserId == readerUserId)));
+
+        var newlyRead = await context.Messages
+            .Find(receiptMissingFilter)
             // Sort oldest → newest so callers see ids in chronological order. The anchor sits
             // at the tail of the list.
             .Sort(Builders<MessageDocument>.Sort.Ascending(m => m.CreatedAtUtc).Ascending(m => m.Id))
-            .Project(m => new { m.Id, m.DeliveredAtUtc })
+            .Project(m => new { m.Id, m.State, m.DeliveredAtUtc })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (transitioned.Count == 0)
+        if (newlyRead.Count == 0)
         {
             return Array.Empty<Guid>();
         }
 
         var ts = readAtUtc.UtcDateTime;
+        var newlyReadIds = newlyRead.Select(t => t.Id).ToList();
+        var transitionIds = newlyRead
+            .Where(t => t.State != MessageState.Read)
+            .Select(t => t.Id)
+            .ToList();
 
-        // Set Delivered timestamp where it's not yet set, then set Read state and ReadAt.
-        var deliveredUpdate = Builders<MessageDocument>.Update
-            .Set(m => m.DeliveredAtUtc, ts);
+        if (transitionIds.Count > 0)
+        {
+            // Set Delivered timestamp where it's not yet set, then set Read state and ReadAt.
+            var deliveredUpdate = Builders<MessageDocument>.Update
+                .Set(m => m.DeliveredAtUtc, ts);
+            await context.Messages
+                .UpdateManyAsync(
+                    fb.And(
+                        fb.Eq(m => m.ConversationId, conversationId),
+                        fb.In(m => m.Id, newlyRead.Where(t => t.DeliveredAtUtc is null).Select(t => t.Id).ToList()),
+                        fb.Eq(m => m.DeliveredAtUtc, default(DateTime?))),
+                    deliveredUpdate,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            var readUpdate = Builders<MessageDocument>.Update
+                .Set(m => m.State, MessageState.Read)
+                .Set(m => m.ReadAtUtc, ts);
+            await context.Messages
+                .UpdateManyAsync(
+                    fb.And(
+                        fb.Eq(m => m.ConversationId, conversationId),
+                        fb.In(m => m.Id, transitionIds),
+                        fb.Ne(m => m.State, MessageState.Read)),
+                    readUpdate,
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        var receiptUpdate = Builders<MessageDocument>.Update
+            .Push(m => m.ReadBy, ReadReceiptDocument.FromDomain(new ReadReceipt(readerUserId, readAtUtc)));
         await context.Messages
             .UpdateManyAsync(
                 fb.And(
-                    fb.Eq(m => m.ConversationId, conversationId),
-                    fb.In(m => m.Id, transitioned.Where(t => t.DeliveredAtUtc is null).Select(t => t.Id).ToList()),
-                    fb.Eq(m => m.DeliveredAtUtc, default(DateTime?))),
-                deliveredUpdate,
+                    rangeFilter,
+                    fb.In(m => m.Id, newlyReadIds),
+                    fb.Not(fb.ElemMatch(m => m.ReadBy, r => r.UserId == readerUserId))),
+                receiptUpdate,
                 cancellationToken: cancellationToken)
             .ConfigureAwait(false);
 
-        var readUpdate = Builders<MessageDocument>.Update
-            .Set(m => m.State, MessageState.Read)
-            .Set(m => m.ReadAtUtc, ts);
-        await context.Messages
-            .UpdateManyAsync(
-                fb.And(fb.Eq(m => m.ConversationId, conversationId), fb.In(m => m.Id, transitioned.Select(t => t.Id).ToList())),
-                readUpdate,
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-        return transitioned.Select(t => t.Id).ToList();
+        return newlyReadIds;
     }
 
     public async Task<bool> ApplyEditAsync(

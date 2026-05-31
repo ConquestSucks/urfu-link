@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
+import { useRouter } from "expo-router";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ChatHeader } from "./chat-header/ChatHeader";
 import { ChatInput, type ChatInputHandle } from "./chat-input/Input";
-import { MessagesList, type MessagesListHandle } from "./MessagesList";
+import { MessagesList, type MessageAuthorProfile, type MessagesListHandle } from "./MessagesList";
 import { SubjectHeader } from "./subject-header/SubjectHeader";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useParticipantsStore } from "@/entities/conversation/model/participants-store";
@@ -12,8 +13,6 @@ import {
     restoreDirectDraftConversation,
 } from "@/entities/conversation/model/direct-draft-cache";
 import { isDirectDraftConversation } from "@/entities/conversation/model/direct-draft-status";
-import { apiClient } from "@/shared/lib/api";
-import type { DocumentPickerAsset } from "expo-document-picker";
 import { LocalSearchPanel } from "@/features/chat-search";
 import {
     ForwardPickerModal,
@@ -26,16 +25,22 @@ import { PinnedMessagesModal } from "./PinnedMessagesModal";
 import { ThreadPanel } from "./thread/ThreadPanel";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { ModalOverlay } from "@/shared/ui";
+import { apiClient } from "@/shared/lib/api";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import { useCallStore } from "@/entities/call";
 import {
     toChatThreadViewingContext,
     toChatViewingContext,
     usePresenceStore,
 } from "@/entities/presence";
+import { useConversationSend } from "../lib/use-conversation-send";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
-    const { sendMessage, setPendingScrollToMessageId } = useChatStore();
+    const router = useRouter();
+    const { setPendingScrollToMessageId } = useChatStore();
+    const startCall = useCallStore((state) => state.startCall);
+    const joinCall = useCallStore((state) => state.joinCall);
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === (params.id as string)),
     );
@@ -49,6 +54,7 @@ export const ChatView = () => {
     const [forwardIds, setForwardIds] = useState<string[] | null>(null);
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
     const [isPinnedModalOpen, setIsPinnedModalOpen] = useState(false);
+    const [subjectProfileUserId, setSubjectProfileUserId] = useState<string | null>(null);
     const [isDocumentVisible, setIsDocumentVisible] = useState(() =>
         typeof document === "undefined" || document.visibilityState === "visible",
     );
@@ -56,52 +62,56 @@ export const ChatView = () => {
     const listRef = useRef<MessagesListHandle>(null);
     const inputRef = useRef<ChatInputHandle>(null);
     const currentUserId = useCurrentUserId();
+    const [isStartingCall, setIsStartingCall] = useState(false);
     const setViewingContexts = usePresenceStore((s) => s.setViewingContexts);
-
     const chatId = params.id as string;
+    const handleSend = useConversationSend(chatId);
+
+    const handleStartConversationCall = useCallback(async (callType: "Audio" | "Video") => {
+        if (!conversation || isStartingCall) return;
+        try {
+            setIsStartingCall(true);
+            const call = await startCall(conversation.id, callType);
+            if (call.status === "Active") {
+                router.push(`/call/${call.id}` as never);
+            }
+        } finally {
+            setIsStartingCall(false);
+        }
+    }, [conversation, isStartingCall, router, startCall]);
+
+    const handleStartAudioCall = useCallback(
+        () => void handleStartConversationCall("Audio"),
+        [handleStartConversationCall],
+    );
+
+    const handleStartVideoCall = useCallback(
+        () => void handleStartConversationCall("Video"),
+        [handleStartConversationCall],
+    );
+
+    const handleSystemCallJoin = useCallback(
+        async (callId: string) => {
+            await joinCall(callId);
+            router.push(`/call/${callId}` as never);
+        },
+        [joinCall, router],
+    );
+
     const routeMessageId = typeof params.message === "string" ? params.message : null;
     const routeThreadRootId = typeof params.thread === "string" ? params.thread : null;
     const type = currentTab === "chats" ? "chat" : "subject";
+    const handleAuthorPress = useCallback(
+        (author: MessageAuthorProfile) => {
+            if (type === "subject") {
+                setSubjectProfileUserId(author.userId);
+            }
+        },
+        [type],
+    );
     const isDirectDraft = isDirectDraftConversation(conversation);
     const isUnknownDirectDraft = type === "chat" && !conversation && isDirectDraftId(chatId);
     const shouldSkipRemoteConversationLoads = isDirectDraft || isUnknownDirectDraft;
-
-    const handleSend = useCallback(
-        async (
-            text: string,
-            files: DocumentPickerAsset[],
-            replyToMessageId?: string,
-            mentionUserIds?: string[],
-        ) => {
-            try {
-                const assetIds: string[] = [];
-
-                for (const file of files) {
-                    const initRes = await apiClient.media.initUpload({
-                        fileName: file.name,
-                        size: file.size ?? 0,
-                        mimeType: file.mimeType ?? "application/octet-stream",
-                        visibility: "Private",
-                    });
-
-                    const uploadBody = file.file ?? (await fetch(file.uri).then((r) => r.blob()));
-                    await fetch(initRes.presignedPutUrl, {
-                        method: "PUT",
-                        body: uploadBody,
-                    });
-
-                    await apiClient.media.completeUpload({ assetId: initRes.assetId });
-                    assetIds.push(initRes.assetId);
-                }
-
-                await sendMessage(chatId, text, assetIds, replyToMessageId, mentionUserIds);
-            } catch (error) {
-                console.error("Failed to send message", error);
-                throw error;
-            }
-        },
-        [chatId, sendMessage],
-    );
 
     const handleSearchResultPress = useCallback(
         async (item: SearchResultDto) => {
@@ -135,6 +145,10 @@ export const ChatView = () => {
             setPendingScrollToMessageId(routeMessageId);
         }
     }, [routeMessageId, routeThreadRootId, setPendingScrollToMessageId]);
+
+    useEffect(() => {
+        setSubjectProfileUserId(null);
+    }, [chatId, type]);
 
     useEffect(() => {
         if (type !== "chat" || conversation || !isDirectDraftId(chatId)) {
@@ -206,6 +220,11 @@ export const ChatView = () => {
     ]);
 
     const pinnedIds = conversation?.pinnedMessageIds ?? [];
+    const currentRole = currentUserId && conversation ? conversation.participantRoles?.[currentUserId] : undefined;
+    const canManagePins =
+        conversation?.capabilities?.canManagePins ??
+        (conversation?.type === "Direct" ||
+            (conversation?.groupSubtype === "Discipline" && currentRole === "Teacher"));
     const isActionsTargetPinned = !!(
         actionsTarget && pinnedIds.includes(actionsTarget.id)
     );
@@ -296,29 +315,38 @@ export const ChatView = () => {
 
     const mainColumn = (
         <View className="bg-app-card flex-1">
-            {type === "chat" ? (
-                isSearching ? (
-                    <LocalSearchPanel
-                        conversationId={chatId}
-                        onResultPress={handleSearchResultPress}
-                        onClose={() => setIsSearching(false)}
-                    />
-                ) : (
+            {isSearching ? (
+                <LocalSearchPanel
+                    conversationId={chatId}
+                    onResultPress={handleSearchResultPress}
+                    onClose={() => setIsSearching(false)}
+                />
+            ) : type === "chat" ? (
                     <ChatHeader
                         chatId={chatId}
                         onOpenSearch={() => setIsSearching(true)}
                         onOpenPinned={() => setIsPinnedModalOpen(true)}
+                        onStartAudioCall={handleStartAudioCall}
+                        onStartVideoCall={handleStartVideoCall}
                     />
-                )
             ) : (
                 <SubjectHeader
                     subjectId={chatId}
+                    onOpenSearch={() => setIsSearching(true)}
                     onOpenPinned={() => setIsPinnedModalOpen(true)}
+                    onStartGroupAudioCall={handleStartAudioCall}
+                    onStartGroupVideoCall={handleStartVideoCall}
+                    profileUserId={subjectProfileUserId}
+                    onProfileUserIdChange={setSubjectProfileUserId}
                 />
             )}
 
-            {type === "chat" && pinnedIds.length > 0 && (
-                <PinnedBar conversationId={chatId} listRef={listRef} />
+            {pinnedIds.length > 0 && (
+                <PinnedBar
+                    conversationId={chatId}
+                    listRef={listRef}
+                    canManagePins={canManagePins}
+                />
             )}
 
             <MessagesList
@@ -328,8 +356,10 @@ export const ChatView = () => {
                 skipInitialLoad={shouldSkipRemoteConversationLoads}
                 onMessageLongPress={(message) => openActionsMenu(message)}
                 onMessageContextMenu={openActionsMenu}
+                onAuthorPress={type === "subject" ? handleAuthorPress : undefined}
                 onThreadOpen={setOpenThreadRootId}
                 onFilesDropped={(files) => inputRef.current?.addFilesAndOpenModal(files)}
+                onSystemCallJoin={(callId) => void handleSystemCallJoin(callId)}
             />
             {!isUnknownDirectDraft && (
                 <ChatInput
@@ -392,6 +422,7 @@ export const ChatView = () => {
                     if (actionsTarget) setReactionTargetId(actionsTarget.id);
                     closeActionsMenu();
                 }}
+                canManagePins={canManagePins}
             />
             <ReactionPickerModal
                 messageId={reactionTargetId}
@@ -406,6 +437,7 @@ export const ChatView = () => {
                 conversationId={chatId}
                 onClose={() => setIsPinnedModalOpen(false)}
                 onJumpToMessage={jumpToMessage}
+                canManagePins={canManagePins}
             />
         </View>
     );

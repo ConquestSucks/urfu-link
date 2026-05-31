@@ -37,9 +37,17 @@ interface ChatHeaderProps {
     chatId: string;
     onOpenSearch?: () => void;
     onOpenPinned?: () => void;
+    onStartAudioCall?: () => void;
+    onStartVideoCall?: () => void;
 }
 
-export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderProps) => {
+export const ChatHeader = ({
+    chatId,
+    onOpenSearch,
+    onOpenPinned,
+    onStartAudioCall,
+    onStartVideoCall,
+}: ChatHeaderProps) => {
     const [isProfileOpen, setIsProfileOpen] = useState(false);
     const { isMobile } = useWindowSize();
     const conversation = useChatStore((s) =>
@@ -55,6 +63,13 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
         profile?.notifications.mutedConversationIds?.includes(chatId) ?? false;
     const notificationsPending =
         muteNotifications.isPending || unmuteNotifications.isPending;
+    const handleToggleNotifications = React.useCallback(() => {
+        if (notificationsMuted) {
+            unmuteNotifications.mutate(chatId);
+        } else {
+            muteNotifications.mutate(chatId);
+        }
+    }, [chatId, muteNotifications, notificationsMuted, unmuteNotifications]);
 
     // Для direct-чата peerUserId — тот, кто не равен currentUserId.
     // Заголовок и аватар берём из participants (lookup-кэш TTL 5 мин,
@@ -97,6 +112,7 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
 
     const isDirectPresenceLoading =
         conversation.type === "Direct" && (isDirectIdentityLoading || (!!peer?.userId && !peerPresence));
+    const canOpenPeerProfile = conversation.type === "Direct" && !isDirectIdentityLoading;
     const indicatorStatus = presenceStatusToIndicator(peerPresence?.status);
     const statusLabel = peerPresence
         ? presenceStatusToLabel(peerPresence.status)
@@ -115,7 +131,14 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
                             <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
                         </Pressable>
                     )}
-                    <View className="flex-row gap-3 items-center">
+                    <Pressable
+                        testID="chat-header-profile-trigger"
+                        onPress={() => setIsProfileOpen(true)}
+                        disabled={!canOpenPeerProfile}
+                        className={`flex-row gap-3 items-center flex-1 min-w-0 rounded-xl ${
+                            canOpenPeerProfile ? "active:opacity-80 cursor-pointer" : "cursor-default"
+                        }`}
+                    >
                         <View className="relative z-1 p-0.5">
                             {isDirectIdentityLoading ? (
                                 <Skeleton
@@ -180,17 +203,19 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
                                         />
                                     );
                                 }
-                                if (indicatorStatus === "online" && statusLabel) {
+                                if (indicatorStatus !== "offline" && statusLabel) {
                                     return (
                                         <Text
                                             numberOfLines={1}
-                                            className="leading-none text-xs font-medium text-success-600"
+                                            className={`leading-none text-xs font-medium ${
+                                                indicatorStatus === "online" ? "text-success-600" : "text-text-muted"
+                                            }`}
                                         >
                                             {statusLabel}
                                         </Text>
                                     );
                                 }
-                                if (peerPresence?.lastSeenAt) {
+                                if (peerPresence) {
                                     return (
                                         <LastSeenLabel
                                             lastSeenAt={peerPresence.lastSeenAt}
@@ -203,27 +228,27 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
                                         numberOfLines={1}
                                         className="leading-none text-xs font-medium text-text-muted"
                                     >
-                                        {statusLabel ?? "Не в сети"}
+                                        {statusLabel ?? "Был недавно"}
                                     </Text>
                                 );
                             })()}
                         </View>
-                    </View>
+                    </Pressable>
                 </View>
 
                 <ChatHeaderActions
                     onOpenProfile={() => setIsProfileOpen(true)}
                     onOpenPinned={() => onOpenPinned?.()}
                     onSearchPress={() => onOpenSearch?.()}
+                    onStartAudioCall={
+                        conversation?.type === "Direct" ? onStartAudioCall : undefined
+                    }
+                    onStartVideoCall={
+                        conversation?.type === "Direct" ? onStartVideoCall : undefined
+                    }
                     notificationsMuted={notificationsMuted}
                     notificationsPending={notificationsPending}
-                    onToggleNotifications={() => {
-                        if (notificationsMuted) {
-                            unmuteNotifications.mutate(chatId);
-                        } else {
-                            muteNotifications.mutate(chatId);
-                        }
-                    }}
+                    onToggleNotifications={handleToggleNotifications}
                 />
             </View>
 
@@ -236,6 +261,11 @@ export const ChatHeader = ({ chatId, onOpenSearch, onOpenPinned }: ChatHeaderPro
                     status: peerPresence?.status,
                     lastSeenAt: peerPresence?.lastSeenAt,
                 }}
+                onStartAudioCall={conversation.type === "Direct" ? onStartAudioCall : undefined}
+                onStartVideoCall={conversation.type === "Direct" ? onStartVideoCall : undefined}
+                onToggleNotifications={handleToggleNotifications}
+                notificationsMuted={notificationsMuted}
+                notificationsPending={notificationsPending}
             />
         </>
     );

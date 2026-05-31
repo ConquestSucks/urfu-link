@@ -23,6 +23,7 @@ public sealed class MediaAssetConfiguration : IEntityTypeConfiguration<MediaAsse
         builder.Property(a => a.Size).HasColumnName("size_bytes").IsRequired();
         builder.Property(a => a.MimeType).HasColumnName("mime_type").HasMaxLength(127).IsRequired();
         builder.Property(a => a.OriginalFileName).HasColumnName("original_file_name").HasMaxLength(255).IsRequired();
+        builder.Property(a => a.DurationSeconds).HasColumnName("duration_seconds");
         builder.Property(a => a.Checksum).HasColumnName("checksum").HasMaxLength(128);
         builder.Property(a => a.State).HasColumnName("state").HasConversion<int>().IsRequired();
         builder.Property(a => a.CreatedAtUtc).HasColumnName("created_at_utc").IsRequired();

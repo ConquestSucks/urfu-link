@@ -20,6 +20,25 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
+  name: livekit-local
+  namespace: urfu-platform
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: livekit.dev.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: livekit
+                port:
+                  number: 7880
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
   name: minio-api-local
   namespace: urfu-platform
 spec:

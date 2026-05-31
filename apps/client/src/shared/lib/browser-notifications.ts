@@ -13,8 +13,10 @@ type BrowserNotificationInput = {
 const DEFAULT_PREFERENCES: Pick<UserNotifications, "mutedConversationIds"> = {
     mutedConversationIds: [],
 };
+const BROWSER_NOTIFICATIONS_ENABLED_KEY = "urfu-link:browser-notifications-enabled";
 
 let preferences = DEFAULT_PREFERENCES;
+let browserNotificationsEnabledFallback = true;
 const shownKeys = new Set<string>();
 let navigateToHref = (href: string) => window.location.assign(href);
 
@@ -34,6 +36,39 @@ const isMuted = (conversationId?: string | null) =>
 const getNotificationCtor = () =>
     isSupported() ? (window as unknown as { Notification: typeof Notification }).Notification : null;
 
+const getBrowserNotificationStorage = () => {
+    try {
+        return typeof window === "undefined" ? null : window.localStorage ?? null;
+    } catch {
+        return null;
+    }
+};
+
+export const getBrowserNotificationsEnabled = () => {
+    try {
+        const stored = getBrowserNotificationStorage()?.getItem(BROWSER_NOTIFICATIONS_ENABLED_KEY);
+        return stored == null ? browserNotificationsEnabledFallback : stored !== "false";
+    } catch {
+        return browserNotificationsEnabledFallback;
+    }
+};
+
+export const setBrowserNotificationsEnabled = (enabled: boolean) => {
+    browserNotificationsEnabledFallback = enabled;
+    const storage = getBrowserNotificationStorage();
+
+    if (!storage) return;
+    try {
+        if (enabled) {
+            storage.removeItem(BROWSER_NOTIFICATIONS_ENABLED_KEY);
+        } else {
+            storage.setItem(BROWSER_NOTIFICATIONS_ENABLED_KEY, "false");
+        }
+    } catch {
+        // Some browsers block localStorage in private modes; the in-memory fallback still applies.
+    }
+};
+
 const buildConversationHref = (
     conversationId: string,
     messageId: string | null | undefined,
@@ -49,9 +84,18 @@ const buildConversationMessageKey = (
     messageId?: string | null,
 ) => conversationId && messageId ? `message:${conversationId}:${messageId}` : null;
 
+const getMessageNotificationBody = (message: MessageDto) => {
+    if (message.body) return message.body;
+    if (message.attachments.some((attachment) => attachment.type === "Voice")) {
+        return "Голосовое сообщение";
+    }
+    return message.attachments.length > 0 ? "Вложение" : "Новое сообщение";
+};
+
 const showBrowserNotification = (input: BrowserNotificationInput): boolean => {
     const NotificationCtor = getNotificationCtor();
     if (!NotificationCtor || NotificationCtor.permission !== "granted") return false;
+    if (!getBrowserNotificationsEnabled()) return false;
     if (isPageActive()) return false;
     if (isMuted(input.conversationId)) return false;
 
@@ -115,7 +159,7 @@ export const showMessageBrowserNotification = (
     return showBrowserNotification({
         key: buildConversationMessageKey(message.conversationId, message.id) ?? `message:${message.id}`,
         title: context.title || "Новое сообщение",
-        body: message.body || (message.attachments.length > 0 ? "Вложение" : "Новое сообщение"),
+        body: getMessageNotificationBody(message),
         href: buildConversationHref(
             message.conversationId,
             message.id,
@@ -127,7 +171,7 @@ export const showMessageBrowserNotification = (
 
 export const showServerBrowserNotification = (notification: NotificationDto) => {
     const scope = inferNotificationScope(notification);
-    const target = resolveNotificationDeepLink(notification.deepLink, scope);
+    const target = resolveNotificationDeepLink(notification.deepLink, scope, notification.data);
     const conversationId = notification.data.conversationId;
     const messageId = notification.data.messageId;
     const conversationMessageKey = buildConversationMessageKey(conversationId, messageId);
@@ -144,8 +188,14 @@ export const showServerBrowserNotification = (notification: NotificationDto) => 
 
 export const resetBrowserNotificationsForTests = () => {
     preferences = DEFAULT_PREFERENCES;
+    browserNotificationsEnabledFallback = true;
     shownKeys.clear();
     navigateToHref = (href: string) => window.location.assign(href);
+    try {
+        getBrowserNotificationStorage()?.removeItem(BROWSER_NOTIFICATIONS_ENABLED_KEY);
+    } catch {
+        // ignore storage cleanup failures in tests and restricted browsers
+    }
 };
 
 export const setBrowserNotificationNavigationForTests = (

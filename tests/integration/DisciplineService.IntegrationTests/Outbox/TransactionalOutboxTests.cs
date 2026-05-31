@@ -62,10 +62,11 @@ public sealed class TransactionalOutboxTests : IAsyncLifetime
         var outboxRows = await verify.OutboxMessages
             .Where(m => m.PublishedAtUtc == null)
             .ToListAsync();
-        outboxRows.Should().HaveCount(2);
+        outboxRows.Should().HaveCount(3);
         outboxRows.Select(r => r.EventType).Should().Contain([
             "discipline.created.v1",
             "discipline.user_enrolled.v1",
+            "discipline.subgroup_created.v1",
         ]);
     }
 

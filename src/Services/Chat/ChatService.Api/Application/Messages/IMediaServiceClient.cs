@@ -14,7 +14,8 @@ public sealed record MediaAssetMetadata(
     long SizeBytes,
     string MimeType,
     string OriginalFileName,
-    bool IsUploaded);
+    bool IsUploaded,
+    int? DurationSeconds = null);
 
 /// <summary>
 /// Abstraction over MediaService gRPC. Decouples the chat application layer from generated

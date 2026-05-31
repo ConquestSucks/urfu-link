@@ -35,7 +35,7 @@ export const LinearProgress = ({ isVisible }: {
                 borderRadius: 999,
             },
         ]}>
-        <View className="bg-brand-600 w-full h-full"/>
+        <View className="bg-brand-650 w-full h-full"/>
       </AnimatedView>
     </View>);
 };

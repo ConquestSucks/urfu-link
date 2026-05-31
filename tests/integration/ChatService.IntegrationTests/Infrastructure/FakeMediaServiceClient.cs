@@ -24,9 +24,10 @@ public sealed class FakeMediaServiceClient : IMediaServiceClient
         long sizeBytes = 1024,
         string mimeType = "image/png",
         string fileName = "asset.png",
-        bool isUploaded = true)
+        bool isUploaded = true,
+        int? durationSeconds = null)
     {
-        _assets[assetId] = new MediaAssetMetadata(assetId, ownerId, kind, sizeBytes, mimeType, fileName, isUploaded);
+        _assets[assetId] = new MediaAssetMetadata(assetId, ownerId, kind, sizeBytes, mimeType, fileName, isUploaded, durationSeconds);
     }
 
     public Task<IReadOnlyList<MediaAssetMetadata>> BatchGetMetadataAsync(

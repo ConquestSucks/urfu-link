@@ -77,7 +77,7 @@ export const Select = ({ options, selectedValue, onSelect, onOpen, placeholder =
             width: dropdownCoords.width,
             zIndex: 50,
         }}>
-            <View className="bg-app-card border border-white/10 rounded-xl overflow-hidden max-h-60 shadow-modal">
+            <View className="bg-app-card border border-white/10 rounded-xl overflow-hidden max-h-60">
               <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
                 {loading ? (<View className="px-4 py-5 items-center justify-center">
                     <ActivityIndicator size="small" className="text-brand-600"/>

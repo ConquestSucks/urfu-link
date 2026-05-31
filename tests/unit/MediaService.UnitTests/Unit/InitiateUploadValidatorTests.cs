@@ -135,6 +135,70 @@ public class InitiateUploadValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("voice.m4a", "audio/m4a")]
+    [InlineData("voice.webm", "audio/webm")]
+    [InlineData("voice.mp4", "audio/mp4")]
+    public void AcceptsExplicitVoiceRecorderMimeTypes(string fileName, string mimeType)
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            fileName,
+            1024,
+            mimeType,
+            Visibility.Private,
+            RequestedKind: AssetKind.Voice,
+            DurationSeconds: 12);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void RejectsExplicitVoiceWithoutDeclaredDuration()
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            "voice.m4a",
+            1024,
+            "audio/m4a",
+            Visibility.Private,
+            RequestedKind: AssetKind.Voice);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(InitiateUploadRequest.DurationSeconds));
+    }
+
+    [Fact]
+    public void RejectsExplicitVoiceOverSizeLimit()
+    {
+        var sut = CreateValidator();
+        var request = new InitiateUploadRequest(
+            "voice.m4a",
+            10L * 1024 * 1024 + 1,
+            "audio/m4a",
+            Visibility.Private,
+            RequestedKind: AssetKind.Voice,
+            DurationSeconds: 12);
+
+        var result = sut.Validate(request);
+
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(InitiateUploadRequest.Size));
+    }
+
+    [Fact]
+    public void GenericM4aRemainsGeneralAudio()
+    {
+        var resolved = MimeTypeCatalog.TryResolve("audio/m4a", out var kind);
+
+        resolved.Should().BeTrue();
+        kind.Should().Be(AssetKind.Audio);
+    }
+
     [Fact]
     public void IgnoresDurationForKindsWithoutMaxDuration()
     {

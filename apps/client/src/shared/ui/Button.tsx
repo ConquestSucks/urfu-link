@@ -9,6 +9,7 @@ interface ButtonProps {
     icon?: React.ReactNode;
     variant?: "primary" | "secondary" | "danger";
     isLoading?: boolean;
+    disabled?: boolean;
     className?: string;
     textClassName?: string;
     children?: ReactNode; 
@@ -20,13 +21,16 @@ export const Button = ({
     icon,
     variant = "primary",
     isLoading,
+    disabled,
     className,
     textClassName,
     children,
 }: ButtonProps) => {
+    const isDisabled = Boolean(disabled || isLoading);
+
     const variantStyles = {
         primary:
-            "bg-brand-600 hover:bg-brand-400 active:bg-brand-700 active:scale-[0.98] active:opacity-90",
+            "bg-brand-650 hover:bg-brand-500 active:bg-brand-700 active:scale-[0.98] active:opacity-90",
         secondary:
             "bg-zinc-900 hover:bg-zinc-900/60 active:bg-zinc-900/80 active:scale-[0.98] active:opacity-90",
         danger: "bg-danger-500/10 hover:bg-danger-500/20 active:bg-red-500/20  active:scale-[0.98] active:opacity-90",
@@ -41,11 +45,11 @@ export const Button = ({
     return (
         <Pressable
             onPress={onPress}
-            disabled={isLoading}
+            disabled={isDisabled}
             className={twMerge(
                 "flex-row items-center justify-center h-fit px-4 py-2 rounded-xl gap-2 transition-all",
                 variantStyles[variant],
-                isLoading ? "opacity-70" : "",
+                isDisabled ? "opacity-60" : "",
                 className,
             )}
         >

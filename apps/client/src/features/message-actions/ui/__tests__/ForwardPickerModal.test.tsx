@@ -5,16 +5,22 @@ import { ForwardPickerModal } from "../ForwardPickerModal";
 
 const mockForwardMessages = jest.fn();
 const mockLoadParticipants = jest.fn();
+const mockUpdateConversation = jest.fn();
+const mockPrimeParticipants = jest.fn();
+const mockSearchUsers = jest.fn();
+const mockOpenDirectConversation = jest.fn();
 
 let mockChatState: {
     conversations: unknown[];
     messagesByConversation: Record<string, unknown[]>;
     forwardMessages: jest.Mock;
+    updateConversation: jest.Mock;
 };
 
 let mockParticipantsState: {
     byConversationId: Record<string, { items: unknown[]; fetchedAt: number }>;
     load: jest.Mock;
+    prime: jest.Mock;
 };
 
 jest.mock("@/entities/conversation/model/chat-store", () => ({
@@ -29,6 +35,17 @@ jest.mock("@/entities/conversation/model/participants-store", () => ({
 
 jest.mock("@/shared/store/auth-store", () => ({
     useCurrentUserId: () => "user-1",
+}));
+
+jest.mock("@/shared/lib/api", () => ({
+    apiClient: {
+        users: {
+            searchUsers: (...args: unknown[]) => mockSearchUsers(...args),
+        },
+        chat: {
+            openDirectConversation: (...args: unknown[]) => mockOpenDirectConversation(...args),
+        },
+    },
 }));
 
 jest.mock("@/shared/ui", () => {
@@ -78,6 +95,7 @@ describe("ForwardPickerModal", () => {
             ],
             messagesByConversation: {},
             forwardMessages: mockForwardMessages,
+            updateConversation: mockUpdateConversation,
         };
         mockParticipantsState = {
             byConversationId: {
@@ -94,7 +112,15 @@ describe("ForwardPickerModal", () => {
                 },
             },
             load: mockLoadParticipants,
+            prime: mockPrimeParticipants,
         };
+        mockSearchUsers.mockResolvedValue({ items: [], hasMore: false });
+        mockOpenDirectConversation.mockResolvedValue({
+            id: "opened-direct",
+            type: "Direct",
+            participants: ["user-1", "searched-user"],
+            lastMessagePreview: null,
+        });
     });
 
     it("hides direct drafts and shows peer identity for real chats", () => {
@@ -127,5 +153,59 @@ describe("ForwardPickerModal", () => {
 
         expect(mockLoadParticipants).toHaveBeenCalledWith("real-direct");
         expect(mockLoadParticipants).not.toHaveBeenCalledWith("draft-direct");
+    });
+
+    it("shows discipline context for subgroup targets", () => {
+        mockChatState.conversations = [
+            {
+                id: "subject-subgroup",
+                type: "Group",
+                participants: ["user-1", "student-1"],
+                title: "Subgroup A",
+                disciplineTitle: "Distributed Systems",
+                disciplineChatKind: "Subgroup",
+                disciplineSubgroupName: "A-01",
+                lastMessagePreview: null,
+            },
+        ];
+
+        render(<ForwardPickerModal messageIds={["message-1"]} onClose={jest.fn()} />);
+
+        expect(screen.getByText("A-01")).toBeTruthy();
+        expect(screen.getByText("Distributed Systems · Подгруппа")).toBeTruthy();
+    });
+
+    it("opens a direct chat from user search before forwarding", async () => {
+        mockSearchUsers.mockResolvedValue({
+            items: [
+                {
+                    id: "searched-user",
+                    displayName: "Search Student",
+                    username: "search.student",
+                    avatarUrl: "https://cdn.test/search.png",
+                },
+            ],
+            hasMore: false,
+        });
+        const onClose = jest.fn();
+
+        render(<ForwardPickerModal messageIds={["message-1"]} onClose={onClose} />);
+
+        fireEvent.changeText(screen.getByTestId("forward-user-search"), "search");
+
+        await waitFor(() => expect(screen.getByText("Search Student")).toBeTruthy());
+        fireEvent.press(screen.getByTestId("forward-user-searched-user"));
+
+        await waitFor(() =>
+            expect(mockForwardMessages).toHaveBeenCalledWith("opened-direct", ["message-1"]),
+        );
+        expect(mockOpenDirectConversation).toHaveBeenCalledWith("searched-user");
+        expect(mockUpdateConversation).toHaveBeenCalledWith(
+            expect.objectContaining({ id: "opened-direct" }),
+        );
+        expect(mockPrimeParticipants).toHaveBeenCalledWith("opened-direct", [
+            expect.objectContaining({ userId: "searched-user" }),
+        ]);
+        expect(onClose).toHaveBeenCalled();
     });
 });

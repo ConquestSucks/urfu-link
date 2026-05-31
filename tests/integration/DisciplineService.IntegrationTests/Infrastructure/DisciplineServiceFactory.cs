@@ -1,4 +1,7 @@
 using DotNet.Testcontainers.Images;
+using DisciplineService.Api.Application.Contracts.Responses;
+using DisciplineService.Api.Domain.Aggregates;
+using DisciplineService.Api.Domain.Interfaces;
 using DisciplineService.Api.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -14,6 +17,7 @@ using NSubstitute;
 using StackExchange.Redis;
 using Testcontainers.PostgreSql;
 using Urfu.Link.BuildingBlocks.Auth;
+using Urfu.Link.BuildingBlocks.Contracts.Integration.Disciplines;
 using Urfu.Link.BuildingBlocks.Idempotency;
 using Urfu.Link.BuildingBlocks.Outbox;
 
@@ -56,6 +60,52 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
         await ctx.Database.ExecuteSqlRawAsync(
             "TRUNCATE TABLE disciplines.enrollments, disciplines.disciplines, disciplines.outbox_messages RESTART IDENTITY CASCADE");
         ResetCapturedState();
+    }
+
+    public async Task<DisciplineResponse> SeedDisciplineAsync(
+        Guid ownerTeacherId,
+        string? code = null,
+        string title = "Intro to CS",
+        string semester = "2026-spring")
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDisciplineRepository>();
+        var discipline = Discipline.CreateNew(
+            code ?? $"CS-{Guid.NewGuid():N}"[..12],
+            title,
+            description: "Foundational course",
+            semester,
+            ownerTeacherId,
+            coverAssetId: null,
+            initiatedBy: ownerTeacherId);
+
+        repository.Add(discipline);
+        await repository.SaveChangesAsync(CancellationToken.None);
+        return ToResponse(discipline);
+    }
+
+    public async Task<DisciplineResponse> SeedEnrollmentsAsync(
+        Guid disciplineId,
+        Guid enrolledBy,
+        IReadOnlyList<(Guid UserId, DisciplineRole Role)> users)
+    {
+        await using var scope = Services.CreateAsyncScope();
+        var repository = scope.ServiceProvider.GetRequiredService<IDisciplineRepository>();
+        var discipline = await repository.GetByIdAsync(disciplineId, CancellationToken.None)
+            ?? throw new InvalidOperationException($"Discipline '{disciplineId}' was not found.");
+        var defaultSubgroupId = discipline.Subgroups.First(s => !s.IsArchived).Id;
+
+        foreach (var user in users)
+        {
+            discipline.Enroll(
+                user.UserId,
+                user.Role,
+                user.Role == DisciplineRole.Student ? defaultSubgroupId : null,
+                enrolledBy);
+        }
+
+        await repository.SaveChangesAsync(CancellationToken.None);
+        return ToResponse(discipline);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -103,6 +153,40 @@ public sealed class DisciplineServiceFactory : WebApplicationFactory<Program>, I
         await using var ctx = new DisciplineDbContext(options);
         await ctx.Database.MigrateAsync();
     }
+
+    private static DisciplineResponse ToResponse(Discipline discipline)
+        => new(
+            discipline.Id,
+            discipline.Code,
+            discipline.Title,
+            discipline.Description,
+            discipline.Semester,
+            discipline.OwnerTeacherId,
+            discipline.CoverAssetId,
+            discipline.CreatedAtUtc,
+            discipline.UpdatedAtUtc,
+            discipline.ArchivedAtUtc,
+            discipline.Subgroups
+                .Select(s => new DisciplineSubgroupResponse(
+                    s.Id,
+                    s.Name,
+                    s.CreatedAtUtc,
+                    s.UpdatedAtUtc,
+                    s.ArchivedAtUtc))
+                .ToList(),
+            new DisciplinePermissionsResponse(
+                CanUpdate: false,
+                CanArchive: false,
+                CanManageEnrollments: false,
+                CanManageSubgroups: false),
+            discipline.Enrollments
+                .Select(e => new EnrollmentResponse(
+                    e.UserId,
+                    e.Role,
+                    e.SubgroupId,
+                    e.EnrolledAtUtc,
+                    e.EnrolledBy))
+                .ToList());
 
     private static void ReplaceAuthWithTestScheme(IServiceCollection services)
     {

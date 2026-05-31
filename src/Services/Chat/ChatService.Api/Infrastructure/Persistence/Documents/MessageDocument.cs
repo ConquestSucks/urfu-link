@@ -102,6 +102,14 @@ internal sealed class MessageDocument
     [BsonRepresentation(MongoDB.Bson.BsonType.String)]
     public ParticipantRole AuthorRole { get; set; }
 
+    [BsonElement("kind")]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public MessageKind Kind { get; set; } = MessageKind.User;
+
+    [BsonElement("systemCall")]
+    [BsonIgnoreIfNull]
+    public SystemCallInfoDocument? SystemCall { get; set; }
+
     public Message ToDomain() => Message.Hydrate(
         Id,
         ConversationId,
@@ -128,7 +136,9 @@ internal sealed class MessageDocument
         ThreadReplyCount,
         ThreadParticipants,
         ThreadLastReplyAtUtc.HasValue ? new DateTimeOffset(DateTime.SpecifyKind(ThreadLastReplyAtUtc.Value, DateTimeKind.Utc)) : null,
-        AuthorRole);
+        AuthorRole,
+        Kind,
+        SystemCall?.ToDomain());
 
     public static MessageDocument FromDomain(Message message) => new()
     {
@@ -158,5 +168,7 @@ internal sealed class MessageDocument
         ThreadParticipants = message.ThreadParticipants.ToList(),
         ThreadLastReplyAtUtc = message.ThreadLastReplyAtUtc?.UtcDateTime,
         AuthorRole = message.AuthorRole,
+        Kind = message.Kind,
+        SystemCall = message.SystemCall is { } systemCall ? SystemCallInfoDocument.FromDomain(systemCall) : null,
     };
 }

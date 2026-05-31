@@ -36,7 +36,8 @@ internal sealed class MediaServiceClient(
                 SizeBytes: item.SizeBytes,
                 MimeType: item.MimeType,
                 OriginalFileName: item.OriginalFileName,
-                IsUploaded: item.State == AssetState.Uploaded))
+                IsUploaded: item.State == AssetState.Uploaded,
+                DurationSeconds: item.HasDurationSeconds ? item.DurationSeconds : null))
             .ToList();
     }
 

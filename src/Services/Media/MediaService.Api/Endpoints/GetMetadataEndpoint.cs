@@ -51,6 +51,7 @@ public sealed class GetMetadataEndpoint(
             asset.OriginalFileName,
             asset.State,
             asset.CreatedAtUtc,
-            asset.UploadedAtUtc), cancellation: ct).ConfigureAwait(false);
+            asset.UploadedAtUtc,
+            asset.DurationSeconds), cancellation: ct).ConfigureAwait(false);
     }
 }

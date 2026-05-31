@@ -3,11 +3,15 @@ import { Linking, Platform } from "react-native";
 
 import { ChatMessage } from "../ChatMessage";
 
-jest.mock("@/shared/ui", () => ({
-    Avatar: () => {
+const mockAvatar = jest.fn(
+    ({ name, src }: { name?: string; src?: string }) => {
         const { Text } = require("react-native");
-        return <Text testID="avatar">avatar</Text>;
+        return <Text testID="avatar">{`${name ?? ""}|${src ?? ""}`}</Text>;
     },
+);
+
+jest.mock("@/shared/ui", () => ({
+    Avatar: (props: { name?: string; src?: string }) => mockAvatar(props),
 }));
 
 jest.mock("@/shared/store/auth-store", () => ({
@@ -19,6 +23,23 @@ jest.mock("@/shared/lib/api", () => ({
         media: {
             getAssetDownloadUrl: jest.fn(),
         },
+    },
+}));
+
+jest.mock("@/features/voice-message", () => ({
+    VoiceMessagePlayer: ({
+        mediaAssetId,
+        durationSeconds,
+    }: {
+        mediaAssetId?: string | null;
+        durationSeconds?: number | null;
+    }) => {
+        const { Text } = require("react-native");
+        return (
+            <Text testID="voice-message-player">
+                voice:{mediaAssetId}:{durationSeconds}
+            </Text>
+        );
     },
 }));
 
@@ -36,7 +57,9 @@ jest.mock("@/shared/ui/phosphor", () => {
         ClockIcon: makeIcon("clock-icon"),
         FileIcon: makeIcon("file-icon"),
         PencilSimpleIcon: makeIcon("edit-icon"),
+        PhoneIcon: makeIcon("phone-icon"),
         TrashIcon: makeIcon("trash-icon"),
+        VideoCameraIcon: makeIcon("video-icon"),
         WarningCircleIcon: makeIcon("warning-icon"),
     };
 });
@@ -86,6 +109,98 @@ describe("ChatMessage read indicator", () => {
         fireEvent.press(screen.getByTestId("chat-message-reply-message-1"));
 
         expect(onReplyPress).toHaveBeenCalledTimes(1);
+    });
+
+    it("shows the sender name for incoming group messages", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        expect(screen.getByText("Ivan Petrov")).toBeTruthy();
+    });
+
+    it("calls the author press handler from incoming group sender names", () => {
+        const onAuthorPress = jest.fn();
+
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+                onAuthorPress={onAuthorPress}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("chat-message-author-message-1"));
+
+        expect(onAuthorPress).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses a defined light color for incoming group sender names", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        const author = screen.getByText("Ivan Petrov");
+        expect(author.props.className).toContain("text-brand-300");
+        expect(author.props.className).not.toContain("text-brand-200");
+    });
+
+    it("passes the sender name to incoming message avatars", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl="https://cdn.test/ivan.webp"
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        expect(mockAvatar).toHaveBeenCalledWith(
+            expect.objectContaining({
+                name: "Ivan Petrov",
+                src: "https://cdn.test/ivan.webp",
+            }),
+        );
+    });
+
+    it("does not show the sender name for own messages", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+            />,
+        );
+
+        expect(screen.queryByText("Ivan Petrov")).toBeNull();
     });
 
     it("shows one check for an own message that has not been read", () => {
@@ -192,6 +307,32 @@ describe("ChatMessage read indicator", () => {
         openUrlSpy.mockRestore();
     });
 
+    it("renders voice attachments through the voice player instead of file opener", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                isOwn
+                time="12:00"
+                avatarUrl=""
+                attachments={[
+                    {
+                        name: "voice.m4a",
+                        url: "/api/media/asset-1/download-url",
+                        mediaAssetId: "asset-1",
+                        type: "Voice",
+                        mimeType: "audio/m4a",
+                        durationSeconds: 17,
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByTestId("voice-message-player")).toBeTruthy();
+        expect(screen.getByText("voice:asset-1:17")).toBeTruthy();
+        expect(screen.queryByText("voice.m4a")).toBeNull();
+    });
+
     it("uses a browser download link for media attachments on web", async () => {
         const originalOS = Platform.OS;
         Object.defineProperty(Platform, "OS", {
@@ -258,5 +399,142 @@ describe("ChatMessage read indicator", () => {
             configurable: true,
             get: () => originalOS,
         });
+    });
+
+    it.each([
+        ["Started", "Audio", "Звонок", null],
+        ["Started", "Video", "Видеозвонок", null],
+        ["Missed", "Audio", "Пропущенный звонок", null],
+        ["Declined", "Audio", "Звонок отклонён", null],
+        ["Cancelled", "Audio", "Звонок отменён", null],
+        ["Failed", "Audio", "Звонок завершён", null],
+        ["Completed", "Audio", "Звонок завершён • 3:12", "PT3M12S"],
+        ["Completed", "Video", "Звонок завершён • 1:02:03", "PT1H2M3S"],
+    ] as const)("renders %s %s system call label", (status, callType, label, duration) => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType,
+                    status,
+                    callerId: "user-1",
+                    duration,
+                    endReason: null,
+                }}
+            />,
+        );
+
+        expect(screen.getByText(label)).toBeTruthy();
+    });
+
+    it("shows started system call time without a prefix", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Started",
+                    callerId: "user-1",
+                    duration: null,
+                    endReason: null,
+                }}
+            />,
+        );
+
+        expect(screen.getByText("12:00")).toBeTruthy();
+        expect(screen.queryByText("Начало: 12:00")).toBeNull();
+        expect(screen.queryByText("Завершён: 12:00")).toBeNull();
+    });
+
+    it("renders a join action for active system call messages", () => {
+        const onJoinCall = jest.fn();
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Started",
+                    callerId: "user-1",
+                    duration: null,
+                    endReason: null,
+                }}
+                showJoinCallAction
+                onJoinCall={onJoinCall}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("system-call-join-message-1"));
+
+        expect(screen.getByText("Войти")).toBeTruthy();
+        expect(onJoinCall).toHaveBeenCalledWith("call-1");
+    });
+
+    it("does not render a join action when the system call action is not allowed", () => {
+        const onJoinCall = jest.fn();
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Started",
+                    callerId: "user-1",
+                    duration: null,
+                    endReason: null,
+                }}
+                onJoinCall={onJoinCall}
+            />,
+        );
+
+        expect(screen.queryByTestId("system-call-join-message-1")).toBeNull();
+        expect(screen.queryByText("Ð’Ð¾Ð¹Ñ‚Ð¸")).toBeNull();
+    });
+
+    it("shows completed system call end time and duration", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Completed",
+                    callerId: "user-1",
+                    duration: "PT3M12S",
+                    endReason: "Completed",
+                }}
+            />,
+        );
+
+        expect(screen.getByText("Завершён: 12:00")).toBeTruthy();
+        expect(screen.queryByText("Начало: 12:00")).toBeNull();
+        expect(screen.getByText("Длительность: 3:12")).toBeTruthy();
     });
 });

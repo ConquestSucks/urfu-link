@@ -58,7 +58,7 @@ public sealed class GetMyProfileEndpoint(IUserRepository userRepository)
                 Email: HttpContext.User.GetEmail(),
                 Username: HttpContext.User.GetUsername()),
             Account: new AccountResponse(user.Account.AvatarUrl, user.Account.AboutMe),
-            Privacy: new PrivacyResponse(user.Privacy.ShowOnlineStatus, user.Privacy.ShowLastVisitTime),
+            Privacy: new PrivacyResponse(user.Privacy.ShowLastVisitTime),
             Notifications: new NotificationsResponse(
                 NewMessages: legacyDirect.Push || legacyDirect.InApp,
                 NotificationSound: prefs.Sound,

@@ -20,11 +20,18 @@ public sealed class EnrollmentConfiguration : IEntityTypeConfiguration<Enrollmen
         builder.Property(e => e.DisciplineId).HasColumnName("discipline_id");
         builder.Property(e => e.UserId).HasColumnName("user_id");
         builder.Property(e => e.Role).HasColumnName("role").HasConversion<int>();
+        builder.Property(e => e.SubgroupId).HasColumnName("subgroup_id");
         builder.Property(e => e.EnrolledAtUtc).HasColumnName("enrolled_at_utc");
         builder.Property(e => e.EnrolledBy).HasColumnName("enrolled_by");
 
         builder.HasIndex(e => new { e.DisciplineId, e.UserId }).IsUnique();
         builder.HasIndex(e => new { e.UserId, e.Role });
+        builder.HasIndex(e => new { e.DisciplineId, e.SubgroupId });
+
+        builder.HasOne<DisciplineSubgroup>()
+            .WithMany()
+            .HasForeignKey(e => e.SubgroupId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // xmin concurrency token: tightens optimistic locking from "any change to the
         // discipline aggregate" down to the specific enrollment row. Two operators

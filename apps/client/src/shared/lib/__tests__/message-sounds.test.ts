@@ -136,4 +136,18 @@ describe("message sounds", () => {
 
         await expect(playMessageSound("send")).resolves.toBe(false);
     });
+
+    it("swallows async playback rejections from browser autoplay policy", async () => {
+        (createAudioPlayer as jest.Mock).mockImplementation(() => {
+            const player = createPlayer();
+            player.play.mockRejectedValue(new DOMException("NotAllowedError", "NotAllowedError"));
+            players.push(player);
+            return player;
+        });
+
+        await expect(playMessageSound("receive", { conversationId: "direct-1", now: 1000 }))
+            .resolves.toBe(false);
+
+        expect(players[0].play).toHaveBeenCalledTimes(1);
+    });
 });

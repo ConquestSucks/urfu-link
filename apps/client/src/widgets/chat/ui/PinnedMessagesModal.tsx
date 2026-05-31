@@ -11,6 +11,7 @@ interface PinnedMessagesModalProps {
     conversationId: string;
     onClose: () => void;
     onJumpToMessage: (messageId: string) => void;
+    canManagePins?: boolean;
 }
 
 const EMPTY_PINNED_MESSAGES: MessageDto[] = [];
@@ -25,6 +26,7 @@ const formatPinnedTime = (value: string | undefined) => {
 const getPreview = (message: MessageDto) => {
     if (message.state === "Deleted") return "Сообщение удалено";
     if (message.body) return message.body;
+    if (message.attachments.some((attachment) => attachment.type === "Voice")) return "Голосовое сообщение";
     return message.attachments.length > 0 ? "Вложение" : "Без текста";
 };
 
@@ -33,6 +35,7 @@ export const PinnedMessagesModal = ({
     conversationId,
     onClose,
     onJumpToMessage,
+    canManagePins = true,
 }: PinnedMessagesModalProps) => {
     const pinned = useChatStore(
         (s) => s.pinnedMessagesByConversation[conversationId] ?? EMPTY_PINNED_MESSAGES,
@@ -84,17 +87,19 @@ export const PinnedMessagesModal = ({
                                     {formatPinnedTime(message.createdAt)}
                                 </Text>
                             </View>
-                            <Pressable
-                                testID={`pinned-unpin-${message.id}`}
-                                hitSlop={8}
-                                onPress={(event) => {
-                                    event?.stopPropagation?.();
-                                    void unpinMessage(conversationId, message.id);
-                                }}
-                                className="p-1 rounded-lg active:bg-white/10"
-                            >
-                                <XIcon size={16} className="text-text-muted" />
-                            </Pressable>
+                            {canManagePins ? (
+                                <Pressable
+                                    testID={`pinned-unpin-${message.id}`}
+                                    hitSlop={8}
+                                    onPress={(event) => {
+                                        event?.stopPropagation?.();
+                                        void unpinMessage(conversationId, message.id);
+                                    }}
+                                    className="p-1 rounded-lg active:bg-white/10"
+                                >
+                                    <XIcon size={16} className="text-text-muted" />
+                                </Pressable>
+                            ) : null}
                         </Pressable>
                     ))}
                 </ScrollView>

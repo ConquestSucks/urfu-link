@@ -72,12 +72,29 @@ public interface IConversationRepository
     /// </summary>
     Task<Conversation?> GetByDisciplineIdAsync(Guid disciplineId, CancellationToken cancellationToken);
 
+    Task<Conversation?> GetGeneralDisciplineAsync(Guid disciplineId, CancellationToken cancellationToken);
+
+    Task<Conversation?> GetByDisciplineSubgroupIdAsync(
+        Guid disciplineId,
+        Guid subgroupId,
+        CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<Conversation>> ListByDisciplineIdAsync(
+        Guid disciplineId,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Adds <paramref name="userId"/> with <paramref name="role"/> to the conversation. Returns
     /// <see langword="true"/> when the user was added (so the caller knows when to publish a
     /// derived event), <see langword="false"/> when already present.
     /// </summary>
     Task<bool> AddParticipantAsync(
+        string conversationId,
+        Guid userId,
+        ParticipantRole role,
+        CancellationToken cancellationToken);
+
+    Task<bool> EnsureParticipantAsync(
         string conversationId,
         Guid userId,
         ParticipantRole role,
@@ -103,6 +120,10 @@ public interface IConversationRepository
         DateTimeOffset archivedAtUtc,
         CancellationToken cancellationToken);
 
+    Task<bool> UnarchiveAsync(
+        string conversationId,
+        CancellationToken cancellationToken);
+
     /// <summary>
     /// Refreshes display metadata (title and cover) projected from the source aggregate. Used
     /// by the discipline.updated.v1 handler. Returns <see langword="true"/> when at least one
@@ -112,5 +133,16 @@ public interface IConversationRepository
         string conversationId,
         string? title,
         Guid? coverAssetId,
+        CancellationToken cancellationToken);
+
+    Task<bool> UpdateDisciplineMetadataAsync(
+        Guid disciplineId,
+        string? disciplineTitle,
+        Guid? coverAssetId,
+        CancellationToken cancellationToken);
+
+    Task<bool> UpdateSubgroupMetadataAsync(
+        string conversationId,
+        string subgroupName,
         CancellationToken cancellationToken);
 }

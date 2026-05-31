@@ -38,6 +38,6 @@ public sealed class GetDisciplineEndpoint(
             return;
         }
 
-        await Send.OkAsync(discipline.ToResponse(), cancellation: ct).ConfigureAwait(false);
+        await Send.OkAsync(discipline.ToResponse(User, authorization), cancellation: ct).ConfigureAwait(false);
     }
 }

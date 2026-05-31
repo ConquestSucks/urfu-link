@@ -31,12 +31,29 @@ export type LocalMessageDto = MessageDto & {
 export type ChatMessagePropsMapped = {
     id: string;
     text: string;
+    kind?: "User" | "SystemCall";
+    systemCall?: {
+        callId: string;
+        callType: "Audio" | "Video";
+        status: string;
+        callerId: string;
+        duration?: string | null;
+        endReason?: string | null;
+    } | null;
     isOwn: boolean;
     time: string;
     avatarUrl: string;
+    authorName?: string;
     showAvatar?: boolean;
     seen?: boolean;
-    attachments?: { name: string; url: string; mediaAssetId?: string }[];
+    attachments?: {
+        name: string;
+        url: string;
+        mediaAssetId?: string;
+        type?: MessageDto["attachments"][number]["type"];
+        mimeType?: string;
+        durationSeconds?: number | null;
+    }[];
 };
 
 type ThreadEvent =
@@ -67,6 +84,7 @@ type ChatState = {
     pinnedLoadingByConversation: Record<string, boolean>;
     isLoading: boolean;
     pendingScrollToMessageId: string | null;
+    pendingReadByConversation: Record<string, string>;
     threadEventListeners: Set<ThreadEventHandler>;
 
     connect: () => Promise<void>;
@@ -89,6 +107,7 @@ type ChatState = {
 
     editMessage: (messageId: string, body: string) => Promise<void>;
     deleteMessage: (messageId: string, mode: DeleteMode) => Promise<void>;
+    flushPendingReads: () => Promise<void>;
     forwardMessages: (targetConversationId: string, messageIds: string[]) => Promise<void>;
     addReaction: (messageId: string, emoji: string) => Promise<void>;
     removeReaction: (messageId: string, emoji: string) => Promise<void>;
@@ -190,6 +209,7 @@ const updateConversationPreviewFromMessage = (
             sentAtUtc,
             hasAttachments: message.attachments.length > 0,
             attachmentFileNames: message.attachments.map((a) => a.fileName),
+            attachmentTypes: message.attachments.map((a) => a.type),
             readAtUtc: message.readAt,
         },
     };
@@ -247,6 +267,9 @@ const mergeConversationUpdate = (
             attachmentFileNames:
                 incomingPreview.attachmentFileNames ??
                 currentPreview.attachmentFileNames,
+            attachmentTypes:
+                incomingPreview.attachmentTypes ??
+                currentPreview.attachmentTypes,
         },
     };
 };
@@ -319,6 +342,7 @@ const updateConversationPreviewForEditedMessage = (
             body: message.body,
             hasAttachments: message.attachments.length > 0,
             attachmentFileNames: message.attachments.map((a) => a.fileName),
+            attachmentTypes: message.attachments.map((a) => a.type),
             readAtUtc: message.readAt,
         },
     };
@@ -332,6 +356,11 @@ const withoutUnread = (unread: Record<string, number>, conversationId: string) =
     delete next[conversationId];
     return next;
 };
+
+export const getConversationUnreadCount = (
+    conversation: Pick<ConversationPreview, "id" | "unreadCount">,
+    unreadByConversation: Record<string, number>,
+) => Math.max(conversation.unreadCount ?? 0, unreadByConversation[conversation.id] ?? 0);
 
 const incrementUnread = (
     unread: Record<string, number>,
@@ -393,6 +422,36 @@ const markIncomingReadInState = (
     };
 };
 
+const selectNewestReadAnchor = (
+    messages: MessageDto[] | undefined,
+    currentMessageId: string | undefined,
+    nextMessageId: string,
+) => {
+    if (!messages || !currentMessageId) return nextMessageId;
+
+    const currentIndex = messages.findIndex((message) => message.id === currentMessageId);
+    const nextIndex = messages.findIndex((message) => message.id === nextMessageId);
+    if (currentIndex === -1) return nextMessageId;
+    if (nextIndex === -1) return currentMessageId;
+
+    return nextIndex < currentIndex ? nextMessageId : currentMessageId;
+};
+
+const queuePendingReadInState = (
+    state: Pick<ChatState, "messagesByConversation" | "pendingReadByConversation">,
+    conversationId: string,
+    messageId: string,
+) => ({
+    pendingReadByConversation: {
+        ...state.pendingReadByConversation,
+        [conversationId]: selectNewestReadAnchor(
+            state.messagesByConversation[conversationId],
+            state.pendingReadByConversation[conversationId],
+            messageId,
+        ),
+    },
+});
+
 export const useChatStore = create<ChatState>((set, get) => ({
     connection: null,
     isConnected: false,
@@ -408,6 +467,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pinnedLoadingByConversation: {},
     isLoading: false,
     pendingScrollToMessageId: null,
+    pendingReadByConversation: {},
     threadEventListeners: new Set<ThreadEventHandler>(),
 
     connect: async () => {
@@ -630,6 +690,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             // курсоры и hasMore, чтобы следующий loadMessages(reset=true) подтянул
             // свежий снэпшот.
             set({ cursors: {}, hasMoreByConversation: {}, isConnected: true });
+            void get().flushPendingReads();
         });
 
         newConnection.onreconnecting((err) => {
@@ -640,6 +701,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         try {
             await newConnection.start();
             set({ connection: newConnection, isConnected: true });
+            await get().flushPendingReads();
         } catch (e) {
             console.error("Failed to connect to ChatHub", e);
             set({ isConnected: false });
@@ -660,6 +722,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const res = await apiClient.chat.getConversations(type, undefined, 50);
             set((state) => {
                 const unreadByConversation = { ...state.unreadByConversation };
+                const incoming = res.items.map(normalizeConversationDraftStatus);
                 for (const conversation of res.items) {
                     if (typeof conversation.unreadCount !== "number") continue;
                     if (conversation.unreadCount > 0) {
@@ -669,8 +732,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     }
                 }
 
+                const conversations = (() => {
+                    if (!type) {
+                        return incoming;
+                    }
+
+                    const isLoadedType = (conversation: ConversationPreview) =>
+                        type === "Direct"
+                            ? conversation.type === "Direct"
+                            : conversation.groupSubtype === "Discipline";
+                    const incomingIds = new Set(incoming.map((conversation) => conversation.id));
+                    return [
+                        ...state.conversations.filter(
+                            (conversation) =>
+                                !isLoadedType(conversation) && !incomingIds.has(conversation.id),
+                        ),
+                        ...incoming,
+                    ].sort(compareConversationActivity);
+                })();
+
                 return {
-                    conversations: res.items.map(normalizeConversationDraftStatus),
+                    conversations,
                     unreadByConversation,
                     isConversationsLoading: false,
                 };
@@ -879,12 +961,50 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     markRead: async (chatId, messageId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
-            await connection.invoke("MarkRead", chatId, messageId);
-            const currentUserId = useAuthStore.getState().userId;
+        const currentUserId = useAuthStore.getState().userId;
+        const applyLocalRead = () => {
             set((state) =>
                 markIncomingReadInState(state, chatId, messageId, currentUserId ?? null),
             );
+        };
+
+        if (connection?.state === HubConnectionState.Connected) {
+            applyLocalRead();
+            try {
+                await connection.invoke("MarkRead", chatId, messageId);
+                return;
+            } catch (error) {
+                console.warn("Failed to mark chat messages read; queued for retry", error);
+            }
+        }
+
+        set((state) => ({
+            ...markIncomingReadInState(state, chatId, messageId, currentUserId ?? null),
+            ...queuePendingReadInState(state, chatId, messageId),
+        }));
+    },
+
+    flushPendingReads: async () => {
+        const { connection, pendingReadByConversation } = get();
+        if (connection?.state !== HubConnectionState.Connected) return;
+
+        const entries = Object.entries(pendingReadByConversation);
+        for (const [conversationId, messageId] of entries) {
+            try {
+                await connection.invoke("MarkRead", conversationId, messageId);
+                set((state) => {
+                    if (state.pendingReadByConversation[conversationId] !== messageId) {
+                        return state;
+                    }
+
+                    const nextPending = { ...state.pendingReadByConversation };
+                    delete nextPending[conversationId];
+                    return { pendingReadByConversation: nextPending };
+                });
+            } catch (error) {
+                console.warn("Failed to flush pending chat read marker", error);
+                return;
+            }
         }
     },
 
@@ -911,13 +1031,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     forwardMessages: async (targetConversationId, messageIds) => {
-        const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
-            await connection.invoke("ForwardMessages", targetConversationId, messageIds);
-        } else {
-            const forwarded = await apiClient.chat.forwardMessages(targetConversationId, messageIds);
-            forwarded.map(normalizeMessage).forEach((message) => get().addMessage(message));
-        }
+        const forwarded = await apiClient.chat.forwardMessages(targetConversationId, messageIds);
+        forwarded.map(normalizeMessage).forEach((message) => get().addMessage(message));
     },
 
     addReaction: async (messageId, emoji) => {
@@ -1040,9 +1155,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 !normalized.id.startsWith("optimistic:");
             const serverUnreadCount = state.conversations.find((c) => c.id === conversationId)
                 ?.unreadCount;
-            const unreadBaseline = typeof serverUnreadCount === "number"
-                ? serverUnreadCount
-                : 0;
+            const unreadBaseline = getConversationUnreadCount(
+                { id: conversationId, unreadCount: serverUnreadCount },
+                state.unreadByConversation,
+            );
 
             return {
                 messagesByConversation: {
@@ -1225,6 +1341,8 @@ export const mapMessageToProps = (
     return {
         id: normalized.id,
         text: normalized.body,
+        kind: normalized.kind,
+        systemCall: normalized.systemCall,
         isOwn: normalized.senderId === currentUserId,
         time: timeStr,
         avatarUrl: "",
@@ -1233,6 +1351,9 @@ export const mapMessageToProps = (
             name: a.fileName,
             url: `/api/media/${a.mediaAssetId}/download-url`,
             mediaAssetId: a.mediaAssetId,
+            type: a.type,
+            mimeType: a.mimeType,
+            durationSeconds: a.durationSeconds,
         })),
     };
 };

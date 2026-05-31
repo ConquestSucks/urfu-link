@@ -1,5 +1,9 @@
 import { useWindowSize } from "@/shared/lib/useWindowSize";
-import { useNotificationBadge } from "@/features/notifications";
+import {
+    getNotificationScopeUnreadCount,
+    type NotificationScope,
+    useNotificationBadge,
+} from "@/features/notifications";
 import { useNotificationStore } from "@/shared/store/notification-store";
 import { BellIcon, ChatCircleTextIcon } from "@/shared/ui/phosphor";
 import { Link } from "expo-router";
@@ -10,6 +14,7 @@ import { ViewType } from "../model/types";
 interface ViewToggleProps {
     currentView: ViewType;
     createHref: (view: ViewType) => any;
+    notificationScope?: NotificationScope;
 }
 
 const TOGGLE_ITEMS = [
@@ -17,11 +22,18 @@ const TOGGLE_ITEMS = [
     { id: "notifications" as const, icon: BellIcon, label: "Уведомления", hasBadge: true },
 ];
 
-export const ViewToggle = ({ currentView, createHref }: ViewToggleProps) => {
+export const ViewToggle = ({
+    currentView,
+    createHref,
+    notificationScope = "chats",
+}: ViewToggleProps) => {
     const { isMobile } = useWindowSize();
     const { data } = useNotificationBadge();
     const liveBadge = useNotificationStore((s) => s.badge);
-    const unreadCount = (liveBadge ?? data)?.total ?? 0;
+    const unreadCount = getNotificationScopeUnreadCount(
+        liveBadge ?? data,
+        notificationScope,
+    );
 
     const containerClasses = isMobile
         ? "flex-row items-center gap-1"
@@ -34,7 +46,7 @@ export const ViewToggle = ({ currentView, createHref }: ViewToggleProps) => {
 
                 const buttonClasses = isMobile
                     ? "p-2.5"
-                    : `p-2 rounded-xl transition-colors duration-300 ${isActive ? "bg-brand-600 shadow-brand-soft" : "hover:bg-white/5"}`;
+                    : `p-2 rounded-xl transition-colors duration-300 ${isActive ? "bg-brand-650" : "hover:bg-white/5"}`;
                 const iconSize = isMobile ? 24 : 18;
                 const iconWeight = isMobile && isActive ? "fill" : "regular";
                 const iconColor = isActive

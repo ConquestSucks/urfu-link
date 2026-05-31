@@ -43,6 +43,23 @@ internal sealed class ConversationDocument
     [BsonIgnoreIfNull]
     public Guid? DisciplineId { get; set; }
 
+    [BsonElement("disciplineChatKind")]
+    [BsonIgnoreIfNull]
+    [BsonRepresentation(MongoDB.Bson.BsonType.String)]
+    public DisciplineChatKind? DisciplineChatKind { get; set; }
+
+    [BsonElement("disciplineSubgroupId")]
+    [BsonIgnoreIfNull]
+    public Guid? DisciplineSubgroupId { get; set; }
+
+    [BsonElement("disciplineTitle")]
+    [BsonIgnoreIfNull]
+    public string? DisciplineTitle { get; set; }
+
+    [BsonElement("disciplineSubgroupName")]
+    [BsonIgnoreIfNull]
+    public string? DisciplineSubgroupName { get; set; }
+
     [BsonElement("archivedAtUtc")]
     [BsonIgnoreIfNull]
     public DateTime? ArchivedAtUtc { get; set; }
@@ -73,6 +90,10 @@ internal sealed class ConversationDocument
         PinnedMessageIds,
         ParticipantRoles?.ToDictionary(e => e.UserId, e => e.Role),
         DisciplineId,
+        DisciplineChatKind,
+        DisciplineSubgroupId,
+        DisciplineTitle,
+        DisciplineSubgroupName,
         ArchivedAtUtc is { } archived
             ? new DateTimeOffset(DateTime.SpecifyKind(archived, DateTimeKind.Utc))
             : null,
@@ -102,6 +123,10 @@ internal sealed class ConversationDocument
                     .Select(kv => new ParticipantRoleEntry(kv.Key, kv.Value))
                     .ToList(),
             DisciplineId = conversation.DisciplineId,
+            DisciplineChatKind = conversation.DisciplineChatKind,
+            DisciplineSubgroupId = conversation.DisciplineSubgroupId,
+            DisciplineTitle = conversation.DisciplineTitle,
+            DisciplineSubgroupName = conversation.DisciplineSubgroupName,
             ArchivedAtUtc = conversation.ArchivedAtUtc?.UtcDateTime,
             Title = conversation.Title,
             CoverAssetId = conversation.CoverAssetId,

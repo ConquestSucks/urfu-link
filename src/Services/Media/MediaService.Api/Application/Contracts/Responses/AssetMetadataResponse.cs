@@ -12,4 +12,5 @@ public sealed record AssetMetadataResponse(
     string OriginalFileName,
     AssetState State,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset? UploadedAtUtc);
+    DateTimeOffset? UploadedAtUtc,
+    int? DurationSeconds = null);

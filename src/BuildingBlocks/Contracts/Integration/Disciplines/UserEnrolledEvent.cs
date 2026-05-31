@@ -4,7 +4,8 @@ public sealed record UserEnrolledEvent(
     Guid DisciplineId,
     Guid UserId,
     DisciplineRole Role,
-    Guid EnrolledBy) : IIntegrationEvent
+    Guid EnrolledBy,
+    Guid? SubgroupId = null) : IIntegrationEvent
 {
     public Guid EventId { get; } = Guid.NewGuid();
 

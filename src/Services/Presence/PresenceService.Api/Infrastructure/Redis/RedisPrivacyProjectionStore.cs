@@ -6,7 +6,6 @@ namespace Urfu.Link.Services.Presence.Infrastructure.Redis;
 
 public sealed class RedisPrivacyProjectionStore(IConnectionMultiplexer redis) : IPrivacyProjectionStore
 {
-    private const string OnlineField = "online";
     private const string LastVisitField = "lastVisit";
 
     public async Task<PrivacySettings> GetAsync(Guid userId, CancellationToken cancellationToken)
@@ -17,9 +16,8 @@ public sealed class RedisPrivacyProjectionStore(IConnectionMultiplexer redis) : 
         var entries = await db.HashGetAllAsync(key).ConfigureAwait(false);
         if (entries.Length == 0) return PrivacySettings.Default;
 
-        var online = ReadFlag(entries, OnlineField, defaultValue: PrivacySettings.Default.ShowOnlineStatus);
         var lastVisit = ReadFlag(entries, LastVisitField, defaultValue: PrivacySettings.Default.ShowLastVisitTime);
-        return new PrivacySettings(online, lastVisit);
+        return new PrivacySettings(lastVisit);
     }
 
     public async Task SetAsync(Guid userId, PrivacySettings settings, CancellationToken cancellationToken)
@@ -31,7 +29,6 @@ public sealed class RedisPrivacyProjectionStore(IConnectionMultiplexer redis) : 
         var key = RedisKeys.Privacy(userId);
         await db.HashSetAsync(key,
             [
-                new HashEntry(OnlineField, settings.ShowOnlineStatus ? "1" : "0"),
                 new HashEntry(LastVisitField, settings.ShowLastVisitTime ? "1" : "0"),
             ]).ConfigureAwait(false);
     }

@@ -15,7 +15,7 @@ export const InboxTabsMobile = ({ currentTab, createHref }: InboxTabsMobileProps
                 <Pressable
                     className={`flex-1 py-2 rounded-full items-center justify-center ${
                         currentTab === "chats"
-                            ? "bg-brand-650 text-white shadow-lg shadow-brand-650/20"
+                            ? "bg-brand-650 text-white"
                             : "text-text-subtle active:text-white"
                     }`}
                 >
@@ -33,7 +33,7 @@ export const InboxTabsMobile = ({ currentTab, createHref }: InboxTabsMobileProps
                 <Pressable
                     className={`flex-1 py-2 rounded-full items-center justify-center ${
                         currentTab === "subjects"
-                            ? "bg-brand-650 text-white shadow-lg shadow-brand-650/20"
+                            ? "bg-brand-650 text-white"
                             : "text-text-subtle active:text-white"
                     }`}
                 >

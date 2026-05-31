@@ -25,21 +25,21 @@ public class PrivacyProjectionTests : IAsyncLifetime
     {
         var userId = Guid.NewGuid();
 
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, userId, showOnlineStatus: false, showLastVisitTime: true);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, userId, showLastVisitTime: true);
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IPrivacyProjectionStore>();
         var loaded = await store.GetAsync(userId, CancellationToken.None);
-        loaded.Should().Be(new PrivacySettings(false, true));
+        loaded.Should().Be(new PrivacySettings(true));
     }
 
     [Fact]
     public async Task TriggerPrivacyChanged_OverridesPreviousProjection()
     {
         var userId = Guid.NewGuid();
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, userId, false, false);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, userId, false);
 
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, userId, true, true);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, userId, true);
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IPrivacyProjectionStore>();
@@ -66,19 +66,18 @@ public class PrivacyProjectionTests : IAsyncLifetime
                 LastHeartbeatAt: DateTimeOffset.UtcNow), CancellationToken.None);
         }
 
-        // Before: privacy is default (everything visible) → REST returns Online.
+        // Before: privacy is default and online status is always visible.
         var before = await _factory.CreateClient().GetFromJsonAsync<Urfu.Link.Services.Presence.Application.Contracts.Responses.PresenceInfoResponse>(
             $"/api/v1/presence/users/{targetId}");
         before!.Status.Should().Be(Urfu.Link.Services.Presence.Domain.Enums.PresenceStatus.Online);
 
-        // Kafka projects privacy=hide-online.
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, false, true);
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, targetId, true);
 
-        // REST now reflects offline (status hidden).
+        // REST still exposes online status; the online-status privacy toggle was removed.
         var after = await _factory.CreateClient().GetFromJsonAsync<Urfu.Link.Services.Presence.Application.Contracts.Responses.PresenceInfoResponse>(
             $"/api/v1/presence/users/{targetId}");
-        after!.Status.Should().Be(Urfu.Link.Services.Presence.Domain.Enums.PresenceStatus.Offline);
-        after.Platforms.Should().BeEmpty();
+        after!.Status.Should().Be(Urfu.Link.Services.Presence.Domain.Enums.PresenceStatus.Online);
+        after.Platforms.Should().Contain(Urfu.Link.Services.Presence.Domain.Enums.Platform.Web);
     }
 
     [Fact]
