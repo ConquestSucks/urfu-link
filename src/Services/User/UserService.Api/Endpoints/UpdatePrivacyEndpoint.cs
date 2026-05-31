@@ -24,12 +24,12 @@ public sealed class UpdatePrivacyEndpoint(IUserRepository userRepository)
         if (user is null)
         {
             user = UserProfile.CreateDefault(userId);
-            user.UpdatePrivacy(req.ShowOnlineStatus, req.ShowLastVisitTime);
+            user.UpdatePrivacy(req.ShowLastVisitTime);
             userRepository.Add(user);
         }
         else
         {
-            user.UpdatePrivacy(req.ShowOnlineStatus, req.ShowLastVisitTime);
+            user.UpdatePrivacy(req.ShowLastVisitTime);
         }
 
         await userRepository.SaveChangesAsync(ct).ConfigureAwait(false);

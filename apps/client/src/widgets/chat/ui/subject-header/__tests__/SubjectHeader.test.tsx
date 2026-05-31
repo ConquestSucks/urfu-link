@@ -119,16 +119,19 @@ jest.mock("../SubjectMembersModal", () => ({
 jest.mock("../../chat-header/UserProfileModal", () => ({
     UserProfileModal: ({
         isOpen,
+        user,
         onClose,
         onStartAudioCall,
     }: {
         isOpen: boolean;
+        user: { name: string };
         onClose: () => void;
         onStartAudioCall?: () => void;
     }) => {
         const { Pressable, Text, View } = require("react-native");
         return isOpen ? (
             <View testID="profile-modal-open">
+                <Text testID="user-profile-modal">{user.name}</Text>
                 <Pressable
                     testID="start-profile-audio"
                     onPress={() => {
@@ -139,7 +142,9 @@ jest.mock("../../chat-header/UserProfileModal", () => ({
                     <Text>audio</Text>
                 </Pressable>
             </View>
-        ) : null;
+        ) : (
+            <Text testID="user-profile-modal">closed</Text>
+        );
     },
 }));
 
@@ -183,6 +188,35 @@ describe("SubjectHeader", () => {
 
         expect(() => rerender(<SubjectHeader subjectId="subject-1" />)).not.toThrow();
         expect(screen.getByTestId("subject-header-actions")).toBeTruthy();
+    });
+
+    it("opens a controlled participant profile", () => {
+        mockConversations = [
+            {
+                id: "subject-1",
+                type: "Group",
+                groupSubtype: "Discipline",
+                title: "Algorithms",
+                disciplineTitle: "Algorithms",
+                disciplineChatKind: "General",
+                participantRoles: { "current-user": "Student" },
+                capabilities: {},
+            },
+        ];
+        mockParticipants = [
+            {
+                userId: "teacher-1",
+                role: "Teacher",
+                displayName: "Teacher One",
+                avatarUrl: "https://cdn.test/teacher.png",
+            },
+        ];
+
+        render(<SubjectHeader subjectId="subject-1" profileUserId="teacher-1" />);
+
+        expect(screen.getByTestId("user-profile-modal").props.children).toBe(
+            "Teacher One",
+        );
     });
 
     it("closes member and profile modals before starting a direct call from a profile", async () => {

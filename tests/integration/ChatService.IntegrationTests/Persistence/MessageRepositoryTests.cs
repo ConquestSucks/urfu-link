@@ -173,8 +173,9 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
             await _repo.InsertAsync(m, default);
         }
 
+        var reader = Guid.NewGuid();
         var anchorId = messages[2].Id;
-        var result = await _repo.MarkReadUpToAsync(conv, anchorId, DateTimeOffset.UtcNow, default);
+        var result = await _repo.MarkReadUpToAsync(conv, reader, anchorId, DateTimeOffset.UtcNow, default);
 
         result.Should().Equal(messages[0].Id, messages[1].Id, messages[2].Id);
         result[^1].Should().Be(anchorId);
@@ -198,10 +199,30 @@ public class MessageRepositoryTests : IClassFixture<MongoFixture>, IAsyncLifetim
         var conv = $"conv-read-noop-{Guid.NewGuid():N}";
         var msg = Message.Send(Guid.NewGuid(), conv, sender, "x", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}", DateTimeOffset.UtcNow);
         await _repo.InsertAsync(msg, default);
-        await _repo.MarkReadUpToAsync(conv, msg.Id, DateTimeOffset.UtcNow, default);
+        var reader = Guid.NewGuid();
+        await _repo.MarkReadUpToAsync(conv, reader, msg.Id, DateTimeOffset.UtcNow, default);
 
-        var second = await _repo.MarkReadUpToAsync(conv, msg.Id, DateTimeOffset.UtcNow, default);
+        var second = await _repo.MarkReadUpToAsync(conv, reader, msg.Id, DateTimeOffset.UtcNow, default);
 
         second.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task MarkReadUpToAsync_AlreadyReadByAnotherReader_AddsReceiptForNewReader()
+    {
+        var sender = Guid.NewGuid();
+        var firstReader = Guid.NewGuid();
+        var secondReader = Guid.NewGuid();
+        var conv = $"conv-read-group-{Guid.NewGuid():N}";
+        var msg = Message.Send(Guid.NewGuid(), conv, sender, "x", Array.Empty<Attachment>(), $"c-{Guid.NewGuid():N}", DateTimeOffset.UtcNow);
+        await _repo.InsertAsync(msg, default);
+
+        await _repo.MarkReadUpToAsync(conv, firstReader, msg.Id, DateTimeOffset.UtcNow, default);
+
+        var second = await _repo.MarkReadUpToAsync(conv, secondReader, msg.Id, DateTimeOffset.UtcNow.AddSeconds(1), default);
+
+        second.Should().ContainSingle().Which.Should().Be(msg.Id);
+        var receipts = await _repo.GetReadReceiptsAsync(msg.Id, default);
+        receipts.Select(r => r.UserId).Should().BeEquivalentTo(new[] { firstReader, secondReader });
     }
 }

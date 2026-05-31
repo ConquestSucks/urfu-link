@@ -2,13 +2,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Text } from "react-native";
 
 interface LastSeenLabelProps {
-    lastSeenAt: string;
+    lastSeenAt?: string | null;
     className?: string;
 }
 
-const formatLastSeen = (iso: string): string => {
+const formatLastSeen = (iso?: string | null): string => {
+    if (!iso) return "Был недавно";
+
     const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return "был недавно";
+    if (Number.isNaN(date.getTime())) return "Был недавно";
 
     const diffMs = Date.now() - date.getTime();
     const diffMin = Math.floor(diffMs / 60_000);

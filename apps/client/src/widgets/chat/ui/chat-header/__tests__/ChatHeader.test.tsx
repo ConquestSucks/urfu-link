@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactNode } from "react";
 
 import { ChatHeader } from "../ChatHeader";
@@ -73,9 +73,9 @@ jest.mock("@/entities/user", () => ({
 }));
 
 jest.mock("@/entities/presence", () => ({
-    LastSeenLabel: ({ lastSeenAt }: { lastSeenAt: string }) => {
+    LastSeenLabel: ({ lastSeenAt }: { lastSeenAt?: string | null }) => {
         const { Text } = require("react-native");
-        return <Text>{`last seen ${lastSeenAt}`}</Text>;
+        return <Text>{lastSeenAt ? `last seen ${lastSeenAt}` : "Был недавно"}</Text>;
     },
     TypingIndicator: () => {
         const { Text } = require("react-native");
@@ -103,7 +103,10 @@ jest.mock("../ChatHeaderActions", () => ({
 }));
 
 jest.mock("../UserProfileModal", () => ({
-    UserProfileModal: () => null,
+    UserProfileModal: ({ isOpen }: { isOpen: boolean }) => {
+        const { Text } = require("react-native");
+        return isOpen ? <Text>profile modal open</Text> : null;
+    },
 }));
 
 describe("ChatHeader presence state", () => {
@@ -140,7 +143,7 @@ describe("ChatHeader presence state", () => {
         expect(screen.queryByText("Не в сети")).toBeNull();
     });
 
-    it("shows offline only after an offline presence snapshot", () => {
+    it("shows recently label after an offline presence snapshot without last seen", () => {
         mockPeerPresence = {
             userId: mockPeerUserId,
             status: "Offline",
@@ -151,6 +154,21 @@ describe("ChatHeader presence state", () => {
         render(<ChatHeader chatId="chat-1" />);
 
         expect(screen.queryByTestId("chat-header-presence-skeleton")).toBeNull();
-        expect(screen.getByText("Не в сети")).toBeTruthy();
+        expect(screen.getByText("Был недавно")).toBeTruthy();
+    });
+
+    it("opens the profile modal from the direct chat identity block", () => {
+        mockPeerPresence = {
+            userId: mockPeerUserId,
+            status: "Online",
+            platforms: [],
+            lastSeenAt: null,
+        };
+
+        render(<ChatHeader chatId="chat-1" />);
+
+        fireEvent.press(screen.getByTestId("chat-header-profile-trigger"));
+
+        expect(screen.getByText("profile modal open")).toBeTruthy();
     });
 });

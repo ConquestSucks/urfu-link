@@ -132,6 +132,87 @@ public class MarkDeliveredAndReadTests : IAsyncLifetime
         _factory.OutboxWriter.Published.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task MarkRead_GroupMessageAlreadyReadByAnotherParticipant_ClearsCurrentReadersUnread()
+    {
+        var teacher = Guid.NewGuid();
+        var firstReader = Guid.NewGuid();
+        var secondReader = Guid.NewGuid();
+        var disciplineId = Guid.NewGuid();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var conversation = Conversation.OpenDiscipline(disciplineId, teacher, DateTimeOffset.UtcNow, "API Integrations");
+        conversation.AddParticipant(firstReader, ParticipantRole.Student);
+        conversation.AddParticipant(secondReader, ParticipantRole.Student);
+
+        var conversationRepo = scope.ServiceProvider.GetRequiredService<IConversationRepository>();
+        await conversationRepo.TryCreateAsync(conversation, default);
+
+        var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
+        var message = await send.SendAsync(
+            new SendMessageRequest(
+                conversation.Id,
+                teacher,
+                "group message",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}"),
+            default);
+
+        var markRead = scope.ServiceProvider.GetRequiredService<MarkReadService>();
+        await markRead.MarkAsync(new MarkReadRequest(conversation.Id, firstReader, message.Id), default);
+
+        var messageRepo = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
+        var before = await messageRepo.GetUnreadCountsByConversationIdsAsync(
+            new[] { conversation.Id }, secondReader, default);
+        before.Should().ContainKey(conversation.Id).WhoseValue.Should().Be(1);
+
+        var anchor = await markRead.MarkAsync(new MarkReadRequest(conversation.Id, secondReader, message.Id), default);
+
+        anchor.Should().Be(message.Id);
+        var receipts = await messageRepo.GetReadReceiptsAsync(message.Id, default);
+        receipts.Select(r => r.UserId).Should().BeEquivalentTo(new[] { firstReader, secondReader });
+
+        var after = await messageRepo.GetUnreadCountsByConversationIdsAsync(
+            new[] { conversation.Id }, secondReader, default);
+        after.Should().NotContainKey(conversation.Id);
+    }
+
+    [Fact]
+    public async Task MarkRead_DirectMessageAlreadyReadBySender_ClearsRecipientsUnread()
+    {
+        var (sender, recipient, conversation) = await OpenConversationAsync();
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var send = scope.ServiceProvider.GetRequiredService<SendMessageService>();
+        var message = await send.SendAsync(
+            new SendMessageRequest(
+                conversation.Id,
+                sender,
+                "direct message",
+                Array.Empty<Guid>(),
+                $"c-{Guid.NewGuid():N}",
+                PeerUserId: recipient),
+            default);
+
+        var markRead = scope.ServiceProvider.GetRequiredService<MarkReadService>();
+        await markRead.MarkAsync(new MarkReadRequest(conversation.Id, sender, message.Id), default);
+
+        var messageRepo = scope.ServiceProvider.GetRequiredService<IMessageRepository>();
+        var before = await messageRepo.GetUnreadCountsByConversationIdsAsync(
+            new[] { conversation.Id }, recipient, default);
+        before.Should().ContainKey(conversation.Id).WhoseValue.Should().Be(1);
+
+        var anchor = await markRead.MarkAsync(new MarkReadRequest(conversation.Id, recipient, message.Id), default);
+
+        anchor.Should().Be(message.Id);
+        var receipts = await messageRepo.GetReadReceiptsAsync(message.Id, default);
+        receipts.Select(r => r.UserId).Should().BeEquivalentTo(new[] { sender, recipient });
+
+        var after = await messageRepo.GetUnreadCountsByConversationIdsAsync(
+            new[] { conversation.Id }, recipient, default);
+        after.Should().NotContainKey(conversation.Id);
+    }
+
     private async Task<(Guid sender, Guid recipient, Conversation conv)> OpenConversationAsync()
     {
         var sender = Guid.NewGuid();

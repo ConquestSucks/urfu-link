@@ -26,6 +26,17 @@ import type { CallType, ConversationParticipantDto } from "@urfu-link/api-client
 const roleLabel = (role: ConversationParticipantDto["role"]) =>
     role === "Teacher" ? "Преподаватель" : role === "Student" ? "Студент" : "Участник";
 
+interface SubjectHeaderProps {
+    subjectId: string;
+    onOpenPinned?: () => void;
+    onOpenSearch?: () => void;
+    onStartGroupAudioCall?: () => void;
+    onStartGroupVideoCall?: () => void;
+    onBeforeStartCall?: () => void;
+    profileUserId?: string | null;
+    onProfileUserIdChange?: (userId: string | null) => void;
+}
+
 export const SubjectHeader = ({
     subjectId,
     onOpenPinned,
@@ -33,16 +44,24 @@ export const SubjectHeader = ({
     onStartGroupAudioCall,
     onStartGroupVideoCall,
     onBeforeStartCall,
-}: {
-    subjectId: string;
-    onOpenPinned?: () => void;
-    onOpenSearch?: () => void;
-    onStartGroupAudioCall?: () => void;
-    onStartGroupVideoCall?: () => void;
-    onBeforeStartCall?: () => void;
-}) => {
+    profileUserId: controlledProfileUserId,
+    onProfileUserIdChange,
+}: SubjectHeaderProps) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
-    const [profileUserId, setProfileUserId] = useState<string | null>(null);
+    const [internalProfileUserId, setInternalProfileUserId] = useState<string | null>(null);
+    const isProfileControlled = controlledProfileUserId !== undefined;
+    const profileUserId = isProfileControlled ? controlledProfileUserId : internalProfileUserId;
+    const setProfileUserId = useCallback(
+        (userId: string | null) => {
+            if (isProfileControlled) {
+                onProfileUserIdChange?.(userId);
+                return;
+            }
+
+            setInternalProfileUserId(userId);
+        },
+        [isProfileControlled, onProfileUserIdChange],
+    );
     const { isMobile } = useWindowSize();
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === subjectId),
