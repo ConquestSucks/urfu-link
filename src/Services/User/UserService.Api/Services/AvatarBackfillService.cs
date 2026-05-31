@@ -39,17 +39,31 @@ public sealed class AvatarBackfillService(
         }
 
         var batchSize = Math.Clamp(_options.BatchSize, 1, 1000);
-        var batch = await candidates
-            .ListCandidatesAsync(batchSize, cancellationToken)
-            .ConfigureAwait(false);
-
-        foreach (var candidate in batch)
+        while (!cancellationToken.IsCancellationRequested)
         {
-            await BackfillCandidateAsync(candidate, cancellationToken).ConfigureAwait(false);
+            var batch = await candidates
+                .ListCandidatesAsync(batchSize, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (batch.Count == 0)
+            {
+                return;
+            }
+
+            var madeProgress = false;
+            foreach (var candidate in batch)
+            {
+                madeProgress |= await BackfillCandidateAsync(candidate, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (!madeProgress)
+            {
+                return;
+            }
         }
     }
 
-    private async Task BackfillCandidateAsync(
+    private async Task<bool> BackfillCandidateAsync(
         AvatarBackfillCandidate candidate,
         CancellationToken cancellationToken)
     {
@@ -59,15 +73,16 @@ public sealed class AvatarBackfillService(
         if (current is null)
         {
             logger.LogWarning("Skipping avatar backfill for missing object {AvatarUrl}", candidate.AvatarUrl);
-            return;
+            return false;
         }
 
         await using var identifyStream = new MemoryStream(current.Content.ToArray(), writable: false);
-        if (await avatarImageProcessor
+        if (HasCanonicalVariantUrl(candidate.AvatarUrl) &&
+            await avatarImageProcessor
                 .IsNormalizedAsync(identifyStream, current.ContentType, cancellationToken)
                 .ConfigureAwait(false))
         {
-            return;
+            return false;
         }
 
         await using var sourceStream = new MemoryStream(current.Content.ToArray(), writable: false);
@@ -75,20 +90,29 @@ public sealed class AvatarBackfillService(
             .ProcessAsync(sourceStream, current.ContentType, cancellationToken)
             .ConfigureAwait(false);
 
-        await using var processedStream = new MemoryStream(processed.Content.ToArray(), writable: false);
         var newAvatarUrl = await avatarStorage
-            .UploadAsync(candidate.UserId, processedStream, processed.ContentType, cancellationToken)
+            .UploadAsync(candidate.UserId, processed, cancellationToken)
             .ConfigureAwait(false);
 
         var user = await userRepository.GetByIdAsync(candidate.UserId, cancellationToken).ConfigureAwait(false);
         if (user is null || !string.Equals(user.Account.AvatarUrl, candidate.AvatarUrl, StringComparison.Ordinal))
         {
             await avatarStorage.DeleteAsync(newAvatarUrl, cancellationToken).ConfigureAwait(false);
-            return;
+            return false;
         }
 
         user.UploadAvatar(newAvatarUrl);
         await userRepository.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await avatarStorage.DeleteAsync(candidate.AvatarUrl, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    private static bool HasCanonicalVariantUrl(string avatarUrl)
+    {
+        var path = Uri.TryCreate(avatarUrl, UriKind.Absolute, out var uri)
+            ? uri.AbsolutePath
+            : avatarUrl;
+
+        return path.EndsWith("-256.webp", StringComparison.OrdinalIgnoreCase);
     }
 }

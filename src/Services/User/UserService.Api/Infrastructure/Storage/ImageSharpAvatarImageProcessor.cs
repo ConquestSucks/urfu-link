@@ -8,6 +8,7 @@ namespace UserService.Api.Infrastructure.Storage;
 public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
 {
     public const int AvatarSize = 256;
+    public static readonly int[] AvatarVariantSizes = [64, 128, AvatarSize];
     public const int WebpQuality = 82;
     public const string WebpContentType = "image/webp";
 
@@ -21,25 +22,31 @@ public sealed class ImageSharpAvatarImageProcessor : IAvatarImageProcessor
 
         using var image = await Image.LoadAsync(fileStream, cancellationToken).ConfigureAwait(false);
 
-        image.Mutate(context => context
-            .AutoOrient()
-            .Resize(new ResizeOptions
-            {
-                Size = new Size(AvatarSize, AvatarSize),
-                Mode = ResizeMode.Crop,
-                Sampler = KnownResamplers.Lanczos3,
-            }));
+        image.Mutate(context => context.AutoOrient());
 
         image.Metadata.ExifProfile = null;
         image.Metadata.IccProfile = null;
 
-        await using var output = new MemoryStream();
-        await image.SaveAsWebpAsync(
-            output,
-            new WebpEncoder { Quality = WebpQuality },
-            cancellationToken).ConfigureAwait(false);
+        var variants = new List<ProcessedAvatarVariant>(AvatarVariantSizes.Length);
+        foreach (var size in AvatarVariantSizes)
+        {
+            using var resized = image.Clone(context => context.Resize(new ResizeOptions
+            {
+                Size = new Size(size, size),
+                Mode = ResizeMode.Crop,
+                Sampler = KnownResamplers.Lanczos3,
+            }));
 
-        return new ProcessedAvatar(output.ToArray(), WebpContentType);
+            await using var output = new MemoryStream();
+            await resized.SaveAsWebpAsync(
+                output,
+                new WebpEncoder { Quality = WebpQuality },
+                cancellationToken).ConfigureAwait(false);
+
+            variants.Add(new ProcessedAvatarVariant(size, output.ToArray(), WebpContentType));
+        }
+
+        return new ProcessedAvatar(variants);
     }
 
     public async Task<bool> IsNormalizedAsync(

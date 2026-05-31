@@ -8,27 +8,35 @@ public sealed class FakeAvatarStorage : IAvatarStorage
     public ConcurrentDictionary<string, byte[]> Uploads { get; } = new();
     private readonly ConcurrentDictionary<string, string> _contentTypes = new();
 
-    public async Task<string> UploadAsync(Guid userId, Stream fileStream, string contentType, CancellationToken cancellationToken = default)
+    public Task<string> UploadAsync(Guid userId, ProcessedAvatar avatar, CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(fileStream);
+        ArgumentNullException.ThrowIfNull(avatar);
 
-        var extension = contentType switch
+        var avatarId = Guid.NewGuid().ToString("N");
+        string? canonicalUrl = null;
+        foreach (var variant in avatar.Variants)
         {
-            "image/jpeg" => "jpg",
-            "image/png" => "png",
-            "image/webp" => "webp",
-            _ => "bin",
-        };
+            var extension = variant.ContentType switch
+            {
+                "image/jpeg" => "jpg",
+                "image/png" => "png",
+                "image/webp" => "webp",
+                _ => "bin",
+            };
 
-        var key = $"avatars/{userId:N}/{Guid.NewGuid():N}.{extension}";
-        var url = $"http://localhost:9000/user-avatars/{key}";
+            var key = $"avatars/{userId:N}/{avatarId}-{variant.Size}.{extension}";
+            var url = $"http://localhost:9000/user-avatars/{key}";
 
-        using var ms = new MemoryStream();
-        await fileStream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
-        Uploads[url] = ms.ToArray();
-        _contentTypes[url] = contentType;
+            Uploads[url] = variant.Content.ToArray();
+            _contentTypes[url] = variant.ContentType;
 
-        return url;
+            if (variant.Size == avatar.CanonicalVariant.Size)
+            {
+                canonicalUrl = url;
+            }
+        }
+
+        return Task.FromResult(canonicalUrl ?? throw new InvalidOperationException("No avatar variants were uploaded."));
     }
 
     public Task<AvatarObject?> DownloadAsync(string objectUrl, CancellationToken cancellationToken = default)

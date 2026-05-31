@@ -47,10 +47,27 @@ jest.mock("@/shared/lib/message-sounds", () => ({
 }));
 
 describe("useCallHub", () => {
+    let pagehideHandler: (() => void) | null = null;
+    let pageshowHandler: (() => void) | null = null;
+    const addWindowEventListener = jest.fn((event: string, handler: () => void) => {
+        if (event === "pagehide") pagehideHandler = handler;
+        if (event === "pageshow") pageshowHandler = handler;
+    });
+    const removeWindowEventListener = jest.fn();
+
     beforeEach(() => {
         jest.clearAllMocks();
         Object.keys(handlers).forEach((key) => delete handlers[key]);
         mockConnection.state = "Disconnected";
+        pagehideHandler = null;
+        pageshowHandler = null;
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {
+                addEventListener: addWindowEventListener,
+                removeEventListener: removeWindowEventListener,
+            },
+        });
         jest.spyOn(AppState, "addEventListener").mockReturnValue({ remove: jest.fn() });
     });
 
@@ -86,5 +103,21 @@ describe("useCallHub", () => {
 
         expect(mockHandleIncomingCall).not.toHaveBeenCalled();
         expect(mockPlayMessageSound).not.toHaveBeenCalled();
+    });
+
+    it("stops the connection before bfcache and reconnects when restored", () => {
+        renderHook(() => useCallHub());
+        mockConnection.start.mockClear();
+        mockConnection.state = "Disconnected";
+
+        pagehideHandler?.();
+        pageshowHandler?.();
+
+        expect(mockConnection.stop).toHaveBeenCalledTimes(1);
+        expect(mockConnection.start).toHaveBeenCalledTimes(1);
+        expect(addWindowEventListener).not.toHaveBeenCalledWith(
+            "beforeunload",
+            expect.any(Function),
+        );
     });
 });

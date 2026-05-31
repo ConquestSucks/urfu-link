@@ -13,7 +13,9 @@ public sealed class EfAvatarBackfillRepository(UserDbContext dbContext) : IAvata
 
         return await dbContext.UserProfiles
             .AsNoTracking()
-            .Where(user => user.Account.AvatarUrl != null)
+            .Where(user =>
+                user.Account.AvatarUrl != null &&
+                !EF.Functions.ILike(user.Account.AvatarUrl, "%-256.webp"))
             .OrderBy(user => user.Id)
             .Take(normalizedLimit)
             .Select(user => new AvatarBackfillCandidate(user.Id, user.Account.AvatarUrl!))

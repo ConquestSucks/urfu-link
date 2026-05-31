@@ -32,6 +32,8 @@ env:
   Storage__Endpoint: http://urfu-minio.urfu-platform.svc.cluster.local:9000
   Storage__AvatarBucket: user-avatars
   Storage__PublicEndpoint: https://storage.ghjc.ru
+  AvatarBackfill__Enabled: "true"
+  AvatarBackfill__BatchSize: "500"
 
 secrets:
   enabled: true

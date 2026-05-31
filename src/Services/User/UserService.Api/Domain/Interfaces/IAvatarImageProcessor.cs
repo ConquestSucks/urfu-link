@@ -1,6 +1,12 @@
 namespace UserService.Api.Domain.Interfaces;
 
-public sealed record ProcessedAvatar(ReadOnlyMemory<byte> Content, string ContentType);
+public sealed record ProcessedAvatarVariant(int Size, ReadOnlyMemory<byte> Content, string ContentType);
+
+public sealed record ProcessedAvatar(IReadOnlyList<ProcessedAvatarVariant> Variants)
+{
+    public ProcessedAvatarVariant CanonicalVariant =>
+        Variants.OrderByDescending(variant => variant.Size).First();
+}
 
 public interface IAvatarImageProcessor
 {

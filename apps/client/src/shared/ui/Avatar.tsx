@@ -1,6 +1,7 @@
 import { Image } from "expo-image";
 import React from "react";
 import { Text, View } from "react-native";
+import { getAvatarVariantUrl } from "@/shared/lib/avatar-url";
 
 interface AvatarProps {
     size?: number;
@@ -83,7 +84,7 @@ export const Avatar = ({
     }
     return (
         <Image
-            source={{ uri: src }}
+            source={{ uri: getAvatarVariantUrl(src, size) }}
             style={{ width: size, height: size }}
             className={`rounded-xl shrink-0 ${className ?? ""}`}
             accessibilityLabel={label}
