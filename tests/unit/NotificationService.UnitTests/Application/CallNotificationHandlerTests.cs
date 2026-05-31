@@ -77,6 +77,26 @@ public sealed class CallNotificationHandlerTests
     }
 
     [Fact]
+    public async Task Incoming_call_v2_notification_for_discipline_group_uses_join_copy()
+    {
+        const string conversationId = "discipline:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        var evt = new CallIncomingV2Event(
+            CallId,
+            conversationId,
+            CallerId,
+            [CallerId, CalleeId],
+            CallType.Video,
+            OccurredAt);
+
+        var intents = await new CallIncomingHandler().PrepareAsync(evt, CancellationToken.None);
+
+        var intent = intents.Should().ContainSingle().Subject;
+        intent.Content.Title.Should().Be("Звонок в дисциплине");
+        intent.Content.Body.Should().Be("Преподаватель создал видеозвонок");
+        intent.Content.DeepLink.Should().Be($"urfulink://chat/conv/{conversationId}");
+    }
+
+    [Fact]
     public async Task Missed_call_notification_targets_recipient_and_includes_ring_seconds()
     {
         var evt = new CallMissedEvent(

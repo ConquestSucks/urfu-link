@@ -254,6 +254,7 @@ export const ChatHeader = ({
                 onStartAudioCall={conversation.type === "Direct" ? onStartAudioCall : undefined}
                 onStartVideoCall={conversation.type === "Direct" ? onStartVideoCall : undefined}
                 onToggleNotifications={handleToggleNotifications}
+                notificationsMuted={notificationsMuted}
                 notificationsPending={notificationsPending}
             />
         </>

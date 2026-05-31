@@ -65,10 +65,16 @@ public sealed class CallIncomingHandler :
         ArgumentNullException.ThrowIfNull(integrationEvent);
         _ = cancellationToken;
 
+        var isDisciplineGroupCall = integrationEvent.ConversationId.StartsWith(
+            "discipline:",
+            StringComparison.OrdinalIgnoreCase);
         var label = integrationEvent.CallType == CallType.Video ? "Видеозвонок" : "Звонок";
+        var disciplineLabel = integrationEvent.CallType == CallType.Video ? "видеозвонок" : "звонок";
         var content = NotificationContent.Create(
-            "Входящий звонок",
-            $"{label} от пользователя",
+            isDisciplineGroupCall ? "Звонок в дисциплине" : "Входящий звонок",
+            isDisciplineGroupCall
+                ? $"Преподаватель создал {disciplineLabel}"
+                : $"{label} от пользователя",
             imageUrl: null,
             deepLink: $"urfulink://chat/conv/{integrationEvent.ConversationId}");
 

@@ -169,6 +169,7 @@ export const ChatMessage = ({
     onReplyPress,
     onThreadOpen,
     onReactionPress,
+    onJoinCall,
 }: ChatMessageProps) => {
     const currentUserId = useCurrentUserId();
     const isOptimistic = localStatus === "sending";
@@ -178,6 +179,7 @@ export const ChatMessage = ({
         const systemText = buildSystemCallLabel(systemCall);
         const timeLabel = buildSystemCallTimeLabel(systemCall?.status, time);
         const duration = formatDuration(systemCall?.duration);
+        const canJoinCall = systemCall?.status === "Started" && !!systemCall.callId && !!onJoinCall;
         return (
             <View className="px-2 items-center">
                 <View className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10">
@@ -203,6 +205,15 @@ export const ChatMessage = ({
                             </Text>
                         ) : null}
                     </View>
+                    {canJoinCall ? (
+                        <Pressable
+                            testID={`system-call-join-${id}`}
+                            onPress={() => onJoinCall(systemCall.callId)}
+                            className="mt-2 self-center rounded-full bg-brand-600 px-3 py-1.5 active:opacity-80"
+                        >
+                            <Text className="text-[12px] font-semibold text-white">Войти</Text>
+                        </Pressable>
+                    ) : null}
                 </View>
             </View>
         );

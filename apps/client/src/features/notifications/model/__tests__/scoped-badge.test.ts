@@ -31,4 +31,19 @@ describe("getNotificationScopeUnreadCount", () => {
             ),
         ).toBe(0);
     });
+
+    it("keeps pinned chat notifications visible when backend scopes are absent", () => {
+        expect(
+            getNotificationScopeUnreadCount(
+                {
+                    total: 1,
+                    perCategory: { 7: 1 },
+                    totalUnseen: 1,
+                    urgentUnread: 0,
+                    perType: null,
+                },
+                "chats",
+            ),
+        ).toBe(1);
+    });
 });

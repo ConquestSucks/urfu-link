@@ -1,5 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/shared/lib/api";
+import {
+  getCachedCurrentUser,
+  setCurrentUserCache,
+} from "@/shared/lib/current-user";
 import type {
   UpdateAccountDto,
   UpdateNotificationsDto,
@@ -13,6 +17,29 @@ function useInvalidateMe() {
   const queryClient = useQueryClient();
   return () => queryClient.invalidateQueries({ queryKey: userKeys.me });
 }
+
+const updateCurrentUserProfile = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  update: (current: UserProfile) => UserProfile,
+) => {
+  const current = queryClient.getQueryData<UserProfile>(userKeys.me) ?? getCachedCurrentUser();
+  if (!current) return;
+
+  const next = update(current);
+  queryClient.setQueryData<UserProfile>(userKeys.me, next);
+  setCurrentUserCache(next);
+};
+
+const restoreCurrentUserProfile = (
+  queryClient: ReturnType<typeof useQueryClient>,
+  previousQuery: UserProfile | undefined,
+  previousCache: UserProfile | null,
+) => {
+  if (previousQuery) {
+    queryClient.setQueryData<UserProfile>(userKeys.me, previousQuery);
+  }
+  setCurrentUserCache(previousCache);
+};
 
 export function useUpdateAccount() {
   const invalidateMe = useInvalidateMe();
@@ -45,27 +72,43 @@ export function useUpdatePrivacy() {
     mutationFn: (dto: UpdatePrivacyDto) => apiClient.users.updatePrivacy(dto),
     onMutate: async (dto) => {
       await queryClient.cancelQueries({ queryKey: userKeys.me });
-      const previous = queryClient.getQueryData<UserProfile>(userKeys.me);
-      queryClient.setQueryData<UserProfile>(userKeys.me, (current) =>
-        current ? { ...current, privacy: { ...dto } } : current,
+      const previousQuery = queryClient.getQueryData<UserProfile>(userKeys.me);
+      const previousCache = getCachedCurrentUser();
+      updateCurrentUserProfile(queryClient, (current) =>
+        ({ ...current, privacy: { ...dto } }),
       );
-      return { previous };
+      return { previousQuery, previousCache };
     },
     onError: (_error, _dto, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(userKeys.me, context.previous);
-      }
+      restoreCurrentUserProfile(queryClient, context?.previousQuery, context?.previousCache ?? null);
     },
     onSettled: invalidateMe,
   });
 }
 
 export function useUpdateNotifications() {
+  const queryClient = useQueryClient();
   const invalidateMe = useInvalidateMe();
   return useMutation({
     mutationFn: (dto: UpdateNotificationsDto) =>
       apiClient.users.updateNotifications(dto),
-    onSuccess: invalidateMe,
+    onMutate: async (dto) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.me });
+      const previousQuery = queryClient.getQueryData<UserProfile>(userKeys.me);
+      const previousCache = getCachedCurrentUser();
+      updateCurrentUserProfile(queryClient, (current) => ({
+        ...current,
+        notifications: {
+          ...current.notifications,
+          ...dto,
+        },
+      }));
+      return { previousQuery, previousCache };
+    },
+    onError: (_error, _dto, context) => {
+      restoreCurrentUserProfile(queryClient, context?.previousQuery, context?.previousCache ?? null);
+    },
+    onSettled: invalidateMe,
   });
 }
 
@@ -74,9 +117,7 @@ const updateMutedConversationCache = (
   conversationId: string,
   muted: boolean,
 ) => {
-  queryClient.setQueryData<UserProfile>(userKeys.me, (current) => {
-    if (!current) return current;
-
+  updateCurrentUserProfile(queryClient, (current) => {
     const existing = current.notifications.mutedConversationIds ?? [];
     const nextMuted = muted
       ? Array.from(new Set([...existing, conversationId]))
@@ -97,10 +138,17 @@ export function useMuteConversationNotifications() {
   return useMutation({
     mutationFn: (conversationId: string) =>
       apiClient.users.muteConversationNotifications(conversationId),
-    onSuccess: (_data, conversationId) => {
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.me });
+      const previousQuery = queryClient.getQueryData<UserProfile>(userKeys.me);
+      const previousCache = getCachedCurrentUser();
       updateMutedConversationCache(queryClient, conversationId, true);
-      queryClient.invalidateQueries({ queryKey: userKeys.me });
+      return { previousQuery, previousCache };
     },
+    onError: (_error, _conversationId, context) => {
+      restoreCurrentUserProfile(queryClient, context?.previousQuery, context?.previousCache ?? null);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: userKeys.me }),
   });
 }
 
@@ -109,10 +157,17 @@ export function useUnmuteConversationNotifications() {
   return useMutation({
     mutationFn: (conversationId: string) =>
       apiClient.users.unmuteConversationNotifications(conversationId),
-    onSuccess: (_data, conversationId) => {
+    onMutate: async (conversationId) => {
+      await queryClient.cancelQueries({ queryKey: userKeys.me });
+      const previousQuery = queryClient.getQueryData<UserProfile>(userKeys.me);
+      const previousCache = getCachedCurrentUser();
       updateMutedConversationCache(queryClient, conversationId, false);
-      queryClient.invalidateQueries({ queryKey: userKeys.me });
+      return { previousQuery, previousCache };
     },
+    onError: (_error, _conversationId, context) => {
+      restoreCurrentUserProfile(queryClient, context?.previousQuery, context?.previousCache ?? null);
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: userKeys.me }),
   });
 }
 
@@ -123,24 +178,21 @@ export function useUpdateSoundVideo() {
     mutationFn: (dto: UpdateSoundVideoDto) => apiClient.users.updateSoundVideo(dto),
     onMutate: async (dto) => {
       await queryClient.cancelQueries({ queryKey: userKeys.me });
-      const previous = queryClient.getQueryData<UserProfile>(userKeys.me);
-      queryClient.setQueryData<UserProfile>(userKeys.me, (current) =>
-        current
-          ? {
-              ...current,
-              soundVideo: {
-                ...current.soundVideo,
-                ...dto,
-              },
-            }
-          : current,
+      const previousQuery = queryClient.getQueryData<UserProfile>(userKeys.me);
+      const previousCache = getCachedCurrentUser();
+      updateCurrentUserProfile(queryClient, (current) =>
+        ({
+          ...current,
+          soundVideo: {
+            ...current.soundVideo,
+            ...dto,
+          },
+        }),
       );
-      return { previous };
+      return { previousQuery, previousCache };
     },
     onError: (_error, _dto, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(userKeys.me, context.previous);
-      }
+      restoreCurrentUserProfile(queryClient, context?.previousQuery, context?.previousCache ?? null);
     },
     onSettled: invalidateMe,
   });

@@ -419,6 +419,34 @@ describe("ChatMessage read indicator", () => {
         expect(screen.queryByText("Завершён: 12:00")).toBeNull();
     });
 
+    it("renders a join action for active system call messages", () => {
+        const onJoinCall = jest.fn();
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Started",
+                    callerId: "user-1",
+                    duration: null,
+                    endReason: null,
+                }}
+                onJoinCall={onJoinCall}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("system-call-join-message-1"));
+
+        expect(screen.getByText("Войти")).toBeTruthy();
+        expect(onJoinCall).toHaveBeenCalledWith("call-1");
+    });
+
     it("shows completed system call end time and duration", () => {
         render(
             <ChatMessage
