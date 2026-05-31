@@ -1,10 +1,14 @@
 param(
-    [string]$SshTarget = "root@89.167.93.199",
+    [string]$SshTarget = $env:URFU_PROD_SSH_TARGET,
     [switch]$DirectApply
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
+
+if ([string]::IsNullOrWhiteSpace($SshTarget)) {
+    throw "Set -SshTarget or URFU_PROD_SSH_TARGET to the production SSH target."
+}
 
 function Invoke-Remote {
     param([string]$Command)
