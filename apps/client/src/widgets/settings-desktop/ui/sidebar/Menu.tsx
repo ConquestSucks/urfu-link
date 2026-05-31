@@ -1,4 +1,4 @@
-import { SidebarItem } from "@/shared/ui";
+import { SidebarItem } from "@/shared/ui/SidebarItem";
 import { View } from "react-native";
 import { SETTINGS_ITEMS } from "@/shared/config";
 import { Logout } from "@/features/logout";

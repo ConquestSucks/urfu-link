@@ -46,6 +46,7 @@ module.exports = {
     moduleNameMapper: {
         ...(expoPreset.moduleNameMapper ?? {}),
         "^msw/node$": "<rootDir>/node_modules/msw/lib/node/index.js",
+        "^react-native-reanimated$": "<rootDir>/src/shared/lib/reanimated-web-shim.ts",
         "^@/(.*)$": "<rootDir>/src/$1",
     },
 };

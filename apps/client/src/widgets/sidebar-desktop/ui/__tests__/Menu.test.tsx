@@ -19,6 +19,10 @@ jest.mock("@/shared/ui", () => ({
     SidebarItem: (props: unknown) => mockSidebarItem(props),
 }));
 
+jest.mock("@/shared/ui/SidebarItem", () => ({
+    SidebarItem: (props: unknown) => mockSidebarItem(props),
+}));
+
 jest.mock("@/entities/conversation/model/chat-store", () => ({
     getConversationUnreadCount: (
         conversation: { id: string; unreadCount?: number },

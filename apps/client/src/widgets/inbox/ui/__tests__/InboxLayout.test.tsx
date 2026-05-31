@@ -10,6 +10,7 @@ const mockSetPendingScrollToMessageId = jest.fn();
 const mockRouterPush = jest.fn();
 let mockCurrentView: "messages" | "notifications" = "messages";
 let mockCurrentTab: "chats" | "subjects" = "chats";
+let mockSegments = ["(authorized)", "chats", "[id]"];
 let mockNotifications: any[] = [
     {
         id: "notification-1",
@@ -31,7 +32,7 @@ jest.mock("expo-router", () => ({
     router: {
         push: (...args: unknown[]) => mockRouterPush(...args),
     },
-    useSegments: () => ["(authorized)", "chats", "[id]"],
+    useSegments: () => mockSegments,
 }));
 
 jest.mock("@/shared/lib/useWindowSize", () => ({
@@ -54,11 +55,20 @@ jest.mock("@/shared/ui", () => ({
 }));
 
 jest.mock("@/entities/inbox-chat", () => ({
-    InboxChat: ({ name, onPress }: { name: string; onPress: () => void }) => {
+    InboxChat: ({
+        name,
+        isActive,
+        onPress,
+    }: {
+        name: string;
+        isActive?: boolean;
+        onPress: () => void;
+    }) => {
         const { Pressable, Text } = require("react-native");
         return (
             <Pressable testID="inbox-chat-row" onPress={onPress}>
                 <Text>{name}</Text>
+                <Text testID="inbox-chat-active-state">{isActive ? "active" : "idle"}</Text>
             </Pressable>
         );
     },
@@ -133,6 +143,7 @@ describe("InboxLayout navigation", () => {
         jest.clearAllMocks();
         mockCurrentView = "messages";
         mockCurrentTab = "chats";
+        mockSegments = ["(authorized)", "chats", "[id]"];
         mockNotifications = [
             {
                 id: "notification-1",
@@ -157,6 +168,14 @@ describe("InboxLayout navigation", () => {
         fireEvent.press(screen.getByTestId("inbox-chat-row"));
 
         expect(mockRouterPush).toHaveBeenCalledWith("/chats/chat-1");
+    });
+
+    it("clears stale active chat selection outside the detail route", () => {
+        mockSegments = ["(authorized)", "chats"];
+
+        render(<InboxLayout />);
+
+        expect(screen.getByTestId("inbox-chat-active-state").props.children).toBe("idle");
     });
 
     it("opens a notification deep link and prepares message scrolling", () => {

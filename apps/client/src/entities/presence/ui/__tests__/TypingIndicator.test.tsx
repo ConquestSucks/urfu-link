@@ -12,6 +12,11 @@ jest.mock("@microsoft/signalr", () => ({
 
 jest.mock("@/shared/lib/signalr", () => ({
     createHubConnection: jest.fn(),
+    HUB_CONNECTION_STATE: {
+        Connected: "Connected",
+        Connecting: "Connecting",
+        Disconnected: "Disconnected",
+    },
 }));
 
 jest.mock("@/entities/conversation/model/participants-store", () => ({

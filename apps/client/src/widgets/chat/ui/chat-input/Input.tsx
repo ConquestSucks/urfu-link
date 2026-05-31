@@ -45,8 +45,13 @@ const INPUT_VERTICAL_PADDING = 10;
 const MAX_INPUT_CONTENT_HEIGHT = SCREEN_HEIGHT * 0.35;
 const MAX_FILES_LIMIT = 10;
 const WEB_STALE_MEASUREMENT_THRESHOLD = INPUT_LINE_HEIGHT * 4;
-const EmojiPicker = lazy(() =>
-    import("@/features/emoji-picker").then((module) => ({ default: module.EmojiPicker })),
+const loadEmojiPicker = () => import("@/features/emoji-picker");
+const EmojiPicker = lazy(() => loadEmojiPicker().then((module) => ({ default: module.EmojiPicker })));
+
+const EmojiPickerFallback = () => (
+    <View className="flex-1 items-center justify-center bg-app-card">
+        <ActivityIndicator size="small" className="text-brand-400" />
+    </View>
 );
 
 const getComposerInputHeight = (contentHeight: number) =>
@@ -190,6 +195,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
             setInputHeight(getExplicitLineContentHeight(editing.body));
         }
     }, [editing?.id]);
+
+    useEffect(() => {
+        if (Platform.OS === "web" && typeof document === "undefined") return;
+
+        const timeoutId = setTimeout(() => {
+            void loadEmojiPicker();
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, []);
 
     // Когда query становится пустым — на вебе onContentSizeChange textarea не
     // схлопывается обратно к высоте одной строки. Принудительно сбрасываем
@@ -570,11 +585,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                         onPress={() => {
                             Keyboard.dismiss();
                             const willShow = !isEmojiVisible;
+                            if (willShow) void loadEmojiPicker();
                             setIsEmojiVisible(willShow);
                             animate(willShow);
                         }}
-                        className={`py-2.5 ml-2 ${isSubmitting ? "opacity-40" : ""}`}
-                        style={[{ alignSelf: "flex-end" }, isEmojiVisible ? glow.brandSubtle : undefined]}
+                        className={`py-2.5 ml-2 outline-none focus:outline-none ${isSubmitting ? "opacity-40" : ""}`}
+                        style={{ alignSelf: "flex-end", outlineWidth: 0 }}
                     >
                         <SmileyIcon
                             size={24}
@@ -632,9 +648,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(
                 <Animated.View
                     style={{ height: 320, width: "100%", transform: [{ translateY: slideAnim }] }}
                 >
-                    <Suspense fallback={null}>
-                        <EmojiPicker onPick={handlePickEmoji} />
-                    </Suspense>
+                    {isEmojiVisible ? (
+                        <Suspense fallback={<EmojiPickerFallback />}>
+                            <EmojiPicker onPick={handlePickEmoji} />
+                        </Suspense>
+                    ) : null}
                 </Animated.View>
             </Animated.View>
 

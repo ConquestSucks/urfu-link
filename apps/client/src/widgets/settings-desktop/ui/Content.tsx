@@ -1,5 +1,5 @@
 import { useUIStore } from "@/shared/model";
-import { LinearProgress } from "@/shared/ui";
+import { LinearProgress } from "@/shared/ui/LinearProgress";
 import React, { lazy, Suspense } from "react";
 import { Text, View } from "react-native";
 import { SETTINGS_ITEMS } from "@/shared/config";

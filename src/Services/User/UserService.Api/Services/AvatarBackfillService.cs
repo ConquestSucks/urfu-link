@@ -18,6 +18,7 @@ public sealed class AvatarBackfillOptions
 
     public bool Enabled { get; set; }
     public int BatchSize { get; set; } = 100;
+    public int IntervalMinutes { get; set; } = 360;
 }
 
 public sealed class AvatarBackfillService(
@@ -53,7 +54,24 @@ public sealed class AvatarBackfillService(
             var madeProgress = false;
             foreach (var candidate in batch)
             {
-                madeProgress |= await BackfillCandidateAsync(candidate, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    madeProgress |= await BackfillCandidateAsync(candidate, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+#pragma warning disable CA1031 // One invalid legacy avatar must not stop backfilling other users.
+                catch (Exception ex)
+                {
+                    logger.LogWarning(
+                        ex,
+                        "Failed to backfill avatar {AvatarUrl} for user {UserId}",
+                        candidate.AvatarUrl,
+                        candidate.UserId);
+                }
+#pragma warning restore CA1031
             }
 
             if (!madeProgress)

@@ -139,7 +139,7 @@ export const InboxLayout = () => {
             }
 
             if (currentTab === "chats") {
-                const isActive = item.id === params.id;
+                const isActive = isDetailView && item.id === params.id;
 
                 return (
                     <View key={item.id}>
@@ -159,7 +159,9 @@ export const InboxLayout = () => {
                 <View key={subject.id}>
                     <InboxSubjectGroup
                         subject={subject}
-                        activeChatId={typeof params.id === "string" ? params.id : undefined}
+                        activeChatId={
+                            isDetailView && typeof params.id === "string" ? params.id : undefined
+                        }
                         onChatPress={(chatId) => {
                             router.push(`/subjects/${chatId}`);
                         }}
@@ -167,7 +169,7 @@ export const InboxLayout = () => {
                 </View>
             );
         },
-        [currentView, currentTab, markNotificationRead, openNotification, params.id]
+        [currentView, currentTab, isDetailView, markNotificationRead, openNotification, params.id]
     );
 
     return (

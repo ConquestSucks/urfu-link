@@ -13,6 +13,9 @@ import {
     FadeInRight,
     FadeOut,
     LinearTransition,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
     ZoomIn,
     ZoomOut,
 } from "react-native-reanimated";
@@ -128,6 +131,7 @@ const ControlButton = ({
     isActive,
     danger,
     disabled,
+    loading,
     showLabel,
     iconOnlySize = 48,
     onPress,
@@ -138,52 +142,97 @@ const ControlButton = ({
     isActive?: boolean;
     danger?: boolean;
     disabled?: boolean;
+    loading?: boolean;
     showLabel: boolean;
     iconOnlySize?: number;
     onPress?: () => void;
-}) => (
-    <AnimatedPressable
-        testID={testID}
-        accessibilityLabel={label}
-        onPress={onPress}
-        disabled={disabled || !onPress}
-        entering={ZoomIn.duration(150)}
-        exiting={ZoomOut.duration(120)}
-        layout={LinearTransition.duration(180)}
-        style={[
-            showLabel
-                ? undefined
-                : {
-                      width: iconOnlySize,
-                      height: iconOnlySize,
-                  },
-            !disabled && danger ? glow.danger : !disabled && isActive ? glow.brandSoft : undefined,
-        ]}
-        className={`h-12 rounded-xl items-center justify-center gap-2 ${
-            showLabel ? "px-4 min-w-[82px] flex-row" : "w-12"
-        } ${
-            disabled
-                ? "bg-white/5"
-                : danger
-                  ? "bg-red-600"
-                  : isActive
-                    ? "bg-brand-650"
-                    : "bg-white/10"
-        }`}
-    >
-        <Icon size={20} className={disabled ? "text-white/40" : "text-white"} />
-        {showLabel && label ? (
-            <Text
-                numberOfLines={1}
-                className={`text-xs font-semibold ${
-                    disabled ? "text-white/40" : "text-white"
-                }`}
-            >
-                {label}
-            </Text>
-        ) : null}
-    </AnimatedPressable>
-);
+}) => {
+    const isDimmed = Boolean(disabled || !onPress);
+    const isDisabled = isDimmed || Boolean(loading);
+    const pressProgress = useSharedValue(0);
+    const pressStyle = useAnimatedStyle(() => ({
+        opacity: 1 - pressProgress.value * 0.08,
+        transform: [{ scale: 1 - pressProgress.value * 0.07 }],
+    }));
+
+    React.useEffect(() => {
+        if (isDisabled) {
+            pressProgress.value = withSpring(0, { damping: 18, stiffness: 320 });
+        }
+    }, [isDisabled, pressProgress]);
+
+    const handlePressIn = React.useCallback(() => {
+        if (isDisabled) return;
+        pressProgress.value = withSpring(1, { damping: 18, stiffness: 320 });
+    }, [isDisabled, pressProgress]);
+
+    const handlePressOut = React.useCallback(() => {
+        pressProgress.value = withSpring(0, { damping: 18, stiffness: 320 });
+    }, [pressProgress]);
+
+    return (
+        <AnimatedPressable
+            testID={testID}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityState={{
+                disabled: isDisabled,
+                selected: isActive,
+                busy: loading,
+            }}
+            onPress={onPress}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            disabled={isDisabled}
+            entering={ZoomIn.duration(150)}
+            exiting={ZoomOut.duration(120)}
+            layout={LinearTransition.duration(180)}
+            style={[
+                showLabel
+                    ? undefined
+                    : {
+                          width: iconOnlySize,
+                          height: iconOnlySize,
+                      },
+                !isDimmed && danger
+                    ? glow.danger
+                    : !isDimmed && isActive
+                      ? glow.brandSoft
+                      : undefined,
+                pressStyle,
+            ]}
+            className={`h-12 rounded-xl items-center justify-center gap-2 ${
+                showLabel ? "px-4 min-w-[82px] flex-row" : "w-12"
+            } ${
+                isDimmed
+                    ? "bg-white/5"
+                    : danger
+                      ? "bg-red-600"
+                      : isActive
+                        ? "bg-brand-650"
+                        : "bg-white/10"
+            }`}
+        >
+            {loading ? (
+                <ActivityIndicator testID={`${testID}-spinner`} size="small" color="#fff" />
+            ) : (
+                <Icon size={20} className={isDimmed ? "text-white/40" : "text-white"} />
+            )}
+            {showLabel && label ? (
+                <Text
+                    numberOfLines={1}
+                    className={`text-xs font-semibold ${
+                        isDimmed ? "text-white/40" : "text-white"
+                    }`}
+                >
+                    {label}
+                </Text>
+            ) : null}
+        </AnimatedPressable>
+    );
+};
+
+type PendingCallControl = "microphone" | "camera" | "switchCamera" | "screenShare";
 
 const StatusIconBadge = ({
     label,
@@ -341,6 +390,23 @@ export const CallControls = ({
 }) => {
     const showLabel = !isMobile;
     const iconOnlySize = isMobile ? 44 : 48;
+    const [pendingControl, setPendingControl] = React.useState<PendingCallControl | null>(null);
+    const mediaControlPending = pendingControl !== null;
+    const runControlAction = React.useCallback(
+        async (control: PendingCallControl, action: () => Promise<void> | void) => {
+            if (pendingControl) return;
+
+            setPendingControl(control);
+            try {
+                await action();
+            } catch (error) {
+                console.error("Failed to run call control action", error);
+            } finally {
+                setPendingControl((current) => (current === control ? null : current));
+            }
+        },
+        [pendingControl],
+    );
 
     return (
         <AnimatedView
@@ -361,9 +427,12 @@ export const CallControls = ({
                     testID="call-control-mic"
                     icon={micEnabled ? MicrophoneIcon : MicrophoneSlashIcon}
                     label="Микрофон"
-                    onPress={onToggleMicrophone}
+                    onPress={() => {
+                        void runControlAction("microphone", onToggleMicrophone);
+                    }}
                     isActive={micEnabled}
-                    disabled={busy}
+                    disabled={busy || (mediaControlPending && pendingControl !== "microphone")}
+                    loading={pendingControl === "microphone"}
                     showLabel={showLabel}
                     iconOnlySize={iconOnlySize}
                 />
@@ -371,9 +440,12 @@ export const CallControls = ({
                     testID="call-control-camera"
                     icon={VideoCameraIcon}
                     label="Камера"
-                    onPress={onToggleCamera}
+                    onPress={() => {
+                        void runControlAction("camera", onToggleCamera);
+                    }}
                     isActive={cameraEnabled}
-                    disabled={busy}
+                    disabled={busy || (mediaControlPending && pendingControl !== "camera")}
+                    loading={pendingControl === "camera"}
                     showLabel={showLabel}
                     iconOnlySize={iconOnlySize}
                 />
@@ -382,8 +454,15 @@ export const CallControls = ({
                         testID="call-control-switch-camera"
                         icon={ArrowsClockwiseIcon}
                         label="Сменить камеру"
-                        onPress={onSwitchCamera}
-                        disabled={busy || !cameraEnabled}
+                        onPress={() => {
+                            void runControlAction("switchCamera", onSwitchCamera);
+                        }}
+                        disabled={
+                            busy ||
+                            !cameraEnabled ||
+                            (mediaControlPending && pendingControl !== "switchCamera")
+                        }
+                        loading={pendingControl === "switchCamera"}
                         showLabel={showLabel}
                         iconOnlySize={iconOnlySize}
                     />
@@ -392,9 +471,16 @@ export const CallControls = ({
                     testID="call-control-screen"
                     icon={ScreencastIcon}
                     label="Экран"
-                    onPress={onToggleScreenShare}
+                    onPress={() => {
+                        void runControlAction("screenShare", onToggleScreenShare);
+                    }}
                     isActive={screenShareEnabled}
-                    disabled={busy || !screenShareAvailable}
+                    disabled={
+                        busy ||
+                        !screenShareAvailable ||
+                        (mediaControlPending && pendingControl !== "screenShare")
+                    }
+                    loading={pendingControl === "screenShare"}
                     showLabel={showLabel}
                     iconOnlySize={iconOnlySize}
                 />

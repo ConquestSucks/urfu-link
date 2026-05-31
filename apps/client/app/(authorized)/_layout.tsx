@@ -6,7 +6,6 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useChatHub } from "@/shared/lib/useChatHub";
 import { useCurrentUser } from "@/entities/user";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
 import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
@@ -18,17 +17,27 @@ type IdleWindow = Window & {
     cancelIdleCallback?: (handle: number) => void;
 };
 
-const scheduleAfterFirstPaint = (callback: () => void) => {
-    if (typeof window !== "undefined") {
-        const idleWindow = window as IdleWindow;
-        if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
-            const handle = idleWindow.requestIdleCallback(callback);
-            return () => idleWindow.cancelIdleCallback?.(handle);
-        }
-    }
+const REALTIME_BOOT_DELAY_MS = 2500;
 
-    const handle = setTimeout(callback, 0);
-    return () => clearTimeout(handle);
+const scheduleAfterFirstPaint = (callback: () => void) => {
+    let cancelIdle: (() => void) | null = null;
+    const delayHandle = setTimeout(() => {
+        if (typeof window !== "undefined") {
+            const idleWindow = window as IdleWindow;
+            if (idleWindow.requestIdleCallback && idleWindow.cancelIdleCallback) {
+                const idleHandle = idleWindow.requestIdleCallback(callback);
+                cancelIdle = () => idleWindow.cancelIdleCallback?.(idleHandle);
+                return;
+            }
+        }
+
+        callback();
+    }, REALTIME_BOOT_DELAY_MS);
+
+    return () => {
+        clearTimeout(delayHandle);
+        cancelIdle?.();
+    };
 };
 
 const DeferredRealtime = lazy(() => import("@/features/realtime/DeferredRealtime"));
@@ -47,10 +56,6 @@ export default function AuthLayout() {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRealtimeReady, setIsRealtimeReady] = useState(false);
     const shouldElevateThreadDetail = isMobile && isThreadDetail;
-
-    // Подключаемся к ChatHub и PresenceHub на всё время авторизованной сессии.
-    // Хуки сами обрабатывают AppState (background/foreground) и cleanup при unmount.
-    useChatHub();
 
     const { data: profile } = useCurrentUser();
 

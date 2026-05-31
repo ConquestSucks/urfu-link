@@ -1,5 +1,5 @@
 import { Avatar } from "@/shared/ui";
-import { Text, View, Pressable, Linking, Platform } from "react-native";
+import { Text, View, Pressable, Linking, Platform, type ViewStyle } from "react-native";
 import { ChatMessageProps } from "../model/types";
 import { apiClient } from "@/shared/lib/api";
 import type { AttachmentType } from "@urfu-link/api-client";
@@ -19,6 +19,15 @@ import {
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { VoiceMessagePlayer } from "@/features/voice-message";
 import { glow } from "@/shared/ui/glow";
+
+const WEB_MESSAGE_BUBBLE_MAX_WIDTH = 680;
+const IS_WEB = Platform.OS === "web";
+const messageBubbleMaxWidthClass = IS_WEB ? "" : "max-w-[85%]";
+const webMessageBubbleMaxWidthStyle = IS_WEB
+    ? ({
+          maxWidth: `min(85%, ${WEB_MESSAGE_BUBBLE_MAX_WIDTH}px)`,
+      } as unknown as ViewStyle)
+    : undefined;
 
 const renderBodyWithMentions = (text: string) => {
     const parts = text.split(/(@[A-Za-zА-Яа-я0-9_.-]+)/g);
@@ -284,7 +293,10 @@ export const ChatMessage = ({
         return (
             <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
                 {renderAuthorAvatar()}
-                <View className="max-w-[85%] px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2" style={glow.surface}>
+                <View
+                    className={`${messageBubbleMaxWidthClass} px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2`}
+                    style={[webMessageBubbleMaxWidthStyle, glow.surface]}
+                >
                     <TrashIcon size={14} className="text-text-muted" />
                     <Text className="text-text-muted text-[13px] italic">Сообщение удалено</Text>
                 </View>
@@ -319,12 +331,13 @@ export const ChatMessage = ({
                 delayLongPress={350}
                 {...contextMenuProps}
                 testID={`chat-message-bubble-${id}`}
-                className={`max-w-[85%] cursor-default ${hasAttachments ? "min-w-[240px]" : ""} gap-1 px-3 ${
+                className={`${messageBubbleMaxWidthClass} cursor-default ${hasAttachments ? "min-w-[240px]" : ""} gap-1 px-3 ${
                     hasOnlyMediaContent ? "py-2.5" : "py-3"
                 } rounded-2xl border border-transparent ${
                     isOwn ? "bg-brand-650" : "bg-white/5"
                 }`}
                 style={[
+                    webMessageBubbleMaxWidthStyle,
                     { opacity: isOptimistic ? 0.6 : 1 },
                     isFailed ? glow.danger : isOwn ? glow.brandSoft : glow.surface,
                 ]}
@@ -345,7 +358,9 @@ export const ChatMessage = ({
                             onPress={onAuthorPress}
                             hitSlop={4}
                             accessibilityRole="button"
-                            className="self-start cursor-pointer active:opacity-70"
+                            className={`self-start cursor-pointer active:opacity-70 ${
+                                hasAttachments ? "mb-1" : ""
+                            }`}
                         >
                             <Text
                                 className="text-[12px] font-semibold text-brand-300"
@@ -355,7 +370,12 @@ export const ChatMessage = ({
                             </Text>
                         </Pressable>
                     ) : (
-                        <Text className="text-[12px] font-semibold text-brand-300" numberOfLines={1}>
+                        <Text
+                            className={`text-[12px] font-semibold text-brand-300 ${
+                                hasAttachments ? "mb-1" : ""
+                            }`}
+                            numberOfLines={1}
+                        >
                             {authorName}
                         </Text>
                     )

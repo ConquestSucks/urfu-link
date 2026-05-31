@@ -1,5 +1,5 @@
 import { AnimatedViewStyle } from "@/shared/types";
-import { SidebarItem } from "@/shared/ui";
+import { SidebarItem } from "@/shared/ui/SidebarItem";
 import { Link, usePathname } from "expo-router";
 import { useEffect } from "react";
 import { MENU_ITEMS } from "../config/menu";

@@ -1,6 +1,6 @@
 import { useCurrentUser } from "@/entities/user";
 import { AnimatedView } from "@/shared/lib/nativewind-interop";
-import { ProfileCard } from "@/shared/ui";
+import { ProfileCard } from "@/shared/ui/ProfileCard";
 import { CaretLeftIcon, GearIcon } from "@/shared/ui/phosphor";
 import { Pressable, Text, View } from "react-native";
 import { glow } from "@/shared/ui/glow";

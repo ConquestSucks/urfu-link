@@ -495,7 +495,7 @@ describe("MessagesList loading state", () => {
         );
     });
 
-    it("renders the current date as a floating overlay", () => {
+    it("renders date separators as regular list rows", () => {
         jest.useFakeTimers();
         jest.setSystemTime(new Date("2026-05-24T12:00:00.000Z"));
         mockChatState = {
@@ -528,15 +528,7 @@ describe("MessagesList loading state", () => {
         expect(screen.getByTestId("message-date-separator-2026-05-23")).toBeTruthy();
         expect(list.props.stickyHeaderIndices).toBeUndefined();
         expect(list.props.invertStickyHeaders).toBeUndefined();
-        expect(screen.getByTestId("message-floating-date")).toBeTruthy();
-        act(() => {
-            list.props.onViewableItemsChanged?.({
-                viewableItems: [{ item: list.props.data[1], index: 1 }],
-                changed: [],
-            });
-        });
-
-        expect(screen.getAllByText(/23/).length).toBeGreaterThanOrEqual(1);
+        expect(screen.queryByTestId("message-floating-date")).toBeNull();
         jest.useRealTimers();
     });
 
@@ -577,18 +569,21 @@ describe("MessagesList loading state", () => {
 
         render(<MessagesList chatId="chat-date-boundary" type="chat" />);
 
-        const serialized = JSON.stringify(screen.toJSON());
+        const list = screen.UNSAFE_getByType(FlatList);
 
         expect(screen.getByTestId("message-date-separator-2026-05-31")).toBeTruthy();
         expect(screen.getByTestId("message-date-separator-2026-05-30")).toBeTruthy();
         expect(screen.getAllByText("Сегодня").length).toBeGreaterThanOrEqual(1);
-        expect(serialized.indexOf("message-date-separator-2026-05-31")).toBeLessThan(
-            serialized.indexOf("message-message-may-30"),
-        );
+        expect(list.props.data).toEqual([
+            expect.objectContaining({ id: "message-today-voice", type: "message" }),
+            expect.objectContaining({ dayKey: "2026-05-31", type: "date" }),
+            expect.objectContaining({ id: "message-may-30", type: "message" }),
+            expect.objectContaining({ dayKey: "2026-05-30", type: "date" }),
+        ]);
         jest.useRealTimers();
     });
 
-    it("keeps date markers out of the virtualized message data", () => {
+    it("keeps date separators as independent list rows", () => {
         mockChatState = {
             ...mockChatState,
             messagesByConversation: {
@@ -617,7 +612,9 @@ describe("MessagesList loading state", () => {
         const list = screen.UNSAFE_getByType(FlatList);
         expect(list.props.data).toEqual([
             expect.objectContaining({ id: "message-today", type: "message" }),
+            expect.objectContaining({ dayKey: "2026-05-24", type: "date" }),
             expect.objectContaining({ id: "message-yesterday", type: "message" }),
+            expect.objectContaining({ dayKey: "2026-05-23", type: "date" }),
         ]);
     });
 

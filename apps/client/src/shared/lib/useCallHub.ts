@@ -1,13 +1,12 @@
 import { useEffect } from "react";
 import { AppState, AppStateStatus } from "react-native";
-import { HubConnectionState } from "@microsoft/signalr";
 import type { CallSessionDto } from "@urfu-link/api-client";
-import { createHubConnection } from "@/shared/lib/signalr";
+import { createHubConnection, HUB_CONNECTION_STATE, type HubConnection } from "@/shared/lib/signalr";
 import { useCallStore } from "@/entities/call/model/call-store";
 import { playMessageSound } from "@/shared/lib/message-sounds";
 
-const connectHub = async (connection: ReturnType<typeof createHubConnection>) => {
-    if (connection.state === HubConnectionState.Connected) {
+const connectHub = async (connection: HubConnection) => {
+    if (connection.state === HUB_CONNECTION_STATE.Connected) {
         return;
     }
 
@@ -32,55 +31,70 @@ export const useCallHub = () => {
     const handleCallDeviceReplaced = useCallStore((s) => s.handleCallDeviceReplaced);
 
     useEffect(() => {
-        const connection = createHubConnection("/hubs/calls");
+        let connection: HubConnection | null = null;
+        let disposed = false;
 
-        connection.on("IncomingCall", (call: CallSessionDto) => {
-            if (isActiveDisciplineGroupCall(call)) {
+        const setupConnection = async () => {
+            const nextConnection = await createHubConnection("/hubs/calls");
+            if (disposed) {
+                void nextConnection.stop();
                 return;
             }
 
-            handleIncomingCall(call);
-            void playMessageSound("receive", {
-                conversationId: call.conversationId,
+            connection = nextConnection;
+
+            nextConnection.on("IncomingCall", (call: CallSessionDto) => {
+                if (isActiveDisciplineGroupCall(call)) {
+                    return;
+                }
+
+                handleIncomingCall(call);
+                void playMessageSound("receive", {
+                    conversationId: call.conversationId,
+                });
             });
-        });
 
-        connection.on("CallAccepted", (call: CallSessionDto) => {
-            handleCallAccepted(call);
-        });
+            nextConnection.on("CallAccepted", (call: CallSessionDto) => {
+                handleCallAccepted(call);
+            });
 
-        connection.on("CallDeclined", (call: CallSessionDto) => {
-            handleCallDeclined(call);
-        });
+            nextConnection.on("CallDeclined", (call: CallSessionDto) => {
+                handleCallDeclined(call);
+            });
 
-        connection.on("CallCancelled", (call: CallSessionDto) => {
-            handleCallCancelled(call);
-        });
+            nextConnection.on("CallCancelled", (call: CallSessionDto) => {
+                handleCallCancelled(call);
+            });
 
-        connection.on("CallEnded", (call: CallSessionDto) => {
-            handleCallEnded(call);
-        });
+            nextConnection.on("CallEnded", (call: CallSessionDto) => {
+                handleCallEnded(call);
+            });
 
-        connection.on("CallParticipantJoined", (callId: string, userId: string) => {
-            handleCallParticipantJoined(callId, userId);
-        });
+            nextConnection.on("CallParticipantJoined", (callId: string, userId: string) => {
+                handleCallParticipantJoined(callId, userId);
+            });
 
-        connection.on("CallParticipantLeft", (callId: string, userId: string) => {
-            handleCallParticipantLeft(callId, userId);
-        });
+            nextConnection.on("CallParticipantLeft", (callId: string, userId: string) => {
+                handleCallParticipantLeft(callId, userId);
+            });
 
-        connection.on("CallDeviceReplaced", (callId: string, clientInstanceId: string) => {
-            handleCallDeviceReplaced(callId, clientInstanceId);
-        });
+            nextConnection.on("CallDeviceReplaced", (callId: string, clientInstanceId: string) => {
+                handleCallDeviceReplaced(callId, clientInstanceId);
+            });
 
-        void connectHub(connection);
+            void connectHub(nextConnection);
+        };
+
+        void setupConnection().catch((error) => {
+            console.warn("CallHub setup failed", error);
+        });
 
         const handlePageHide = () => {
-            void connection.stop();
+            void connection?.stop();
         };
 
         const handlePageShow = () => {
-            void connectHub(connection);
+            if (connection) void connectHub(connection);
         };
 
         if (typeof window !== "undefined") {
@@ -89,26 +103,27 @@ export const useCallHub = () => {
         }
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
-            if (nextState === "active") {
+            if (nextState === "active" && connection) {
                 void connectHub(connection);
             }
         });
 
         return () => {
+            disposed = true;
             if (typeof window !== "undefined") {
                 window.removeEventListener("pagehide", handlePageHide);
                 window.removeEventListener("pageshow", handlePageShow);
             }
-            connection.off("IncomingCall");
-            connection.off("CallAccepted");
-            connection.off("CallDeclined");
-            connection.off("CallCancelled");
-            connection.off("CallEnded");
-            connection.off("CallParticipantJoined");
-            connection.off("CallParticipantLeft");
-            connection.off("CallDeviceReplaced");
+            connection?.off("IncomingCall");
+            connection?.off("CallAccepted");
+            connection?.off("CallDeclined");
+            connection?.off("CallCancelled");
+            connection?.off("CallEnded");
+            connection?.off("CallParticipantJoined");
+            connection?.off("CallParticipantLeft");
+            connection?.off("CallDeviceReplaced");
             subscription.remove();
-            void connection.stop();
+            void connection?.stop();
         };
     }, [
         handleCallAccepted,

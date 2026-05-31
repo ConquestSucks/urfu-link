@@ -1,7 +1,7 @@
 import React, { ReactNode } from "react";
 import { ActivityIndicator } from "@/shared/ui/activity-indicator";
 import { Pressable, Text, View } from "react-native";
-import { twMerge } from "tailwind-merge";
+import { cx } from "@/shared/lib/classnames";
 import { glow } from "./glow";
 
 interface ButtonProps {
@@ -48,7 +48,7 @@ export const Button = ({
             onPress={onPress}
             disabled={isDisabled}
             style={!isDisabled && variant === "primary" ? glow.brandSoft : undefined}
-            className={twMerge(
+            className={cx(
                 "flex-row items-center justify-center h-fit px-4 py-2 rounded-xl gap-2 transition-all",
                 variantStyles[variant],
                 isDisabled ? "opacity-60" : "",
@@ -67,7 +67,7 @@ export const Button = ({
 
                     {label && (
                         <Text
-                            className={twMerge(
+                            className={cx(
                                 "font-medium text-sm select-none",
                                 textStyles[variant],
                                 textClassName,

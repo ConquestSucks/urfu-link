@@ -1,5 +1,6 @@
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
+const path = require("path");
 const config = getDefaultConfig(__dirname);
 config.resolver.alias = {
     '@': './src',
@@ -9,6 +10,13 @@ config.resolver.alias = {
 // parse in a non-module bundle. Force CJS resolution by clearing isESMImport
 // so Metro picks the "require" condition instead of "import".
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+    if (platform === 'web' && moduleName === 'react-native-reanimated') {
+        return {
+            type: 'sourceFile',
+            filePath: path.resolve(__dirname, 'src/shared/lib/reanimated-web-shim.ts'),
+        };
+    }
+
     if (moduleName === 'zustand' || moduleName.startsWith('zustand/')) {
         return context.resolveRequest(
             { ...context, isESMImport: false },
