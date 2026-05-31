@@ -100,8 +100,9 @@ export const isActiveScreenShareAudio = (
 
 export const getCallStageLayoutStyles = (
     isMobile: boolean,
-): { container: ViewStyle; main: ViewStyle; rail: ViewStyle } => ({
-    container: {
+    hasScreenShare = false,
+): { container: ViewStyle; main: ViewStyle; rail: ViewStyle } => {
+    const container: ViewStyle = {
         alignSelf: "stretch",
         flex: 1,
         flexGrow: 1,
@@ -110,31 +111,53 @@ export const getCallStageLayoutStyles = (
         minHeight: 0,
         minWidth: 0,
         width: "100%",
-    },
-    main: {
+    };
+    const main: ViewStyle = {
         alignSelf: "stretch",
-        flex: 1,
+        flex: hasScreenShare && !isMobile ? 2 : 1,
         flexBasis: isMobile ? "auto" : 0,
-        flexGrow: 1,
+        flexGrow: hasScreenShare && !isMobile ? 2 : 1,
         flexShrink: 1,
         height: "100%",
         minHeight: 0,
         minWidth: 0,
-        width: "100%",
-    },
-    rail: isMobile
-        ? {
-              flexShrink: 0,
-              maxHeight: 156,
-              width: "100%",
-          }
-        : {
-              alignSelf: "stretch",
-              flexShrink: 0,
-              minHeight: 0,
-              width: 220,
-          },
-});
+        ...(hasScreenShare && !isMobile ? {} : { width: "100%" }),
+    };
+
+    if (isMobile) {
+        return {
+            container,
+            main,
+            rail: {
+                flexShrink: 0,
+                maxHeight: 156,
+                width: "100%",
+            },
+        };
+    }
+
+    return {
+        container,
+        main,
+        rail: hasScreenShare
+            ? {
+                  alignSelf: "stretch",
+                  flex: 1,
+                  flexBasis: 0,
+                  flexGrow: 1,
+                  flexShrink: 1,
+                  height: "100%",
+                  minHeight: 0,
+                  minWidth: 280,
+              }
+            : {
+                  alignSelf: "stretch",
+                  flexShrink: 0,
+                  minHeight: 0,
+                  width: 220,
+              },
+    };
+};
 
 export const getParticipantRailCardStyle = (
     isMobile: boolean,
