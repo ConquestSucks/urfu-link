@@ -27,6 +27,148 @@ const WAVEFORM_BARS = [
     8, 10, 8, 14, 18, 12, 22, 28, 18, 12, 16, 24, 30, 18, 12, 20, 26, 16, 10,
     14, 22, 18, 30, 24, 14, 10, 16, 22, 28, 18, 12, 20, 26, 18, 12, 16, 22,
 ];
+const WAVEFORM_BAR_COUNT = WAVEFORM_BARS.length;
+const WAVEFORM_MIN_HEIGHT = 6;
+const WAVEFORM_MAX_HEIGHT = 30;
+const WAVEFORM_SAMPLE_LIMIT_PER_BAR = 700;
+
+type DecodedAudioBuffer = {
+    length: number;
+    numberOfChannels: number;
+    getChannelData: (channel: number) => Float32Array;
+};
+
+type BrowserAudioContext = {
+    decodeAudioData: (
+        data: ArrayBuffer,
+        onSuccess?: (buffer: DecodedAudioBuffer) => void,
+        onError?: (error: unknown) => void,
+    ) => Promise<DecodedAudioBuffer> | void;
+    close?: () => Promise<void>;
+};
+
+type BrowserAudioContextConstructor = new () => BrowserAudioContext;
+
+const getBrowserAudioContextConstructor = (): BrowserAudioContextConstructor | null => {
+    const audioGlobal = globalThis as typeof globalThis & {
+        AudioContext?: BrowserAudioContextConstructor;
+        webkitAudioContext?: BrowserAudioContextConstructor;
+    };
+
+    return audioGlobal.AudioContext ?? audioGlobal.webkitAudioContext ?? null;
+};
+
+const decodeAudioData = (
+    context: BrowserAudioContext,
+    data: ArrayBuffer,
+): Promise<DecodedAudioBuffer> =>
+    new Promise((resolve, reject) => {
+        const result = context.decodeAudioData(data, resolve, reject);
+        if (result && typeof result.then === "function") {
+            result.then(resolve, reject);
+        }
+    });
+
+const levelToWaveformHeight = (level: number) =>
+    WAVEFORM_MIN_HEIGHT +
+    Math.max(0, Math.min(level, 1)) * (WAVEFORM_MAX_HEIGHT - WAVEFORM_MIN_HEIGHT);
+
+const normalizeWaveformLevels = (levels: number[]) => {
+    const maxLevel = Math.max(...levels);
+    if (!Number.isFinite(maxLevel) || maxLevel <= 0.0001) {
+        return Array.from({ length: WAVEFORM_BAR_COUNT }, () => WAVEFORM_MIN_HEIGHT);
+    }
+
+    return levels.map((level) => levelToWaveformHeight(Math.sqrt(level / maxLevel)));
+};
+
+const buildWaveformFromAudioBuffer = (audioBuffer: DecodedAudioBuffer) => {
+    if (audioBuffer.length <= 0 || audioBuffer.numberOfChannels <= 0) return null;
+
+    const levels = Array.from({ length: WAVEFORM_BAR_COUNT }, (_, barIndex) => {
+        const start = Math.floor((barIndex / WAVEFORM_BAR_COUNT) * audioBuffer.length);
+        const end = Math.max(
+            start + 1,
+            Math.floor(((barIndex + 1) / WAVEFORM_BAR_COUNT) * audioBuffer.length),
+        );
+        const stride = Math.max(
+            1,
+            Math.floor((end - start) / WAVEFORM_SAMPLE_LIMIT_PER_BAR),
+        );
+        let sumSquares = 0;
+        let sampleCount = 0;
+
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel += 1) {
+            const channelData = audioBuffer.getChannelData(channel);
+            for (let sampleIndex = start; sampleIndex < end; sampleIndex += stride) {
+                const sample = channelData[sampleIndex] ?? 0;
+                sumSquares += sample * sample;
+                sampleCount += 1;
+            }
+        }
+
+        return sampleCount > 0 ? Math.sqrt(sumSquares / sampleCount) : 0;
+    });
+
+    return normalizeWaveformLevels(levels);
+};
+
+const extractWaveformBars = async (uri: string) => {
+    const AudioContextConstructor = getBrowserAudioContextConstructor();
+    if (!AudioContextConstructor || typeof fetch !== "function") return null;
+
+    const context = new AudioContextConstructor();
+    try {
+        const response = await fetch(uri);
+        const audioData = await response.arrayBuffer();
+        const decodedAudio = await decodeAudioData(context, audioData);
+        return buildWaveformFromAudioBuffer(decodedAudio);
+    } finally {
+        await context.close?.().catch(() => undefined);
+    }
+};
+
+const getTimelineLocationX = (event: any, width: number) => {
+    const nativeEvent = event.nativeEvent ?? event;
+    const directLocation =
+        nativeEvent.locationX ??
+        nativeEvent.offsetX ??
+        nativeEvent.layerX ??
+        nativeEvent.nativeEvent?.locationX;
+
+    if (typeof directLocation === "number" && Number.isFinite(directLocation)) {
+        return Math.max(0, Math.min(directLocation, width));
+    }
+
+    const clientX =
+        nativeEvent.clientX ??
+        nativeEvent.changedTouches?.[0]?.clientX ??
+        nativeEvent.touches?.[0]?.clientX;
+    const pageX =
+        nativeEvent.pageX ??
+        nativeEvent.changedTouches?.[0]?.pageX ??
+        nativeEvent.touches?.[0]?.pageX;
+    const target = event.currentTarget ?? nativeEvent.currentTarget ?? nativeEvent.target;
+    const rect =
+        target && typeof target.getBoundingClientRect === "function"
+            ? target.getBoundingClientRect()
+            : null;
+
+    if (typeof clientX === "number" && rect) {
+        return Math.max(0, Math.min(clientX - rect.left, width));
+    }
+
+    if (typeof pageX === "number" && rect) {
+        const viewport = globalThis as typeof globalThis & {
+            scrollX?: number;
+            pageXOffset?: number;
+        };
+        const scrollX = viewport.scrollX ?? viewport.pageXOffset ?? 0;
+        return Math.max(0, Math.min(pageX - rect.left - scrollX, width));
+    }
+
+    return null;
+};
 
 const formatFileSize = (size?: number | null): string | null => {
     if (typeof size !== "number" || size <= 0) return null;
@@ -59,7 +201,9 @@ export const VoiceMessagePlayer = ({
     const [isResolving, setIsResolving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [timelineWidth, setTimelineWidth] = useState(0);
+    const [waveformBars, setWaveformBars] = useState(WAVEFORM_BARS);
     const loadedUriRef = useRef<string | null>(null);
+    const waveformRequestRef = useRef(0);
     const progressFrameRef = useRef<ProgressFrameHandle | null>(null);
     const playbackClockRef = useRef({ startedAt: 0, startedFrom: 0 });
     const player = useAudioPlayer(null);
@@ -82,6 +226,30 @@ export const VoiceMessagePlayer = ({
         setPlaybackUri(sourceUri);
         replacePlaybackSource(sourceUri);
     }, [replacePlaybackSource, sourceUri]);
+
+    useEffect(() => {
+        const waveformUri = playbackUri ?? sourceUri;
+        const requestId = waveformRequestRef.current + 1;
+        waveformRequestRef.current = requestId;
+
+        if (!waveformUri) {
+            setWaveformBars(WAVEFORM_BARS);
+            return undefined;
+        }
+
+        let isActive = true;
+        setWaveformBars(WAVEFORM_BARS);
+        extractWaveformBars(waveformUri)
+            .then((bars) => {
+                if (!isActive || waveformRequestRef.current !== requestId || !bars) return;
+                setWaveformBars(bars);
+            })
+            .catch(() => undefined);
+
+        return () => {
+            isActive = false;
+        };
+    }, [playbackUri, sourceUri]);
 
     const totalSeconds = useMemo(() => {
         const metadataDuration = durationSeconds && durationSeconds > 0 ? durationSeconds : 0;
@@ -216,16 +384,18 @@ export const VoiceMessagePlayer = ({
     const handleTimelinePress = useCallback(
         (event: any) => {
             if (timelineWidth <= 0) return;
-            const locationX = event.nativeEvent?.locationX ?? 0;
+            const locationX = getTimelineLocationX(event, timelineWidth);
+            if (locationX == null) return;
             void seekToProgress(locationX / timelineWidth);
         },
         [seekToProgress, timelineWidth],
     );
 
     const renderWaveformBars = (color: string) =>
-        WAVEFORM_BARS.map((height, index) => (
+        waveformBars.map((height, index) => (
             <View
                 key={`${color}-${index}`}
+                testID="voice-message-waveform-bar"
                 style={[styles.waveformBar, { height, backgroundColor: color }]}
             />
         ));

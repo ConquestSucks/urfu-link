@@ -206,6 +206,30 @@ describe("ChatMessage read indicator", () => {
         expect(author.props.className).not.toContain("text-brand-200");
     });
 
+    it("adds extra sender name spacing before attachments", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                showAvatar
+                authorName="Ivan Petrov"
+                attachments={[
+                    {
+                        name: "file.json",
+                        url: "/api/media/asset-1/download-url",
+                        mediaAssetId: "asset-1",
+                        type: "Document",
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText("Ivan Petrov").props.className).toContain("mb-1");
+    });
+
     it("passes the sender name to incoming message avatars", () => {
         render(
             <ChatMessage
