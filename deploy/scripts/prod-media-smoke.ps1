@@ -1,6 +1,6 @@
 param(
-    [string]$SshTarget = "root@89.167.93.199",
-    [string]$ExpectedIp = "89.167.93.199",
+    [string]$SshTarget = $env:URFU_PROD_SSH_TARGET,
+    [string]$ExpectedIp = $env:URFU_PROD_MEDIA_IP,
     [string]$LiveKitUrl = "https://livekit.urfu-link.ghjc.ru",
     [string]$ApiUrl = "https://api.urfu-link.ghjc.ru",
     [string]$CallId,
@@ -8,6 +8,16 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($SshTarget)) {
+    throw "Set -SshTarget or URFU_PROD_SSH_TARGET to the production SSH target."
+}
+
+if ([string]::IsNullOrWhiteSpace($ExpectedIp)) {
+    throw "Set -ExpectedIp or URFU_PROD_MEDIA_IP to the expected public media IP."
+}
+
+$expectedLiveKitServerUrl = $LiveKitUrl -replace "^https://", "wss://" -replace "^http://", "ws://"
 
 function Invoke-Remote {
     param([string]$Command)
@@ -56,7 +66,7 @@ if ($CallId -and $AccessToken) {
     Write-Host "[smoke] Checking call token serverUrl." -ForegroundColor Cyan
     $headers = @{ Authorization = "Bearer $AccessToken" }
     $tokenResponse = Invoke-RestMethod -Uri "$ApiUrl/api/calls/$CallId/token" -Headers $headers -Method Post -TimeoutSec 20
-    if ($tokenResponse.serverUrl -ne "wss://livekit.urfu-link.ghjc.ru") {
+    if ($tokenResponse.serverUrl -ne $expectedLiveKitServerUrl) {
         throw "Unexpected call token serverUrl: $($tokenResponse.serverUrl)"
     }
     Write-Host "[smoke] call token serverUrl is correct" -ForegroundColor Green

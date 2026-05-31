@@ -13,7 +13,7 @@ public sealed record UserProfileResponse(
 
 public sealed record AccountResponse(string? AvatarUrl, string? AboutMe);
 
-public sealed record PrivacyResponse(bool ShowOnlineStatus, bool ShowLastVisitTime);
+public sealed record PrivacyResponse(bool ShowLastVisitTime);
 
 public sealed record NotificationsResponse(
     bool NewMessages,

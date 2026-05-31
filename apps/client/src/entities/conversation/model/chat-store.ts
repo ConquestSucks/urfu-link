@@ -108,7 +108,11 @@ type ChatState = {
     editMessage: (messageId: string, body: string) => Promise<void>;
     deleteMessage: (messageId: string, mode: DeleteMode) => Promise<void>;
     flushPendingReads: () => Promise<void>;
-    forwardMessages: (targetConversationId: string, messageIds: string[]) => Promise<void>;
+    forwardMessages: (
+        targetConversationId: string,
+        messageIds: string[],
+        peerUserId?: string,
+    ) => Promise<void>;
     addReaction: (messageId: string, emoji: string) => Promise<void>;
     removeReaction: (messageId: string, emoji: string) => Promise<void>;
     pinMessage: (conversationId: string, messageId: string) => Promise<void>;
@@ -1030,8 +1034,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         }
     },
 
-    forwardMessages: async (targetConversationId, messageIds) => {
-        const forwarded = await apiClient.chat.forwardMessages(targetConversationId, messageIds);
+    forwardMessages: async (targetConversationId, messageIds, peerUserId) => {
+        const forwarded = peerUserId
+            ? await apiClient.chat.forwardMessages(targetConversationId, messageIds, peerUserId)
+            : await apiClient.chat.forwardMessages(targetConversationId, messageIds);
         forwarded.map(normalizeMessage).forEach((message) => get().addMessage(message));
     },
 

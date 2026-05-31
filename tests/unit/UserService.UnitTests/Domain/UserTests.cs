@@ -17,7 +17,6 @@ public sealed class UserTests
         Assert.Equal(TestUserId, user.Id);
         Assert.Null(user.Account.AvatarUrl);
         Assert.Null(user.Account.AboutMe);
-        Assert.True(user.Privacy.ShowOnlineStatus);
         Assert.True(user.Privacy.ShowLastVisitTime);
         Assert.True(user.Notifications.Sound);
         Assert.False(user.Notifications.DndEnabled);
@@ -123,14 +122,12 @@ public sealed class UserTests
     {
         var user = UserProfile.CreateDefault(TestUserId);
 
-        user.UpdatePrivacy(showOnlineStatus: false, showLastVisitTime: false);
+        user.UpdatePrivacy(showLastVisitTime: false);
 
-        Assert.False(user.Privacy.ShowOnlineStatus);
         Assert.False(user.Privacy.ShowLastVisitTime);
         var evt = Assert.Single(user.DomainEvents);
         var privacyEvent = Assert.IsType<UserPrivacySettingsChangedEvent>(evt);
         Assert.Equal(TestUserId, privacyEvent.UserId);
-        Assert.False(privacyEvent.ShowOnlineStatus);
         Assert.False(privacyEvent.ShowLastVisitTime);
     }
 
@@ -229,7 +226,7 @@ public sealed class UserTests
     {
         var user = UserProfile.CreateDefault(TestUserId);
         user.UpdateAccount("bio");
-        user.UpdatePrivacy(false, false);
+        user.UpdatePrivacy(false);
         Assert.Equal(2, user.DomainEvents.Count);
 
         user.ClearDomainEvents();

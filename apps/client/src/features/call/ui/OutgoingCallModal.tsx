@@ -36,7 +36,7 @@ export const OutgoingCallModal = () => {
     }, [conversationId, participants.length]);
 
     useEffect(() => {
-        if (!outgoingCall) {
+        if (!outgoingCall || outgoingCall.status !== "Ringing") {
             if (!activeCall || activeCall.id !== outgoingCallIdRef.current) {
                 outgoingCallIdRef.current = null;
             }

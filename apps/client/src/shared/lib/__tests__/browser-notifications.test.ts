@@ -1,6 +1,7 @@
 import {
     configureBrowserNotifications,
     getBrowserNotificationPermission,
+    setBrowserNotificationsEnabled,
     requestBrowserNotificationPermission,
     resetBrowserNotificationsForTests,
     setBrowserNotificationNavigationForTests,
@@ -81,6 +82,25 @@ describe("browser notifications", () => {
 
     it("does not show messages while the page is active", () => {
         setPageState("visible", true);
+
+        const shown = showMessageBrowserNotification({
+            id: "message-1",
+            conversationId: "direct-1",
+            senderId: "peer-1",
+            body: "hello",
+            attachments: [],
+            state: "Sent",
+            createdAt: "2026-05-24T10:03:00.000Z",
+            deliveredAt: null,
+            readAt: null,
+        });
+
+        expect(shown).toBe(false);
+        expect(instances).toHaveLength(0);
+    });
+
+    it("does not show messages when browser notifications are disabled in app settings", () => {
+        setBrowserNotificationsEnabled(false);
 
         const shown = showMessageBrowserNotification({
             id: "message-1",

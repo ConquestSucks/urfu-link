@@ -221,6 +221,56 @@ public class MessengerEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Post_Forward_ToDraftDirect_ReturnsNewMessages()
+    {
+        var caller = Guid.NewGuid();
+        var groupMember = Guid.NewGuid();
+        var targetPeer = Guid.NewGuid();
+
+        Guid sourceMsgId;
+        string targetConvId;
+        await using (var seed = _factory.Services.CreateAsyncScope())
+        {
+            var convRepo = seed.ServiceProvider.GetRequiredService<IConversationRepository>();
+            var groupConv = Conversation.Hydrate(
+                id: $"group-{Guid.NewGuid():N}",
+                type: ConversationType.Group,
+                participants: new[] { caller, groupMember },
+                createdAtUtc: DateTimeOffset.UtcNow,
+                lastMessageAtUtc: DateTimeOffset.UtcNow,
+                lastMessagePreview: null);
+            await convRepo.TryCreateAsync(groupConv, default);
+
+            var send = seed.ServiceProvider.GetRequiredService<SendMessageService>();
+            var dto = await send.SendAsync(
+                new SendMessageRequest(groupConv.Id, groupMember, "to forward from group", Array.Empty<Guid>(), $"c-{Guid.NewGuid():N}"),
+                default);
+            sourceMsgId = dto.Id;
+
+            var open = seed.ServiceProvider.GetRequiredService<OpenDirectConversationService>();
+            var targetDraft = await open.OpenAsync(caller, targetPeer, default);
+            targetConvId = targetDraft.Id;
+        }
+
+        TestAuthHandler.CurrentPrincipal = TestUserBuilder.Authenticated(caller);
+
+        using var client = _factory.CreateClient();
+        var response = await client.PostAsJsonAsync(
+            $"/api/v1/chat/conversations/{targetConvId}/forward",
+            new { messageIds = new[] { sourceMsgId }, peerUserId = targetPeer });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var forwarded = await response.Content.ReadFromChatJsonAsync<List<MessageDto>>();
+        forwarded.Should().ContainSingle();
+        forwarded![0].ConversationId.Should().Be(targetConvId);
+
+        await using var verify = _factory.Services.CreateAsyncScope();
+        var persisted = await verify.ServiceProvider.GetRequiredService<IConversationRepository>()
+            .GetByIdAsync(targetConvId, default);
+        persisted.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task Get_ReadReceipts_ReturnsReceiptsForParticipant()
     {
         var (caller, peer, _, msg) = await SeedSentMessageAsync();

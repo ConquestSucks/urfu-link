@@ -262,10 +262,11 @@ export function createChatApi(
       });
     },
 
-    forwardMessages(targetConversationId: string, messageIds: string[]): Promise<MessageDto[]> {
+    forwardMessages(targetConversationId: string, messageIds: string[], peerUserId?: string): Promise<MessageDto[]> {
+      const payload = peerUserId ? { messageIds, peerUserId } : { messageIds };
       return request<MessageDto[]>(`${PREFIX}/conversations/${encodeURIComponent(targetConversationId)}/forward`, {
         method: "POST",
-        body: JSON.stringify({ messageIds }),
+        body: JSON.stringify(payload),
       });
     },
 

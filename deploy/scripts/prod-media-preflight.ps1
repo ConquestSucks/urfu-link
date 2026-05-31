@@ -1,12 +1,20 @@
 param(
-    [string]$SshTarget = "root@89.167.93.199",
-    [string]$ExpectedIp = "89.167.93.199",
+    [string]$SshTarget = $env:URFU_PROD_SSH_TARGET,
+    [string]$ExpectedIp = $env:URFU_PROD_MEDIA_IP,
     [string[]]$MediaDomains = @("livekit.urfu-link.ghjc.ru", "turn.urfu-link.ghjc.ru"),
     [switch]$RequireTargetState
 )
 
 $ErrorActionPreference = "Stop"
 $failures = New-Object System.Collections.Generic.List[string]
+
+if ([string]::IsNullOrWhiteSpace($SshTarget)) {
+    throw "Set -SshTarget or URFU_PROD_SSH_TARGET to the production SSH target."
+}
+
+if ([string]::IsNullOrWhiteSpace($ExpectedIp)) {
+    throw "Set -ExpectedIp or URFU_PROD_MEDIA_IP to the expected public media IP."
+}
 
 function Add-Failure {
     param([string]$Message)

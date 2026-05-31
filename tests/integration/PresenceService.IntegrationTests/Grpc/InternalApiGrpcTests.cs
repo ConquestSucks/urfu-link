@@ -124,8 +124,8 @@ public sealed class InternalApiGrpcTests : IAsyncLifetime
                 target, "d1", DomainEnums.Platform.Web, DomainEnums.PresenceStatus.Online,
                 null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow), CancellationToken.None);
         }
-        // Privacy says hide everything — gRPC should ignore that.
-        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, target, false, false);
+        // Privacy says hide last-visit time — gRPC should ignore public privacy filtering.
+        await TestKafkaTrigger.TriggerPrivacyChangedAsync(_factory, target, true);
 
         var client = AuthorizedClient(caller);
         var reply = await client.GetPresenceAsync(new GetPresenceRequest { UserId = target.ToString() });

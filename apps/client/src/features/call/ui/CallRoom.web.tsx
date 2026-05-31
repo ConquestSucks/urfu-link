@@ -46,6 +46,10 @@ import {
     type ScreenShareCandidate,
     type StageMediaItem,
 } from "./CallRoomMedia";
+import {
+    getCurrentBrowserDeviceInfo,
+    isMobileBrowserDevice,
+} from "./CallRoomPlatform";
 
 type CameraFacingMode = "user" | "environment";
 
@@ -72,6 +76,33 @@ type ParticipantMediaInfo = ParticipantInfo & {
     isSpeaking: boolean;
     cameraTrack: WebVideoTrackRef | null;
     screenTrack: WebVideoTrackRef | null;
+};
+
+const PARTICIPANT_GRID_GAP = 12;
+
+const getParticipantGridColumns = (itemCount: number, isMobile: boolean) => {
+    if (isMobile || itemCount <= 1) return 1;
+    if (itemCount <= 4) return 2;
+    if (itemCount <= 6) return 3;
+    return 4;
+};
+
+const getParticipantGridItemStyle = (
+    itemCount: number,
+    isMobile: boolean,
+): React.CSSProperties => {
+    const columns = getParticipantGridColumns(itemCount, isMobile);
+    const rows = Math.max(1, Math.ceil(itemCount / columns));
+    const widthOffset = ((columns - 1) * PARTICIPANT_GRID_GAP) / columns;
+    const heightOffset = ((rows - 1) * PARTICIPANT_GRID_GAP) / rows;
+
+    return {
+        flex: `1 1 calc(${100 / columns}% - ${widthOffset}px)`,
+        height: `calc(${100 / rows}% - ${heightOffset}px)`,
+        minHeight: 0,
+        minWidth: 0,
+        overflow: "hidden",
+    };
 };
 
 const collectVideoTracks = (room: Room, participantInfos: ParticipantInfo[]) => {
@@ -367,7 +398,7 @@ const ParticipantTile = ({
                         ) : (
                             <View className="items-center gap-3 px-3">
                                 <Avatar
-                                    size={compact ? 54 : 104}
+                                    size={compact ? 62 : 112}
                                     src={participant.avatarUrl}
                                     name={participant.displayName}
                                 />
@@ -548,14 +579,13 @@ const ParticipantRail = ({
             showsHorizontalScrollIndicator={false}
             showsVerticalScrollIndicator={false}
             style={layoutStyles.rail}
-            className={isMobile ? "max-h-32" : "w-44"}
             contentContainerStyle={
                 isMobile
-                    ? { gap: 8, paddingRight: 4 }
-                    : { gap: 8, alignItems: "stretch" }
+                    ? { gap: 10, paddingRight: 4 }
+                    : { gap: 10, alignItems: "stretch" }
             }
         >
-            <View className={`gap-2 ${isMobile ? "flex-row" : ""}`}>
+            <View className={`gap-2.5 ${isMobile ? "flex-row" : ""}`}>
                 {items.map((item, index) => (
                     <AnimatedView
                         key={item.id}
@@ -582,6 +612,64 @@ const ParticipantRail = ({
                 ))}
             </View>
         </ScrollView>
+    );
+};
+
+const ParticipantGrid = ({
+    items,
+    participants,
+    isVideoCall,
+    isMobile,
+    localFacingMode,
+    onSelectItem,
+}: {
+    items: RenderedStageItem[];
+    participants: ParticipantMediaInfo[];
+    isVideoCall: boolean;
+    isMobile: boolean;
+    localFacingMode: CameraFacingMode;
+    onSelectItem: (itemId: string) => void;
+}) => {
+    const itemStyle = getParticipantGridItemStyle(items.length, isMobile);
+
+    return React.createElement(
+        "div",
+        {
+            "data-testid": "call-participant-grid",
+            style: {
+                alignContent: "stretch",
+                display: "flex",
+                flex: 1,
+                flexDirection: "row",
+                flexWrap: "wrap",
+                gap: PARTICIPANT_GRID_GAP,
+                height: "100%",
+                minHeight: 0,
+                minWidth: 0,
+                width: "100%",
+            } satisfies React.CSSProperties,
+        },
+        items.map((item) =>
+            React.createElement(
+                "div",
+                {
+                    key: item.id,
+                    style: itemStyle,
+                },
+                <StageItemTile
+                    item={item}
+                    participants={participants}
+                    isMain
+                    isVideoCall={isVideoCall}
+                    localFacingMode={localFacingMode}
+                    onSelect={onSelectItem}
+                    onOpenScreenShareFullscreen={() => undefined}
+                    screenShareAudioAvailable={false}
+                    screenShareVolume={1}
+                    onScreenShareVolumeChange={() => undefined}
+                />,
+            ),
+        ),
     );
 };
 
@@ -627,34 +715,49 @@ const CallStage = ({
                 isMobile ? "" : "flex-row"
             }`}
         >
-            <AnimatedView
-                testID="call-stage-main"
-                layout={LinearTransition.duration(240)}
-                style={layoutStyles.main}
-                className="flex-1 min-w-0 min-h-0 self-stretch"
-            >
-                <StageItemTile
-                    item={mainItem}
+            {hasScreenShare ? (
+                <>
+                    <AnimatedView
+                        testID="call-stage-main"
+                        layout={LinearTransition.duration(240)}
+                        style={layoutStyles.main}
+                        className="flex-1 min-w-0 min-h-0 self-stretch"
+                    >
+                        <StageItemTile
+                            item={mainItem}
+                            participants={participants}
+                            isMain
+                            isVideoCall={isVideoCall}
+                            localFacingMode={localFacingMode}
+                            onSelect={onSelectStageItem}
+                            onOpenScreenShareFullscreen={onOpenScreenShareFullscreen}
+                            screenShareAudioAvailable={
+                                mainItem.kind === "screen" && screenShareAudioAvailable
+                            }
+                            screenShareVolume={screenShareVolume}
+                            onScreenShareVolumeChange={onScreenShareVolumeChange}
+                        />
+                    </AnimatedView>
+                    <ParticipantRail
+                        items={railItems}
+                        participants={participants}
+                        isVideoCall={isVideoCall}
+                        isMobile={isMobile}
+                        hasScreenShare={hasScreenShare}
+                        localFacingMode={localFacingMode}
+                        onSelectItem={onSelectStageItem}
+                    />
+                </>
+            ) : (
+                <ParticipantGrid
+                    items={items}
                     participants={participants}
-                    isMain
                     isVideoCall={isVideoCall}
+                    isMobile={isMobile}
                     localFacingMode={localFacingMode}
-                    onSelect={onSelectStageItem}
-                    onOpenScreenShareFullscreen={onOpenScreenShareFullscreen}
-                    screenShareAudioAvailable={mainItem.kind === "screen" && screenShareAudioAvailable}
-                    screenShareVolume={screenShareVolume}
-                    onScreenShareVolumeChange={onScreenShareVolumeChange}
+                    onSelectItem={onSelectStageItem}
                 />
-            </AnimatedView>
-            <ParticipantRail
-                items={railItems}
-                participants={participants}
-                isVideoCall={isVideoCall}
-                isMobile={isMobile}
-                hasScreenShare={hasScreenShare}
-                localFacingMode={localFacingMode}
-                onSelectItem={onSelectStageItem}
-            />
+            )}
         </AnimatedView>
     );
 };
@@ -696,6 +799,9 @@ export const CallRoom = ({
     const [isScreenShareFullscreen, setIsScreenShareFullscreen] = useState(false);
     const [facingMode, setFacingMode] = useState<CameraFacingMode>("user");
     const [videoInputCount, setVideoInputCount] = useState(0);
+    const [isMobileBrowser, setIsMobileBrowser] = useState(() =>
+        isMobileBrowserDevice(getCurrentBrowserDeviceInfo()),
+    );
     const knownRemoteScreenShareKeysRef = useRef<Set<string>>(new Set());
     const browserFullscreenActiveRef = useRef(false);
 
@@ -707,8 +813,12 @@ export const CallRoom = ({
             Boolean(navigator.mediaDevices?.getDisplayMedia),
         [],
     );
-    const canSwitchCamera = isMobile && videoInputCount > 1;
+    const canSwitchCamera = isMobileBrowser && videoInputCount > 1;
     const localUserId = participantInfos.find((participant) => participant.isSelf)?.userId ?? null;
+
+    useEffect(() => {
+        setIsMobileBrowser(isMobileBrowserDevice(getCurrentBrowserDeviceInfo()));
+    }, []);
 
     const refreshVideoInputs = useCallback(async () => {
         try {
@@ -976,6 +1086,24 @@ export const CallRoom = ({
         [activeScreenShareCandidate, videoTracks],
     );
 
+    const connectedParticipantIds = useMemo(
+        () =>
+            new Set(
+                participantMediaInfos
+                    .filter((participant) => participant.isConnected)
+                    .map((participant) => participant.userId),
+            ),
+        [participantMediaInfos],
+    );
+
+    const visibleActiveScreenShareTrack = useMemo(
+        () =>
+            activeScreenShareTrack && connectedParticipantIds.has(activeScreenShareTrack.ownerId)
+                ? activeScreenShareTrack
+                : null,
+        [activeScreenShareTrack, connectedParticipantIds],
+    );
+
     const activeScreenShareAudioTracks = useMemo(
         () =>
             audioTracks.filter(
@@ -983,11 +1111,11 @@ export const CallRoom = ({
                     track.source === Track.Source.ScreenShareAudio &&
                     isActiveScreenShareAudio(
                         track.ownerId,
-                        activeScreenShareTrack?.ownerId ?? null,
+                        visibleActiveScreenShareTrack?.ownerId ?? null,
                         track.isLocal,
                     ),
             ),
-        [activeScreenShareTrack?.ownerId, audioTracks],
+        [audioTracks, visibleActiveScreenShareTrack?.ownerId],
     );
 
     const hasActiveScreenShareAudio = activeScreenShareAudioTracks.length > 0;
@@ -1002,34 +1130,36 @@ export const CallRoom = ({
     }, [activeScreenShareAudioTracks, playbackDeviceId, screenShareVolume]);
 
     const stageItems = useMemo<RenderedStageItem[]>(() => {
-        const participantItems = participantMediaInfos.map((participant) => ({
-            id: `participant:${participant.userId}`,
-            kind: "participant" as const,
-            ownerId: participant.userId,
-            hasCamera: Boolean(participant.cameraTrack),
-            isSpeaking: participant.isSpeaking,
-            isConnected: participant.isConnected,
-            participant,
-        }));
+        const participantItems = participantMediaInfos
+            .filter((participant) => participant.isConnected)
+            .map((participant) => ({
+                id: `participant:${participant.userId}`,
+                kind: "participant" as const,
+                ownerId: participant.userId,
+                hasCamera: Boolean(participant.cameraTrack),
+                isSpeaking: participant.isSpeaking,
+                isConnected: participant.isConnected,
+                participant,
+            }));
 
-        if (!activeScreenShareTrack) {
+        if (!visibleActiveScreenShareTrack) {
             return participantItems;
         }
 
         return [
             {
-                id: `screen:${activeScreenShareTrack.ownerId}:${activeScreenShareTrack.key}`,
+                id: `screen:${visibleActiveScreenShareTrack.ownerId}:${visibleActiveScreenShareTrack.key}`,
                 kind: "screen" as const,
-                ownerId: activeScreenShareTrack.ownerId,
-                trackKey: activeScreenShareTrack.key,
+                ownerId: visibleActiveScreenShareTrack.ownerId,
+                trackKey: visibleActiveScreenShareTrack.key,
                 hasCamera: false,
                 isSpeaking: false,
                 isConnected: true,
-                screenTrack: activeScreenShareTrack,
+                screenTrack: visibleActiveScreenShareTrack,
             },
             ...participantItems,
         ];
-    }, [activeScreenShareTrack, participantMediaInfos]);
+    }, [participantMediaInfos, visibleActiveScreenShareTrack]);
 
     const selectedStageItem = useMemo(
         () =>
@@ -1130,7 +1260,8 @@ export const CallRoom = ({
             !room ||
             !isConnectedToCall ||
             !room.localParticipant.isCameraEnabled ||
-            !canSwitchCamera
+            !canSwitchCamera ||
+            !isMobileBrowserDevice(getCurrentBrowserDeviceInfo())
         ) {
             return;
         }
@@ -1186,7 +1317,7 @@ export const CallRoom = ({
             call.status === "Active");
 
     const openScreenShareFullscreen = useCallback(() => {
-        if (!activeScreenShareTrack) return;
+        if (!visibleActiveScreenShareTrack) return;
 
         setPanel("none");
         setIsScreenShareFullscreen(true);
@@ -1200,7 +1331,7 @@ export const CallRoom = ({
                     browserFullscreenActiveRef.current = false;
                 });
         }
-    }, [activeScreenShareTrack]);
+    }, [visibleActiveScreenShareTrack]);
 
     const closeScreenShareFullscreen = useCallback(() => {
         setIsScreenShareFullscreen(false);
@@ -1237,10 +1368,10 @@ export const CallRoom = ({
     }, [closeScreenShareFullscreen, isScreenShareFullscreen]);
 
     useEffect(() => {
-        if (!activeScreenShareTrack && isScreenShareFullscreen) {
+        if (!visibleActiveScreenShareTrack && isScreenShareFullscreen) {
             closeScreenShareFullscreen();
         }
-    }, [activeScreenShareTrack, closeScreenShareFullscreen, isScreenShareFullscreen]);
+    }, [closeScreenShareFullscreen, isScreenShareFullscreen, visibleActiveScreenShareTrack]);
 
     return (
         <View className="flex-1 min-w-0 self-stretch">
@@ -1305,15 +1436,15 @@ export const CallRoom = ({
                 onClose={() => setPanel("none")}
             />
 
-            {isScreenShareFullscreen && activeScreenShareTrack ? (
+            {isScreenShareFullscreen && visibleActiveScreenShareTrack ? (
                 <AnimatedView
                     entering={FadeIn.duration(160)}
                     exiting={FadeOut.duration(120)}
                     className="absolute inset-0 z-50 bg-black"
                 >
                     <VideoElement
-                        track={activeScreenShareTrack.track}
-                        muted={activeScreenShareTrack.isLocal}
+                        track={visibleActiveScreenShareTrack.track}
+                        muted={visibleActiveScreenShareTrack.isLocal}
                         objectFit="contain"
                     />
                     <AnimatedPressable

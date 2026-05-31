@@ -37,7 +37,7 @@ public class RedisPrivacyProjectionStoreTests : IAsyncLifetime
     {
         var sut = Resolve();
         var userId = Guid.NewGuid();
-        var settings = new PrivacySettings(ShowOnlineStatus: false, ShowLastVisitTime: true);
+        var settings = new PrivacySettings(ShowLastVisitTime: true);
 
         await sut.SetAsync(userId, settings, CancellationToken.None);
         var loaded = await sut.GetAsync(userId, CancellationToken.None);
@@ -50,11 +50,11 @@ public class RedisPrivacyProjectionStoreTests : IAsyncLifetime
     {
         var sut = Resolve();
         var userId = Guid.NewGuid();
-        await sut.SetAsync(userId, new PrivacySettings(false, false), CancellationToken.None);
+        await sut.SetAsync(userId, new PrivacySettings(false), CancellationToken.None);
 
-        await sut.SetAsync(userId, new PrivacySettings(true, true), CancellationToken.None);
+        await sut.SetAsync(userId, new PrivacySettings(true), CancellationToken.None);
 
         var loaded = await sut.GetAsync(userId, CancellationToken.None);
-        loaded.Should().Be(new PrivacySettings(true, true));
+        loaded.Should().Be(new PrivacySettings(true));
     }
 }
