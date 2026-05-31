@@ -132,8 +132,19 @@ public class ForwardMessagesServiceTests
             Arg.Is<Message>(m => m.ConversationId == target.Id && m.ForwardedFrom != null),
             Arg.Any<CancellationToken>());
         _outbox.Captured.OfType<ChatMessageSentEvent>().Should().ContainSingle();
-        await _broadcaster.Received().NotifyMessageReceivedAsync(
-            Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<MessageDto>(), Arg.Any<CancellationToken>());
+        await _broadcaster.Received(1).NotifyConversationUpdatedAsync(
+            Arg.Is<IReadOnlyList<Guid>>(ids =>
+                ids.Count == 2 && ids.Contains(Caller) && ids.Contains(TargetPeer)),
+            Arg.Is<ConversationDto>(conversation =>
+                conversation.Id == target.Id &&
+                conversation.LastMessagePreview != null &&
+                conversation.LastMessagePreview.MessageId == result[0].Id),
+            Arg.Any<CancellationToken>());
+        await _broadcaster.Received(1).NotifyMessageReceivedAsync(
+            Arg.Is<IReadOnlyList<Guid>>(ids =>
+                ids.Count == 2 && ids.Contains(Caller) && ids.Contains(TargetPeer)),
+            Arg.Is<MessageDto>(message => message.Id == result[0].Id),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]

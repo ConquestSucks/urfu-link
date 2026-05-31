@@ -50,12 +50,18 @@ public class ChatHubForwardTests : IAsyncLifetime
             PeerUserId = targetPeer,
         });
 
+        var callerReceived = new TaskCompletionSource<MessageDto>(TaskCreationOptions.RunContinuationsAsynchronously);
         var targetReceived = new TaskCompletionSource<MessageDto>(TaskCreationOptions.RunContinuationsAsynchronously);
+        callerConn.On<MessageDto>("MessageReceived", msg => callerReceived.TrySetResult(msg));
         targetConn.On<MessageDto>("MessageReceived", msg => targetReceived.TrySetResult(msg));
 
         await callerConn.InvokeAsync<IReadOnlyList<MessageDto>>("ForwardMessages", targetConv.Id, new[] { sourceMsg.Id });
 
+        var callerEcho = await callerReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
         var received = await targetReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        callerEcho.SenderId.Should().Be(caller);
+        callerEcho.ConversationId.Should().Be(targetConv.Id);
+        callerEcho.ForwardedFrom.Should().NotBeNull();
         received.SenderId.Should().Be(caller);
         received.ConversationId.Should().Be(targetConv.Id);
         received.ForwardedFrom.Should().NotBeNull();

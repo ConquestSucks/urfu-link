@@ -503,6 +503,12 @@ describe("chat store direct draft sending", () => {
 
         expect(playMessageSound).not.toHaveBeenCalled();
         expect(showMessageBrowserNotification).not.toHaveBeenCalled();
+        expect(useChatStore.getState().messagesByConversation["direct-1"][0]).toEqual(
+            expect.objectContaining({
+                id: "message-own",
+                body: "own echo",
+            }),
+        );
     });
 
     it("keeps media asset ids in mapped message attachments", () => {
@@ -751,6 +757,48 @@ describe("chat store direct draft sending", () => {
                 body: "forwarded",
                 createdAt: "2026-05-24T10:05:00.000Z",
             }),
+        );
+    });
+
+    it("deduplicates a forwarded message when its realtime echo reaches the sender", async () => {
+        const forwarded = {
+            id: "forwarded-echo",
+            conversationId: "direct-2",
+            senderId: "user-1",
+            body: "forwarded",
+            attachments: [],
+            state: "Sent",
+            createdAtUtc: "2026-05-24T10:05:00.000Z",
+            deliveredAtUtc: null,
+            readAtUtc: null,
+            clientMessageId: "forward:message-1:user-1",
+            editedAtUtc: null,
+            replyTo: null,
+            reactionsSummary: {},
+            mentions: [],
+            forwardedFrom: null,
+        };
+        (apiClient.chat.forwardMessages as jest.Mock).mockResolvedValue([forwarded]);
+        useChatStore.setState({
+            conversations: [
+                {
+                    id: "direct-2",
+                    type: "Direct",
+                    participants: ["peer-2", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessagePreview: null,
+                },
+            ],
+        });
+
+        await useChatStore.getState().connect();
+        await useChatStore.getState().forwardMessages("direct-2", ["message-1"]);
+        hubHandlers.MessageReceived(forwarded);
+
+        expect(useChatStore.getState().messagesByConversation["direct-2"]).toHaveLength(1);
+        expect(useChatStore.getState().messagesByConversation["direct-2"][0]).toEqual(
+            expect.objectContaining({ id: "forwarded-echo" }),
         );
     });
 

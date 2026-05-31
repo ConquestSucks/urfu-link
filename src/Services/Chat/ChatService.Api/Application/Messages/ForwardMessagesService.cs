@@ -86,8 +86,10 @@ public sealed class ForwardMessagesService(
         var now = clock.GetUtcNow();
         var produced = new List<MessageDto>(sources.Count);
         var lastPreview = (preview: (MessagePreview?)null, sentAt: now);
+        Message? lastMessage = null;
         var grantTasks = new List<Task>();
         var grantees = target.Participants.Where(p => p != request.CallerUserId).ToList();
+        var realtimeRecipients = target.Participants.ToList();
 
         var index = 0;
         foreach (var src in sources)
@@ -114,11 +116,13 @@ public sealed class ForwardMessagesService(
                 authorRole: target.RoleOf(request.CallerUserId));
 
             await messages.InsertAsync(newMessage, cancellationToken).ConfigureAwait(false);
-            produced.Add(MessageDto.FromDomain(newMessage));
+            var dto = MessageDto.FromDomain(newMessage);
+            produced.Add(dto);
 
             lastPreview = (
                 BuildMessagePreview(newMessage),
                 sentAt);
+            lastMessage = newMessage;
 
             // Grant access on each forwarded attachment to the new conversation participants.
             if (grantees.Count > 0)
@@ -141,9 +145,6 @@ public sealed class ForwardMessagesService(
                     sentAt),
                 cancellationToken).ConfigureAwait(false);
 
-            await broadcaster.NotifyMessageReceivedAsync(
-                grantees, MessageDto.FromDomain(newMessage), cancellationToken).ConfigureAwait(false);
-
             index++;
         }
 
@@ -156,6 +157,18 @@ public sealed class ForwardMessagesService(
         {
             await conversations.UpdateLastMessageAsync(
                 target.Id, preview, lastPreview.sentAt, cancellationToken).ConfigureAwait(false);
+            target.RegisterMessage(preview, lastPreview.sentAt);
+
+            await broadcaster.NotifyConversationUpdatedAsync(
+                realtimeRecipients,
+                ConversationDto.FromDomain(target).WithLastMessageMetadata(lastMessage),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        foreach (var dto in produced)
+        {
+            await broadcaster.NotifyMessageReceivedAsync(
+                realtimeRecipients, dto, cancellationToken).ConfigureAwait(false);
         }
 
         return produced;
