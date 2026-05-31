@@ -29,7 +29,7 @@ public sealed class MinioAvatarStorageTests
 
         Assert.NotNull(capturedRequest);
         Assert.Equal("public, max-age=31536000, immutable", capturedRequest.Headers.CacheControl);
-        Assert.EndsWith("-256.webp", capturedRequest.Key, StringComparison.Ordinal);
+        Assert.EndsWith("-v2-256.webp", capturedRequest.Key, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -51,10 +51,10 @@ public sealed class MinioAvatarStorageTests
             CancellationToken.None);
 
         Assert.Equal(3, capturedRequests.Count);
-        Assert.Contains(capturedRequests, request => request.Key.EndsWith("-64.webp", StringComparison.Ordinal));
-        Assert.Contains(capturedRequests, request => request.Key.EndsWith("-128.webp", StringComparison.Ordinal));
-        Assert.Contains(capturedRequests, request => request.Key.EndsWith("-256.webp", StringComparison.Ordinal));
-        Assert.EndsWith("-256.webp", avatarUrl, StringComparison.Ordinal);
+        Assert.Contains(capturedRequests, request => request.Key.EndsWith("-v2-64.webp", StringComparison.Ordinal));
+        Assert.Contains(capturedRequests, request => request.Key.EndsWith("-v2-128.webp", StringComparison.Ordinal));
+        Assert.Contains(capturedRequests, request => request.Key.EndsWith("-v2-256.webp", StringComparison.Ordinal));
+        Assert.EndsWith("-v2-256.webp", avatarUrl, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -101,6 +101,32 @@ public sealed class MinioAvatarStorageTests
                 "avatars/11111111111111111111111111111111/avatar-64.webp",
                 "avatars/11111111111111111111111111111111/avatar-128.webp",
                 "avatars/11111111111111111111111111111111/avatar-256.webp",
+            ],
+            capturedRequests.Select(request => request.Key).ToArray());
+    }
+
+    [Fact]
+    public async Task DeleteAsyncShouldDeleteAllVersionedVariantSiblings()
+    {
+        var s3Client = Substitute.For<IAmazonS3>();
+        var capturedRequests = new List<DeleteObjectRequest>();
+        s3Client
+            .DeleteObjectAsync(
+                Arg.Do<DeleteObjectRequest>(request => capturedRequests.Add(request)),
+                Arg.Any<CancellationToken>())
+            .Returns(new DeleteObjectResponse());
+
+        var storage = CreateStorage(s3Client);
+
+        await storage.DeleteAsync(
+            "https://storage.ghjc.ru/user-avatars/avatars/11111111111111111111111111111111/avatar-v2-256.webp",
+            CancellationToken.None);
+
+        Assert.Equal(
+            [
+                "avatars/11111111111111111111111111111111/avatar-v2-64.webp",
+                "avatars/11111111111111111111111111111111/avatar-v2-128.webp",
+                "avatars/11111111111111111111111111111111/avatar-v2-256.webp",
             ],
             capturedRequests.Select(request => request.Key).ToArray());
     }

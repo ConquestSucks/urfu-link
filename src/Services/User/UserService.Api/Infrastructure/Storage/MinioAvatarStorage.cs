@@ -1,6 +1,7 @@
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Options;
+using UserService.Api.Domain;
 using UserService.Api.Domain.Interfaces;
 
 namespace UserService.Api.Infrastructure.Storage;
@@ -25,7 +26,7 @@ public sealed class MinioAvatarStorage(
         foreach (var variant in avatar.Variants)
         {
             var extension = GetExtension(variant.ContentType);
-            var key = $"avatars/{userId:N}/{avatarId}-{variant.Size}.{extension}";
+            var key = $"avatars/{userId:N}/{avatarId}-{AvatarVariantNaming.CurrentVersion}-{variant.Size}.{extension}";
             await using var fileStream = new MemoryStream(variant.Content.ToArray(), writable: false);
             var putRequest = new PutObjectRequest
             {
