@@ -74,9 +74,8 @@ public sealed class UploadAvatarEndpoint(
         var processed = await avatarImageProcessor
             .ProcessAsync(stream, req.File.ContentType, ct)
             .ConfigureAwait(false);
-        await using var processedStream = new MemoryStream(processed.Content.ToArray(), writable: false);
         var avatarUrl = await avatarStorage
-            .UploadAsync(userId, processedStream, processed.ContentType, ct)
+            .UploadAsync(userId, processed, ct)
             .ConfigureAwait(false);
 
         user.UploadAvatar(avatarUrl);

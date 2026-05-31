@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import * as DocumentPicker from "expo-document-picker";
+import type * as DocumentPicker from "expo-document-picker";
 
 type LocalDocumentPickerAsset = DocumentPicker.DocumentPickerAsset & {
     _objectUrlOwner?: true;
@@ -224,6 +224,7 @@ export const useAttachments = (maxLimit: number, onOpenPicker?: () => void) => {
         }
 
         try {
+            const DocumentPicker = await import("expo-document-picker");
             const result = await DocumentPicker.getDocumentAsync({
                 copyToCacheDirectory: true,
                 multiple: true,

@@ -1,10 +1,10 @@
 import React from "react";
 import { View, Text, Pressable } from "react-native";
 import { FileIcon, XIcon } from "@/shared/ui/phosphor";
-import * as DocumentPicker from "expo-document-picker";
+import type { DocumentPickerAsset } from "expo-document-picker";
 
 interface Props {
-    attachments: DocumentPicker.DocumentPickerAsset[];
+    attachments: DocumentPickerAsset[];
     onRemove: (index: number) => void;
     onOpenModal: () => void;
     disabled?: boolean;

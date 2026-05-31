@@ -5,6 +5,7 @@ export interface Attachment {
     url: string;
     mediaAssetId?: string;
     type?: AttachmentType;
+    size?: number | null;
     mimeType?: string;
     durationSeconds?: number | null;
 }

@@ -524,12 +524,11 @@ describe("MessagesList loading state", () => {
         render(<MessagesList chatId="chat-dates" type="chat" />);
 
         const list = screen.UNSAFE_getByType(FlatList);
-        expect(screen.queryByTestId("message-date-separator-2026-05-24")).toBeNull();
-        expect(screen.queryByTestId("message-date-separator-2026-05-23")).toBeNull();
+        expect(screen.getByTestId("message-date-separator-2026-05-24")).toBeTruthy();
+        expect(screen.getByTestId("message-date-separator-2026-05-23")).toBeTruthy();
         expect(list.props.stickyHeaderIndices).toBeUndefined();
         expect(list.props.invertStickyHeaders).toBeUndefined();
         expect(screen.getByTestId("message-floating-date")).toBeTruthy();
-        expect(screen.getAllByText("Сегодня")).toHaveLength(1);
         act(() => {
             list.props.onViewableItemsChanged?.({
                 viewableItems: [{ item: list.props.data[1], index: 1 }],
@@ -537,7 +536,55 @@ describe("MessagesList loading state", () => {
             });
         });
 
-        expect(screen.getByText(/23/)).toBeTruthy();
+        expect(screen.getAllByText(/23/).length).toBeGreaterThanOrEqual(1);
+        jest.useRealTimers();
+    });
+
+    it("renders a new date separator before a newer message from another day", () => {
+        jest.useFakeTimers();
+        jest.setSystemTime(new Date("2026-05-31T17:00:00.000Z"));
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "chat-date-boundary": [
+                    {
+                        id: "message-today-voice",
+                        body: "",
+                        senderId: "peer-user",
+                        readAt: null,
+                        createdAt: "2026-05-31T16:33:00.000Z",
+                        attachments: [
+                            {
+                                id: "voice-1",
+                                fileName: "voice.ogg",
+                                contentType: "audio/ogg",
+                                url: "https://cdn.test/voice.ogg",
+                                size: 1234,
+                            },
+                        ],
+                    },
+                    {
+                        id: "message-may-30",
+                        body: "older",
+                        senderId: "peer-user",
+                        readAt: null,
+                        createdAt: "2026-05-30T18:10:00.000Z",
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "chat-date-boundary": true },
+        };
+
+        render(<MessagesList chatId="chat-date-boundary" type="chat" />);
+
+        const serialized = JSON.stringify(screen.toJSON());
+
+        expect(screen.getByTestId("message-date-separator-2026-05-31")).toBeTruthy();
+        expect(screen.getByTestId("message-date-separator-2026-05-30")).toBeTruthy();
+        expect(screen.getAllByText("Сегодня").length).toBeGreaterThanOrEqual(1);
+        expect(serialized.indexOf("message-date-separator-2026-05-31")).toBeLessThan(
+            serialized.indexOf("message-message-may-30"),
+        );
         jest.useRealTimers();
     });
 

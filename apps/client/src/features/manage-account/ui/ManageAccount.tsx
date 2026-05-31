@@ -1,6 +1,5 @@
 import { useCurrentUser, useDeleteAvatar, useUploadAvatar } from "@/entities/user";
 import { Avatar, Button, Input, LabeledCard, Skeleton } from "@/shared/ui";
-import * as ImagePicker from "expo-image-picker";
 import { Platform, ScrollView, View } from "react-native";
 
 async function pickFile(): Promise<File | null> {
@@ -16,6 +15,7 @@ async function pickFile(): Promise<File | null> {
     });
   }
 
+  const ImagePicker = await import("expo-image-picker");
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!permission.granted) return null;
 

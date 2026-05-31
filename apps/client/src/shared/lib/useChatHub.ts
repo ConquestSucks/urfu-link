@@ -13,6 +13,19 @@ export const useChatHub = () => {
     useEffect(() => {
         connect();
 
+        const handlePageHide = () => {
+            void disconnect();
+        };
+
+        const handlePageShow = () => {
+            connect();
+        };
+
+        if (typeof window !== "undefined") {
+            window.addEventListener("pagehide", handlePageHide);
+            window.addEventListener("pageshow", handlePageShow);
+        }
+
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
                 connect();
@@ -22,6 +35,10 @@ export const useChatHub = () => {
         });
 
         return () => {
+            if (typeof window !== "undefined") {
+                window.removeEventListener("pagehide", handlePageHide);
+                window.removeEventListener("pageshow", handlePageShow);
+            }
             disconnect();
             subscription.remove();
         };

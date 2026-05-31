@@ -1,8 +1,11 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import { View } from "react-native";
 import { ModalOverlay } from "@/shared/ui";
-import { EmojiPicker } from "@/features/emoji-picker";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+
+const EmojiPicker = lazy(() =>
+    import("@/features/emoji-picker").then((module) => ({ default: module.EmojiPicker })),
+);
 
 interface ReactionPickerModalProps {
     messageId: string | null;
@@ -30,7 +33,9 @@ export const ReactionPickerModal = ({ messageId, onClose }: ReactionPickerModalP
             contentClassName="bg-app-card border border-white/10 rounded-3xl overflow-hidden w-full max-w-[560px] h-[480px] max-h-[82vh]"
         >
             <View className="flex-1" style={{ minHeight: 0, minWidth: 0 }}>
-                <EmojiPicker onPick={handlePick} />
+                <Suspense fallback={null}>
+                    <EmojiPicker onPick={handlePick} />
+                </Suspense>
             </View>
         </ModalOverlay>
     );

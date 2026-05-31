@@ -373,6 +373,30 @@ describe("ChatMessage read indicator", () => {
         expect(screen.queryByText("voice.m4a")).toBeNull();
     });
 
+    it("renders file attachment size inside the message bubble", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                isOwn
+                time="12:00"
+                avatarUrl=""
+                attachments={[
+                    {
+                        name: "file.json",
+                        url: "/api/media/asset-1/download-url",
+                        mediaAssetId: "asset-1",
+                        type: "Document",
+                        size: 2048,
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText("file.json")).toBeTruthy();
+        expect(screen.getByText("2.0 KB")).toBeTruthy();
+    });
+
     it("uses a browser download link for media attachments on web", async () => {
         const originalOS = Platform.OS;
         Object.defineProperty(Platform, "OS", {
