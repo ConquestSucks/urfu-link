@@ -123,6 +123,7 @@ jest.mock("@/shared/ui", () => ({
 
 jest.mock("@/shared/ui/phosphor", () => ({
     ChatCircleTextIcon: () => null,
+    CaretDownIcon: () => null,
 }));
 
 jest.mock("@/shared/store/auth-store", () => ({
@@ -494,7 +495,7 @@ describe("MessagesList loading state", () => {
         );
     });
 
-    it("renders date separators as sticky list rows", () => {
+    it("renders the current date as a floating overlay", () => {
         jest.useFakeTimers();
         jest.setSystemTime(new Date("2026-05-24T12:00:00.000Z"));
         mockChatState = {
@@ -523,16 +524,24 @@ describe("MessagesList loading state", () => {
         render(<MessagesList chatId="chat-dates" type="chat" />);
 
         const list = screen.UNSAFE_getByType(FlatList);
-        expect(screen.getByTestId("message-date-separator-2026-05-24")).toBeTruthy();
-        expect(screen.getByTestId("message-date-separator-2026-05-23")).toBeTruthy();
-        expect(list.props.stickyHeaderIndices).toEqual([2, 4]);
-        expect(list.props.invertStickyHeaders).toBe(true);
+        expect(screen.queryByTestId("message-date-separator-2026-05-24")).toBeNull();
+        expect(screen.queryByTestId("message-date-separator-2026-05-23")).toBeNull();
+        expect(list.props.stickyHeaderIndices).toBeUndefined();
+        expect(list.props.invertStickyHeaders).toBeUndefined();
+        expect(screen.getByTestId("message-floating-date")).toBeTruthy();
         expect(screen.getAllByText("Сегодня")).toHaveLength(1);
-        expect(screen.getByText(/мая/)).toBeTruthy();
+        act(() => {
+            list.props.onViewableItemsChanged?.({
+                viewableItems: [{ item: list.props.data[1], index: 1 }],
+                changed: [],
+            });
+        });
+
+        expect(screen.getByText(/23/)).toBeTruthy();
         jest.useRealTimers();
     });
 
-    it("keeps date separators as independent list rows", () => {
+    it("keeps date markers out of the virtualized message data", () => {
         mockChatState = {
             ...mockChatState,
             messagesByConversation: {
@@ -561,10 +570,46 @@ describe("MessagesList loading state", () => {
         const list = screen.UNSAFE_getByType(FlatList);
         expect(list.props.data).toEqual([
             expect.objectContaining({ id: "message-today", type: "message" }),
-            expect.objectContaining({ dayKey: "2026-05-24", type: "date" }),
             expect.objectContaining({ id: "message-yesterday", type: "message" }),
-            expect.objectContaining({ dayKey: "2026-05-23", type: "date" }),
         ]);
+    });
+
+    it("shows a scroll-to-bottom button after scrolling away from newest messages", () => {
+        mockChatState = {
+            ...mockChatState,
+            messagesByConversation: {
+                "chat-scroll": [
+                    {
+                        id: "message-new",
+                        body: "new",
+                        senderId: "peer-user",
+                        readAt: null,
+                    },
+                    {
+                        id: "message-old",
+                        body: "old",
+                        senderId: "peer-user",
+                        readAt: null,
+                    },
+                ],
+            },
+            messagesLoadedByConversation: { "chat-scroll": true },
+        };
+
+        render(<MessagesList chatId="chat-scroll" type="chat" />);
+
+        const list = screen.UNSAFE_getByType(FlatList);
+        expect(screen.queryByTestId("messages-scroll-to-bottom")).toBeNull();
+
+        act(() => {
+            list.props.onScroll?.({ nativeEvent: { contentOffset: { y: 420 } } });
+        });
+
+        expect(screen.getByTestId("messages-scroll-to-bottom")).toBeTruthy();
+
+        fireEvent.press(screen.getByTestId("messages-scroll-to-bottom"));
+
+        expect(screen.queryByTestId("messages-scroll-to-bottom")).toBeNull();
     });
 
     it("highlights a message for a few seconds after imperative scroll", async () => {

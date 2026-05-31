@@ -20,6 +20,7 @@ import {
     Animated,
     FlatList,
     Platform,
+    Pressable,
     StyleSheet,
     Text,
     View,
@@ -36,6 +37,7 @@ import {
     useConversationParticipants,
     useParticipantsStore,
 } from "@/entities/conversation/model/participants-store";
+import { CaretDownIcon } from "@/shared/ui/phosphor";
 
 interface MessagesListProps {
     chatId: string;
@@ -65,6 +67,7 @@ const HIGHLIGHT_TOTAL_MS = HIGHLIGHT_FADE_IN_MS + HIGHLIGHT_HOLD_MS + HIGHLIGHT_
 const MAX_SCROLL_LOAD_ATTEMPTS = 30;
 const SCROLL_DIRECTION_EPSILON = 8;
 const NEWER_EDGE_OFFSET = 64;
+const SCROLL_TO_BOTTOM_BUTTON_OFFSET = 360;
 
 type MessageListMessageItem = {
     type: "message";
@@ -72,47 +75,14 @@ type MessageListMessageItem = {
     message: MessageDto;
 };
 
-type MessageListDateItem = {
-    type: "date";
-    id: string;
-    dayKey: string;
-    createdAt: string;
-};
+type MessageListItem = MessageListMessageItem;
 
-type MessageListItem = MessageListMessageItem | MessageListDateItem;
-
-const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] => {
-    const items: MessageListItem[] = [];
-
-    messages.forEach((message, index) => {
-        items.push({
-            type: "message",
-            id: message.id,
-            message,
-        });
-
-        const currentDay = getMessageDayKey(message.createdAt);
-        const nextDay = getMessageDayKey(messages[index + 1]?.createdAt);
-        if (currentDay === "" || currentDay === nextDay) return;
-
-        items.push({
-            type: "date",
-            id: `date-${currentDay}-${index}`,
-            dayKey: currentDay,
-            createdAt: message.createdAt,
-        });
-    });
-
-    return items;
-};
-
-const getDateStickyHeaderIndices = (items: MessageListItem[], stickyOffset = 0) =>
-    items.reduce<number[]>((indices, item, index) => {
-        if (item.type === "date") {
-            indices.push(index + stickyOffset);
-        }
-        return indices;
-    }, []);
+const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] =>
+    messages.map((message) => ({
+        type: "message",
+        id: message.id,
+        message,
+    }));
 
 const getMessageListItemKey = (item: MessageListItem) => item.id;
 
@@ -151,13 +121,13 @@ const getJoinableSystemCallIds = (messages: MessageDto[]): Set<string> => {
 };
 
 const styles = StyleSheet.create({
-    dateSeparator: {
-        marginTop: 24,
-        marginBottom: 4,
-        zIndex: 2,
-    },
-    firstDateSeparator: {
-        marginTop: 0,
+    floatingDate: {
+        position: "absolute",
+        top: 12,
+        left: 0,
+        right: 0,
+        alignItems: "center",
+        zIndex: 10,
     },
     highlightOutline: {
         position: "absolute",
@@ -186,6 +156,21 @@ const styles = StyleSheet.create({
     },
     fileDropActive: {
         backgroundColor: "rgba(43, 127, 255, 0.08)",
+    },
+    scrollToBottomButton: {
+        position: "absolute",
+        right: 24,
+        bottom: 16,
+        zIndex: 11,
+        ...(Platform.OS === "web"
+            ? {}
+            : {
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.22,
+                  shadowRadius: 16,
+                  elevation: 6,
+              }),
     },
 });
 
@@ -218,12 +203,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const isLoaded = messagesLoadedByConversation[chatId] || false;
         const hasMore = hasMoreByConversation[chatId] || false;
         const listItems = useMemo(() => buildMessageListItems(messages), [messages]);
-        const stickyHeaderIndices = useMemo(
-            () => getDateStickyHeaderIndices(listItems, 1),
-            [listItems],
-        );
         const listRef = useRef<FlatList<MessageListItem>>(null);
         const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+        const [visibleDateCreatedAt, setVisibleDateCreatedAt] = useState<string | null>(null);
+        const [showScrollToBottom, setShowScrollToBottom] = useState(false);
         const highlightOpacity = useRef(new Animated.Value(0)).current;
         const highlightAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
         const highlightClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -249,10 +232,29 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             enabled: !!onFilesDropped,
             onFiles: handleFilesDropped,
         });
+        const visibleDateLabel = useMemo(
+            () => formatMessageDateLabel(visibleDateCreatedAt),
+            [visibleDateCreatedAt],
+        );
 
         useEffect(() => {
             readContextRef.current = { chatId, currentUserId, markRead };
         }, [chatId, currentUserId, markRead]);
+
+        useEffect(() => {
+            setVisibleDateCreatedAt(null);
+            setShowScrollToBottom(false);
+            lastScrollOffsetRef.current = null;
+        }, [chatId]);
+
+        useEffect(() => {
+            if (messages.length === 0) {
+                setVisibleDateCreatedAt(null);
+                return;
+            }
+
+            setVisibleDateCreatedAt((current) => current ?? messages[0]?.createdAt ?? null);
+        }, [messages]);
 
         useEffect(() => {
             if (skipInitialLoad) return;
@@ -388,7 +390,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
 
                 const unreadItems = viewableItems.filter(
                     (v): v is { item: MessageListMessageItem; index: number | null } =>
-                        v.item.type === "message" &&
                         v.item.message.senderId !== activeCurrentUserId &&
                         v.item.message.readAt === null,
                 );
@@ -397,6 +398,17 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         (curr.index ?? 0) < (prev.index ?? 0) ? curr : prev,
                     );
                     activeMarkRead(activeChatId, newestUnread.item.message.id);
+                }
+
+                const topVisibleMessage = viewableItems.reduce<
+                    { item: MessageListMessageItem; index: number } | null
+                >((top, current) => {
+                    if (current.index === null) return top;
+                    if (top && current.index <= top.index) return top;
+                    return { item: current.item, index: current.index };
+                }, null);
+                if (topVisibleMessage?.item.message.createdAt) {
+                    setVisibleDateCreatedAt(topVisibleMessage.item.message.createdAt);
                 }
             },
         ).current;
@@ -415,6 +427,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             const offsetY = event.nativeEvent.contentOffset.y;
             const previousOffset = lastScrollOffsetRef.current;
             lastScrollOffsetRef.current = offsetY;
+            const shouldShowScrollToBottom = offsetY > SCROLL_TO_BOTTOM_BUTTON_OFFSET;
+            setShowScrollToBottom((current) =>
+                current === shouldShowScrollToBottom ? current : shouldShowScrollToBottom,
+            );
 
             if (
                 !suppressEndReachedAfterScrollRef.current ||
@@ -432,6 +448,15 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             }
         }, []);
 
+        const handleScrollToBottom = useCallback(() => {
+            suppressEndReachedAfterScrollRef.current = false;
+            userDraggingAfterProgrammaticScrollRef.current = false;
+            lastScrollOffsetRef.current = 0;
+            setVisibleDateCreatedAt(messages[0]?.createdAt ?? null);
+            setShowScrollToBottom(false);
+            listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }, [messages]);
+
         const handleEndReached = useCallback(() => {
             if (suppressEndReachedAfterScrollRef.current) return;
             loadMore(chatId, type);
@@ -440,27 +465,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const renderItem = useMemo(
             () =>
                 ({ item, index }: { item: MessageListItem; index: number }) => {
-                    if (item.type === "date") {
-                        const isFirstVisualItem = index === listItems.length - 1;
-
-                        return (
-                            <View
-                                testID={`message-date-separator-${item.dayKey}`}
-                                className="items-center py-1"
-                                style={[
-                                    styles.dateSeparator,
-                                    isFirstVisualItem ? styles.firstDateSeparator : null,
-                                ]}
-                            >
-                                <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
-                                    <Text className="text-[12px] font-semibold text-text-subtle">
-                                        {formatMessageDateLabel(item.createdAt)}
-                                    </Text>
-                                </View>
-                            </View>
-                        );
-                    }
-
                     const message = item.message;
                     const view = mapMessageToProps(message, currentUserId);
                     const sender = participantsByUserId.get(message.senderId);
@@ -484,8 +488,16 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
                     const itemAbove = listItems[index + 1];
-                    const messageSpacing =
-                        itemAbove?.type === "message" ? styles.messageAfterMessage : null;
+                    const currentDay = getMessageDayKey(message.createdAt);
+                    const itemAboveDay = getMessageDayKey(itemAbove?.message.createdAt);
+                    const messageSpacing = itemAbove
+                        ? [
+                              styles.messageAfterMessage,
+                              currentDay && currentDay !== itemAboveDay
+                                  ? { marginTop: 28 }
+                                  : null,
+                          ]
+                        : null;
 
                     return (
                         <View style={messageSpacing}>
@@ -647,8 +659,6 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                     contentContainerStyle={{
                         flexGrow: 1,
                     }}
-                    stickyHeaderIndices={stickyHeaderIndices}
-                    invertStickyHeaders
                     onViewableItemsChanged={handleViewableItemsChanged}
                     viewabilityConfig={viewabilityConfig}
                     renderItem={renderItem}
@@ -684,6 +694,31 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         ) : null
                     }
                 />
+                {visibleDateLabel ? (
+                    <View
+                        pointerEvents="none"
+                        testID="message-floating-date"
+                        style={styles.floatingDate}
+                    >
+                        <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
+                            <Text className="text-[12px] font-semibold text-text-subtle">
+                                {visibleDateLabel}
+                            </Text>
+                        </View>
+                    </View>
+                ) : null}
+                {showScrollToBottom ? (
+                    <Pressable
+                        accessibilityLabel="Scroll to newest messages"
+                        accessibilityRole="button"
+                        testID="messages-scroll-to-bottom"
+                        className="h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-app-panel active:opacity-80"
+                        style={styles.scrollToBottomButton}
+                        onPress={handleScrollToBottom}
+                    >
+                        <CaretDownIcon size={22} weight="bold" className="text-text-subtle" />
+                    </Pressable>
+                ) : null}
             </View>
         );
     },
