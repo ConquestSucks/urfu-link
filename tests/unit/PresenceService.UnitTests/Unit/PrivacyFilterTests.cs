@@ -35,19 +35,9 @@ public class PrivacyFilterTests
     }
 
     [Fact]
-    public void Apply_ShowLastVisitTrue_ClearsLastSeen()
+    public void Apply_ShowLastVisitTrue_PassesThrough()
     {
         var settings = new PrivacySettings(ShowLastVisitTime: true);
-        var result = PrivacyFilter.Apply(Online(), settings);
-
-        result.LastSeenAt.Should().BeNull();
-        result.Status.Should().Be(PresenceStatus.Online);
-    }
-
-    [Fact]
-    public void Apply_ShowLastVisitFalse_PassesThrough()
-    {
-        var settings = new PrivacySettings(ShowLastVisitTime: false);
         var input = Online();
         var result = PrivacyFilter.Apply(input, settings);
 
@@ -55,13 +45,21 @@ public class PrivacyFilterTests
     }
 
     [Fact]
-    public void Apply_DefaultSettings_HidesLastSeenOnly()
+    public void Apply_ShowLastVisitFalse_ClearsLastSeen()
+    {
+        var settings = new PrivacySettings(ShowLastVisitTime: false);
+        var result = PrivacyFilter.Apply(Online(), settings);
+
+        result.LastSeenAt.Should().BeNull();
+        result.Status.Should().Be(PresenceStatus.Online);
+    }
+
+    [Fact]
+    public void Apply_DefaultSettings_ShowsLastSeen()
     {
         var input = Online();
         var result = PrivacyFilter.Apply(input, PrivacySettings.Default);
 
-        result.LastSeenAt.Should().BeNull();
-        result.Status.Should().Be(input.Status);
-        result.Platforms.Should().Equal(input.Platforms);
+        result.Should().Be(input);
     }
 }
