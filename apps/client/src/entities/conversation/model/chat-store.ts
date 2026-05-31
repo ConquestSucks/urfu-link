@@ -5,8 +5,7 @@ import {
     MessageDto,
     ReactionsSummary,
 } from "@urfu-link/api-client";
-import { createHubConnection } from "@/shared/lib/signalr";
-import { HubConnection, HubConnectionState } from "@microsoft/signalr";
+import { createHubConnection, HUB_CONNECTION_STATE, type HubConnection } from "@/shared/lib/signalr";
 import { apiClient } from "@/shared/lib/api";
 import { resolveCurrentUserId } from "@/shared/lib/current-user";
 import { playMessageSound } from "@/shared/lib/message-sounds";
@@ -72,6 +71,7 @@ type ThreadEventHandler = (event: ThreadEvent) => void;
 type ConversationLoadType = "Direct" | "Discipline";
 
 const conversationLoadPromises = new Map<ConversationLoadType | "all", Promise<void>>();
+let chatConnectPromise: Promise<void> | null = null;
 
 type ChatState = {
     connection: HubConnection | null;
@@ -478,13 +478,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
     pendingReadByConversation: {},
     threadEventListeners: new Set<ThreadEventHandler>(),
 
-    connect: async () => {
+    connect: () => {
         const { connection, isConnected } = get();
-        if (isConnected || connection?.state === HubConnectionState.Connected) {
-            return;
+        if (isConnected || connection?.state === HUB_CONNECTION_STATE.Connected) {
+            return Promise.resolve();
         }
 
-        const newConnection = createHubConnection("/hubs/chat");
+        if (chatConnectPromise) {
+            return chatConnectPromise;
+        }
+
+        chatConnectPromise = (async () => {
+        const newConnection = await createHubConnection("/hubs/chat");
 
         newConnection.on("MessageReceived", (message: MessageDto) => {
             const normalized = normalizeMessage(message);
@@ -714,9 +719,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
             console.error("Failed to connect to ChatHub", e);
             set({ isConnected: false });
         }
+        })().finally(() => {
+            chatConnectPromise = null;
+        });
+
+        return chatConnectPromise;
     },
 
     disconnect: async () => {
+        chatConnectPromise = null;
         const { connection } = get();
         if (connection) {
             await connection.stop();
@@ -895,7 +906,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     sendMessage: async (chatId, text, attachments = [], replyToMessageId, mentionUserIds = []) => {
         const { connection } = get();
-        if (connection?.state !== HubConnectionState.Connected) {
+        if (connection?.state !== HUB_CONNECTION_STATE.Connected) {
             throw new Error("ChatHub is not connected");
         }
         const currentUserId = await resolveCurrentUserId();
@@ -989,7 +1000,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             );
         };
 
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             applyLocalRead();
             try {
                 await connection.invoke("MarkRead", chatId, messageId);
@@ -1007,7 +1018,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     flushPendingReads: async () => {
         const { connection, pendingReadByConversation } = get();
-        if (connection?.state !== HubConnectionState.Connected) return;
+        if (connection?.state !== HUB_CONNECTION_STATE.Connected) return;
 
         const entries = Object.entries(pendingReadByConversation);
         for (const [conversationId, messageId] of entries) {
@@ -1031,7 +1042,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     editMessage: async (messageId, body) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             await connection.invoke("EditMessage", { messageId, newBody: body });
         } else {
             const updated = await apiClient.chat.editMessage(messageId, body);
@@ -1041,7 +1052,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     deleteMessage: async (messageId, mode) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             await connection.invoke("DeleteMessage", messageId, mode);
         } else {
             const deleted = await apiClient.chat.deleteMessage(messageId, mode);
@@ -1060,7 +1071,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     addReaction: async (messageId, emoji) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             await connection.invoke("AddReaction", messageId, emoji);
         } else {
             await apiClient.chat.addReaction(messageId, emoji);
@@ -1069,7 +1080,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     removeReaction: async (messageId, emoji) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             await connection.invoke("RemoveReaction", messageId, emoji);
         } else {
             await apiClient.chat.removeReaction(messageId, emoji);
@@ -1078,7 +1089,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     pinMessage: async (conversationId, messageId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             const pinned = await connection.invoke<MessageDto[]>(
                 "PinMessage",
                 conversationId,
@@ -1093,7 +1104,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     unpinMessage: async (conversationId, messageId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             const pinned = await connection.invoke<MessageDto[]>(
                 "UnpinMessage",
                 conversationId,
@@ -1108,7 +1119,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     startTyping: (conversationId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             connection.invoke("StartTyping", conversationId).catch((error) =>
                 console.warn("StartTyping failed", error),
             );
@@ -1117,7 +1128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     stopTyping: (conversationId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             connection.invoke("StopTyping", conversationId).catch((error) =>
                 console.warn("StopTyping failed", error),
             );

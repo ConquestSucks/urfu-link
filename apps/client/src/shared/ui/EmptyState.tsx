@@ -1,6 +1,6 @@
 import React, { ComponentType, ReactNode } from "react";
 import { Text, View } from "react-native";
-import { twMerge } from "tailwind-merge";
+import { cx } from "@/shared/lib/classnames";
 import type { IconProps } from "@/shared/ui/phosphor-types";
 import { glow } from "./glow";
 
@@ -24,7 +24,7 @@ export const EmptyState = ({
     if (size === "compact") {
         return (
             <View
-                className={twMerge(
+                className={cx(
                     "py-8 items-center justify-center",
                     className,
                 )}
@@ -45,7 +45,7 @@ export const EmptyState = ({
 
     return (
         <View
-            className={twMerge(
+            className={cx(
                 "flex-1 items-center justify-center py-20 px-6 min-h-[280px]",
                 className,
             )}

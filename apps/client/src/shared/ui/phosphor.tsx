@@ -1,65 +1,63 @@
 import { cssInterop } from "nativewind";
 import type { ComponentType } from "react";
-import {
-  ArrowBendDoubleUpRightIcon as PhosphorArrowBendDoubleUpRightIcon,
-  ArrowBendUpLeftIcon as PhosphorArrowBendUpLeftIcon,
-  ArrowsClockwiseIcon as PhosphorArrowsClockwiseIcon,
-  AtIcon as PhosphorAtIcon,
-  BellIcon as PhosphorBellIcon,
-  BellSlashIcon as PhosphorBellSlashIcon,
-  BookOpenIcon as PhosphorBookOpenIcon,
-  CaretDownIcon as PhosphorCaretDownIcon,
-  CaretLeftIcon as PhosphorCaretLeftIcon,
-  CaretRightIcon as PhosphorCaretRightIcon,
-  ChatCircleTextIcon as PhosphorChatCircleTextIcon,
-  ChatsCircleIcon as PhosphorChatsCircleIcon,
-  CheckIcon as PhosphorCheckIcon,
-  ChecksIcon as PhosphorChecksIcon,
-  ClockIcon as PhosphorClockIcon,
-  CopyIcon as PhosphorCopyIcon,
-  DeviceMobileIcon as PhosphorDeviceMobileIcon,
-  DotsThreeVerticalIcon as PhosphorDotsThreeVerticalIcon,
-  DownloadSimpleIcon as PhosphorDownloadSimpleIcon,
-  EnvelopeIcon as PhosphorEnvelopeIcon,
-  EnvelopeSimpleIcon as PhosphorEnvelopeSimpleIcon,
-  FileIcon as PhosphorFileIcon,
-  FunnelIcon as PhosphorFunnelIcon,
-  GearIcon as PhosphorGearIcon,
-  ImageSquareIcon as PhosphorImageSquareIcon,
-  InfoIcon as PhosphorInfoIcon,
-  LaptopIcon as PhosphorLaptopIcon,
-  LockIcon as PhosphorLockIcon,
-  MagnifyingGlassIcon as PhosphorMagnifyingGlassIcon,
-  MicrophoneIcon as PhosphorMicrophoneIcon,
-  MicrophoneSlashIcon as PhosphorMicrophoneSlashIcon,
-  MonitorArrowUpIcon as PhosphorMonitorArrowUpIcon,
-  MonitorIcon as PhosphorMonitorIcon,
-  PaperPlaneRightIcon as PhosphorPaperPlaneRightIcon,
-  PauseIcon as PhosphorPauseIcon,
-  PencilSimpleIcon as PhosphorPencilSimpleIcon,
-  PhoneDisconnectIcon as PhosphorPhoneDisconnectIcon,
-  PhoneIcon as PhosphorPhoneIcon,
-  PlayIcon as PhosphorPlayIcon,
-  PlusCircleIcon as PhosphorPlusCircleIcon,
-  PlusIcon as PhosphorPlusIcon,
-  ProhibitIcon as PhosphorProhibitIcon,
-  PushPinIcon as PhosphorPushPinIcon,
-  PushPinSlashIcon as PhosphorPushPinSlashIcon,
-  ScreencastIcon as PhosphorScreencastIcon,
-  ShieldCheckIcon as PhosphorShieldCheckIcon,
-  SignOutIcon as PhosphorSignOutIcon,
-  SmileyIcon as PhosphorSmileyIcon,
-  SpeakerHighIcon as PhosphorSpeakerHighIcon,
-  StopCircleIcon as PhosphorStopCircleIcon,
-  TrashIcon as PhosphorTrashIcon,
-  UploadSimpleIcon as PhosphorUploadSimpleIcon,
-  UserCircleIcon as PhosphorUserCircleIcon,
-  UserIcon as PhosphorUserIcon,
-  UsersIcon as PhosphorUsersIcon,
-  VideoCameraIcon as PhosphorVideoCameraIcon,
-  WarningCircleIcon as PhosphorWarningCircleIcon,
-  XIcon as PhosphorXIcon,
-} from "phosphor-react-native";
+import { ArrowBendDoubleUpRightIcon as PhosphorArrowBendDoubleUpRightIcon } from "phosphor-react-native/lib/commonjs/icons/ArrowBendDoubleUpRight";
+import { ArrowBendUpLeftIcon as PhosphorArrowBendUpLeftIcon } from "phosphor-react-native/lib/commonjs/icons/ArrowBendUpLeft";
+import { ArrowsClockwiseIcon as PhosphorArrowsClockwiseIcon } from "phosphor-react-native/lib/commonjs/icons/ArrowsClockwise";
+import { AtIcon as PhosphorAtIcon } from "phosphor-react-native/lib/commonjs/icons/At";
+import { BellIcon as PhosphorBellIcon } from "phosphor-react-native/lib/commonjs/icons/Bell";
+import { BellSlashIcon as PhosphorBellSlashIcon } from "phosphor-react-native/lib/commonjs/icons/BellSlash";
+import { BookOpenIcon as PhosphorBookOpenIcon } from "phosphor-react-native/lib/commonjs/icons/BookOpen";
+import { CaretDownIcon as PhosphorCaretDownIcon } from "phosphor-react-native/lib/commonjs/icons/CaretDown";
+import { CaretLeftIcon as PhosphorCaretLeftIcon } from "phosphor-react-native/lib/commonjs/icons/CaretLeft";
+import { CaretRightIcon as PhosphorCaretRightIcon } from "phosphor-react-native/lib/commonjs/icons/CaretRight";
+import { ChatCircleTextIcon as PhosphorChatCircleTextIcon } from "phosphor-react-native/lib/commonjs/icons/ChatCircleText";
+import { ChatsCircleIcon as PhosphorChatsCircleIcon } from "phosphor-react-native/lib/commonjs/icons/ChatsCircle";
+import { CheckIcon as PhosphorCheckIcon } from "phosphor-react-native/lib/commonjs/icons/Check";
+import { ChecksIcon as PhosphorChecksIcon } from "phosphor-react-native/lib/commonjs/icons/Checks";
+import { ClockIcon as PhosphorClockIcon } from "phosphor-react-native/lib/commonjs/icons/Clock";
+import { CopyIcon as PhosphorCopyIcon } from "phosphor-react-native/lib/commonjs/icons/Copy";
+import { DeviceMobileIcon as PhosphorDeviceMobileIcon } from "phosphor-react-native/lib/commonjs/icons/DeviceMobile";
+import { DotsThreeVerticalIcon as PhosphorDotsThreeVerticalIcon } from "phosphor-react-native/lib/commonjs/icons/DotsThreeVertical";
+import { DownloadSimpleIcon as PhosphorDownloadSimpleIcon } from "phosphor-react-native/lib/commonjs/icons/DownloadSimple";
+import { EnvelopeIcon as PhosphorEnvelopeIcon } from "phosphor-react-native/lib/commonjs/icons/Envelope";
+import { EnvelopeSimpleIcon as PhosphorEnvelopeSimpleIcon } from "phosphor-react-native/lib/commonjs/icons/EnvelopeSimple";
+import { FileIcon as PhosphorFileIcon } from "phosphor-react-native/lib/commonjs/icons/File";
+import { FunnelIcon as PhosphorFunnelIcon } from "phosphor-react-native/lib/commonjs/icons/Funnel";
+import { GearIcon as PhosphorGearIcon } from "phosphor-react-native/lib/commonjs/icons/Gear";
+import { ImageSquareIcon as PhosphorImageSquareIcon } from "phosphor-react-native/lib/commonjs/icons/ImageSquare";
+import { InfoIcon as PhosphorInfoIcon } from "phosphor-react-native/lib/commonjs/icons/Info";
+import { LaptopIcon as PhosphorLaptopIcon } from "phosphor-react-native/lib/commonjs/icons/Laptop";
+import { LockIcon as PhosphorLockIcon } from "phosphor-react-native/lib/commonjs/icons/Lock";
+import { MagnifyingGlassIcon as PhosphorMagnifyingGlassIcon } from "phosphor-react-native/lib/commonjs/icons/MagnifyingGlass";
+import { MicrophoneIcon as PhosphorMicrophoneIcon } from "phosphor-react-native/lib/commonjs/icons/Microphone";
+import { MicrophoneSlashIcon as PhosphorMicrophoneSlashIcon } from "phosphor-react-native/lib/commonjs/icons/MicrophoneSlash";
+import { MonitorArrowUpIcon as PhosphorMonitorArrowUpIcon } from "phosphor-react-native/lib/commonjs/icons/MonitorArrowUp";
+import { MonitorIcon as PhosphorMonitorIcon } from "phosphor-react-native/lib/commonjs/icons/Monitor";
+import { PaperPlaneRightIcon as PhosphorPaperPlaneRightIcon } from "phosphor-react-native/lib/commonjs/icons/PaperPlaneRight";
+import { PauseIcon as PhosphorPauseIcon } from "phosphor-react-native/lib/commonjs/icons/Pause";
+import { PencilSimpleIcon as PhosphorPencilSimpleIcon } from "phosphor-react-native/lib/commonjs/icons/PencilSimple";
+import { PhoneDisconnectIcon as PhosphorPhoneDisconnectIcon } from "phosphor-react-native/lib/commonjs/icons/PhoneDisconnect";
+import { PhoneIcon as PhosphorPhoneIcon } from "phosphor-react-native/lib/commonjs/icons/Phone";
+import { PlayIcon as PhosphorPlayIcon } from "phosphor-react-native/lib/commonjs/icons/Play";
+import { PlusCircleIcon as PhosphorPlusCircleIcon } from "phosphor-react-native/lib/commonjs/icons/PlusCircle";
+import { PlusIcon as PhosphorPlusIcon } from "phosphor-react-native/lib/commonjs/icons/Plus";
+import { ProhibitIcon as PhosphorProhibitIcon } from "phosphor-react-native/lib/commonjs/icons/Prohibit";
+import { PushPinIcon as PhosphorPushPinIcon } from "phosphor-react-native/lib/commonjs/icons/PushPin";
+import { PushPinSlashIcon as PhosphorPushPinSlashIcon } from "phosphor-react-native/lib/commonjs/icons/PushPinSlash";
+import { ScreencastIcon as PhosphorScreencastIcon } from "phosphor-react-native/lib/commonjs/icons/Screencast";
+import { ShieldCheckIcon as PhosphorShieldCheckIcon } from "phosphor-react-native/lib/commonjs/icons/ShieldCheck";
+import { SignOutIcon as PhosphorSignOutIcon } from "phosphor-react-native/lib/commonjs/icons/SignOut";
+import { SmileyIcon as PhosphorSmileyIcon } from "phosphor-react-native/lib/commonjs/icons/Smiley";
+import { SpeakerHighIcon as PhosphorSpeakerHighIcon } from "phosphor-react-native/lib/commonjs/icons/SpeakerHigh";
+import { StopCircleIcon as PhosphorStopCircleIcon } from "phosphor-react-native/lib/commonjs/icons/StopCircle";
+import { TrashIcon as PhosphorTrashIcon } from "phosphor-react-native/lib/commonjs/icons/Trash";
+import { UploadSimpleIcon as PhosphorUploadSimpleIcon } from "phosphor-react-native/lib/commonjs/icons/UploadSimple";
+import { UserCircleIcon as PhosphorUserCircleIcon } from "phosphor-react-native/lib/commonjs/icons/UserCircle";
+import { UserIcon as PhosphorUserIcon } from "phosphor-react-native/lib/commonjs/icons/User";
+import { UsersIcon as PhosphorUsersIcon } from "phosphor-react-native/lib/commonjs/icons/Users";
+import { VideoCameraIcon as PhosphorVideoCameraIcon } from "phosphor-react-native/lib/commonjs/icons/VideoCamera";
+import { WarningCircleIcon as PhosphorWarningCircleIcon } from "phosphor-react-native/lib/commonjs/icons/WarningCircle";
+import { XIcon as PhosphorXIcon } from "phosphor-react-native/lib/commonjs/icons/X";
 import type { IconProps } from "./phosphor-types";
 
 export type { IconProps } from "./phosphor-types";

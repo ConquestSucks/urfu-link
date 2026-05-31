@@ -1,8 +1,7 @@
 import { create } from "zustand";
 import { useMemo } from "react";
 import type { Platform, PresenceInfo, PresenceStatus } from "@urfu-link/api-client";
-import { createHubConnection } from "@/shared/lib/signalr";
-import { HubConnection, HubConnectionState } from "@microsoft/signalr";
+import { createHubConnection, HUB_CONNECTION_STATE, type HubConnection } from "@/shared/lib/signalr";
 
 type TypingUser = {
     userId: string;
@@ -86,7 +85,7 @@ const normalizePlatforms = (platforms: Array<Platform | number | string>): Platf
         .filter((platform): platform is Platform => platform !== null);
 
 const isActiveConnection = (connection: HubConnection | null) =>
-    connection !== null && connection.state !== HubConnectionState.Disconnected;
+    connection !== null && connection.state !== HUB_CONNECTION_STATE.Disconnected;
 
 export const toPresenceTypingConversationId = (conversationId: string) => {
     if (GUID_RE.test(conversationId)) {
@@ -126,12 +125,14 @@ const publishViewingContexts = (
     connection: HubConnection | null,
     contexts: string[],
 ) => {
-    if (connection?.state === HubConnectionState.Connected) {
+    if (connection?.state === HUB_CONNECTION_STATE.Connected) {
         connection.invoke("SetViewingContexts", contexts).catch((e) =>
             warnUnlessConnectionClosingError("SetViewingContexts failed", e)
         );
     }
 };
+
+let presenceConnectPromise: Promise<void> | null = null;
 
 export const usePresenceStore = create<PresenceState>((set, get) => ({
     connection: null,
@@ -142,18 +143,23 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
     watchedUserRefCounts: {},
     viewingContexts: [],
 
-    connect: async () => {
+    connect: () => {
         const { connection, isConnected } = get();
         if (isConnected || isActiveConnection(connection)) {
-            return;
+            return Promise.resolve();
         }
 
-        const newConnection = createHubConnection("/hubs/presence");
+        if (presenceConnectPromise) {
+            return presenceConnectPromise;
+        }
+
+        presenceConnectPromise = (async () => {
+        const newConnection = await createHubConnection("/hubs/presence");
         const subscribeWatchedUsers = async () => {
             const watched = get().watchedUserIds.filter(isUuid);
             if (
                 watched.length === 0 ||
-                newConnection.state !== HubConnectionState.Connected ||
+                newConnection.state !== HUB_CONNECTION_STATE.Connected ||
                 get().connection !== newConnection
             ) {
                 return;
@@ -272,9 +278,15 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
                 set({ connection: null, isConnected: false });
             }
         }
+        })().finally(() => {
+            presenceConnectPromise = null;
+        });
+
+        return presenceConnectPromise;
     },
 
     disconnect: async () => {
+        presenceConnectPromise = null;
         const { connection } = get();
         if (connection) {
             await connection.stop();
@@ -298,7 +310,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         }));
 
         const { connection } = get();
-        if (shouldSubscribe && connection?.state === HubConnectionState.Connected) {
+        if (shouldSubscribe && connection?.state === HUB_CONNECTION_STATE.Connected) {
             await connection.invoke("SubscribeToUsers", [userId]).catch((error) =>
                 warnUnlessConnectionClosingError("Presence subscribe failed", error),
             );
@@ -347,7 +359,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
         }));
 
         const { connection } = get();
-        if (shouldUnsubscribe && connection?.state === HubConnectionState.Connected) {
+        if (shouldUnsubscribe && connection?.state === HUB_CONNECTION_STATE.Connected) {
             connection.invoke("UnsubscribeFromUsers", [userId]).catch((error) =>
                 warnUnlessConnectionClosingError("Presence unsubscribe failed", error),
             );
@@ -403,7 +415,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     sendHeartbeat: () => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             connection.invoke("Heartbeat").catch((e) =>
                 warnUnlessConnectionClosingError("Heartbeat failed", e)
             );
@@ -412,7 +424,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     startTyping: (conversationId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             connection.invoke("StartTyping", conversationId).catch((e) =>
                 warnUnlessConnectionClosingError("StartTyping failed", e)
             );
@@ -421,7 +433,7 @@ export const usePresenceStore = create<PresenceState>((set, get) => ({
 
     stopTyping: (conversationId) => {
         const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
+        if (connection?.state === HUB_CONNECTION_STATE.Connected) {
             connection.invoke("StopTyping", conversationId).catch((e) =>
                 warnUnlessConnectionClosingError("StopTyping failed", e)
             );

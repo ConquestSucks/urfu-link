@@ -1,5 +1,5 @@
 import { useCurrentUser } from "@/entities/user";
-import { ProfileCard } from "@/shared/ui";
+import { ProfileCard } from "@/shared/ui/ProfileCard";
 import { View } from "react-native";
 import Header from "./Header";
 import { Menu } from "./Menu";

@@ -17,8 +17,34 @@ public sealed class AvatarBackfillHostedService(
             return;
         }
 
-        await using var scope = scopeFactory.CreateAsyncScope();
-        var service = scope.ServiceProvider.GetRequiredService<AvatarBackfillService>();
-        await service.RunOnceAsync(stoppingToken).ConfigureAwait(false);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await using var scope = scopeFactory.CreateAsyncScope();
+                var service = scope.ServiceProvider.GetRequiredService<AvatarBackfillService>();
+                await service.RunOnceAsync(stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+#pragma warning disable CA1031 // The background loop must retry after transient storage or database failures.
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Avatar backfill run failed.");
+            }
+#pragma warning restore CA1031
+
+            var interval = TimeSpan.FromMinutes(Math.Clamp(_options.IntervalMinutes, 5, 24 * 60));
+            try
+            {
+                await Task.Delay(interval, stoppingToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+        }
     }
 }

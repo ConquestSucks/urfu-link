@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react-native";
+import { act, renderHook, waitFor } from "@testing-library/react-native";
 
 import { apiClient } from "@/shared/lib/api";
 import { createHubConnection } from "@/shared/lib/signalr";
@@ -46,6 +46,11 @@ jest.mock("@microsoft/signalr", () => ({
 
 jest.mock("@/shared/lib/signalr", () => ({
     createHubConnection: jest.fn(),
+    HUB_CONNECTION_STATE: {
+        Connected: "Connected",
+        Connecting: "Connecting",
+        Disconnected: "Disconnected",
+    },
 }));
 
 jest.mock("@/shared/lib/api", () => ({
@@ -140,6 +145,7 @@ describe("presence store subscriptions", () => {
         const second = usePresenceStore.getState().connect();
 
         expect(createHubConnection).toHaveBeenCalledTimes(1);
+        await waitFor(() => expect(finishStart).toEqual(expect.any(Function)));
 
         await act(async () => {
             finishStart();

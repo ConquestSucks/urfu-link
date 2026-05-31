@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { AppState, AppStateStatus } from "react-native";
-import { HubConnectionState } from "@microsoft/signalr";
 import { useQueryClient } from "@tanstack/react-query";
 import type { NotificationBadgeDto, NotificationDto } from "@urfu-link/api-client";
-import { createHubConnection } from "@/shared/lib/signalr";
+import { createHubConnection, HUB_CONNECTION_STATE, type HubConnection } from "@/shared/lib/signalr";
 import { useNotificationStore } from "@/shared/store/notification-store";
 import { showServerBrowserNotification } from "@/shared/lib/browser-notifications";
 import { notificationKeys } from "./queries";
@@ -14,7 +13,7 @@ export function useNotificationHub() {
     const setBadge = useNotificationStore((s) => s.setBadge);
 
     useEffect(() => {
-        const connection = createHubConnection("/hubs/notifications");
+        let connection: HubConnection | null = null;
         let retryTimer: ReturnType<typeof setTimeout> | null = null;
         let retryAttempt = 0;
         let disposed = false;
@@ -30,64 +29,13 @@ export function useNotificationHub() {
             retryTimer = null;
         };
 
-        const scheduleRetry = () => {
-            if (disposed || !isPageVisible || retryTimer) return;
-            const delay = Math.min(1_000 * 2 ** retryAttempt, 10_000);
-            retryAttempt += 1;
-            retryTimer = setTimeout(() => {
-                retryTimer = null;
-                void connect();
-            }, delay);
-        };
-
-        connection.on("BadgeUpdated", (badge: NotificationBadgeDto) => {
-            setBadge(badge);
-            queryClient.setQueryData(notificationKeys.badge(), badge);
-        });
-
-        connection.on("NotificationReceived", (notification: NotificationDto) => {
-            showServerBrowserNotification(notification);
-            invalidateNotifications();
-        });
-
-        connection.on("NotificationUpserted", (notification: NotificationDto) => {
-            showServerBrowserNotification(notification);
-            invalidateNotifications();
-        });
-
-        connection.on("NotificationStateChanged", () => {
-            invalidateNotifications();
-        });
-
-        connection.on("NotificationRemoved", () => {
-            invalidateNotifications();
-        });
-
-        connection.on("NotificationBackfillRequired", () => {
-            invalidateNotifications();
-        });
-
-        connection.onreconnected(() => {
-            retryAttempt = 0;
-            clearRetry();
-            setConnected(true);
-            invalidateNotifications();
-        });
-
-        connection.onreconnecting(() => {
-            setConnected(false);
-        });
-
-        connection.onclose(() => {
-            setConnected(false);
-        });
-
         const connect = async () => {
             if (
                 disposed ||
                 !isPageVisible ||
-                connection.state === HubConnectionState.Connected ||
-                connection.state === HubConnectionState.Connecting
+                !connection ||
+                connection.state === HUB_CONNECTION_STATE.Connected ||
+                connection.state === HUB_CONNECTION_STATE.Connecting
             ) {
                 return;
             }
@@ -104,12 +52,81 @@ export function useNotificationHub() {
             }
         };
 
-        void connect();
+        const scheduleRetry = () => {
+            if (disposed || !isPageVisible || retryTimer) return;
+            const delay = Math.min(1_000 * 2 ** retryAttempt, 10_000);
+            retryAttempt += 1;
+            retryTimer = setTimeout(() => {
+                retryTimer = null;
+                void connect();
+            }, delay);
+        };
+
+        const setupConnection = async () => {
+            try {
+                connection = await createHubConnection("/hubs/notifications");
+            } catch (error) {
+                console.warn("NotificationHub setup failed", error);
+                scheduleRetry();
+                return;
+            }
+
+            if (disposed) {
+                void connection.stop();
+                return;
+            }
+
+            connection.on("BadgeUpdated", (badge: NotificationBadgeDto) => {
+                setBadge(badge);
+                queryClient.setQueryData(notificationKeys.badge(), badge);
+            });
+
+            connection.on("NotificationReceived", (notification: NotificationDto) => {
+                showServerBrowserNotification(notification);
+                invalidateNotifications();
+            });
+
+            connection.on("NotificationUpserted", (notification: NotificationDto) => {
+                showServerBrowserNotification(notification);
+                invalidateNotifications();
+            });
+
+            connection.on("NotificationStateChanged", () => {
+                invalidateNotifications();
+            });
+
+            connection.on("NotificationRemoved", () => {
+                invalidateNotifications();
+            });
+
+            connection.on("NotificationBackfillRequired", () => {
+                invalidateNotifications();
+            });
+
+            connection.onreconnected(() => {
+                retryAttempt = 0;
+                clearRetry();
+                setConnected(true);
+                invalidateNotifications();
+            });
+
+            connection.onreconnecting(() => {
+                setConnected(false);
+            });
+
+            connection.onclose(() => {
+                setConnected(false);
+            });
+
+            void connect();
+        };
+
+        void setupConnection();
 
         const handlePageHide = () => {
             isPageVisible = false;
             clearRetry();
-            void connection.stop();
+            void connection?.stop();
             setConnected(false);
         };
 
@@ -137,7 +154,7 @@ export function useNotificationHub() {
                 window.removeEventListener("pageshow", handlePageShow);
             }
             subscription.remove();
-            void connection.stop();
+            void connection?.stop();
             setConnected(false);
         };
     }, [queryClient, setBadge, setConnected]);
