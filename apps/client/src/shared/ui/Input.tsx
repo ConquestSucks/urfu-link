@@ -12,7 +12,7 @@ export const Input = ({ error, value, disabled, className, ...props }: InputProp
           ${error ? "border-red-500/50" : "border-white/10"} 
           ${!disabled && "focus:border-brand-600"}
           text-white px-4 py-3.5 rounded-xl text-[15px]
-          placeholder:text-text-disabled selection:text-brand-600 caret-brand-600
+          placeholder:text-text-disabled selection:bg-brand-600/40 selection:text-white caret-brand-600
         `} {...props}/>
 
       {error && <Text className="text-red-500 text-xs ml-1">{error}</Text>}
