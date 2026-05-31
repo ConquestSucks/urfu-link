@@ -66,15 +66,29 @@ export const ChatView = () => {
     const chatId = params.id as string;
     const handleSend = useConversationSend(chatId);
 
+    const closeCallModals = useCallback(() => {
+        setIsSearching(false);
+        setActionsTarget(null);
+        setActionsAnchor(null);
+        setReadStatusLabel(null);
+        setIsReadStatusLoading(false);
+        setReactionTargetId(null);
+        setForwardIds(null);
+        setOpenThreadRootId(null);
+        setIsPinnedModalOpen(false);
+        inputRef.current?.closeModals();
+    }, []);
+
     const handleStartConversationCall = useCallback(async (callType: "Audio" | "Video") => {
         if (!conversation || isStartingCall) return;
+        closeCallModals();
         try {
             setIsStartingCall(true);
             await startCall(conversation.id, callType);
         } finally {
             setIsStartingCall(false);
         }
-    }, [conversation, isStartingCall, startCall]);
+    }, [closeCallModals, conversation, isStartingCall, startCall]);
 
     const handleStartAudioCall = useCallback(
         () => void handleStartConversationCall("Audio"),
@@ -320,6 +334,7 @@ export const ChatView = () => {
                     onOpenPinned={() => setIsPinnedModalOpen(true)}
                     onStartGroupAudioCall={handleStartAudioCall}
                     onStartGroupVideoCall={handleStartVideoCall}
+                    onBeforeStartCall={closeCallModals}
                 />
             )}
 

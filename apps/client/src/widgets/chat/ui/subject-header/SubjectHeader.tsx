@@ -32,12 +32,14 @@ export const SubjectHeader = ({
     onOpenSearch,
     onStartGroupAudioCall,
     onStartGroupVideoCall,
+    onBeforeStartCall,
 }: {
     subjectId: string;
     onOpenPinned?: () => void;
     onOpenSearch?: () => void;
     onStartGroupAudioCall?: () => void;
     onStartGroupVideoCall?: () => void;
+    onBeforeStartCall?: () => void;
 }) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
     const [profileUserId, setProfileUserId] = useState<string | null>(null);
@@ -99,6 +101,10 @@ export const SubjectHeader = ({
             return;
         }
 
+        setIsMembersOpen(false);
+        setProfileUserId(null);
+        onBeforeStartCall?.();
+
         const direct = await apiClient.chat.openDirectConversation(selectedParticipant.userId);
         updateConversation(direct);
 
@@ -121,7 +127,7 @@ export const SubjectHeader = ({
             },
         ]);
         await startCall(direct.id, callType);
-    }, [currentUserId, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
+    }, [currentUserId, onBeforeStartCall, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
 
     if (!conversation) return null;
 
