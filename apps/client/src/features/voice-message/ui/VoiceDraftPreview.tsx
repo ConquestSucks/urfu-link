@@ -21,14 +21,16 @@ export const VoiceDraftPreview = ({
 }: VoiceDraftPreviewProps) => (
     <View
         testID="voice-draft-preview"
-        className="flex-row items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5"
-        style={glow.brandSubtle}
+        className="flex-row items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2.5"
+        style={glow.surface}
     >
-        <VoiceMessagePlayer
-            sourceUri={draft.uri}
-            durationSeconds={draft.durationSeconds}
-            compact
-        />
+        <View className="flex-1 min-w-0">
+            <VoiceMessagePlayer
+                sourceUri={draft.uri}
+                durationSeconds={draft.durationSeconds}
+                compact
+            />
+        </View>
         <Pressable
             testID="voice-draft-delete"
             onPress={onDelete}

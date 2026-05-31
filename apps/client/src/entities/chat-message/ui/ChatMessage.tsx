@@ -38,6 +38,7 @@ type AttachmentFile = {
     url: string;
     mediaAssetId?: string;
     type?: AttachmentType;
+    size?: number | null;
     mimeType?: string;
     durationSeconds?: number | null;
 };
@@ -100,6 +101,26 @@ const formatDuration = (value: string | null | undefined): string | null => {
 
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
+
+const formatAttachmentSize = (size?: number | null): string | null => {
+    if (typeof size !== "number" || size <= 0) return null;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+    if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+    return `${(size / 1024 / 1024 / 1024).toFixed(1)} GB`;
+};
+
+const formatAttachmentDuration = (seconds?: number | null): string | null => {
+    if (typeof seconds !== "number" || seconds <= 0) return null;
+    const safeSeconds = Math.floor(seconds);
+    const minutes = Math.floor(safeSeconds / 60);
+    const rest = safeSeconds % 60;
+    return `${minutes}:${rest.toString().padStart(2, "0")}`;
+};
+
+const buildAttachmentMeta = (file: AttachmentFile) =>
+    [formatAttachmentDuration(file.durationSeconds), formatAttachmentSize(file.size)]
+        .filter(Boolean)
+        .join(", ");
 
 const buildSystemCallLabel = (systemCall?: ChatMessageProps["systemCall"]) => {
     const callLabel = systemCall?.callType === "Video" ? "Видеозвонок" : "Звонок";
@@ -268,6 +289,8 @@ export const ChatMessage = ({
                   },
               }
             : {};
+    const hasAttachments = attachments.length > 0;
+    const hasOnlyMediaContent = hasAttachments && !text;
 
     return (
         <View className={`flex-row gap-2 ${isOwn ? "justify-end" : "justify-start"}`}>
@@ -278,7 +301,9 @@ export const ChatMessage = ({
                 delayLongPress={350}
                 {...contextMenuProps}
                 testID={`chat-message-bubble-${id}`}
-                className={`max-w-[85%] gap-1 px-3 py-3 rounded-2xl border border-transparent ${
+                className={`max-w-[85%] ${hasAttachments ? "min-w-[240px]" : ""} gap-1 px-3 ${
+                    hasOnlyMediaContent ? "py-2.5" : "py-3"
+                } rounded-2xl border border-transparent ${
                     isOwn ? "bg-brand-650" : "bg-white/5"
                 }`}
                 style={[
@@ -342,41 +367,58 @@ export const ChatMessage = ({
                     </Pressable>
                 )}
 
-                {attachments.length > 0 && (
-                    <View className="mb-1 gap-2">
-                        {attachments.map((file, index) =>
-                            file.type === "Voice" ? (
-                                <View
-                                    key={`${file.url}-${index}`}
-                                    className={`px-3 py-2.5 rounded-xl ${
-                                        isOwn ? "bg-white/20" : "bg-white/10"
-                                    }`}
-                                >
+                {hasAttachments && (
+                    <View className={`${text ? "mb-1" : ""} gap-2`}>
+                        {attachments.map((file, index) => {
+                            const attachmentMeta = buildAttachmentMeta(file);
+                            const itemKey = `${file.url}-${index}`;
+                            const itemSeparator = index > 0 ? "pt-2 border-t border-white/10" : "";
+
+                            return file.type === "Voice" ? (
+                                <View key={itemKey} className={itemSeparator}>
                                     <VoiceMessagePlayer
                                         mediaAssetId={file.mediaAssetId}
                                         durationSeconds={file.durationSeconds}
+                                        fileSizeBytes={file.size}
                                         isOwn={isOwn}
                                     />
                                 </View>
                             ) : (
                                 <Pressable
-                                    key={`${file.url}-${index}`}
+                                    key={itemKey}
                                     onPress={() => void openAttachment(file)}
-                                    className={`flex-row items-center px-3 py-2.5 rounded-xl gap-2 active:opacity-60 ${
-                                        isOwn ? "bg-white/20" : "bg-white/10"
-                                    }`}
-                                    style={glow.brandSubtle}
+                                    className={`flex-row items-center gap-2.5 active:opacity-60 ${itemSeparator}`}
+                                    hitSlop={4}
                                 >
-                                    <FileIcon size={20} className="text-white" />
-                                    <Text
-                                        className="text-[13px] font-medium text-white flex-1"
-                                        numberOfLines={1}
+                                    <View
+                                        className={`w-10 h-10 rounded-full items-center justify-center ${
+                                            isOwn ? "bg-white/20" : "bg-brand-650"
+                                        }`}
+                                        style={isOwn ? undefined : glow.brandSubtle}
                                     >
-                                        {file.name}
-                                    </Text>
+                                        <FileIcon size={20} className="text-white" weight="fill" />
+                                    </View>
+                                    <View className="flex-1 min-w-0">
+                                        <Text
+                                            className="text-[13px] font-semibold text-white"
+                                            numberOfLines={1}
+                                        >
+                                            {file.name}
+                                        </Text>
+                                        {attachmentMeta ? (
+                                            <Text
+                                                className={`text-[11px] font-medium ${
+                                                    isOwn ? "text-white/75" : "text-text-placeholder"
+                                                }`}
+                                                numberOfLines={1}
+                                            >
+                                                {attachmentMeta}
+                                            </Text>
+                                        ) : null}
+                                    </View>
                                 </Pressable>
-                            ),
-                        )}
+                            );
+                        })}
                     </View>
                 )}
 

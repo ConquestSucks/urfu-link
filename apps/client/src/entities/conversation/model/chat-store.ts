@@ -51,6 +51,7 @@ export type ChatMessagePropsMapped = {
         url: string;
         mediaAssetId?: string;
         type?: MessageDto["attachments"][number]["type"];
+        size?: number | null;
         mimeType?: string;
         durationSeconds?: number | null;
     }[];
@@ -1374,6 +1375,7 @@ export const mapMessageToProps = (
             url: `/api/media/${a.mediaAssetId}/download-url`,
             mediaAssetId: a.mediaAssetId,
             type: a.type,
+            size: a.size,
             mimeType: a.mimeType,
             durationSeconds: a.durationSeconds,
         })),

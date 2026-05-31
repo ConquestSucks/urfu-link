@@ -184,7 +184,7 @@ describe("VoiceMessagePlayer", () => {
         expect(apiClient.media.getAssetDownloadUrl).not.toHaveBeenCalled();
     });
 
-    it("renders current and total voice duration", () => {
+    it("renders current voice duration", () => {
         mockStatus = {
             playing: false,
             currentTime: 5,
@@ -199,7 +199,6 @@ describe("VoiceMessagePlayer", () => {
         );
 
         expect(screen.getByText("0:05")).toBeTruthy();
-        expect(screen.getByText("0:17")).toBeTruthy();
     });
 
     it("uses the loaded audio duration when saved metadata is longer", () => {
@@ -216,7 +215,44 @@ describe("VoiceMessagePlayer", () => {
             />,
         );
 
-        expect(screen.getAllByText("0:04")).toHaveLength(2);
+        expect(screen.getAllByText("0:04")).toHaveLength(1);
         expect(screen.queryByText("0:05")).toBeNull();
+    });
+
+    it("shows voice size next to the duration when available", () => {
+        render(
+            <VoiceMessagePlayer
+                sourceUri="file://voice.m4a"
+                durationSeconds={17}
+                fileSizeBytes={9 * 1024}
+            />,
+        );
+
+        expect(screen.getByText("0:17, 9.0 KB")).toBeTruthy();
+    });
+
+    it("seeks from the waveform timeline", async () => {
+        mockStatus = {
+            playing: false,
+            currentTime: 0,
+            duration: 20,
+        };
+
+        render(
+            <VoiceMessagePlayer
+                sourceUri="file://voice.m4a"
+                durationSeconds={20}
+            />,
+        );
+        const timeline = screen.getByTestId("voice-message-timeline");
+
+        fireEvent(timeline, "layout", {
+            nativeEvent: { layout: { width: 200 } },
+        });
+        await act(async () => {
+            fireEvent.press(timeline, { nativeEvent: { locationX: 50 } });
+        });
+
+        expect(mockPlayer.seekTo).toHaveBeenCalledWith(5);
     });
 });
