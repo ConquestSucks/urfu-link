@@ -27,12 +27,12 @@ export const ManageDevices = () => {
 
   if (isLoading) {
     return (
-      <ScrollView contentContainerClassName="gap-4">
+      <ScrollView contentContainerClassName="gap-4 px-1 py-1 pb-2">
         <View className="gap-3">
           <DeviceCardSkeleton />
           <DeviceCardSkeleton />
         </View>
-        <View className="gap-4 bg-app-bg border border-danger-500/20 rounded-2xl p-5" style={glow.danger}>
+        <View className="gap-4 bg-app-bg border border-danger-500/20 rounded-2xl p-5" style={glow.dangerSubtle}>
           <View className="gap-2">
             <Skeleton className="h-3.5 w-40 rounded" />
             <Skeleton className="h-3 w-full rounded bg-white/5" />
@@ -55,7 +55,7 @@ export const ManageDevices = () => {
   }
 
   return (
-    <ScrollView contentContainerClassName="gap-4">
+    <ScrollView contentContainerClassName="gap-4 px-1 py-1 pb-2">
       <View className="gap-3">
         {devices.map((device) => (
           <DeviceCard

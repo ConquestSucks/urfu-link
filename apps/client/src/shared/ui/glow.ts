@@ -38,10 +38,20 @@ export const glow = {
             boxShadow:
                 "0 0 20px rgba(0, 212, 146, 0.28), 0 8px 20px rgba(0, 0, 0, 0.18)",
         },
+    successSubtle:
+        {
+            boxShadow:
+                "0 0 12px rgba(0, 212, 146, 0.12)",
+        },
     danger:
         {
             boxShadow:
                 "0 0 20px rgba(251, 44, 54, 0.28), 0 8px 20px rgba(0, 0, 0, 0.2)",
+        },
+    dangerSubtle:
+        {
+            boxShadow:
+                "0 0 12px rgba(251, 44, 54, 0.12)",
         },
     warning:
         {

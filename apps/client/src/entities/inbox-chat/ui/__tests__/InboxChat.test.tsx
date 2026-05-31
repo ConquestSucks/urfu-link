@@ -22,6 +22,38 @@ jest.mock("@/shared/ui/phosphor", () => {
 });
 
 describe("InboxChat unread preview", () => {
+    it("does not use external row glow that gets clipped by inbox containers", () => {
+        render(
+            <InboxChat
+                id="direct-1"
+                avatarUrl=""
+                name="Peer User"
+                message="active chat"
+                time="12:00"
+                isActive
+            />,
+        );
+
+        expect(screen.getByTestId("inbox-chat-row").props.style).toBeUndefined();
+    });
+
+    it("uses enough line height for the message preview", () => {
+        render(
+            <InboxChat
+                id="direct-1"
+                avatarUrl=""
+                name="Peer User"
+                message="Звонок завершён • 0:46"
+                time="12:00"
+            />,
+        );
+
+        const preview = screen.getByText("Звонок завершён • 0:46");
+
+        expect(preview.props.className).toContain("leading-[18px]");
+        expect(preview.props.className).not.toContain("leading-none");
+    });
+
     it("highlights an unread incoming latest message", () => {
         render(
             <InboxChat
