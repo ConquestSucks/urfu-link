@@ -15,33 +15,37 @@ public sealed class MinioAvatarStorage(
 
     public async Task<string> UploadAsync(
         Guid userId,
-        Stream fileStream,
-        string contentType,
+        ProcessedAvatar avatar,
         CancellationToken cancellationToken)
     {
-        var extension = contentType switch
+        ArgumentNullException.ThrowIfNull(avatar);
+
+        var avatarId = Guid.NewGuid().ToString("N");
+        string? canonicalKey = null;
+        foreach (var variant in avatar.Variants)
         {
-            "image/jpeg" => "jpg",
-            "image/png" => "png",
-            "image/webp" => "webp",
-            _ => "bin",
-        };
+            var extension = GetExtension(variant.ContentType);
+            var key = $"avatars/{userId:N}/{avatarId}-{variant.Size}.{extension}";
+            await using var fileStream = new MemoryStream(variant.Content.ToArray(), writable: false);
+            var putRequest = new PutObjectRequest
+            {
+                BucketName = _options.AvatarBucket,
+                Key = key,
+                InputStream = fileStream,
+                ContentType = variant.ContentType,
+            };
+            putRequest.Headers.CacheControl = AvatarCacheControl;
 
-        var key = $"avatars/{userId:N}/{Guid.NewGuid():N}.{extension}";
+            await s3Client.PutObjectAsync(putRequest, cancellationToken).ConfigureAwait(false);
 
-        var putRequest = new PutObjectRequest
-        {
-            BucketName = _options.AvatarBucket,
-            Key = key,
-            InputStream = fileStream,
-            ContentType = contentType,
-        };
-        putRequest.Headers.CacheControl = AvatarCacheControl;
-
-        await s3Client.PutObjectAsync(putRequest, cancellationToken).ConfigureAwait(false);
+            if (variant.Size == avatar.CanonicalVariant.Size)
+            {
+                canonicalKey = key;
+            }
+        }
 
         var publicBase = (_options.PublicEndpoint ?? _options.Endpoint).TrimEnd('/');
-        return $"{publicBase}/{_options.AvatarBucket}/{key}";
+        return $"{publicBase}/{_options.AvatarBucket}/{canonicalKey ?? throw new InvalidOperationException("No avatar variants were uploaded.")}";
     }
 
     public async Task<AvatarObject?> DownloadAsync(string objectUrl, CancellationToken cancellationToken)
@@ -80,13 +84,56 @@ public sealed class MinioAvatarStorage(
             return;
         }
 
-        var deleteRequest = new DeleteObjectRequest
+        foreach (var keyToDelete in GetObjectKeysToDelete(key))
         {
-            BucketName = _options.AvatarBucket,
-            Key = key,
+            var deleteRequest = new DeleteObjectRequest
+            {
+                BucketName = _options.AvatarBucket,
+                Key = keyToDelete,
+            };
+
+            await s3Client.DeleteObjectAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private static string GetExtension(string contentType) =>
+        contentType switch
+        {
+            "image/jpeg" => "jpg",
+            "image/png" => "png",
+            "image/webp" => "webp",
+            _ => "bin",
         };
 
-        await s3Client.DeleteObjectAsync(deleteRequest, cancellationToken).ConfigureAwait(false);
+    private static IEnumerable<string> GetObjectKeysToDelete(string key)
+    {
+        var extensionIndex = key.LastIndexOf('.', StringComparison.Ordinal);
+        if (extensionIndex < 0 || !key.EndsWith(".webp", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return key;
+            yield break;
+        }
+
+        var nameWithoutExtension = key[..extensionIndex];
+        var suffixIndex = nameWithoutExtension.LastIndexOf('-', StringComparison.Ordinal);
+        if (suffixIndex < 0)
+        {
+            yield return key;
+            yield break;
+        }
+
+        var suffix = nameWithoutExtension[(suffixIndex + 1)..];
+        if (suffix is not ("64" or "128" or "256"))
+        {
+            yield return key;
+            yield break;
+        }
+
+        var prefix = nameWithoutExtension[..suffixIndex];
+        foreach (var size in ImageSharpAvatarImageProcessor.AvatarVariantSizes)
+        {
+            yield return $"{prefix}-{size}.webp";
+        }
     }
 
     private string? GetObjectKey(string objectUrl)

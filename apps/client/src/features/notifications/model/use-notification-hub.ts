@@ -18,6 +18,7 @@ export function useNotificationHub() {
         let retryTimer: ReturnType<typeof setTimeout> | null = null;
         let retryAttempt = 0;
         let disposed = false;
+        let isPageVisible = true;
 
         const invalidateNotifications = () => {
             queryClient.invalidateQueries({ queryKey: notificationKeys.all });
@@ -30,7 +31,7 @@ export function useNotificationHub() {
         };
 
         const scheduleRetry = () => {
-            if (disposed || retryTimer) return;
+            if (disposed || !isPageVisible || retryTimer) return;
             const delay = Math.min(1_000 * 2 ** retryAttempt, 10_000);
             retryAttempt += 1;
             retryTimer = setTimeout(() => {
@@ -84,6 +85,7 @@ export function useNotificationHub() {
         const connect = async () => {
             if (
                 disposed ||
+                !isPageVisible ||
                 connection.state === HubConnectionState.Connected ||
                 connection.state === HubConnectionState.Connecting
             ) {
@@ -104,6 +106,23 @@ export function useNotificationHub() {
 
         void connect();
 
+        const handlePageHide = () => {
+            isPageVisible = false;
+            clearRetry();
+            void connection.stop();
+            setConnected(false);
+        };
+
+        const handlePageShow = () => {
+            isPageVisible = true;
+            void connect();
+        };
+
+        if (typeof window !== "undefined") {
+            window.addEventListener("pagehide", handlePageHide);
+            window.addEventListener("pageshow", handlePageShow);
+        }
+
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
                 void connect();
@@ -113,6 +132,10 @@ export function useNotificationHub() {
         return () => {
             disposed = true;
             clearRetry();
+            if (typeof window !== "undefined") {
+                window.removeEventListener("pagehide", handlePageHide);
+                window.removeEventListener("pageshow", handlePageShow);
+            }
             subscription.remove();
             void connection.stop();
             setConnected(false);

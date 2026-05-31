@@ -51,6 +51,7 @@ export type ChatMessagePropsMapped = {
         url: string;
         mediaAssetId?: string;
         type?: MessageDto["attachments"][number]["type"];
+        size?: number | null;
         mimeType?: string;
         durationSeconds?: number | null;
     }[];
@@ -68,6 +69,9 @@ type ThreadEvent =
       };
 
 type ThreadEventHandler = (event: ThreadEvent) => void;
+type ConversationLoadType = "Direct" | "Discipline";
+
+const conversationLoadPromises = new Map<ConversationLoadType | "all", Promise<void>>();
 
 type ChatState = {
     connection: HubConnection | null;
@@ -92,7 +96,7 @@ type ChatState = {
 
     // Фильтр для GET /conversations — бэк принимает "direct" или "discipline"
     // (case-insensitive). "Direct" → личные, "Discipline" → дисциплинные группы.
-    loadConversations: (type?: "Direct" | "Discipline") => Promise<void>;
+    loadConversations: (type?: ConversationLoadType) => Promise<void>;
     loadMessages: (chatId: string, type: "chat" | "subject", reset?: boolean) => Promise<void>;
     loadMore: (chatId: string, type: "chat" | "subject") => Promise<void>;
     loadPinnedMessages: (conversationId: string) => Promise<void>;
@@ -721,50 +725,63 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     loadConversations: async (type) => {
-        set({ isConversationsLoading: true });
-        try {
-            const res = await apiClient.chat.getConversations(type, undefined, 50);
-            set((state) => {
-                const unreadByConversation = { ...state.unreadByConversation };
-                const incoming = res.items.map(normalizeConversationDraftStatus);
-                for (const conversation of res.items) {
-                    if (typeof conversation.unreadCount !== "number") continue;
-                    if (conversation.unreadCount > 0) {
-                        unreadByConversation[conversation.id] = conversation.unreadCount;
-                    } else {
-                        delete unreadByConversation[conversation.id];
-                    }
-                }
-
-                const conversations = (() => {
-                    if (!type) {
-                        return incoming;
-                    }
-
-                    const isLoadedType = (conversation: ConversationPreview) =>
-                        type === "Direct"
-                            ? conversation.type === "Direct"
-                            : conversation.groupSubtype === "Discipline";
-                    const incomingIds = new Set(incoming.map((conversation) => conversation.id));
-                    return [
-                        ...state.conversations.filter(
-                            (conversation) =>
-                                !isLoadedType(conversation) && !incomingIds.has(conversation.id),
-                        ),
-                        ...incoming,
-                    ].sort(compareConversationActivity);
-                })();
-
-                return {
-                    conversations,
-                    unreadByConversation,
-                    isConversationsLoading: false,
-                };
-            });
-        } catch (error) {
-            console.error("Failed to load conversations", error);
-            set({ isConversationsLoading: false });
+        const loadKey = type ?? "all";
+        const existingLoad = conversationLoadPromises.get(loadKey);
+        if (existingLoad) {
+            return existingLoad;
         }
+
+        const loadPromise = (async () => {
+            set({ isConversationsLoading: true });
+            try {
+                const res = await apiClient.chat.getConversations(type, undefined, 50);
+                set((state) => {
+                    const unreadByConversation = { ...state.unreadByConversation };
+                    const incoming = res.items.map(normalizeConversationDraftStatus);
+                    for (const conversation of res.items) {
+                        if (typeof conversation.unreadCount !== "number") continue;
+                        if (conversation.unreadCount > 0) {
+                            unreadByConversation[conversation.id] = conversation.unreadCount;
+                        } else {
+                            delete unreadByConversation[conversation.id];
+                        }
+                    }
+
+                    const conversations = (() => {
+                        if (!type) {
+                            return incoming;
+                        }
+
+                        const isLoadedType = (conversation: ConversationPreview) =>
+                            type === "Direct"
+                                ? conversation.type === "Direct"
+                                : conversation.groupSubtype === "Discipline";
+                        const incomingIds = new Set(incoming.map((conversation) => conversation.id));
+                        return [
+                            ...state.conversations.filter(
+                                (conversation) =>
+                                    !isLoadedType(conversation) && !incomingIds.has(conversation.id),
+                            ),
+                            ...incoming,
+                        ].sort(compareConversationActivity);
+                    })();
+
+                    return {
+                        conversations,
+                        unreadByConversation,
+                        isConversationsLoading: false,
+                    };
+                });
+            } catch (error) {
+                console.error("Failed to load conversations", error);
+                set({ isConversationsLoading: false });
+            } finally {
+                conversationLoadPromises.delete(loadKey);
+            }
+        })();
+
+        conversationLoadPromises.set(loadKey, loadPromise);
+        return loadPromise;
     },
 
     loadMessages: async (chatId, _type, reset = false) => {
@@ -1358,6 +1375,7 @@ export const mapMessageToProps = (
             url: `/api/media/${a.mediaAssetId}/download-url`,
             mediaAssetId: a.mediaAssetId,
             type: a.type,
+            size: a.size,
             mimeType: a.mimeType,
             durationSeconds: a.durationSeconds,
         })),

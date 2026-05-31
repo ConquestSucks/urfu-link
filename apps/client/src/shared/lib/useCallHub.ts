@@ -75,6 +75,19 @@ export const useCallHub = () => {
 
         void connectHub(connection);
 
+        const handlePageHide = () => {
+            void connection.stop();
+        };
+
+        const handlePageShow = () => {
+            void connectHub(connection);
+        };
+
+        if (typeof window !== "undefined") {
+            window.addEventListener("pagehide", handlePageHide);
+            window.addEventListener("pageshow", handlePageShow);
+        }
+
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
                 void connectHub(connection);
@@ -82,6 +95,10 @@ export const useCallHub = () => {
         });
 
         return () => {
+            if (typeof window !== "undefined") {
+                window.removeEventListener("pagehide", handlePageHide);
+                window.removeEventListener("pageshow", handlePageShow);
+            }
             connection.off("IncomingCall");
             connection.off("CallAccepted");
             connection.off("CallDeclined");

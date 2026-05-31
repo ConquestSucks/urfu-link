@@ -21,10 +21,14 @@ public sealed class AvatarImageProcessorTests
             "image/png",
             CancellationToken.None);
 
-        Assert.Equal("image/webp", processed.ContentType);
+        Assert.Equal([64, 128, 256], processed.Variants.Select(variant => variant.Size).ToArray());
 
-        using var output = Image.Load(processed.Content.ToArray());
-        Assert.Equal(256, output.Width);
-        Assert.Equal(256, output.Height);
+        foreach (var variant in processed.Variants)
+        {
+            Assert.Equal("image/webp", variant.ContentType);
+            using var output = Image.Load(variant.Content.ToArray());
+            Assert.Equal(variant.Size, output.Width);
+            Assert.Equal(variant.Size, output.Height);
+        }
     }
 }

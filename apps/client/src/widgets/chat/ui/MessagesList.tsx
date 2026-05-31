@@ -86,6 +86,23 @@ const buildMessageListItems = (messages: MessageDto[]): MessageListItem[] =>
 
 const getMessageListItemKey = (item: MessageListItem) => item.id;
 
+const MessageDateSeparator = ({ createdAt }: { createdAt: string }) => {
+    const dayKey = getMessageDayKey(createdAt);
+    const label = formatMessageDateLabel(createdAt);
+
+    if (!dayKey || !label) return null;
+
+    return (
+        <View testID={`message-date-separator-${dayKey}`} className="items-center py-3">
+            <View className="px-3 py-1.5 rounded-full bg-app-panel border border-white/10">
+                <Text className="text-[12px] font-semibold text-text-subtle">
+                    {label}
+                </Text>
+            </View>
+        </View>
+    );
+};
+
 const waitForListUpdate = () => new Promise((resolve) => setTimeout(resolve, 50));
 
 const getJoinableSystemCallIds = (messages: MessageDto[]): Set<string> => {
@@ -203,6 +220,10 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
         const isLoaded = messagesLoadedByConversation[chatId] || false;
         const hasMore = hasMoreByConversation[chatId] || false;
         const listItems = useMemo(() => buildMessageListItems(messages), [messages]);
+        const listItemIndexById = useMemo(
+            () => new Map(listItems.map((item, index) => [item.id, index])),
+            [listItems],
+        );
         const listRef = useRef<FlatList<MessageListItem>>(null);
         const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
         const [visibleDateCreatedAt, setVisibleDateCreatedAt] = useState<string | null>(null);
@@ -487,20 +508,18 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                         joinableSystemCallIds.has(view.systemCall.callId);
                     const localStatus = (message as LocalMessageDto)._localStatus;
                     const isHighlighted = view.id === highlightedMessageId;
-                    const itemAbove = listItems[index + 1];
+                    const itemIndex = listItemIndexById.get(item.id) ?? -1;
+                    const itemAbove = itemIndex >= 0 ? listItems[itemIndex + 1] : undefined;
                     const currentDay = getMessageDayKey(message.createdAt);
                     const itemAboveDay = getMessageDayKey(itemAbove?.message.createdAt);
-                    const messageSpacing = itemAbove
-                        ? [
-                              styles.messageAfterMessage,
-                              currentDay && currentDay !== itemAboveDay
-                                  ? { marginTop: 28 }
-                                  : null,
-                          ]
-                        : null;
+                    const shouldShowDateSeparator = Boolean(currentDay) && currentDay !== itemAboveDay;
+                    const messageSpacing = itemAbove ? styles.messageAfterMessage : null;
 
                     return (
                         <View style={messageSpacing}>
+                            {shouldShowDateSeparator ? (
+                                <MessageDateSeparator createdAt={message.createdAt} />
+                            ) : null}
                             <View
                                 testID={`message-row-${view.id}`}
                                 className="-mx-2 rounded-2xl px-2 py-1 overflow-hidden"
@@ -594,6 +613,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 currentUserId,
                 highlightedMessageId,
                 joinableSystemCallIds,
+                listItemIndexById,
                 listItems,
                 participantsByUserId,
                 shouldShowAvatars,

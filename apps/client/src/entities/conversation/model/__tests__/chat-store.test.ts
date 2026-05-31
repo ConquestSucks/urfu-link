@@ -540,6 +540,7 @@ describe("chat store direct draft sending", () => {
                 url: "/api/media/asset-1/download-url",
                 mediaAssetId: "asset-1",
                 type: "Document",
+                size: 128,
                 mimeType: "application/json",
                 durationSeconds: undefined,
             },
@@ -674,6 +675,39 @@ describe("chat store direct draft sending", () => {
         ]);
         expect(state.unreadByConversation["direct-1"]).toBe(2);
         expect(state.unreadByConversation["discipline-1"]).toBe(4);
+    });
+
+    it("deduplicates concurrent loads for the same conversation type", async () => {
+        let resolveLoad!: (value: unknown) => void;
+        (apiClient.chat.getConversations as jest.Mock).mockReturnValue(
+            new Promise((resolve) => {
+                resolveLoad = resolve;
+            }),
+        );
+
+        const first = useChatStore.getState().loadConversations("Direct");
+        const second = useChatStore.getState().loadConversations("Direct");
+
+        resolveLoad({
+            items: [
+                {
+                    id: "direct-1",
+                    type: "Direct",
+                    participants: ["peer-1", "user-1"],
+                    createdAtUtc: "2026-05-24T09:59:00.000Z",
+                    lastMessageAtUtc: "2026-05-24T10:03:00.000Z",
+                    lastMessagePreview: null,
+                    unreadCount: 0,
+                },
+            ],
+            nextCursor: null,
+        });
+
+        await Promise.all([first, second]);
+
+        expect(apiClient.chat.getConversations).toHaveBeenCalledTimes(1);
+        expect(apiClient.chat.getConversations).toHaveBeenCalledWith("Direct", undefined, 50);
+        expect(useChatStore.getState().conversations).toHaveLength(1);
     });
 
     it("uses local unread when a stale conversation preview still has zero unread", () => {

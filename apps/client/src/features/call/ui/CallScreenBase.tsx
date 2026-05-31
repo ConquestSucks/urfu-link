@@ -277,16 +277,14 @@ export const CallScreen = () => {
             return;
         }
 
-        const handleUnload = () => {
+        const handlePageHide = () => {
             sendCallLeaveBeacon(call.id);
             clearToken(call.id);
         };
 
-        window.addEventListener("pagehide", handleUnload);
-        window.addEventListener("beforeunload", handleUnload);
+        window.addEventListener("pagehide", handlePageHide);
         return () => {
-            window.removeEventListener("pagehide", handleUnload);
-            window.removeEventListener("beforeunload", handleUnload);
+            window.removeEventListener("pagehide", handlePageHide);
         };
     }, [call?.id, call?.status, clearToken]);
 

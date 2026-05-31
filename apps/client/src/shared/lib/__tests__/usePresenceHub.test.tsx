@@ -23,11 +23,11 @@ jest.mock("@/shared/lib/signalr", () => ({
 describe("usePresenceHub", () => {
     let appStateHandler: ((state: AppStateStatus) => void) | null = null;
     let pagehideHandler: (() => void) | null = null;
-    let beforeUnloadHandler: (() => void) | null = null;
+    let pageshowHandler: (() => void) | null = null;
     const remove = jest.fn();
     const addWindowEventListener = jest.fn((event: string, handler: () => void) => {
         if (event === "pagehide") pagehideHandler = handler;
-        if (event === "beforeunload") beforeUnloadHandler = handler;
+        if (event === "pageshow") pageshowHandler = handler;
     });
     const removeWindowEventListener = jest.fn();
     const setPlatformOS = (os: typeof Platform.OS) => {
@@ -43,7 +43,7 @@ describe("usePresenceHub", () => {
         setPlatformOS("ios");
         appStateHandler = null;
         pagehideHandler = null;
-        beforeUnloadHandler = null;
+        pageshowHandler = null;
         Object.defineProperty(globalThis, "window", {
             configurable: true,
             value: {
@@ -162,7 +162,26 @@ describe("usePresenceHub", () => {
 
         expect(mockDisconnect).toHaveBeenCalledTimes(1);
         expect(notifyPresenceDisconnect).toHaveBeenCalledTimes(1);
-        expect(beforeUnloadHandler).not.toBeNull();
+        expect(addWindowEventListener).not.toHaveBeenCalledWith(
+            "beforeunload",
+            expect.any(Function),
+        );
+    });
+
+    it("reconnects when a bfcache page is restored", async () => {
+        renderHook(() => usePresenceHub());
+
+        await act(async () => {
+            await Promise.resolve();
+        });
+        mockConnect.mockClear();
+
+        await act(async () => {
+            pageshowHandler?.();
+            await Promise.resolve();
+        });
+
+        expect(mockConnect).toHaveBeenCalledTimes(1);
     });
 
     it("queues the keepalive disconnect before stopping the hub on page close", async () => {
