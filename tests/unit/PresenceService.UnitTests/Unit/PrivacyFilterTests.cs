@@ -17,27 +17,27 @@ public class PrivacyFilterTests
         LastSeen);
 
     [Fact]
-    public void Apply_ShowOnlineFalse_ReturnsOffline()
+    public void Apply_AlwaysPassesStatusThrough()
     {
-        var settings = new PrivacySettings(ShowOnlineStatus: false, ShowLastVisitTime: true);
+        var settings = new PrivacySettings(ShowLastVisitTime: true);
         var result = PrivacyFilter.Apply(Online(), settings);
 
-        result.Status.Should().Be(PresenceStatus.Offline);
+        result.Status.Should().Be(PresenceStatus.Online);
     }
 
     [Fact]
-    public void Apply_ShowOnlineFalse_ClearsPlatforms()
+    public void Apply_AlwaysPassesPlatformsThrough()
     {
-        var settings = new PrivacySettings(ShowOnlineStatus: false, ShowLastVisitTime: true);
+        var settings = new PrivacySettings(ShowLastVisitTime: true);
         var result = PrivacyFilter.Apply(Online(), settings);
 
-        result.Platforms.Should().BeEmpty();
+        result.Platforms.Should().Equal(Platform.Web, Platform.Mobile);
     }
 
     [Fact]
-    public void Apply_ShowLastVisitFalse_ClearsLastSeen()
+    public void Apply_ShowLastVisitTrue_ClearsLastSeen()
     {
-        var settings = new PrivacySettings(ShowOnlineStatus: true, ShowLastVisitTime: false);
+        var settings = new PrivacySettings(ShowLastVisitTime: true);
         var result = PrivacyFilter.Apply(Online(), settings);
 
         result.LastSeenAt.Should().BeNull();
@@ -45,9 +45,9 @@ public class PrivacyFilterTests
     }
 
     [Fact]
-    public void Apply_AllAllowed_PassesThrough()
+    public void Apply_ShowLastVisitFalse_PassesThrough()
     {
-        var settings = new PrivacySettings(ShowOnlineStatus: true, ShowLastVisitTime: true);
+        var settings = new PrivacySettings(ShowLastVisitTime: false);
         var input = Online();
         var result = PrivacyFilter.Apply(input, settings);
 
@@ -55,22 +55,13 @@ public class PrivacyFilterTests
     }
 
     [Fact]
-    public void Apply_DefaultSettings_AllowsEverything()
+    public void Apply_DefaultSettings_HidesLastSeenOnly()
     {
         var input = Online();
         var result = PrivacyFilter.Apply(input, PrivacySettings.Default);
 
-        result.Should().Be(input);
-    }
-
-    [Fact]
-    public void Apply_BothHidden_StatusOfflineAndLastSeenNull()
-    {
-        var settings = new PrivacySettings(ShowOnlineStatus: false, ShowLastVisitTime: false);
-        var result = PrivacyFilter.Apply(Online(), settings);
-
-        result.Status.Should().Be(PresenceStatus.Offline);
-        result.Platforms.Should().BeEmpty();
         result.LastSeenAt.Should().BeNull();
+        result.Status.Should().Be(input.Status);
+        result.Platforms.Should().Equal(input.Platforms);
     }
 }

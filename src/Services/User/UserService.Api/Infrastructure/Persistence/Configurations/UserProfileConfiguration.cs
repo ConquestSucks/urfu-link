@@ -30,7 +30,6 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
 
         builder.OwnsOne(u => u.Privacy, privacy =>
         {
-            privacy.Property(p => p.ShowOnlineStatus).HasColumnName("show_online_status");
             privacy.Property(p => p.ShowLastVisitTime).HasColumnName("show_last_visit_time");
         });
 

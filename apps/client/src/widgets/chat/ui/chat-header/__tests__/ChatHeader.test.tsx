@@ -73,9 +73,9 @@ jest.mock("@/entities/user", () => ({
 }));
 
 jest.mock("@/entities/presence", () => ({
-    LastSeenLabel: ({ lastSeenAt }: { lastSeenAt: string }) => {
+    LastSeenLabel: ({ lastSeenAt }: { lastSeenAt?: string | null }) => {
         const { Text } = require("react-native");
-        return <Text>{`last seen ${lastSeenAt}`}</Text>;
+        return <Text>{lastSeenAt ? `last seen ${lastSeenAt}` : "Был недавно"}</Text>;
     },
     TypingIndicator: () => {
         const { Text } = require("react-native");
@@ -140,7 +140,7 @@ describe("ChatHeader presence state", () => {
         expect(screen.queryByText("Не в сети")).toBeNull();
     });
 
-    it("shows offline only after an offline presence snapshot", () => {
+    it("shows recently label after an offline presence snapshot without last seen", () => {
         mockPeerPresence = {
             userId: mockPeerUserId,
             status: "Offline",
@@ -151,6 +151,6 @@ describe("ChatHeader presence state", () => {
         render(<ChatHeader chatId="chat-1" />);
 
         expect(screen.queryByTestId("chat-header-presence-skeleton")).toBeNull();
-        expect(screen.getByText("Не в сети")).toBeTruthy();
+        expect(screen.getByText("Был недавно")).toBeTruthy();
     });
 });

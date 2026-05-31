@@ -1,4 +1,3 @@
-using Urfu.Link.Services.Presence.Domain.Enums;
 using Urfu.Link.Services.Presence.Domain.ValueObjects;
 
 namespace Urfu.Link.Services.Presence.Application.Privacy;
@@ -10,10 +9,8 @@ public static class PrivacyFilter
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var status = settings.ShowOnlineStatus ? original.Status : PresenceStatus.Offline;
-        IReadOnlyList<Platform> platforms = settings.ShowOnlineStatus ? original.Platforms : [];
-        var lastSeen = settings.ShowLastVisitTime ? original.LastSeenAt : null;
+        var lastSeen = settings.ShowLastVisitTime ? null : original.LastSeenAt;
 
-        return new AggregatedPresence(original.UserId, status, platforms, lastSeen);
+        return new AggregatedPresence(original.UserId, original.Status, original.Platforms, lastSeen);
     }
 }

@@ -14,11 +14,10 @@ public sealed class ValueObjectTests
     }
 
     [Fact]
-    public void PrivacySettingsDefaultShouldBeTrueForBothFlags()
+    public void PrivacySettingsDefaultShouldHideLastVisitTime()
     {
         var settings = PrivacySettings.Default;
 
-        Assert.True(settings.ShowOnlineStatus);
         Assert.True(settings.ShowLastVisitTime);
     }
 
@@ -95,8 +94,8 @@ public sealed class ValueObjectTests
     [Fact]
     public void ValueObjectsWithSameValuesShouldBeEqual()
     {
-        var a = new PrivacySettings(true, false);
-        var b = new PrivacySettings(true, false);
+        var a = new PrivacySettings(false);
+        var b = new PrivacySettings(false);
 
         Assert.Equal(a, b);
     }
@@ -104,8 +103,8 @@ public sealed class ValueObjectTests
     [Fact]
     public void ValueObjectsWithDifferentValuesShouldNotBeEqual()
     {
-        var a = new PrivacySettings(true, false);
-        var b = new PrivacySettings(false, false);
+        var a = new PrivacySettings(true);
+        var b = new PrivacySettings(false);
 
         Assert.NotEqual(a, b);
     }

@@ -93,7 +93,6 @@ describe("chat store direct draft sending", () => {
                 aboutMe: null,
             },
             privacy: {
-                showOnlineStatus: true,
                 showLastVisitTime: true,
             },
             notifications: {

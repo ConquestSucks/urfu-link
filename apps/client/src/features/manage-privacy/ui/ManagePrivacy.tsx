@@ -24,7 +24,6 @@ export const ManagePrivacy = () => {
   const handleToggle = (field: PrivacyField) => (newValue: boolean) => {
     if (!privacy) return;
     updatePrivacy.mutate({
-      showOnlineStatus: field === "showOnlineStatus" ? newValue : privacy.showOnlineStatus,
       showLastVisitTime: field === "showLastVisitTime" ? newValue : privacy.showLastVisitTime,
     });
   };

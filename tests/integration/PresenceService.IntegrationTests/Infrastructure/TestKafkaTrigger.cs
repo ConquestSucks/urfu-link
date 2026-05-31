@@ -14,7 +14,6 @@ public static class TestKafkaTrigger
     public static async Task TriggerPrivacyChangedAsync(
         PresenceServiceFactory factory,
         Guid userId,
-        bool showOnlineStatus,
         bool showLastVisitTime,
         CancellationToken cancellationToken = default)
     {
@@ -23,7 +22,6 @@ public static class TestKafkaTrigger
         var payload = JsonSerializer.SerializeToElement(new
         {
             UserId = userId,
-            ShowOnlineStatus = showOnlineStatus,
             ShowLastVisitTime = showLastVisitTime,
             EventId = Guid.NewGuid(),
             EventType = PrivacyChangedHandler.SubscribedEventType,
