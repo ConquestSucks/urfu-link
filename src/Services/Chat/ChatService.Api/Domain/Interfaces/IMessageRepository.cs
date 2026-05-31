@@ -85,11 +85,13 @@ public interface IMessageRepository
 
     /// <summary>
     /// Marks all messages in the conversation up to and including <paramref name="upToMessageId"/>
-    /// as Read. Returns the ids that actually transitioned, ordered from oldest to newest
-    /// (so the last element is the new anchor). Returns an empty list if nothing transitioned.
+    /// as read by <paramref name="readerUserId"/>. Returns the ids that newly received this
+    /// reader's receipt, ordered from oldest to newest (so the last element is the new anchor).
+    /// Returns an empty list if the reader had already read the range.
     /// </summary>
     Task<IReadOnlyList<Guid>> MarkReadUpToAsync(
         string conversationId,
+        Guid readerUserId,
         Guid upToMessageId,
         DateTimeOffset readAtUtc,
         CancellationToken cancellationToken);
