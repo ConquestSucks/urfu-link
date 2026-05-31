@@ -540,6 +540,7 @@ describe("chat store direct draft sending", () => {
                 url: "/api/media/asset-1/download-url",
                 mediaAssetId: "asset-1",
                 type: "Document",
+                size: 128,
                 mimeType: "application/json",
                 durationSeconds: undefined,
             },
