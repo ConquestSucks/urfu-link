@@ -46,6 +46,7 @@ export default function AuthLayout() {
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRealtimeReady, setIsRealtimeReady] = useState(false);
+    const shouldElevateThreadDetail = isMobile && isThreadDetail;
 
     // Подключаемся к ChatHub и PresenceHub на всё время авторизованной сессии.
     // Хуки сами обрабатывают AppState (background/foreground) и cleanup при unmount.
@@ -79,9 +80,9 @@ export default function AuthLayout() {
                 <View
                     className="flex-1 min-w-0"
                     style={{
-                        zIndex: isThreadDetail ? 2 : 1,
-                        elevation: isThreadDetail ? 12 : 0,
-                        ...(isThreadDetail ? glow.surfaceStrong : {}),
+                        zIndex: shouldElevateThreadDetail ? 2 : 1,
+                        elevation: shouldElevateThreadDetail ? 12 : 0,
+                        ...(shouldElevateThreadDetail ? glow.surfaceStrong : {}),
                     }}
                 >
                     <Slot />
