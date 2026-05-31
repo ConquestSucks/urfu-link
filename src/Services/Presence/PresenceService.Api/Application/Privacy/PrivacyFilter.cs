@@ -9,7 +9,7 @@ public static class PrivacyFilter
         ArgumentNullException.ThrowIfNull(original);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var lastSeen = settings.ShowLastVisitTime ? null : original.LastSeenAt;
+        var lastSeen = settings.ShowLastVisitTime ? original.LastSeenAt : null;
 
         return new AggregatedPresence(original.UserId, original.Status, original.Platforms, lastSeen);
     }
