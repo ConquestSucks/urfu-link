@@ -1,11 +1,13 @@
 import { safeGoBack } from "@/shared/lib/safeGoBack";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
+import { useRouter } from "expo-router";
 import { Avatar } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import {
     useConversationParticipants,
     useParticipantsStore,
 } from "@/entities/conversation/model/participants-store";
+import { saveDirectDraftConversation } from "@/entities/conversation/model/direct-draft-cache";
 import {
     useCurrentUser,
     useMuteConversationNotifications,
@@ -62,6 +64,7 @@ export const SubjectHeader = ({
         },
         [isProfileControlled, onProfileUserIdChange],
     );
+    const router = useRouter();
     const { isMobile } = useWindowSize();
     const conversation = useChatStore((s) =>
         s.conversations.find((c) => c.id === subjectId),
@@ -115,9 +118,9 @@ export const SubjectHeader = ({
     const selectedPresence = profileUserId ? presenceByUser[profileUserId] : undefined;
     const isSelectedSelf = selectedParticipant?.userId === currentUserId;
 
-    const handleStartDirectCallFromProfile = useCallback(async (callType: CallType) => {
+    const openDirectConversationFromProfile = useCallback(async () => {
         if (!selectedParticipant || selectedParticipant.userId === currentUserId) {
-            return;
+            return null;
         }
 
         setIsMembersOpen(false);
@@ -136,7 +139,7 @@ export const SubjectHeader = ({
                       avatarUrl: profile.account.avatarUrl ?? "",
                   }
                 : null;
-        primeParticipants(direct.id, [
+        const directParticipants = [
             ...(currentParticipant ? [currentParticipant] : []),
             {
                 userId: selectedParticipant.userId,
@@ -144,9 +147,32 @@ export const SubjectHeader = ({
                 displayName: selectedParticipant.displayName,
                 avatarUrl: selectedParticipant.avatarUrl,
             },
-        ]);
-        await startCall(direct.id, callType);
-    }, [currentUserId, onBeforeStartCall, primeParticipants, profile, selectedParticipant, startCall, updateConversation]);
+        ];
+        primeParticipants(direct.id, directParticipants);
+        saveDirectDraftConversation(direct, directParticipants);
+
+        return direct.id;
+    }, [currentUserId, onBeforeStartCall, primeParticipants, profile, selectedParticipant, setProfileUserId, updateConversation]);
+
+    const handleStartDirectCallFromProfile = useCallback(async (callType: CallType) => {
+        const conversationId = await openDirectConversationFromProfile();
+        if (!conversationId) {
+            return;
+        }
+
+        await startCall(conversationId, callType);
+    }, [openDirectConversationFromProfile, startCall]);
+
+    const handleOpenDirectChatFromProfile = useCallback(async () => {
+        setIsMembersOpen(false);
+
+        const conversationId = await openDirectConversationFromProfile();
+        if (!conversationId) {
+            return;
+        }
+
+        router.push(`/chats/${conversationId}` as never);
+    }, [openDirectConversationFromProfile, router]);
 
     if (!conversation) return null;
 
@@ -236,9 +262,9 @@ export const SubjectHeader = ({
                         ? () => void handleStartDirectCallFromProfile("Audio")
                         : undefined
                 }
-                onStartVideoCall={
+                onOpenChat={
                     selectedParticipant && !isSelectedSelf
-                        ? () => void handleStartDirectCallFromProfile("Video")
+                        ? () => void handleOpenDirectChatFromProfile()
                         : undefined
                 }
                 onToggleNotifications={handleToggleNotifications}

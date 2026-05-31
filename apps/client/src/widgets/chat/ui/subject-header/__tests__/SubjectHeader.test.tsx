@@ -17,6 +17,10 @@ jest.mock("@/shared/lib/useWindowSize", () => ({
     useWindowSize: () => ({ isMobile: false }),
 }));
 
+jest.mock("expo-router", () => ({
+    useRouter: () => ({ push: jest.fn() }),
+}));
+
 jest.mock("@/shared/ui", () => ({
     Avatar: () => {
         const { Text } = require("react-native");
@@ -42,6 +46,10 @@ jest.mock("@/entities/conversation/model/participants-store", () => ({
         selector({
             prime: mockPrimeParticipants,
         }),
+}));
+
+jest.mock("@/entities/conversation/model/direct-draft-cache", () => ({
+    saveDirectDraftConversation: jest.fn(),
 }));
 
 jest.mock("@/entities/user", () => ({
