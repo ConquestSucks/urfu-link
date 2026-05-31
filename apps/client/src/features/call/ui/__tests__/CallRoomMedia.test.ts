@@ -217,6 +217,34 @@ describe("CallRoomMedia", () => {
         );
     });
 
+    it("uses a flexible desktop participant area while screen share is visible", () => {
+        const layout = getCallStageLayoutStyles(false, true);
+
+        expect(layout.main).toEqual(
+            expect.objectContaining({
+                alignSelf: "stretch",
+                flex: 2,
+                flexBasis: 0,
+                flexGrow: 2,
+                height: "100%",
+                minWidth: 0,
+            }),
+        );
+        expect(layout.main).not.toHaveProperty("width");
+        expect(layout.rail).toEqual(
+            expect.objectContaining({
+                alignSelf: "stretch",
+                flex: 1,
+                flexBasis: 0,
+                flexGrow: 1,
+                flexShrink: 1,
+                height: "100%",
+                minWidth: 280,
+            }),
+        );
+        expect(layout.rail).not.toHaveProperty("width");
+    });
+
     it("uses larger rail cards when screen share is present", () => {
         const desktopDefault = getParticipantRailCardStyle(false, false);
         const desktopScreenShare = getParticipantRailCardStyle(false, true);

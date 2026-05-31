@@ -79,9 +79,18 @@ type ParticipantMediaInfo = ParticipantInfo & {
 };
 
 const PARTICIPANT_GRID_GAP = 12;
+type ParticipantGridVariant = "stage" | "rail";
 
-const getParticipantGridColumns = (itemCount: number, isMobile: boolean) => {
+const getParticipantGridColumns = (
+    itemCount: number,
+    isMobile: boolean,
+    variant: ParticipantGridVariant = "stage",
+) => {
     if (isMobile || itemCount <= 1) return 1;
+    if (variant === "rail") {
+        if (itemCount <= 2) return 1;
+        return 2;
+    }
     if (itemCount <= 4) return 2;
     if (itemCount <= 6) return 3;
     return 4;
@@ -90,8 +99,9 @@ const getParticipantGridColumns = (itemCount: number, isMobile: boolean) => {
 const getParticipantGridItemStyle = (
     itemCount: number,
     isMobile: boolean,
+    variant: ParticipantGridVariant = "stage",
 ): React.CSSProperties => {
-    const columns = getParticipantGridColumns(itemCount, isMobile);
+    const columns = getParticipantGridColumns(itemCount, isMobile, variant);
     const rows = Math.max(1, Math.ceil(itemCount / columns));
     const widthOffset = ((columns - 1) * PARTICIPANT_GRID_GAP) / columns;
     const heightOffset = ((rows - 1) * PARTICIPANT_GRID_GAP) / rows;
@@ -569,8 +579,29 @@ const ParticipantRail = ({
 }) => {
     if (items.length === 0) return null;
 
-    const layoutStyles = getCallStageLayoutStyles(isMobile);
+    const layoutStyles = getCallStageLayoutStyles(isMobile, hasScreenShare);
     const cardStyle = getParticipantRailCardStyle(isMobile, hasScreenShare);
+
+    if (!isMobile) {
+        return (
+            <AnimatedView
+                testID="call-participant-rail"
+                layout={LinearTransition.duration(240)}
+                style={layoutStyles.rail}
+                className="min-w-0 min-h-0 self-stretch"
+            >
+                <ParticipantGrid
+                    items={items}
+                    participants={participants}
+                    isVideoCall={isVideoCall}
+                    isMobile={isMobile}
+                    localFacingMode={localFacingMode}
+                    onSelectItem={onSelectItem}
+                    variant="rail"
+                />
+            </AnimatedView>
+        );
+    }
 
     return (
         <ScrollView
@@ -622,6 +653,7 @@ const ParticipantGrid = ({
     isMobile,
     localFacingMode,
     onSelectItem,
+    variant = "stage",
 }: {
     items: RenderedStageItem[];
     participants: ParticipantMediaInfo[];
@@ -629,8 +661,10 @@ const ParticipantGrid = ({
     isMobile: boolean;
     localFacingMode: CameraFacingMode;
     onSelectItem: (itemId: string) => void;
+    variant?: ParticipantGridVariant;
 }) => {
-    const itemStyle = getParticipantGridItemStyle(items.length, isMobile);
+    const itemStyle = getParticipantGridItemStyle(items.length, isMobile, variant);
+    const isMainGrid = variant === "stage";
 
     return React.createElement(
         "div",
@@ -659,7 +693,7 @@ const ParticipantGrid = ({
                 <StageItemTile
                     item={item}
                     participants={participants}
-                    isMain
+                    isMain={isMainGrid}
                     isVideoCall={isVideoCall}
                     localFacingMode={localFacingMode}
                     onSelect={onSelectItem}
@@ -702,8 +736,8 @@ const CallStage = ({
     if (!mainItem) return <View className="flex-1 w-full self-stretch" />;
 
     const railItems = items.filter((item) => item.id !== mainItem.id);
-    const layoutStyles = getCallStageLayoutStyles(isMobile);
     const hasScreenShare = items.some((item) => item.kind === "screen");
+    const layoutStyles = getCallStageLayoutStyles(isMobile, hasScreenShare);
 
     return (
         <AnimatedView
@@ -721,7 +755,7 @@ const CallStage = ({
                         testID="call-stage-main"
                         layout={LinearTransition.duration(240)}
                         style={layoutStyles.main}
-                        className="flex-1 min-w-0 min-h-0 self-stretch"
+                        className="min-w-0 min-h-0 self-stretch"
                     >
                         <StageItemTile
                             item={mainItem}
