@@ -43,6 +43,7 @@ jest.mock("@/shared/ui/phosphor", () => {
     };
 
     return {
+        DownloadSimpleIcon: makeIcon("download-icon"),
         PauseIcon: makeIcon("pause-icon"),
         PlayIcon: makeIcon("play-icon"),
         WarningCircleIcon: makeIcon("warning-icon"),
@@ -62,7 +63,7 @@ describe("VoiceMessagePlayer", () => {
         });
     });
 
-    it("resolves media URL lazily and starts playback", async () => {
+    it("downloads a remote voice before showing playback controls", async () => {
         render(
             <VoiceMessagePlayer
                 mediaAssetId="asset-1"
@@ -70,6 +71,9 @@ describe("VoiceMessagePlayer", () => {
                 isOwn
             />,
         );
+
+        expect(screen.getByTestId("download-icon")).toBeTruthy();
+        expect(screen.queryByTestId("play-icon")).toBeNull();
 
         await act(async () => {
             fireEvent.press(screen.getByTestId("voice-message-play-button"));
@@ -80,8 +84,18 @@ describe("VoiceMessagePlayer", () => {
             expect(mockPlayer.replace).toHaveBeenCalledWith({
                 uri: "https://media.example/voice.m4a",
             });
-            expect(mockPlayer.play).toHaveBeenCalledTimes(1);
         });
+        expect(mockPlayer.play).not.toHaveBeenCalled();
+        expect(setAudioModeAsync).not.toHaveBeenCalled();
+        expect(screen.getByTestId("play-icon")).toBeTruthy();
+        expect(screen.queryByTestId("download-icon")).toBeNull();
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("voice-message-play-button"));
+        });
+
+        expect(apiClient.media.getAssetDownloadUrl).toHaveBeenCalledTimes(1);
+        expect(mockPlayer.play).toHaveBeenCalledTimes(1);
         expect(useAudioPlayer).toHaveBeenCalledWith(null);
         expect(useAudioPlayer).not.toHaveBeenCalledWith({
             uri: "https://media.example/voice.m4a",
@@ -89,6 +103,38 @@ describe("VoiceMessagePlayer", () => {
         expect(setAudioModeAsync).toHaveBeenCalledWith(
             expect.objectContaining({ allowsRecording: false, playsInSilentMode: true }),
         );
+    });
+
+    it("shows a spinner while a remote voice is downloading", async () => {
+        let resolveDownload!: (value: { downloadUrl: string }) => void;
+        (apiClient.media.getAssetDownloadUrl as jest.Mock).mockReturnValue(
+            new Promise((resolve) => {
+                resolveDownload = resolve;
+            }),
+        );
+
+        render(
+            <VoiceMessagePlayer
+                mediaAssetId="asset-1"
+                durationSeconds={17}
+            />,
+        );
+
+        await act(async () => {
+            fireEvent.press(screen.getByTestId("voice-message-play-button"));
+        });
+
+        expect(screen.getByTestId("activity-indicator")).toBeTruthy();
+        expect(screen.queryByTestId("download-icon")).toBeNull();
+        expect(mockPlayer.play).not.toHaveBeenCalled();
+
+        await act(async () => {
+            resolveDownload({ downloadUrl: "https://media.example/voice.m4a" });
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId("play-icon")).toBeTruthy();
+        });
     });
 
     it("pauses without resolving a new URL when already playing", async () => {
@@ -121,6 +167,9 @@ describe("VoiceMessagePlayer", () => {
             />,
         );
         mockPlayer.replace.mockClear();
+
+        expect(screen.getByTestId("play-icon")).toBeTruthy();
+        expect(screen.queryByTestId("download-icon")).toBeNull();
 
         await act(async () => {
             fireEvent.press(screen.getByTestId("voice-message-play-button"));
