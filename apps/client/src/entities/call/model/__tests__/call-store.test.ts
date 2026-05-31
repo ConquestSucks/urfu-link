@@ -75,6 +75,14 @@ describe("useCallStore", () => {
     beforeEach(() => {
         jest.clearAllMocks();
         jest.spyOn(Date, "now").mockReturnValue(Date.parse(now));
+        Object.defineProperty(globalThis, "localStorage", {
+            configurable: true,
+            value: {
+                getItem: jest.fn(() => null),
+                setItem: jest.fn(),
+                removeItem: jest.fn(),
+            },
+        });
         useCallStore.getState().clearCallCache();
     });
 
@@ -150,6 +158,24 @@ describe("useCallStore", () => {
         expect(useCallStore.getState().incomingCall).toBeNull();
     });
 
+    it("uses the active call from another tab instead of creating a delayed outgoing call", async () => {
+        const active = makeActiveCall({ id: "call-remote" });
+        (globalThis.localStorage.getItem as jest.Mock).mockReturnValue(JSON.stringify({
+            callId: "call-remote",
+            clientInstanceId: "client-2",
+            updatedAt: Date.now(),
+        }));
+        mockCalls.get.mockResolvedValue(active);
+
+        const result = await useCallStore.getState().startCall("conversation-1", "Audio");
+
+        expect(mockCalls.start).not.toHaveBeenCalled();
+        expect(mockCalls.get).toHaveBeenCalledWith("call-remote");
+        expect(result).toEqual(active);
+        expect(useCallStore.getState().activeCall).toEqual(active);
+        expect(useCallStore.getState().outgoingCall).toBeNull();
+    });
+
     it("accept event promotes a matching outgoing call to active", () => {
         const ringing = makeCall();
         const active = makeActiveCall();
@@ -200,6 +226,20 @@ describe("useCallStore", () => {
         expect(useCallStore.getState().activeCall).toEqual(active);
     });
 
+    it("joinCall accepts an active group call and stores it as active", async () => {
+        const active = makeActiveCall({
+            id: "group-call",
+            conversationId: "discipline:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        });
+        mockCalls.accept.mockResolvedValue(active);
+
+        await useCallStore.getState().joinCall("group-call");
+
+        expect(mockCalls.accept).toHaveBeenCalledWith("group-call");
+        expect(useCallStore.getState().incomingCall).toBeNull();
+        expect(useCallStore.getState().activeCall).toEqual(active);
+    });
+
     it("declineIncoming declines through the API and clears incoming call", async () => {
         const ringing = makeCall();
         mockCalls.decline.mockResolvedValue(makeEndedCall({ endReason: "DeclinedByCallee" }));
@@ -229,10 +269,12 @@ describe("useCallStore", () => {
     it("device replacement clears local token and blocks reconnect from old tab", async () => {
         mockCalls.token.mockResolvedValue(makeToken());
         await useCallStore.getState().loadToken("call-1");
+        useCallStore.getState().setActiveCall(makeActiveCall());
 
         useCallStore.getState().handleCallDeviceReplaced("call-1", "client-2");
 
         expect(useCallStore.getState().callTokens["call-1"]).toBeUndefined();
+        expect(useCallStore.getState().activeCall).toBeNull();
         expect(useCallStore.getState().tokenErrorByCallId["call-1"]).toBe(
             "Звонок открыт в другой вкладке или на другом устройстве.",
         );

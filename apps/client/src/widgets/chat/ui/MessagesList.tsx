@@ -45,6 +45,7 @@ interface MessagesListProps {
     onMessageContextMenu?: (message: MessageDto, anchor: MessageContextMenuAnchor) => void;
     onThreadOpen?: (rootMessageId: string) => void;
     onFilesDropped?: (files: File[]) => void;
+    onSystemCallJoin?: (callId: string) => void;
 }
 
 export interface MessagesListHandle {
@@ -160,6 +161,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
             onMessageContextMenu,
             onThreadOpen,
             onFilesDropped,
+            onSystemCallJoin,
         },
         ref,
     ) => {
@@ -504,6 +506,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                                                 : undefined
                                               )
                                     }
+                                    onJoinCall={isSystemMessage ? onSystemCallJoin : undefined}
                                     onThreadOpen={
                                         message.threadReplyCount && message.threadReplyCount > 0
                                             ? () => onThreadOpen?.(message.id)
@@ -523,6 +526,7 @@ export const MessagesList = forwardRef<MessagesListHandle, MessagesListProps>(
                 onMessageLongPress,
                 onMessageContextMenu,
                 onThreadOpen,
+                onSystemCallJoin,
                 addReaction,
                 removeReaction,
                 scrollToMessage,

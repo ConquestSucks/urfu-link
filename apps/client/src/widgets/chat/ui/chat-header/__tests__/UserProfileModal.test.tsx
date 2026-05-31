@@ -19,6 +19,7 @@ jest.mock("@/shared/ui/phosphor", () => {
     };
 
     return {
+        BellIcon: makeIcon("bell-on-icon"),
         BellSlashIcon: makeIcon("bell-icon"),
         EnvelopeIcon: makeIcon("mail-icon"),
         PhoneIcon: makeIcon("phone-icon"),
@@ -61,6 +62,7 @@ describe("UserProfileModal", () => {
     });
 
     it("calls profile action handlers", () => {
+        const onClose = jest.fn();
         const onStartAudioCall = jest.fn();
         const onStartVideoCall = jest.fn();
         const onToggleNotifications = jest.fn();
@@ -68,7 +70,7 @@ describe("UserProfileModal", () => {
         render(
             <UserProfileModal
                 isOpen
-                onClose={jest.fn()}
+                onClose={onClose}
                 user={{ name: "Peer" }}
                 onStartAudioCall={onStartAudioCall}
                 onStartVideoCall={onStartVideoCall}
@@ -83,5 +85,34 @@ describe("UserProfileModal", () => {
         expect(onStartAudioCall).toHaveBeenCalledTimes(1);
         expect(onStartVideoCall).toHaveBeenCalledTimes(1);
         expect(onToggleNotifications).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalledTimes(2);
+    });
+
+    it("renders the notification action from the shared muted state", () => {
+        const { rerender } = render(
+            <UserProfileModal
+                isOpen
+                onClose={jest.fn()}
+                user={{ name: "Peer" }}
+                onToggleNotifications={jest.fn()}
+                notificationsMuted={false}
+            />,
+        );
+
+        expect(screen.getByText("Отключить")).toBeTruthy();
+        expect(screen.getByTestId("bell-icon")).toBeTruthy();
+
+        rerender(
+            <UserProfileModal
+                isOpen
+                onClose={jest.fn()}
+                user={{ name: "Peer" }}
+                onToggleNotifications={jest.fn()}
+                notificationsMuted
+            />,
+        );
+
+        expect(screen.getByText("Включить")).toBeTruthy();
+        expect(screen.getByTestId("bell-on-icon")).toBeTruthy();
     });
 });

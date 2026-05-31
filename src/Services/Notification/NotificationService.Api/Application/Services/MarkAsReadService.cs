@@ -14,6 +14,7 @@ namespace Urfu.Link.Services.Notification.Application.Services;
 public sealed class MarkAsReadService(
     INotificationRepository repository,
     IBadgeStore badgeStore,
+    BadgeService badgeService,
     INotificationBroadcaster broadcaster,
     IOutboxEnqueue outboxEnqueue,
     TimeProvider timeProvider)
@@ -57,8 +58,8 @@ public sealed class MarkAsReadService(
         var total = unreadPerCategory.Values.Sum();
         await badgeStore.SetSnapshotAsync(userId, new BadgeSnapshot(total, unreadPerCategory), cancellationToken).ConfigureAwait(false);
 
-        var snapshot = await badgeStore.GetSnapshotAsync(userId, cancellationToken).ConfigureAwait(false);
-        await broadcaster.NotifyBadgeUpdatedAsync(userId, MapSnapshot(snapshot), cancellationToken).ConfigureAwait(false);
+        var snapshot = await badgeService.GetSnapshotAsync(userId, cancellationToken).ConfigureAwait(false);
+        await broadcaster.NotifyBadgeUpdatedAsync(userId, snapshot, cancellationToken).ConfigureAwait(false);
         return updated;
     }
 
@@ -186,8 +187,8 @@ public sealed class MarkAsReadService(
 
     private async Task BroadcastBadgeAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var snapshot = await badgeStore.GetSnapshotAsync(userId, cancellationToken).ConfigureAwait(false);
-        await broadcaster.NotifyBadgeUpdatedAsync(userId, MapSnapshot(snapshot), cancellationToken).ConfigureAwait(false);
+        var snapshot = await badgeService.GetSnapshotAsync(userId, cancellationToken).ConfigureAwait(false);
+        await broadcaster.NotifyBadgeUpdatedAsync(userId, snapshot, cancellationToken).ConfigureAwait(false);
     }
 
     private static NotificationStateChangedDto MapChange(NotificationAggregate notification)
@@ -199,9 +200,4 @@ public sealed class MarkAsReadService(
             notification.DoneAtUtc,
             notification.ArchivedAtUtc);
 
-    private static BadgeSnapshotDto MapSnapshot(BadgeSnapshot snapshot)
-    {
-        var perCategory = snapshot.PerCategory.ToDictionary(kv => (int)kv.Key, kv => kv.Value);
-        return new BadgeSnapshotDto(snapshot.Total, perCategory);
-    }
 }

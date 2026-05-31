@@ -18,6 +18,9 @@ const connectHub = async (connection: ReturnType<typeof createHubConnection>) =>
     }
 };
 
+const isActiveDisciplineGroupCall = (call: CallSessionDto) =>
+    call.status === "Active" && call.conversationId.startsWith("discipline:");
+
 export const useCallHub = () => {
     const handleIncomingCall = useCallStore((s) => s.handleIncomingCall);
     const handleCallAccepted = useCallStore((s) => s.handleCallAccepted);
@@ -32,6 +35,10 @@ export const useCallHub = () => {
         const connection = createHubConnection("/hubs/calls");
 
         connection.on("IncomingCall", (call: CallSessionDto) => {
+            if (isActiveDisciplineGroupCall(call)) {
+                return;
+            }
+
             handleIncomingCall(call);
             void playMessageSound("receive", {
                 conversationId: call.conversationId,

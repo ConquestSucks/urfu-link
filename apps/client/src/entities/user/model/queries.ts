@@ -11,7 +11,7 @@ export const userKeys = {
 export function useCurrentUser() {
   return useQuery<UserProfile>({
     queryKey: userKeys.me,
-    queryFn: () => resolveCurrentUser(),
+    queryFn: () => resolveCurrentUser({ forceRefresh: true }),
   });
 }
 

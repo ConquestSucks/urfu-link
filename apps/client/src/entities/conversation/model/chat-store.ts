@@ -355,6 +355,11 @@ const withoutUnread = (unread: Record<string, number>, conversationId: string) =
     return next;
 };
 
+export const getConversationUnreadCount = (
+    conversation: Pick<ConversationPreview, "id" | "unreadCount">,
+    unreadByConversation: Record<string, number>,
+) => Math.max(conversation.unreadCount ?? 0, unreadByConversation[conversation.id] ?? 0);
+
 const incrementUnread = (
     unread: Record<string, number>,
     conversationId: string,
@@ -682,6 +687,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             const res = await apiClient.chat.getConversations(type, undefined, 50);
             set((state) => {
                 const unreadByConversation = { ...state.unreadByConversation };
+                const incoming = res.items.map(normalizeConversationDraftStatus);
                 for (const conversation of res.items) {
                     if (typeof conversation.unreadCount !== "number") continue;
                     if (conversation.unreadCount > 0) {
@@ -691,8 +697,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
                     }
                 }
 
+                const conversations = (() => {
+                    if (!type) {
+                        return incoming;
+                    }
+
+                    const isLoadedType = (conversation: ConversationPreview) =>
+                        type === "Direct"
+                            ? conversation.type === "Direct"
+                            : conversation.groupSubtype === "Discipline";
+                    const incomingIds = new Set(incoming.map((conversation) => conversation.id));
+                    return [
+                        ...state.conversations.filter(
+                            (conversation) =>
+                                !isLoadedType(conversation) && !incomingIds.has(conversation.id),
+                        ),
+                        ...incoming,
+                    ].sort(compareConversationActivity);
+                })();
+
                 return {
-                    conversations: res.items.map(normalizeConversationDraftStatus),
+                    conversations,
                     unreadByConversation,
                     isConversationsLoading: false,
                 };
@@ -933,13 +958,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     },
 
     forwardMessages: async (targetConversationId, messageIds) => {
-        const { connection } = get();
-        if (connection?.state === HubConnectionState.Connected) {
-            await connection.invoke("ForwardMessages", targetConversationId, messageIds);
-        } else {
-            const forwarded = await apiClient.chat.forwardMessages(targetConversationId, messageIds);
-            forwarded.map(normalizeMessage).forEach((message) => get().addMessage(message));
-        }
+        const forwarded = await apiClient.chat.forwardMessages(targetConversationId, messageIds);
+        forwarded.map(normalizeMessage).forEach((message) => get().addMessage(message));
     },
 
     addReaction: async (messageId, emoji) => {
@@ -1062,9 +1082,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
                 !normalized.id.startsWith("optimistic:");
             const serverUnreadCount = state.conversations.find((c) => c.id === conversationId)
                 ?.unreadCount;
-            const unreadBaseline = typeof serverUnreadCount === "number"
-                ? serverUnreadCount
-                : 0;
+            const unreadBaseline = getConversationUnreadCount(
+                { id: conversationId, unreadCount: serverUnreadCount },
+                state.unreadByConversation,
+            );
 
             return {
                 messagesByConversation: {

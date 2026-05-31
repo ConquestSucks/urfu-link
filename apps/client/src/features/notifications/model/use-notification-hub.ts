@@ -15,9 +15,28 @@ export function useNotificationHub() {
 
     useEffect(() => {
         const connection = createHubConnection("/hubs/notifications");
+        let retryTimer: ReturnType<typeof setTimeout> | null = null;
+        let retryAttempt = 0;
+        let disposed = false;
 
         const invalidateNotifications = () => {
             queryClient.invalidateQueries({ queryKey: notificationKeys.all });
+        };
+
+        const clearRetry = () => {
+            if (!retryTimer) return;
+            clearTimeout(retryTimer);
+            retryTimer = null;
+        };
+
+        const scheduleRetry = () => {
+            if (disposed || retryTimer) return;
+            const delay = Math.min(1_000 * 2 ** retryAttempt, 10_000);
+            retryAttempt += 1;
+            retryTimer = setTimeout(() => {
+                retryTimer = null;
+                void connect();
+            }, delay);
         };
 
         connection.on("BadgeUpdated", (badge: NotificationBadgeDto) => {
@@ -48,6 +67,8 @@ export function useNotificationHub() {
         });
 
         connection.onreconnected(() => {
+            retryAttempt = 0;
+            clearRetry();
             setConnected(true);
             invalidateNotifications();
         });
@@ -61,16 +82,23 @@ export function useNotificationHub() {
         });
 
         const connect = async () => {
-            if (connection.state === HubConnectionState.Connected) {
+            if (
+                disposed ||
+                connection.state === HubConnectionState.Connected ||
+                connection.state === HubConnectionState.Connecting
+            ) {
                 return;
             }
 
             try {
+                clearRetry();
                 await connection.start();
+                retryAttempt = 0;
                 setConnected(true);
             } catch (error) {
                 console.warn("NotificationHub connection failed", error);
                 setConnected(false);
+                scheduleRetry();
             }
         };
 
@@ -83,6 +111,8 @@ export function useNotificationHub() {
         });
 
         return () => {
+            disposed = true;
+            clearRetry();
             subscription.remove();
             void connection.stop();
             setConnected(false);

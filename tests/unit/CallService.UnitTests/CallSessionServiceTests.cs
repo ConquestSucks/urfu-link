@@ -110,7 +110,7 @@ public sealed class CallSessionServiceTests
     }
 
     [Fact]
-    public async Task StartAsync_creates_active_group_call_for_teacher_and_invites_students()
+    public async Task StartAsync_creates_active_group_call_for_teacher_without_incoming_broadcast()
     {
         _chat.Set(GroupConversationId, DisciplineGroupConversation(CallerId, CalleeId, OtherUserId));
 
@@ -121,8 +121,9 @@ public sealed class CallSessionServiceTests
         call.CallType.Should().Be(CallType.Video);
         call.ParticipantIds.Should().BeEquivalentTo([CallerId, CalleeId, OtherUserId]);
         call.Participants.Where(p => p.IsConnected).Select(p => p.UserId).Should().Equal(CallerId);
-        _broadcaster.Incoming.Should().ContainSingle()
-            .Which.Recipients.Should().BeEquivalentTo([CalleeId, OtherUserId]);
+        _outbox.Events.OfType<CallIncomingV2Event>().Should().ContainSingle()
+            .Which.CallId.Should().Be(call.Id);
+        _broadcaster.Incoming.Should().BeEmpty();
     }
 
     [Fact]

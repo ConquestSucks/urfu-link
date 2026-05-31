@@ -14,6 +14,7 @@ import {
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { useCurrentUser } from "@/entities/user";
 import { playCallSound } from "@/shared/lib/call-sounds";
+import { sendCallLeaveBeacon } from "@/shared/lib/call-leave-beacon";
 import { CallRoom } from "./CallRoom";
 import type { ParticipantInfo } from "./CallRoom.types";
 
@@ -49,6 +50,7 @@ export const CallScreen = () => {
     const setActiveCall = useCallStore((state) => state.setActiveCall);
     const clearToken = useCallStore((state) => state.clearToken);
     const loadToken = useCallStore((state) => state.loadToken);
+    const joinCall = useCallStore((state) => state.joinCall);
     const leaveCall = useCallStore((state) => state.leaveCall);
     const cancelCall = useCallStore((state) => state.cancelCall);
     const incomingCall = useCallStore((state) => state.incomingCall);
@@ -80,7 +82,12 @@ export const CallScreen = () => {
     );
     const tokenError = useCallStore((state) => (callId ? state.tokenErrorByCallId[callId] : null));
 
-    const isConnectedToCall = call?.status === "Active";
+    const isCurrentUserConnected =
+        !!currentUserId &&
+        call?.participants.some(
+            (participant) => participant.userId === currentUserId && participant.isConnected,
+        ) === true;
+    const isConnectedToCall = call?.status === "Active" && isCurrentUserConnected;
 
     const callTitle = useMemo(() => {
         if (conversation?.title) return conversation.title;
@@ -136,7 +143,11 @@ export const CallScreen = () => {
                 : "Подключение к звонку";
         }
 
-        if (isConnectedToCall) {
+        if (call.status === "Active") {
+            if (!isConnectedToCall) {
+                return "Подключение к звонку";
+            }
+
             return `${call.callType === "Video" ? "Видеозвонок" : "Звонок"} • ${formatDuration(
                 timerSeconds,
             )}`;
@@ -226,6 +237,31 @@ export const CallScreen = () => {
 
     useEffect(() => {
         if (!call || call.status !== "Active") return;
+        if (!currentUserId || isCurrentUserConnected) return;
+
+        let cancelled = false;
+        void joinCall(call.id)
+            .then((joined) => {
+                if (cancelled) return;
+                setActiveCall(joined);
+                setCallFromApi(joined);
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                setLoadError(
+                    error instanceof Error
+                        ? error.message
+                        : "Не удалось подключиться к звонку",
+                );
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [call, currentUserId, isCurrentUserConnected, joinCall, setActiveCall]);
+
+    useEffect(() => {
+        if (!call || call.status !== "Active" || !isCurrentUserConnected) return;
 
         void (async () => {
             if (!callToken && !isTokenLoading) {
@@ -234,7 +270,25 @@ export const CallScreen = () => {
                 });
             }
         })();
-    }, [call, callToken, isTokenLoading, loadToken]);
+    }, [call, callToken, isCurrentUserConnected, isTokenLoading, loadToken]);
+
+    useEffect(() => {
+        if (typeof window === "undefined" || !call?.id || call.status === "Ended") {
+            return;
+        }
+
+        const handleUnload = () => {
+            sendCallLeaveBeacon(call.id);
+            clearToken(call.id);
+        };
+
+        window.addEventListener("pagehide", handleUnload);
+        window.addEventListener("beforeunload", handleUnload);
+        return () => {
+            window.removeEventListener("pagehide", handleUnload);
+            window.removeEventListener("beforeunload", handleUnload);
+        };
+    }, [call?.id, call?.status, clearToken]);
 
     useEffect(() => {
         if (!callConversationId || call?.status !== "Ended") {

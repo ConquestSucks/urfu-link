@@ -8,6 +8,8 @@ import { apiClient } from "@/shared/lib/api";
 import { getCallClientInstanceId } from "./call-client-instance";
 
 const tokenRefreshMarginMs = 15_000;
+const activeCallStorageKey = "urfu-link:active-call-tab";
+const activeCallTtlMs = 8_000;
 
 type TokenByCallId = Record<string, CallTokenDto>;
 type LoadingByCallId = Record<string, boolean>;
@@ -42,6 +44,34 @@ const isTokenFresh = (token?: CallTokenDto | null): boolean => {
     return Number.isFinite(expiration) && expiration - Date.now() > tokenRefreshMarginMs;
 };
 
+const readRemoteActiveCallId = (): string | null => {
+    if (typeof globalThis.localStorage === "undefined") {
+        return null;
+    }
+
+    try {
+        const raw = globalThis.localStorage.getItem(activeCallStorageKey);
+        if (!raw) return null;
+
+        const parsed = JSON.parse(raw) as Partial<{
+            callId: string;
+            clientInstanceId: string;
+            updatedAt: number;
+        }>;
+        if (!parsed.callId || !parsed.clientInstanceId || typeof parsed.updatedAt !== "number") {
+            return null;
+        }
+
+        if (parsed.clientInstanceId === getCallClientInstanceId()) {
+            return null;
+        }
+
+        return Date.now() - parsed.updatedAt <= activeCallTtlMs ? parsed.callId : null;
+    } catch {
+        return null;
+    }
+};
+
 export type CallStoreState = {
     incomingCall: CallSessionDto | null;
     outgoingCall: CallSessionDto | null;
@@ -69,6 +99,7 @@ export type CallStoreState = {
 
     startCall: (conversationId: string, callType: CallType) => Promise<CallSessionDto>;
     acceptIncoming: () => Promise<void>;
+    joinCall: (callId: string) => Promise<CallSessionDto>;
     declineIncoming: () => Promise<void>;
     cancelCall: (callId: string) => Promise<void>;
     leaveCall: (callId: string) => Promise<void>;
@@ -195,6 +226,9 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
 
             return {
                 callTokens: nextTokens,
+                incomingCall: state.incomingCall?.id === callId ? null : state.incomingCall,
+                outgoingCall: state.outgoingCall?.id === callId ? null : state.outgoingCall,
+                activeCall: state.activeCall?.id === callId ? null : state.activeCall,
                 replacedByClientInstanceId: {
                     ...state.replacedByClientInstanceId,
                     [callId]: clientInstanceId,
@@ -208,6 +242,17 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
     },
 
     startCall: async (conversationId, callType) => {
+        const remoteCallId = readRemoteActiveCallId();
+        if (remoteCallId) {
+            const call = await apiClient.calls.get(remoteCallId);
+            set({
+                incomingCall: null,
+                outgoingCall: null,
+                activeCall: call.status === "Active" ? call : null,
+            });
+            return call;
+        }
+
         const call = await apiClient.calls.start(conversationId, callType);
         set({
             incomingCall: null,
@@ -226,6 +271,16 @@ export const useCallStore = create<CallStoreState>((set, get) => ({
             incomingCall: null,
             activeCall: call,
         });
+    },
+
+    joinCall: async (callId) => {
+        const call = await apiClient.calls.accept(callId);
+        set({
+            incomingCall: null,
+            outgoingCall: null,
+            activeCall: call,
+        });
+        return call;
     },
 
     declineIncoming: async () => {

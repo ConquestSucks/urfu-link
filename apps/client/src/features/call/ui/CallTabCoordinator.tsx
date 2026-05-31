@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { useCallStore } from "@/entities/call";
 import { getCallClientInstanceId } from "@/entities/call/model/call-client-instance";
 
@@ -84,6 +85,7 @@ const createChannel = () => {
 };
 
 export const CallTabCoordinator = () => {
+    const router = useRouter();
     const activeCall = useCallStore((state) => state.activeCall);
     const clientInstanceId = useMemo(() => getCallClientInstanceId(), []);
     const [remoteCall, setRemoteCall] = useState<ActiveCallRecord | null>(null);
@@ -191,6 +193,10 @@ export const CallTabCoordinator = () => {
         channel?.close();
     };
 
+    const handleTakeover = () => {
+        router.push(`/call/${remoteCall.callId}` as never);
+    };
+
     return (
         <View
             testID="call-tab-coordinator"
@@ -201,7 +207,7 @@ export const CallTabCoordinator = () => {
                 Звонок идет в другой вкладке
             </Text>
             <Text className="mt-1 text-xs text-amber-900">
-                Можно переключиться на активную вкладку. Если браузер не даст ее сфокусировать, откройте ее вручную.
+                Можно перейти на активную вкладку или перехватить звонок здесь.
             </Text>
             {focusHint && (
                 <Text className="mt-2 text-xs text-amber-900">
@@ -209,6 +215,14 @@ export const CallTabCoordinator = () => {
                 </Text>
             )}
             <View className="mt-3 flex-row gap-2">
+                <Pressable
+                    accessibilityRole="button"
+                    className="rounded-md bg-brand-600 px-3 py-2"
+                    onPress={handleTakeover}
+                    testID="call-tab-takeover"
+                >
+                    <Text className="text-xs font-semibold text-white">Перехватить</Text>
+                </Pressable>
                 <Pressable
                     accessibilityRole="button"
                     className="rounded-md bg-amber-900 px-3 py-2"

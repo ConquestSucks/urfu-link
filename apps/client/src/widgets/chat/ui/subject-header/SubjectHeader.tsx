@@ -24,7 +24,7 @@ import { apiClient } from "@/shared/lib/api";
 import type { CallType, ConversationParticipantDto } from "@urfu-link/api-client";
 
 const roleLabel = (role: ConversationParticipantDto["role"]) =>
-    role === "Teacher" ? "ÐŸÑ€ÐµÐ¿Ð¾Ð´Ð°Ð²Ð°Ñ‚ÐµÐ»ÑŒ" : role === "Student" ? "Ð¡Ñ‚ÑƒÐ´ÐµÐ½Ñ‚" : "Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº";
+    role === "Teacher" ? "Преподаватель" : role === "Student" ? "Студент" : "Участник";
 
 export const SubjectHeader = ({
     subjectId,
@@ -93,8 +93,8 @@ export const SubjectHeader = ({
     if (!conversation) return null;
 
     const subjectName = conversation.disciplineChatKind === "Subgroup"
-        ? `${conversation.disciplineTitle ?? "Ð”Ð¸ÑÑ†Ð¸Ð¿Ð»Ð¸Ð½Ð°"} Â· ${conversation.disciplineSubgroupName ?? conversation.title ?? "ÐŸÐ¾Ð´Ð³Ñ€ÑƒÐ¿Ð¿Ð°"}`
-        : `${conversation.disciplineTitle ?? conversation.title ?? "Ð”Ð¸ÑÑ†Ð¸Ð¿Ð»Ð¸Ð½Ð°"} Â· ÐžÐ±Ñ‰Ð¸Ð¹ Ñ‡Ð°Ñ‚`;
+        ? `${conversation.disciplineTitle ?? "Дисциплина"} · ${conversation.disciplineSubgroupName ?? conversation.title ?? "Подгруппа"}`
+        : `${conversation.disciplineTitle ?? conversation.title ?? "Дисциплина"} · Общий чат`;
     const subjectAvatarUrl = "";
     const onlineCount = participants.filter((participant) =>
         presenceByUser[participant.userId]?.status === "Online"
@@ -102,7 +102,7 @@ export const SubjectHeader = ({
     const totalCount = participants.length;
     const membersData: SubjectMember[] = participants.map((participant) => ({
         id: participant.userId,
-        name: participant.displayName || "Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº",
+        name: participant.displayName || "Участник",
         avatarUrl: participant.avatarUrl,
         role: roleLabel(participant.role),
         isOnline: presenceByUser[participant.userId]?.status === "Online",
@@ -170,7 +170,7 @@ export const SubjectHeader = ({
                                 numberOfLines={1}
                                 className={`leading-none text-xs font-medium ${onlineCount > 0 ? "text-success-600" : "text-text-muted"}`}
                             >
-                                Ð’ ÑÐµÑ‚Ð¸ {onlineCount} Ð¸Ð· {totalCount}
+                                В сети {onlineCount} из {totalCount}
                             </Text>
                         </View>
                     </View>
@@ -200,7 +200,7 @@ export const SubjectHeader = ({
                 isOpen={!!selectedParticipant}
                 onClose={() => setProfileUserId(null)}
                 user={{
-                    name: selectedParticipant?.displayName || "Ð£Ñ‡Ð°ÑÑ‚Ð½Ð¸Ðº",
+                    name: selectedParticipant?.displayName || "Участник",
                     avatarUrl: selectedParticipant?.avatarUrl,
                     status: selectedPresence?.status,
                     lastSeenAt: selectedPresence?.lastSeenAt,
@@ -216,6 +216,7 @@ export const SubjectHeader = ({
                         : undefined
                 }
                 onToggleNotifications={handleToggleNotifications}
+                notificationsMuted={notificationsMuted}
                 notificationsPending={notificationsPending}
             />
         </>
