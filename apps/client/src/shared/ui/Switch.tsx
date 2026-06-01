@@ -46,7 +46,7 @@ export const Switch = ({ value, onValueChange, disabled }: SwitchProps) => {
           borderRadius: 10,
           backgroundColor: "white",
           transform: [{ translateX: localValue ? 24 : 0 }],
-          boxShadow: localValue ? "0 0 10px rgba(255, 255, 255, 0.48)" : undefined,
+          boxShadow: localValue ? "0 0 0 1px rgba(255, 255, 255, 0.22)" : undefined,
           // @ts-ignore
           transition: "transform 200ms ease",
         }}

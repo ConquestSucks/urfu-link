@@ -46,12 +46,14 @@ export const ViewToggle = ({
                 const isActive = currentView === id;
 
                 const buttonClasses = isMobile
-                    ? "p-2.5"
+                    ? `p-2.5 rounded-full ${isActive ? "bg-brand-650/12" : "active:bg-white/5"}`
                     : `p-2 rounded-xl transition-colors duration-300 ${isActive ? "bg-brand-650" : "hover:bg-white/5"}`;
                 const iconSize = isMobile ? 24 : 18;
                 const iconWeight = isMobile && isActive ? "fill" : "regular";
                 const iconColor = isActive
-                    ? "text-white"
+                    ? isMobile
+                      ? "text-brand-500"
+                      : "text-white"
                     : isMobile
                       ? "text-text-subtle"
                       : "text-text-placeholder";
@@ -64,7 +66,8 @@ export const ViewToggle = ({
                             accessibilityLabel={label}
                             accessibilityState={{ selected: isActive }}
                             className={buttonClasses}
-                            style={isActive ? glow.brandSoft : undefined}
+                            testID={`view-toggle-${id}`}
+                            style={!isMobile && isActive ? glow.brandSoft : undefined}
                         >
                             <View className="relative">
                                 <Icon size={iconSize} weight={iconWeight} className={iconColor} />
