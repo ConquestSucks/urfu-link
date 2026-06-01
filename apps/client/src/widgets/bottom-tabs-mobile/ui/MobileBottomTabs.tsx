@@ -1,22 +1,15 @@
 import { AnimatedView } from "@/shared/lib/nativewind-interop";
-import { router, usePathname, useSegments } from "expo-router";
+import { router, useLocalSearchParams, usePathname, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
+import { isInboxDetailRoute } from "@/shared/lib/inbox-detail-route";
 import { MOBILE_TABS } from "../config/tabs";
 import { MobileBottomTabItem } from "./MobileBottomTabItem";
 import { glow } from "@/shared/ui/glow";
 
 const TIMING_MS = 320;
-
-function isChatDetailPath(pathname: string, segments: string[]) {
-    return (
-        ((segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]")) ||
-        /\/chats\/[^/]+/.test(pathname) ||
-        /\/subjects\/[^/]+/.test(pathname)
-    );
-}
 
 function TabItems({ pathname }: { pathname: string }) {
     return (
@@ -48,7 +41,8 @@ function TabItems({ pathname }: { pathname: string }) {
 export const MobileBottomTabs = () => {
     const pathname = usePathname();
     const segments = useSegments() as string[];
-    const hideTabs = isChatDetailPath(pathname, segments);
+    const params = useLocalSearchParams<{ id?: string }>();
+    const hideTabs = isInboxDetailRoute({ pathname, segments, id: params.id });
     const visible = useSharedValue(hideTabs ? 0 : 1);
 
     useEffect(() => {

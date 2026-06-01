@@ -7,6 +7,7 @@ import { InboxSubjectGroup } from "@/entities/inbox-subject";
 import type { InboxSubjectProps } from "@/entities/inbox-subject";
 import { InboxNotification, InboxNotificationProps } from "@/entities/inbox-notification";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
+import { isInboxDetailRoute } from "@/shared/lib/inbox-detail-route";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { MasterDetailLayout } from "@/shared/ui";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
@@ -15,9 +16,6 @@ import { resolveNotificationDeepLink } from "@/shared/lib/notificationDeepLink";
 import { useInboxConversations } from "../model/use-inbox-conversations";
 import { Inbox } from "./Inbox";
 import { InboxMobile } from "./InboxMobile";
-
-const isInboxDetailPath = (pathname: string, tab: "chats" | "subjects") =>
-    new RegExp(`^/${tab}/[^/?#]+`).test(pathname);
 
 const toInboxDetailPath = (tab: "chats" | "subjects", id: string) =>
     ({
@@ -74,7 +72,12 @@ export const InboxLayout = () => {
     const markNotificationRead = useInboxStore((s) => s.markNotificationRead);
     const markAllNotificationsRead = useInboxStore((s) => s.markAllNotificationsRead);
 
-    const isDetailView = segments.includes("[id]") || isInboxDetailPath(pathname, currentTab);
+    const isDetailView = isInboxDetailRoute({
+        pathname,
+        segments,
+        id: params.id,
+        tab: currentTab,
+    });
     const activeDetailId =
         isDetailView && typeof params.id === "string" ? params.id : undefined;
 

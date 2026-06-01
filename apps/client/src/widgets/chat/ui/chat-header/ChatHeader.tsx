@@ -143,7 +143,7 @@ export const ChatHeader = ({
                             canOpenPeerProfile ? "active:opacity-80 cursor-pointer" : "cursor-default"
                         }`}
                     >
-                        <View className="relative z-1 p-0.5" style={indicatorStatus === "online" ? glow.success : undefined}>
+                        <View className="relative z-1">
                             {isDirectIdentityLoading ? (
                                 <Skeleton
                                     testID="chat-header-avatar-skeleton"
