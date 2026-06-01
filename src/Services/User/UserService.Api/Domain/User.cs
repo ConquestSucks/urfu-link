@@ -105,9 +105,17 @@ public sealed class UserProfile
         _domainEvents.Add(BuildSettingsChangedEvent());
     }
 
-    public void UpdateSoundVideo(string? playbackDeviceId, string? recordingDeviceId, string? webcamDeviceId)
+    public void UpdateSoundVideo(
+        string? playbackDeviceId,
+        string? recordingDeviceId,
+        string? webcamDeviceId,
+        string? webcamFacingMode)
     {
-        SoundVideo = new SoundVideoSettings(playbackDeviceId, recordingDeviceId, webcamDeviceId);
+        SoundVideo = new SoundVideoSettings(
+            playbackDeviceId,
+            recordingDeviceId,
+            webcamDeviceId,
+            webcamFacingMode);
         Touch();
     }
 

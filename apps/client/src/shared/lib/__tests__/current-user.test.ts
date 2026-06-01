@@ -33,6 +33,7 @@ describe("current-user bootstrap", () => {
                 playbackDeviceId: null,
                 recordingDeviceId: null,
                 webcamDeviceId: null,
+                webcamFacingMode: null,
             },
         }));
 

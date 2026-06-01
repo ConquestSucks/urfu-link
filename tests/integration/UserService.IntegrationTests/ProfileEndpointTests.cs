@@ -182,6 +182,7 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
                 PlaybackDeviceId = "speaker-1",
                 RecordingDeviceId = "mic-1",
                 WebcamDeviceId = "cam-1",
+                WebcamFacingMode = "environment",
             });
 
         Assert.Equal(HttpStatusCode.NoContent, updateResponse.StatusCode);
@@ -191,6 +192,7 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
         Assert.Equal("speaker-1", profile?.SoundVideo.PlaybackDeviceId);
         Assert.Equal("mic-1", profile?.SoundVideo.RecordingDeviceId);
         Assert.Equal("cam-1", profile?.SoundVideo.WebcamDeviceId);
+        Assert.Equal("environment", profile?.SoundVideo.WebcamFacingMode);
     }
 
     [Fact]
@@ -202,7 +204,7 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
 
         await client.PatchAsJsonAsync(
             new Uri("/api/v1/me/sound-video", UriKind.Relative),
-            new { PlaybackDeviceId = "speaker-1", RecordingDeviceId = "mic-1", WebcamDeviceId = "cam-1" });
+            new { PlaybackDeviceId = "speaker-1", RecordingDeviceId = "mic-1", WebcamDeviceId = "cam-1", WebcamFacingMode = "user" });
 
         var partialResponse = await client.PatchAsJsonAsync(
             new Uri("/api/v1/me/sound-video", UriKind.Relative),
@@ -215,5 +217,6 @@ public sealed class ProfileEndpointTests(UserServiceFactory factory)
         Assert.Equal("speaker-1", profile?.SoundVideo.PlaybackDeviceId);
         Assert.Equal("mic-2", profile?.SoundVideo.RecordingDeviceId);
         Assert.Equal("cam-1", profile?.SoundVideo.WebcamDeviceId);
+        Assert.Equal("user", profile?.SoundVideo.WebcamFacingMode);
     }
 }

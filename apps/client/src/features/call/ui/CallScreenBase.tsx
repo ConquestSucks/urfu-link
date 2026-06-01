@@ -16,6 +16,7 @@ import { useCurrentUser } from "@/entities/user";
 import { playCallSound } from "@/shared/lib/call-sounds";
 import { sendCallLeaveBeacon } from "@/shared/lib/call-leave-beacon";
 import { subscribePageLifecycle } from "@/shared/lib/page-lifecycle";
+import { ensureCallMediaAccess } from "@/features/call/lib/call-media-preflight";
 import { CallRoom } from "./CallRoom";
 import type { ParticipantInfo } from "./CallRoom.types";
 
@@ -241,44 +242,70 @@ export const CallScreen = () => {
         if (!currentUserId || isCurrentUserConnected) return;
 
         let cancelled = false;
-        void joinCall(call.id)
-            .then((joined) => {
-                if (cancelled) return;
-                setActiveCall(joined);
-                setCallFromApi(joined);
-            })
-            .catch((error) => {
-                if (cancelled) return;
-                setLoadError(
-                    error instanceof Error
-                        ? error.message
-                        : "Не удалось подключиться к звонку",
-                );
+        void (async () => {
+            const media = await ensureCallMediaAccess({
+                callType: call.callType,
+                soundVideo: currentUser?.soundVideo,
             });
+            if (!media.ok) {
+                if (!cancelled) {
+                    setLoadError(media.errorMessage);
+                }
+                return;
+            }
+
+            await joinCall(call.id)
+                .then((joined) => {
+                    if (cancelled) return;
+                    setActiveCall(joined);
+                    setCallFromApi(joined);
+                })
+                .catch((error) => {
+                    if (cancelled) return;
+                    setLoadError(
+                        error instanceof Error
+                            ? error.message
+                            : "Не удалось подключиться к звонку",
+                    );
+                });
+        })();
 
         return () => {
             cancelled = true;
         };
-    }, [call, currentUserId, isCurrentUserConnected, joinCall, setActiveCall]);
+    }, [call, currentUser?.soundVideo, currentUserId, isCurrentUserConnected, joinCall, setActiveCall]);
 
     useEffect(() => {
         if (!call || call.status !== "Active" || !isCurrentUserConnected) return;
 
         void (async () => {
             if (!callToken && !isTokenLoading) {
+                const media = await ensureCallMediaAccess({
+                    callType: call.callType,
+                    soundVideo: currentUser?.soundVideo,
+                });
+                if (!media.ok) {
+                    setLoadError(media.errorMessage);
+                    return;
+                }
+
                 await loadToken(call.id).catch(() => {
                     // Token error is stored and rendered by CallRoom.
                 });
             }
         })();
-    }, [call, callToken, isCurrentUserConnected, isTokenLoading, loadToken]);
+    }, [call, callToken, currentUser?.soundVideo, isCurrentUserConnected, isTokenLoading, loadToken]);
 
     useEffect(() => {
         if (!call?.id || call.status === "Ended") {
             return;
         }
 
-        const handlePageHide = () => {
+        const handlePageHide = (event?: PageTransitionEvent) => {
+            if (event?.persisted) {
+                return;
+            }
+
             sendCallLeaveBeacon(call.id);
             clearToken(call.id);
         };

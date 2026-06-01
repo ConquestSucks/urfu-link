@@ -22,6 +22,7 @@ import { UserProfileModal } from "../chat-header/UserProfileModal";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { usePresenceStore } from "@/entities/presence";
 import { useCallStore } from "@/entities/call";
+import { ensureCallMediaAccess } from "@/features/call/lib/call-media-preflight";
 import { apiClient } from "@/shared/lib/api";
 import type { CallType, ConversationParticipantDto } from "@urfu-link/api-client";
 import { glow } from "@/shared/ui/glow";
@@ -52,6 +53,7 @@ export const SubjectHeader = ({
 }: SubjectHeaderProps) => {
     const [isMembersOpen, setIsMembersOpen] = useState(false);
     const [internalProfileUserId, setInternalProfileUserId] = useState<string | null>(null);
+    const [callStartError, setCallStartError] = useState<string | null>(null);
     const isProfileControlled = controlledProfileUserId !== undefined;
     const profileUserId = isProfileControlled ? controlledProfileUserId : internalProfileUserId;
     const setProfileUserId = useCallback(
@@ -156,13 +158,23 @@ export const SubjectHeader = ({
     }, [currentUserId, onBeforeStartCall, primeParticipants, profile, selectedParticipant, setProfileUserId, updateConversation]);
 
     const handleStartDirectCallFromProfile = useCallback(async (callType: CallType) => {
+        setCallStartError(null);
+        const media = await ensureCallMediaAccess({
+            callType,
+            soundVideo: profile?.soundVideo,
+        });
+        if (!media.ok) {
+            setCallStartError(media.errorMessage);
+            return;
+        }
+
         const conversationId = await openDirectConversationFromProfile();
         if (!conversationId) {
             return;
         }
 
         await startCall(conversationId, callType);
-    }, [openDirectConversationFromProfile, startCall]);
+    }, [openDirectConversationFromProfile, profile?.soundVideo, startCall]);
 
     const handleOpenDirectChatFromProfile = useCallback(async () => {
         setIsMembersOpen(false);
@@ -248,6 +260,12 @@ export const SubjectHeader = ({
                     onToggleNotifications={handleToggleNotifications}
                 />
             </View>
+
+            {callStartError ? (
+                <View className="border-b border-red-500/20 bg-red-500/10 px-3 py-2">
+                    <Text className="text-sm text-red-100">{callStartError}</Text>
+                </View>
+            ) : null}
 
             <SubjectMembersModal
                 isOpen={isMembersOpen}

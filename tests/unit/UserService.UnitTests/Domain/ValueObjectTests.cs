@@ -89,6 +89,7 @@ public sealed class ValueObjectTests
         Assert.Null(settings.PlaybackDeviceId);
         Assert.Null(settings.RecordingDeviceId);
         Assert.Null(settings.WebcamDeviceId);
+        Assert.Null(settings.WebcamFacingMode);
     }
 
     [Fact]

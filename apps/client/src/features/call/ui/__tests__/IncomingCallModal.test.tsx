@@ -14,6 +14,7 @@ const mockCalls = {
 const mockModalOverlay = jest.fn();
 const mockStartCallRingtone = jest.fn(async (_kind: unknown) => true);
 const mockStopCallRingtone = jest.fn(async (_kind: unknown) => undefined);
+const mockEnsureCallMediaAccess: jest.Mock = jest.fn(async () => ({ ok: true }));
 
 jest.mock("@/shared/lib/config", () => ({
     appConfig: {
@@ -29,6 +30,19 @@ jest.mock("expo-router", () => ({
 
 jest.mock("@/shared/store/auth-store", () => ({
     useCurrentUserId: () => "user-1",
+}));
+
+jest.mock("@/entities/user", () => ({
+    useCurrentUser: () => ({
+        data: {
+            soundVideo: {
+                playbackDeviceId: null,
+                recordingDeviceId: null,
+                webcamDeviceId: null,
+                webcamFacingMode: null,
+            },
+        },
+    }),
 }));
 
 jest.mock("@/shared/lib/api", () => ({
@@ -56,6 +70,10 @@ jest.mock("@/shared/ui", () => ({
 jest.mock("@/shared/lib/call-sounds", () => ({
     startCallRingtone: (kind: unknown) => mockStartCallRingtone(kind),
     stopCallRingtone: (kind: unknown) => mockStopCallRingtone(kind),
+}));
+
+jest.mock("@/features/call/lib/call-media-preflight", () => ({
+    ensureCallMediaAccess: (args: unknown) => mockEnsureCallMediaAccess(args),
 }));
 
 const { IncomingCallModal } = require("../IncomingCallModal");
@@ -139,9 +157,30 @@ describe("IncomingCallModal", () => {
         fireEvent.press(screen.getByText("Принять"));
 
         await waitFor(() => {
+            expect(mockEnsureCallMediaAccess).toHaveBeenCalledWith(
+                expect.objectContaining({ callType: "Audio" }),
+            );
             expect(mockCalls.accept).toHaveBeenCalledWith("call-1");
             expect(mockStopCallRingtone).toHaveBeenCalledWith("incoming");
             expect(mockRouter.push).toHaveBeenCalledWith("/call/call-1");
         });
+    });
+
+    it("does not accept when microphone preflight fails", async () => {
+        mockEnsureCallMediaAccess.mockResolvedValueOnce({
+            ok: false,
+            errorMessage: "Не удалось получить доступ к микрофону. Проверьте разрешения браузера.",
+        });
+        useCallStore.getState().setIncomingCall(makeCall());
+
+        render(<IncomingCallModal />);
+
+        fireEvent.press(screen.getByText("Принять"));
+
+        await waitFor(() => {
+            expect(screen.getByText("Не удалось получить доступ к микрофону. Проверьте разрешения браузера.")).toBeTruthy();
+        });
+        expect(mockCalls.accept).not.toHaveBeenCalled();
+        expect(mockRouter.push).not.toHaveBeenCalled();
     });
 });

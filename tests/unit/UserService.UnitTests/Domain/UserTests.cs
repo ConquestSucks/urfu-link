@@ -213,11 +213,12 @@ public sealed class UserTests
     {
         var user = UserProfile.CreateDefault(TestUserId);
 
-        user.UpdateSoundVideo("speaker-1", "mic-1", "cam-1");
+        user.UpdateSoundVideo("speaker-1", "mic-1", "cam-1", "environment");
 
         Assert.Equal("speaker-1", user.SoundVideo.PlaybackDeviceId);
         Assert.Equal("mic-1", user.SoundVideo.RecordingDeviceId);
         Assert.Equal("cam-1", user.SoundVideo.WebcamDeviceId);
+        Assert.Equal("environment", user.SoundVideo.WebcamFacingMode);
         Assert.Empty(user.DomainEvents);
     }
 

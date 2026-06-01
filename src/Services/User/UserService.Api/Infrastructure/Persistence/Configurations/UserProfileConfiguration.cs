@@ -45,6 +45,7 @@ public sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserProf
             soundVideo.Property(s => s.PlaybackDeviceId).HasColumnName("playback_device_id");
             soundVideo.Property(s => s.RecordingDeviceId).HasColumnName("recording_device_id");
             soundVideo.Property(s => s.WebcamDeviceId).HasColumnName("webcam_device_id");
+            soundVideo.Property(s => s.WebcamFacingMode).HasColumnName("webcam_facing_mode");
         });
 
         builder.Property(u => u.CreatedAtUtc).HasColumnName("created_at_utc");
