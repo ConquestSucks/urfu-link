@@ -4,12 +4,8 @@ import { useWindowSize } from "@/shared/lib/useWindowSize";
 import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
 import { configureCallSounds } from "@/shared/lib/call-sounds";
 import { configureMessageSounds } from "@/shared/lib/message-sounds";
-import { glow } from "@/shared/ui/glow";
 import { SidebarDesktop } from "@/widgets/sidebar-desktop";
-import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
-import { Slot, useLocalSearchParams, usePathname, useSegments } from "expo-router";
-import { isInboxDetailRoute } from "@/shared/lib/inbox-detail-route";
-import { useMobileBottomTabsVisibilityStore } from "@/widgets/bottom-tabs-mobile/model/visibility";
+import { Slot, useSegments } from "expo-router";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
@@ -51,19 +47,11 @@ const SettingsDesktop = lazy(() =>
 );
 
 function AuthorizedLayoutContent() {
-    const pathname = usePathname();
     const segments = useSegments() as string[];
-    const params = useLocalSearchParams<{ id?: string }>();
-    const isThreadDetail = isInboxDetailRoute({ pathname, segments, id: params.id });
-    const isFocusedThreadDetail = useMobileBottomTabsVisibilityStore(
-        (state) => state.isDetailRouteFocused,
-    );
     const isCallRoute = segments.includes("call") && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRealtimeReady, setIsRealtimeReady] = useState(false);
-    const shouldHideMobileTabs = isThreadDetail || isFocusedThreadDetail;
-    const shouldElevateThreadDetail = isMobile && shouldHideMobileTabs;
 
     const { data: profile } = useCurrentUser();
 
@@ -90,33 +78,10 @@ function AuthorizedLayoutContent() {
                     <SidebarDesktop onSettingsPress={() => setIsSettingsOpen(true)} />
                 )}
 
-                <View
-                    className="flex-1 min-w-0"
-                    style={{
-                        zIndex: shouldElevateThreadDetail ? 2 : 1,
-                        elevation: shouldElevateThreadDetail ? 4 : 0,
-                        ...(shouldElevateThreadDetail ? glow.surfaceStrong : {}),
-                    }}
-                >
+                <View className="flex-1 min-w-0">
                     <Slot />
                 </View>
             </View>
-
-            {isMobile && !isCallRoute && (
-                <View
-                    style={{
-                        position: "absolute",
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: shouldHideMobileTabs ? 0 : 3,
-                        elevation: shouldHideMobileTabs ? 0 : 1,
-                        pointerEvents: "box-none",
-                    }}
-                >
-                    <MobileBottomTabs hidden={shouldHideMobileTabs} />
-                </View>
-            )}
 
             {isDesktop && isSettingsOpen ? (
                 <Suspense fallback={null}>
