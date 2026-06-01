@@ -237,7 +237,11 @@ export const ChatMessage = ({
             !!onJoinCall;
         return (
             <View className="px-2 items-center">
-                <View className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10" style={canJoinCall ? glow.brandSubtle : glow.surface}>
+                <View
+                    testID={`system-call-chip-${id}`}
+                    className="px-3 py-2 rounded-2xl bg-white/5 border border-white/10"
+                    style={canJoinCall ? glow.brandSubtle : undefined}
+                >
                     <View className="flex-row items-center gap-2">
                         {systemCall?.callType === "Video" ? (
                             <VideoCameraIcon size={12} className="text-text-muted" />
@@ -295,7 +299,7 @@ export const ChatMessage = ({
                 {renderAuthorAvatar()}
                 <View
                     className={`${messageBubbleMaxWidthClass} px-3 py-2 rounded-2xl bg-white/5 flex-row items-center gap-2`}
-                    style={[webMessageBubbleMaxWidthStyle, glow.surface]}
+                    style={webMessageBubbleMaxWidthStyle}
                 >
                     <TrashIcon size={14} className="text-text-muted" />
                     <Text className="text-text-muted text-[13px] italic">Сообщение удалено</Text>
@@ -339,7 +343,7 @@ export const ChatMessage = ({
                 style={[
                     webMessageBubbleMaxWidthStyle,
                     { opacity: isOptimistic ? 0.6 : 1 },
-                    isFailed ? glow.danger : isOwn ? glow.brandSoft : glow.surface,
+                    isFailed ? glow.danger : isOwn ? glow.brandSoft : undefined,
                 ]}
             >
                 {forwardedFrom && (

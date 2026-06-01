@@ -203,7 +203,7 @@ export const CallTabCoordinator = () => {
         <View
             testID="call-tab-coordinator"
             className="absolute left-4 right-4 bottom-5 rounded-2xl border border-white/10 bg-app-card/95 px-4 py-3"
-            style={{ zIndex: 30, elevation: 30, ...glow.surfaceStrong }}
+            style={{ zIndex: 20, elevation: 8, ...glow.surfaceStrong }}
         >
             <View className="flex-row items-start gap-3">
                 <View className="h-9 w-9 rounded-xl bg-brand-650/15 items-center justify-center" style={glow.brandSubtle}>

@@ -86,7 +86,7 @@ export default function AuthLayout() {
                     className="flex-1 min-w-0"
                     style={{
                         zIndex: shouldElevateThreadDetail ? 2 : 1,
-                        elevation: shouldElevateThreadDetail ? 12 : 0,
+                        elevation: shouldElevateThreadDetail ? 4 : 0,
                         ...(shouldElevateThreadDetail ? glow.surfaceStrong : {}),
                     }}
                 >
@@ -102,7 +102,7 @@ export default function AuthLayout() {
                         right: 0,
                         bottom: 0,
                         zIndex: isThreadDetail ? 0 : 3,
-                        elevation: isThreadDetail ? 0 : 3,
+                        elevation: isThreadDetail ? 0 : 1,
                         pointerEvents: "box-none",
                     }}
                 >

@@ -32,8 +32,8 @@ describe("DeviceCard", () => {
         const iconStyle = StyleSheet.flatten(screen.getByTestId("device-card-icon").props.style);
         const badgeStyle = StyleSheet.flatten(screen.getByTestId("device-card-current-badge").props.style);
 
-        expect(cardStyle.boxShadow).toBe("0 0 12px rgba(0, 212, 146, 0.12)");
-        expect(iconStyle.boxShadow).toBe("0 0 12px rgba(0, 212, 146, 0.12)");
+        expect(cardStyle.boxShadow).toBe("0 0 0 1px rgba(0, 212, 146, 0.14)");
+        expect(iconStyle.boxShadow).toBe("0 0 0 1px rgba(0, 212, 146, 0.14)");
         expect(badgeStyle?.boxShadow).toBeUndefined();
     });
 });

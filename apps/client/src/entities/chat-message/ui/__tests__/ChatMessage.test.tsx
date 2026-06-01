@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { Linking, Platform } from "react-native";
+import { Linking, Platform, StyleSheet } from "react-native";
 
 import { ChatMessage } from "../ChatMessage";
 
@@ -186,6 +186,24 @@ describe("ChatMessage read indicator", () => {
         expect(screen.getByTestId("chat-message-bubble-message-1").props.className).toContain(
             "cursor-default",
         );
+    });
+
+    it("keeps incoming message bubbles flat by default", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text="hello"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+            />,
+        );
+
+        const style = StyleSheet.flatten(
+            screen.getByTestId("chat-message-bubble-message-1").props.style,
+        );
+
+        expect(style.boxShadow).toBeUndefined();
     });
 
     it("uses a defined light color for incoming group sender names", () => {
@@ -624,5 +642,32 @@ describe("ChatMessage read indicator", () => {
         expect(screen.getByText("Завершён: 12:00")).toBeTruthy();
         expect(screen.queryByText("Начало: 12:00")).toBeNull();
         expect(screen.getByText("Длительность: 3:12")).toBeTruthy();
+    });
+
+    it("renders passive system call chips without a surface shadow", () => {
+        render(
+            <ChatMessage
+                id="message-1"
+                text=""
+                kind="SystemCall"
+                isOwn={false}
+                time="12:00"
+                avatarUrl=""
+                systemCall={{
+                    callId: "call-1",
+                    callType: "Audio",
+                    status: "Completed",
+                    callerId: "user-1",
+                    duration: "PT3M12S",
+                    endReason: "Completed",
+                }}
+            />,
+        );
+
+        const style = StyleSheet.flatten(
+            screen.getByTestId("system-call-chip-message-1").props.style,
+        );
+
+        expect(style?.boxShadow).toBeUndefined();
     });
 });
