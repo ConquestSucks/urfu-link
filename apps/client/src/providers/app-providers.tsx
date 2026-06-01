@@ -3,7 +3,6 @@ import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AuthProvider from "./auth-provider";
-import { AuthGate } from "@/features/auth";
 
 export default function AppProviders({ children }: PropsWithChildren) {
     const [queryClient] = useState(() => new QueryClient({
@@ -21,7 +20,7 @@ export default function AppProviders({ children }: PropsWithChildren) {
     return (<SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <AuthGate>{children}</AuthGate>
+          {children}
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>);
