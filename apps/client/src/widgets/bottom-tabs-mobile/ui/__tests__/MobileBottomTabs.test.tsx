@@ -72,6 +72,15 @@ describe("MobileBottomTabs", () => {
         expect(style.pointerEvents).toBe("auto");
     });
 
+    it("hides tabs when the focused detail route requests it without local params", () => {
+        mockSegments = ["(authorized)", "chats", "[id]"];
+
+        render(<MobileBottomTabs hidden />);
+
+        const style = StyleSheet.flatten(screen.getByTestId("mobile-bottom-tabs-container").props.style);
+        expect(style.pointerEvents).toBe("none");
+    });
+
     it("keeps tabs interactive on the inbox list route", () => {
         render(<MobileBottomTabs />);
 
