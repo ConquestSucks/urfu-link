@@ -16,6 +16,6 @@ describe("EndSessions", () => {
 
         const style = StyleSheet.flatten(screen.getByTestId("end-sessions-card").props.style);
 
-        expect(style.boxShadow).toBe("0 0 12px rgba(251, 44, 54, 0.12)");
+        expect(style.boxShadow).toBe("0 0 0 1px rgba(251, 44, 54, 0.16)");
     });
 });

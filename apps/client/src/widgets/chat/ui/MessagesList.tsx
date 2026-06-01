@@ -195,15 +195,7 @@ const styles = StyleSheet.create({
         right: 24,
         bottom: 16,
         zIndex: 11,
-        ...(Platform.OS === "web"
-            ? {}
-            : {
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.22,
-                  shadowRadius: 16,
-                  elevation: 6,
-              }),
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.22)",
     },
 });
 
