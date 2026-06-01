@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using MediaService.Api.Domain.Enums;
 
 namespace MediaService.Api.Application.Limits;
@@ -107,7 +108,7 @@ public static class MimeTypeCatalog
     public static bool TryResolve(string mimeType, AssetKind? requestedKind, out AssetKind kind)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(mimeType);
-        var normalized = mimeType.Trim();
+        var normalized = NormalizeMimeType(mimeType);
 
         if (requestedKind is null)
         {
@@ -126,4 +127,16 @@ public static class MimeTypeCatalog
 
     public static bool IsSupportedRequestedKind(AssetKind requestedKind)
         => requestedKind == AssetKind.Voice;
+
+    private static string NormalizeMimeType(string mimeType)
+    {
+        if (MediaTypeHeaderValue.TryParse(mimeType, out var parsed)
+            && !string.IsNullOrWhiteSpace(parsed.MediaType))
+        {
+            return parsed.MediaType;
+        }
+
+        var parameterIndex = mimeType.IndexOf(';', StringComparison.Ordinal);
+        return (parameterIndex >= 0 ? mimeType[..parameterIndex] : mimeType).Trim();
+    }
 }
