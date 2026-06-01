@@ -4,11 +4,13 @@ import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Avatar, ModalOverlay } from "@/shared/ui";
 import { PhoneIcon, VideoCameraIcon } from "@/shared/ui/phosphor";
 import { useCurrentUserId } from "@/shared/store/auth-store";
+import { useCurrentUser } from "@/entities/user";
 import { useConversationParticipants, useParticipantsStore } from "@/entities/conversation/model/participants-store";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
 import { useCallStore } from "@/entities/call";
 import type { CallSessionDto } from "@urfu-link/api-client";
 import { startCallRingtone, stopCallRingtone } from "@/shared/lib/call-sounds";
+import { ensureCallMediaAccess } from "@/features/call/lib/call-media-preflight";
 import { glow } from "@/shared/ui/glow";
 
 export const IncomingCallModal = () => {
@@ -17,6 +19,7 @@ export const IncomingCallModal = () => {
     const acceptIncoming = useCallStore((state) => state.acceptIncoming);
     const declineIncoming = useCallStore((state) => state.declineIncoming);
     const currentUserId = useCurrentUserId();
+    const { data: currentUser } = useCurrentUser();
     const conversationId = incomingCall?.conversationId;
     const participants = useConversationParticipants(conversationId || "");
     const conversation = useChatStore((state) =>
@@ -25,6 +28,7 @@ export const IncomingCallModal = () => {
 
     const [isAccepting, setIsAccepting] = useState(false);
     const [isDeclining, setIsDeclining] = useState(false);
+    const [mediaError, setMediaError] = useState<string | null>(null);
     const keepModalOpen = useCallback(() => undefined, []);
 
     useEffect(() => {
@@ -70,7 +74,17 @@ export const IncomingCallModal = () => {
         }
 
         setIsAccepting(true);
+        setMediaError(null);
         try {
+            const media = await ensureCallMediaAccess({
+                callType: incomingCall.callType,
+                soundVideo: currentUser?.soundVideo,
+            });
+            if (!media.ok) {
+                setMediaError(media.errorMessage);
+                return;
+            }
+
             await acceptIncoming();
             await stopCallRingtone("incoming");
             router.push(`/call/${incomingCall.id}` as never);
@@ -125,6 +139,12 @@ export const IncomingCallModal = () => {
                     <Avatar size={52} src={caller?.avatarUrl} name={caller?.name ?? "A"} />
                 </View>
             </View>
+
+            {mediaError ? (
+                <View className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
+                    <Text className="text-sm text-red-100">{mediaError}</Text>
+                </View>
+            ) : null}
 
             <View className="flex-row gap-3">
                 <Pressable

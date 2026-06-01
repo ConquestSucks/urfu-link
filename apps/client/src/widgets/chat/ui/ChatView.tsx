@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useInboxRouting } from "@/shared/lib/useInboxRouting";
 import { ChatHeader } from "./chat-header/ChatHeader";
@@ -28,6 +28,8 @@ import { ModalOverlay } from "@/shared/ui";
 import { apiClient } from "@/shared/lib/api";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { useCallStore } from "@/entities/call";
+import { useCurrentUser } from "@/entities/user";
+import { ensureCallMediaAccess } from "@/features/call/lib/call-media-preflight";
 import {
     toChatThreadViewingContext,
     toChatViewingContext,
@@ -64,12 +66,15 @@ export const ChatView = () => {
     const listRef = useRef<MessagesListHandle>(null);
     const inputRef = useRef<ChatInputHandle>(null);
     const currentUserId = useCurrentUserId();
+    const { data: currentUser } = useCurrentUser();
     const [isStartingCall, setIsStartingCall] = useState(false);
+    const [callStartError, setCallStartError] = useState<string | null>(null);
     const setViewingContexts = usePresenceStore((s) => s.setViewingContexts);
     const chatId = params.id as string;
     const handleSend = useConversationSend(chatId);
 
     const closeCallModals = useCallback(() => {
+        setCallStartError(null);
         setIsSearching(false);
         setActionsTarget(null);
         setActionsAnchor(null);
@@ -82,11 +87,29 @@ export const ChatView = () => {
         inputRef.current?.closeModals();
     }, []);
 
+    const ensureMediaBeforeCall = useCallback(async (callType: "Audio" | "Video") => {
+        setCallStartError(null);
+        const media = await ensureCallMediaAccess({
+            callType,
+            soundVideo: currentUser?.soundVideo,
+        });
+
+        if (!media.ok) {
+            setCallStartError(media.errorMessage);
+            return false;
+        }
+
+        return true;
+    }, [currentUser?.soundVideo]);
+
     const handleStartConversationCall = useCallback(async (callType: "Audio" | "Video") => {
         if (!conversation || isStartingCall) return;
         closeCallModals();
         try {
             setIsStartingCall(true);
+            if (!await ensureMediaBeforeCall(callType)) {
+                return;
+            }
             const call = await startCall(conversation.id, callType);
             if (call.status === "Active") {
                 router.push(`/call/${call.id}` as never);
@@ -94,7 +117,7 @@ export const ChatView = () => {
         } finally {
             setIsStartingCall(false);
         }
-    }, [closeCallModals, conversation, isStartingCall, router, startCall]);
+    }, [closeCallModals, conversation, ensureMediaBeforeCall, isStartingCall, router, startCall]);
 
     const handleStartAudioCall = useCallback(
         () => void handleStartConversationCall("Audio"),
@@ -108,10 +131,13 @@ export const ChatView = () => {
 
     const handleSystemCallJoin = useCallback(
         async (callId: string) => {
+            if (!await ensureMediaBeforeCall("Audio")) {
+                return;
+            }
             await joinCall(callId);
             router.push(`/call/${callId}` as never);
         },
-        [joinCall, router],
+        [ensureMediaBeforeCall, joinCall, router],
     );
 
     const routeMessageId = typeof params.message === "string" ? params.message : null;
@@ -344,6 +370,12 @@ export const ChatView = () => {
                     onProfileUserIdChange={setSubjectProfileUserId}
                 />
             )}
+
+            {callStartError ? (
+                <View className="mx-3 mt-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2">
+                    <Text className="text-sm text-red-100">{callStartError}</Text>
+                </View>
+            ) : null}
 
             {pinnedIds.length > 0 && (
                 <PinnedBar

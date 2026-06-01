@@ -24,6 +24,7 @@ import { playCallSound } from "@/shared/lib/call-sounds";
 import { AnimatedPressable, AnimatedView } from "@/shared/lib/nativewind-interop";
 import { SpeakerHighIcon } from "@/shared/ui/phosphor";
 import { useCurrentUser } from "@/entities/user";
+import { getCachedCallMediaPreflight } from "@/features/call/lib/call-media-preflight";
 import type { CallRoomProps, ParticipantInfo } from "./CallRoom.types";
 import {
     CallControls,
@@ -812,6 +813,7 @@ export const CallRoom = ({
     const { data: profile } = useCurrentUser();
     const recordingDeviceId = profile?.soundVideo.recordingDeviceId;
     const webcamDeviceId = profile?.soundVideo.webcamDeviceId;
+    const webcamFacingMode = profile?.soundVideo.webcamFacingMode;
     const playbackDeviceId = profile?.soundVideo.playbackDeviceId;
     const roomRef = useRef<Room | null>(null);
     const remoteMicrophoneAudioElementsRef = useRef(new Map<string, HTMLMediaElement>());
@@ -977,19 +979,25 @@ export const CallRoom = ({
                 await room.startAudio().catch((error) => {
                     console.warn("LiveKit audio start was blocked", error);
                 });
-                const audioCaptureOptions = recordingDeviceId
-                    ? { deviceId: recordingDeviceId }
-                    : undefined;
-                const videoCaptureOptions = webcamDeviceId
-                    ? { deviceId: webcamDeviceId }
-                    : { facingMode };
+                const mediaPreflight = getCachedCallMediaPreflight({
+                    callType: call.callType,
+                    recordingDeviceId,
+                    webcamDeviceId,
+                    webcamFacingMode,
+                });
+                const audioCaptureOptions = mediaPreflight?.audioCaptureOptions
+                    ?? (recordingDeviceId ? { deviceId: recordingDeviceId } : undefined);
+                const videoCaptureOptions = mediaPreflight?.videoCaptureOptions
+                    ?? (webcamDeviceId
+                        ? { deviceId: webcamDeviceId }
+                        : { facingMode: webcamFacingMode ?? facingMode });
 
                 await room.localParticipant.setMicrophoneEnabled(true, audioCaptureOptions).catch((error) => {
                     console.error("Failed to enable microphone", error);
                     setRoomError("Не удалось включить микрофон. Проверьте разрешения браузера.");
                 });
 
-                if (call.callType === "Video") {
+                if (call.callType === "Video" && mediaPreflight?.cameraGranted) {
                     await room.localParticipant.setCameraEnabled(true, videoCaptureOptions).catch((error) => {
                         console.error("Failed to enable camera", error);
                         setRoomError("Не удалось включить камеру. Проверьте разрешения браузера.");
@@ -1043,6 +1051,7 @@ export const CallRoom = ({
         refreshVideoInputs,
         syncRoomState,
         webcamDeviceId,
+        webcamFacingMode,
     ]);
 
     const participantMediaInfos = useMemo<ParticipantMediaInfo[]>(() => {
@@ -1277,7 +1286,7 @@ export const CallRoom = ({
         try {
             await room.localParticipant.setCameraEnabled(
                 next,
-                webcamDeviceId ? { deviceId: webcamDeviceId } : { facingMode },
+                webcamDeviceId ? { deviceId: webcamDeviceId } : { facingMode: webcamFacingMode ?? facingMode },
             );
             if (next) {
                 void refreshVideoInputs();
@@ -1286,7 +1295,7 @@ export const CallRoom = ({
         } catch (error) {
             console.error("Failed to toggle camera", error);
         }
-    }, [facingMode, isConnectedToCall, refreshVideoInputs, syncRoomState, webcamDeviceId]);
+    }, [facingMode, isConnectedToCall, refreshVideoInputs, syncRoomState, webcamDeviceId, webcamFacingMode]);
 
     const switchCamera = useCallback(async () => {
         const room = roomRef.current;

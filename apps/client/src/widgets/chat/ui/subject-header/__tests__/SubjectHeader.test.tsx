@@ -8,6 +8,7 @@ const mockUpdateConversation = jest.fn();
 const mockPrimeParticipants = jest.fn();
 const mockStartCall = jest.fn();
 const mockOpenDirectConversation = jest.fn();
+const mockEnsureCallMediaAccess: jest.Mock = jest.fn(async () => ({ ok: true }));
 
 jest.mock("@/shared/lib/safeGoBack", () => ({
     safeGoBack: jest.fn(),
@@ -58,6 +59,12 @@ jest.mock("@/entities/user", () => ({
             identity: { name: "Current User" },
             account: { avatarUrl: null },
             notifications: { mutedConversationIds: [] },
+            soundVideo: {
+                playbackDeviceId: null,
+                recordingDeviceId: null,
+                webcamDeviceId: null,
+                webcamFacingMode: null,
+            },
         },
     }),
     useMuteConversationNotifications: () => ({ isPending: false, mutate: jest.fn() }),
@@ -83,6 +90,10 @@ jest.mock("@/entities/call", () => ({
         selector({
             startCall: mockStartCall,
         }),
+}));
+
+jest.mock("@/features/call/lib/call-media-preflight", () => ({
+    ensureCallMediaAccess: (args: unknown) => mockEnsureCallMediaAccess(args),
 }));
 
 jest.mock("@/shared/lib/api", () => ({
@@ -260,6 +271,9 @@ describe("SubjectHeader", () => {
         fireEvent.press(screen.getByTestId("start-profile-audio"));
 
         await waitFor(() => {
+            expect(mockEnsureCallMediaAccess).toHaveBeenCalledWith(
+                expect.objectContaining({ callType: "Audio" }),
+            );
             expect(mockOpenDirectConversation).toHaveBeenCalledWith("peer-user");
             expect(mockStartCall).toHaveBeenCalledWith("direct-1", "Audio");
         });

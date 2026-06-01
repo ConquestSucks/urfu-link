@@ -25,6 +25,7 @@ export type UserSoundVideo = {
   playbackDeviceId: string | null;
   recordingDeviceId: string | null;
   webcamDeviceId: string | null;
+  webcamFacingMode: "user" | "environment" | null;
 };
 
 export type UserProfile = {
@@ -64,6 +65,7 @@ export type UpdateSoundVideoDto = {
   playbackDeviceId?: string | null;
   recordingDeviceId?: string | null;
   webcamDeviceId?: string | null;
+  webcamFacingMode?: "user" | "environment" | null;
 };
 
 export type SearchUserDto = {
