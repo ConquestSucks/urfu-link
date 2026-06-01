@@ -13,6 +13,7 @@ const mockCalls = {
 const mockModalOverlay = jest.fn();
 const mockStartCallRingtone = jest.fn(async (_kind: unknown) => true);
 const mockStopCallRingtone = jest.fn(async (_kind: unknown) => undefined);
+const mockEnsureCallMediaAccess: jest.Mock = jest.fn(async () => ({ ok: true }));
 
 jest.mock("@/shared/lib/config", () => ({
     appConfig: {
@@ -28,6 +29,19 @@ jest.mock("expo-router", () => ({
 
 jest.mock("@/shared/store/auth-store", () => ({
     useCurrentUserId: () => "user-1",
+}));
+
+jest.mock("@/entities/user", () => ({
+    useCurrentUser: () => ({
+        data: {
+            soundVideo: {
+                playbackDeviceId: null,
+                recordingDeviceId: null,
+                webcamDeviceId: null,
+                webcamFacingMode: null,
+            },
+        },
+    }),
 }));
 
 jest.mock("@/shared/lib/api", () => ({
@@ -55,6 +69,10 @@ jest.mock("@/shared/ui", () => ({
 jest.mock("@/shared/lib/call-sounds", () => ({
     startCallRingtone: (kind: unknown) => mockStartCallRingtone(kind),
     stopCallRingtone: (kind: unknown) => mockStopCallRingtone(kind),
+}));
+
+jest.mock("@/features/call/lib/call-media-preflight", () => ({
+    ensureCallMediaAccess: (args: unknown) => mockEnsureCallMediaAccess(args),
 }));
 
 const { OutgoingCallModal } = require("../OutgoingCallModal");
@@ -195,8 +213,29 @@ describe("OutgoingCallModal", () => {
         });
 
         await waitFor(() => {
+            expect(mockEnsureCallMediaAccess).toHaveBeenCalledWith(
+                expect.objectContaining({ callType: "Audio" }),
+            );
             expect(mockStopCallRingtone).toHaveBeenCalledWith("outgoing");
             expect(mockRouter.push).toHaveBeenCalledWith("/call/call-1");
         });
+    });
+
+    it("does not open the call screen when media preflight fails after accept", async () => {
+        mockEnsureCallMediaAccess.mockResolvedValueOnce({
+            ok: false,
+            errorMessage: "Не удалось получить доступ к микрофону. Проверьте разрешения браузера.",
+        });
+        useCallStore.getState().setOutgoingCall(makeCall());
+        render(<OutgoingCallModal />);
+
+        act(() => {
+            useCallStore.getState().handleCallAccepted(makeCall({ status: "Active" }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText("Не удалось получить доступ к микрофону. Проверьте разрешения браузера.")).toBeTruthy();
+        });
+        expect(mockRouter.push).not.toHaveBeenCalled();
     });
 });

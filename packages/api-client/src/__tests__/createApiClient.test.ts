@@ -246,6 +246,33 @@ describe("createApiClient", () => {
     });
   });
 
+  describe("users sound/video settings", () => {
+    it("sends webcam facing mode with sound/video updates", async () => {
+      const fetchSpy = mockFetchWith({ status: 204, ok: true });
+
+      const client = createApiClient({ baseUrl: "" });
+      await client.users.updateSoundVideo({
+        playbackDeviceId: null,
+        recordingDeviceId: "mic-1",
+        webcamDeviceId: null,
+        webcamFacingMode: "environment",
+      });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "/api/users/me/sound-video",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({
+            playbackDeviceId: null,
+            recordingDeviceId: "mic-1",
+            webcamDeviceId: null,
+            webcamFacingMode: "environment",
+          }),
+        }),
+      );
+    });
+  });
+
   describe("media", () => {
     it("does not send JSON content type for bodyless download-url requests", async () => {
       const fetchSpy = mockFetchWith({

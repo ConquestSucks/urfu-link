@@ -37,4 +37,5 @@ public sealed record QuietHoursResponse(string IanaTimezone, string? Start, stri
 public sealed record SoundVideoResponse(
     string? PlaybackDeviceId,
     string? RecordingDeviceId,
-    string? WebcamDeviceId);
+    string? WebcamDeviceId,
+    string? WebcamFacingMode);

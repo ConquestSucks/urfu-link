@@ -75,6 +75,7 @@ public sealed class GetMyProfileEndpoint(IUserRepository userRepository)
             SoundVideo: new SoundVideoResponse(
                 user.SoundVideo.PlaybackDeviceId,
                 user.SoundVideo.RecordingDeviceId,
-                user.SoundVideo.WebcamDeviceId));
+                user.SoundVideo.WebcamDeviceId,
+                user.SoundVideo.WebcamFacingMode));
     }
 }

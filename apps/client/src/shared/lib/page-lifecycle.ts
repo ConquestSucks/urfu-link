@@ -1,5 +1,5 @@
 type PageLifecycleHandlers = {
-    onPageHide?: () => void;
+    onPageHide?: (event: PageTransitionEvent) => void;
     onPageShow?: () => void;
 };
 

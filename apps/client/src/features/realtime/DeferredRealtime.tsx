@@ -1,4 +1,5 @@
 import { useNotificationHub } from "@/features/notifications";
+import { ActiveCallRouteGuard } from "@/features/call/ui/ActiveCallRouteGuard";
 import { CallTabCoordinator } from "@/features/call/ui/CallTabCoordinator";
 import { IncomingCallModal } from "@/features/call/ui/IncomingCallModal";
 import { OutgoingCallModal } from "@/features/call/ui/OutgoingCallModal";
@@ -17,6 +18,7 @@ export default function DeferredRealtime() {
             <IncomingCallModal />
             <OutgoingCallModal />
             <CallTabCoordinator />
+            <ActiveCallRouteGuard />
         </>
     );
 }

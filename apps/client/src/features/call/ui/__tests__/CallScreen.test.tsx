@@ -14,6 +14,7 @@ const mockCancelCall = jest.fn();
 const mockJoinCall = jest.fn();
 const mockLoadParticipants = jest.fn();
 const mockSendCallLeaveBeacon = jest.fn();
+const mockEnsureCallMediaAccess: jest.Mock = jest.fn(async () => ({ ok: true }));
 
 const mockCall: CallSessionDto = {
     id: "call-123",
@@ -87,6 +88,12 @@ jest.mock("@/entities/user", () => ({
                 avatarUrl: "https://cdn.test/current.png",
                 aboutMe: null,
             },
+            soundVideo: {
+                playbackDeviceId: null,
+                recordingDeviceId: null,
+                webcamDeviceId: null,
+                webcamFacingMode: null,
+            },
         },
     }),
 }));
@@ -98,6 +105,10 @@ jest.mock("@/entities/call", () => ({
 
 jest.mock("@/shared/lib/call-leave-beacon", () => ({
     sendCallLeaveBeacon: (callId: string) => mockSendCallLeaveBeacon(callId),
+}));
+
+jest.mock("@/features/call/lib/call-media-preflight", () => ({
+    ensureCallMediaAccess: (args: unknown) => mockEnsureCallMediaAccess(args),
 }));
 
 jest.mock("@/entities/conversation/model/chat-store", () => ({
@@ -141,7 +152,7 @@ jest.mock("../CallRoom", () => ({
 const { CallScreen } = require("../CallScreen.web");
 
 describe("CallScreen", () => {
-    let pagehideHandler: (() => void) | null = null;
+    let pagehideHandler: ((event?: PageTransitionEvent) => void) | null = null;
 
     beforeEach(() => {
         jest.clearAllMocks();
@@ -215,6 +226,9 @@ describe("CallScreen", () => {
             await Promise.resolve();
         });
 
+        expect(mockEnsureCallMediaAccess).toHaveBeenCalledWith(
+            expect.objectContaining({ callType: "Video" }),
+        );
         expect(mockJoinCall).toHaveBeenCalledWith("call-123");
         expect(mockLoadToken).not.toHaveBeenCalled();
     });
@@ -227,10 +241,26 @@ describe("CallScreen", () => {
         };
 
         render(<CallScreen />);
-        pagehideHandler?.();
+        pagehideHandler?.({ persisted: false } as PageTransitionEvent);
 
         expect(mockSendCallLeaveBeacon).toHaveBeenCalledWith("call-123");
         expect(mockClearToken).toHaveBeenCalledWith("call-123");
+    });
+
+    it("does not leave the call for bfcache pagehide events", () => {
+        mockCallState.activeCall = {
+            ...mockCall,
+            status: "Active",
+            acceptedAtUtc: "2026-05-30T10:00:00.000Z",
+        };
+
+        render(<CallScreen />);
+        mockSendCallLeaveBeacon.mockClear();
+        mockClearToken.mockClear();
+        pagehideHandler?.({ persisted: true } as PageTransitionEvent);
+
+        expect(mockSendCallLeaveBeacon).not.toHaveBeenCalled();
+        expect(mockClearToken).not.toHaveBeenCalled();
     });
 
     it("does not crash on native window shims without page lifecycle listeners", () => {

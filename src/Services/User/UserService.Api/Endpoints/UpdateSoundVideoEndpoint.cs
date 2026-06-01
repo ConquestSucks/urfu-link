@@ -27,7 +27,8 @@ public sealed class UpdateSoundVideoEndpoint(IUserRepository userRepository)
             user.UpdateSoundVideo(
                 req.PlaybackDeviceId.HasValue ? req.PlaybackDeviceId.Value : null,
                 req.RecordingDeviceId.HasValue ? req.RecordingDeviceId.Value : null,
-                req.WebcamDeviceId.HasValue ? req.WebcamDeviceId.Value : null);
+                req.WebcamDeviceId.HasValue ? req.WebcamDeviceId.Value : null,
+                req.WebcamFacingMode.HasValue ? req.WebcamFacingMode.Value : null);
             userRepository.Add(user);
         }
         else
@@ -35,7 +36,8 @@ public sealed class UpdateSoundVideoEndpoint(IUserRepository userRepository)
             user.UpdateSoundVideo(
                 req.PlaybackDeviceId.HasValue ? req.PlaybackDeviceId.Value : user.SoundVideo.PlaybackDeviceId,
                 req.RecordingDeviceId.HasValue ? req.RecordingDeviceId.Value : user.SoundVideo.RecordingDeviceId,
-                req.WebcamDeviceId.HasValue ? req.WebcamDeviceId.Value : user.SoundVideo.WebcamDeviceId);
+                req.WebcamDeviceId.HasValue ? req.WebcamDeviceId.Value : user.SoundVideo.WebcamDeviceId,
+                req.WebcamFacingMode.HasValue ? req.WebcamFacingMode.Value : user.SoundVideo.WebcamFacingMode);
         }
 
         await userRepository.SaveChangesAsync(ct).ConfigureAwait(false);

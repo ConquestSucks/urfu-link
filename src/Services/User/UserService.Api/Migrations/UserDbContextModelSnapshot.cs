@@ -167,6 +167,10 @@ namespace UserService.Api.Migrations
                                 .HasColumnType("text")
                                 .HasColumnName("webcam_device_id");
 
+                            b1.Property<string>("WebcamFacingMode")
+                                .HasColumnType("text")
+                                .HasColumnName("webcam_facing_mode");
+
                             b1.HasKey("UserProfileId");
 
                             b1.ToTable("user_profiles", "users");

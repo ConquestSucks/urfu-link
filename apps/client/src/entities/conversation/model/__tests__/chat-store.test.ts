@@ -111,6 +111,7 @@ describe("chat store direct draft sending", () => {
                 playbackDeviceId: null,
                 recordingDeviceId: null,
                 webcamDeviceId: null,
+                webcamFacingMode: null,
             },
         });
         useChatStore.setState({

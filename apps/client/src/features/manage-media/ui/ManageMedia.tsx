@@ -1,16 +1,24 @@
 import { useCurrentUser, useUpdateSoundVideo } from "@/entities/user";
 import { LabeledCard } from "@/shared/ui";
 import { Select } from "@/shared/ui/Select";
-import { ScrollView } from "react-native";
-import { useMediaDevices } from "../lib/useMediaDevices";
+import { Platform, ScrollView } from "react-native";
+import {
+    defaultDeviceValue,
+    hasAudioOutputSelection,
+    parseFacingModeValue,
+    useMediaDevices,
+} from "../lib/useMediaDevices";
 
 export const ManageMedia = () => {
     const { data: profile } = useCurrentUser();
     const updateSoundVideo = useUpdateSoundVideo();
 
     const mic = useMediaDevices("audioinput", profile?.soundVideo.recordingDeviceId);
-    const camera = useMediaDevices("videoinput", profile?.soundVideo.webcamDeviceId);
+    const camera = useMediaDevices("videoinput", profile?.soundVideo.webcamDeviceId, {
+        initialFacingMode: profile?.soundVideo.webcamFacingMode,
+    });
     const speaker = useMediaDevices("audiooutput", profile?.soundVideo.playbackDeviceId);
+    const canSelectSpeaker = Platform.OS !== "web" || hasAudioOutputSelection();
 
     const getEmptyMessage = (status: string) => {
         switch (status) {
@@ -37,7 +45,9 @@ export const ManageMedia = () => {
                     selectedValue={mic.selectedValue}
                     onSelect={(val) => {
                         mic.setSelectedValue(val);
-                        updateSoundVideo.mutate({ recordingDeviceId: val as string });
+                        updateSoundVideo.mutate({
+                            recordingDeviceId: val === defaultDeviceValue ? null : val as string,
+                        });
                     }}
                     onOpen={mic.requestAccess}
                     emptyMessage={getEmptyMessage(mic.permissionStatus)}
@@ -52,27 +62,36 @@ export const ManageMedia = () => {
                     selectedValue={camera.selectedValue}
                     onSelect={(val) => {
                         camera.setSelectedValue(val);
-                        updateSoundVideo.mutate({ webcamDeviceId: val as string });
+                        const facingMode = parseFacingModeValue(val);
+                        updateSoundVideo.mutate(
+                            facingMode
+                                ? { webcamDeviceId: null, webcamFacingMode: facingMode }
+                                : { webcamDeviceId: val as string, webcamFacingMode: null },
+                        );
                     }}
                     onOpen={camera.requestAccess}
                     emptyMessage={getEmptyMessage(camera.permissionStatus)}
                 />
             </LabeledCard>
 
-            <LabeledCard label="Динамики">
-                <Select
-                    placeholder="Вывод звука по умолчанию"
-                    loading={speaker.isLoading}
-                    options={speaker.options}
-                    selectedValue={speaker.selectedValue}
-                    onSelect={(val) => {
-                        speaker.setSelectedValue(val);
-                        updateSoundVideo.mutate({ playbackDeviceId: val as string });
-                    }}
-                    onOpen={speaker.requestAccess}
-                    emptyMessage={getEmptyMessage(speaker.permissionStatus)}
-                />
-            </LabeledCard>
+            {canSelectSpeaker ? (
+                <LabeledCard label="Динамики">
+                    <Select
+                        placeholder="Вывод звука по умолчанию"
+                        loading={speaker.isLoading}
+                        options={speaker.options}
+                        selectedValue={speaker.selectedValue}
+                        onSelect={(val) => {
+                            speaker.setSelectedValue(val);
+                            updateSoundVideo.mutate({
+                                playbackDeviceId: val === defaultDeviceValue ? null : val as string,
+                            });
+                        }}
+                        onOpen={speaker.requestAccess}
+                        emptyMessage={getEmptyMessage(speaker.permissionStatus)}
+                    />
+                </LabeledCard>
+            ) : null}
         </ScrollView>
     );
 };
