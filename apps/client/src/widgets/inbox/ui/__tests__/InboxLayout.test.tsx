@@ -12,6 +12,7 @@ let mockCurrentView: "messages" | "notifications" = "messages";
 let mockCurrentTab: "chats" | "subjects" = "chats";
 let mockSegments = ["(authorized)", "chats", "[id]"];
 let mockPathname = "/chats/chat-1";
+let mockParams: Record<string, string | undefined> = { id: "chat-1" };
 let mockNotifications: any[] = [
     {
         id: "notification-1",
@@ -45,14 +46,25 @@ jest.mock("@/shared/lib/useInboxRouting", () => ({
         currentTab: mockCurrentTab,
         currentView: mockCurrentView,
         pathname: mockPathname,
-        params: { id: "chat-1" },
+        params: mockParams,
     }),
 }));
 
 jest.mock("@/shared/ui", () => ({
-    MasterDetailLayout: ({ sidebar }: { sidebar: React.ReactNode }) => {
-        const { View } = require("react-native");
-        return <View>{sidebar}</View>;
+    MasterDetailLayout: ({
+        sidebar,
+        isDetailView,
+    }: {
+        sidebar: React.ReactNode;
+        isDetailView: boolean;
+    }) => {
+        const { Text, View } = require("react-native");
+        return (
+            <View>
+                <Text testID="master-detail-state">{isDetailView ? "detail" : "list"}</Text>
+                {sidebar}
+            </View>
+        );
     },
 }));
 
@@ -147,6 +159,7 @@ describe("InboxLayout navigation", () => {
         mockCurrentTab = "chats";
         mockSegments = ["(authorized)", "chats", "[id]"];
         mockPathname = "/chats/chat-1";
+        mockParams = { id: "chat-1" };
         mockNotifications = [
             {
                 id: "notification-1",
@@ -179,6 +192,7 @@ describe("InboxLayout navigation", () => {
     it("clears stale active chat selection outside the detail route", () => {
         mockSegments = ["(authorized)", "chats"];
         mockPathname = "/chats";
+        mockParams = {};
 
         render(<InboxLayout />);
 
@@ -197,10 +211,23 @@ describe("InboxLayout navigation", () => {
     it("keeps the mobile detail route visible when only the nested route segment changes", () => {
         mockSegments = ["(authorized)", "chats", "[id]"];
         mockPathname = "/chats";
+        mockParams = { id: "chat-1" };
 
         render(<InboxLayout />);
 
+        expect(screen.getByTestId("master-detail-state").props.children).toBe("detail");
         expect(screen.getByTestId("inbox-chat-active-state").props.children).toBe("active");
+    });
+
+    it("keeps the inbox list visible when stale dynamic segments remain after returning to root", () => {
+        mockSegments = ["(authorized)", "chats", "[id]"];
+        mockPathname = "/chats";
+        mockParams = {};
+
+        render(<InboxLayout />);
+
+        expect(screen.getByTestId("master-detail-state").props.children).toBe("list");
+        expect(screen.getByTestId("inbox-chat-active-state").props.children).toBe("idle");
     });
 
     it("opens a notification deep link and prepares message scrolling", () => {

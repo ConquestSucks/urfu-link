@@ -7,7 +7,8 @@ import { configureMessageSounds } from "@/shared/lib/message-sounds";
 import { glow } from "@/shared/ui/glow";
 import { SidebarDesktop } from "@/widgets/sidebar-desktop";
 import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
-import { Slot, useSegments } from "expo-router";
+import { Slot, useLocalSearchParams, usePathname, useSegments } from "expo-router";
+import { isInboxDetailRoute } from "@/shared/lib/inbox-detail-route";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
@@ -49,9 +50,10 @@ const SettingsDesktop = lazy(() =>
 );
 
 function AuthorizedLayoutContent() {
+    const pathname = usePathname();
     const segments = useSegments() as string[];
-    const isThreadDetail =
-        (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
+    const params = useLocalSearchParams<{ id?: string }>();
+    const isThreadDetail = isInboxDetailRoute({ pathname, segments, id: params.id });
     const isCallRoute = segments.includes("call") && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
