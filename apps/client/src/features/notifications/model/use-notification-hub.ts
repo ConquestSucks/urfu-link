@@ -5,6 +5,7 @@ import type { NotificationBadgeDto, NotificationDto } from "@urfu-link/api-clien
 import { createHubConnection, HUB_CONNECTION_STATE, type HubConnection } from "@/shared/lib/signalr";
 import { useNotificationStore } from "@/shared/store/notification-store";
 import { showServerBrowserNotification } from "@/shared/lib/browser-notifications";
+import { subscribePageLifecycle } from "@/shared/lib/page-lifecycle";
 import { notificationKeys } from "./queries";
 
 export function useNotificationHub() {
@@ -135,10 +136,10 @@ export function useNotificationHub() {
             void connect();
         };
 
-        if (typeof window !== "undefined") {
-            window.addEventListener("pagehide", handlePageHide);
-            window.addEventListener("pageshow", handlePageShow);
-        }
+        const unsubscribePageLifecycle = subscribePageLifecycle({
+            onPageHide: handlePageHide,
+            onPageShow: handlePageShow,
+        });
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
@@ -149,10 +150,7 @@ export function useNotificationHub() {
         return () => {
             disposed = true;
             clearRetry();
-            if (typeof window !== "undefined") {
-                window.removeEventListener("pagehide", handlePageHide);
-                window.removeEventListener("pageshow", handlePageShow);
-            }
+            unsubscribePageLifecycle();
             subscription.remove();
             void connection?.stop();
             setConnected(false);

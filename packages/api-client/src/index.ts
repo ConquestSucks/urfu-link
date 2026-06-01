@@ -19,6 +19,8 @@ export type {
   UpdateSoundVideoDto,
   SearchUserDto,
   SearchUsersResponse,
+  NativeUploadFilePart,
+  UploadAvatarFile,
 } from "./users";
 
 export type {

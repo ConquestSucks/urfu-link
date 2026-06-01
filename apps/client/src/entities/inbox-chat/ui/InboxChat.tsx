@@ -60,62 +60,62 @@ export const InboxChat = ({
         : message;
 
     return (
-        <Pressable className="select-none" onPress={onPress}>
-            <View
-                testID="inbox-chat-row"
-                className={`px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-brand-600/10 transition-all duration-300 ${containerClass}`}
-            >
-                <Avatar size={48} src={avatarUrl} name={name} />
+        <Pressable
+            accessibilityRole={onPress ? "button" : undefined}
+            className={`select-none px-4 py-3 flex-row items-center gap-3 md:rounded-2xl active:bg-brand-600/10 transition-all duration-300 ${containerClass}`}
+            onPress={onPress}
+            testID="inbox-chat-row"
+        >
+            <Avatar size={48} src={avatarUrl} name={name} />
 
-                <View className="flex-1 gap-2 min-w-0">
-                    <View className="flex-row justify-between items-start gap-2">
-                        <Text numberOfLines={1} className="leading-none flex-1 text-base font-semibold text-white">
-                            {name}
-                        </Text>
-                        <Text className={`leading-none text-xs ${timeClass}`}>
-                            {time}
-                        </Text>
-                    </View>
+            <View className="flex-1 gap-2 min-w-0">
+                <View className="flex-row justify-between items-start gap-2">
+                    <Text numberOfLines={1} className="leading-none flex-1 text-base font-semibold text-white">
+                        {name}
+                    </Text>
+                    <Text className={`leading-none text-xs ${timeClass}`}>
+                        {time}
+                    </Text>
+                </View>
 
-                    <View className="flex-row items-center gap-2 min-w-0">
-                        <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
-                            {showTypingPreview ? (
-                                <InboxTypingPreview
-                                    message={previewMessage}
-                                    className={messageClass}
+                <View className="flex-row items-center gap-2 min-w-0">
+                    <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
+                        {showTypingPreview ? (
+                            <InboxTypingPreview
+                                message={previewMessage}
+                                className={messageClass}
+                            />
+                        ) : (
+                            <Text
+                                numberOfLines={1}
+                                className={`leading-[18px] text-sm flex-1 min-w-0 ${messageClass}`}
+                            >
+                                {message}
+                            </Text>
+                        )}
+                        {showChecks && (
+                            lastMessageRead ? (
+                                <ChecksIcon
+                                    size={16}
+                                    className="text-brand-600 shrink-0"
+                                    weight="bold"
                                 />
                             ) : (
-                                <Text
-                                    numberOfLines={1}
-                                    className={`leading-[18px] text-sm flex-1 min-w-0 ${messageClass}`}
-                                >
-                                    {message}
-                                </Text>
-                            )}
-                            {showChecks && (
-                                lastMessageRead ? (
-                                    <ChecksIcon
-                                        size={16}
-                                        className="text-brand-600 shrink-0"
-                                        weight="bold"
-                                    />
-                                ) : (
-                                    <CheckIcon
-                                        size={16}
-                                        className="text-text-placeholder shrink-0"
-                                        weight="bold"
-                                    />
-                                )
-                            )}
-                        </View>
-                        {hasUnread && (
-                            <View className="bg-brand-650 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0" style={glow.brandSoft}>
-                                <Text className="text-white text-[10px] font-bold">
-                                    {unreadCount > 99 ? "99+" : String(unreadCount)}
-                                </Text>
-                            </View>
+                                <CheckIcon
+                                    size={16}
+                                    className="text-text-placeholder shrink-0"
+                                    weight="bold"
+                                />
+                            )
                         )}
                     </View>
+                    {hasUnread && (
+                        <View className="bg-brand-650 min-w-[20px] h-5 px-1.5 rounded-full items-center justify-center shrink-0" style={glow.brandSoft}>
+                            <Text className="text-white text-[10px] font-bold">
+                                {unreadCount > 99 ? "99+" : String(unreadCount)}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
         </Pressable>

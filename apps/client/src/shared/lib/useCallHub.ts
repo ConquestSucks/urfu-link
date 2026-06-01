@@ -4,6 +4,7 @@ import type { CallSessionDto } from "@urfu-link/api-client";
 import { createHubConnection, HUB_CONNECTION_STATE, type HubConnection } from "@/shared/lib/signalr";
 import { useCallStore } from "@/entities/call/model/call-store";
 import { playMessageSound } from "@/shared/lib/message-sounds";
+import { subscribePageLifecycle } from "@/shared/lib/page-lifecycle";
 
 const connectHub = async (connection: HubConnection) => {
     if (connection.state === HUB_CONNECTION_STATE.Connected) {
@@ -97,10 +98,10 @@ export const useCallHub = () => {
             if (connection) void connectHub(connection);
         };
 
-        if (typeof window !== "undefined") {
-            window.addEventListener("pagehide", handlePageHide);
-            window.addEventListener("pageshow", handlePageShow);
-        }
+        const unsubscribePageLifecycle = subscribePageLifecycle({
+            onPageHide: handlePageHide,
+            onPageShow: handlePageShow,
+        });
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active" && connection) {
@@ -110,10 +111,7 @@ export const useCallHub = () => {
 
         return () => {
             disposed = true;
-            if (typeof window !== "undefined") {
-                window.removeEventListener("pagehide", handlePageHide);
-                window.removeEventListener("pageshow", handlePageShow);
-            }
+            unsubscribePageLifecycle();
             connection?.off("IncomingCall");
             connection?.off("CallAccepted");
             connection?.off("CallDeclined");

@@ -1,10 +1,28 @@
 import { TabType } from "@/entities/tab";
 import { ViewType } from "@/entities/view";
-import { useLocalSearchParams, usePathname } from "expo-router";
+import {
+    useGlobalSearchParams,
+    useLocalSearchParams,
+    usePathname,
+    useSegments,
+} from "expo-router";
+
+const resolveCurrentTab = (pathname: string, segments: string[]): TabType => {
+    if (segments.includes("subjects")) {
+        return "subjects";
+    }
+
+    if (segments.includes("chats")) {
+        return "chats";
+    }
+
+    return pathname.includes("subjects") ? "subjects" : "chats";
+};
 
 export const useInboxRouting = () => {
     const pathname = usePathname();
-    const params = useLocalSearchParams<{
+    const segments = useSegments() as string[];
+    const localParams = useLocalSearchParams<{
         view?: ViewType;
         id?: string;
         message?: string;
@@ -12,13 +30,17 @@ export const useInboxRouting = () => {
         disciplineAction?: string;
         target?: string;
     }>();
-    
-    const currentTab: TabType = pathname.includes("subjects") ? "subjects" : "chats";
-    const currentView: ViewType = params.view || "messages";
+    const globalParams = useGlobalSearchParams<{
+        view?: ViewType;
+    }>();
+
+    const currentTab = resolveCurrentTab(pathname, segments);
+    const currentView: ViewType = globalParams.view || localParams.view || "messages";
+    const params = { ...localParams, view: currentView };
 
     const createViewHref = (newView: ViewType) => ({
-        pathname,
-        params: { ...params, view: newView },
+        pathname: `/${currentTab}`,
+        params: { view: newView },
     });
 
     const createTabHref = (tab: TabType) => ({

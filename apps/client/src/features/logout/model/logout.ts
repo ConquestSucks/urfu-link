@@ -36,10 +36,14 @@ export function createKeycloakLogoutUrl({
 }
 
 function clearPkceState(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !window.sessionStorage) return;
 
-    window.sessionStorage.removeItem("pkce_code_verifier");
-    window.sessionStorage.removeItem("pkce_state");
+    try {
+        window.sessionStorage.removeItem("pkce_code_verifier");
+        window.sessionStorage.removeItem("pkce_state");
+    } catch {
+        // Browser storage may be unavailable in restricted contexts.
+    }
 }
 
 export function performLogout(): void {

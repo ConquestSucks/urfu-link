@@ -78,6 +78,14 @@ export type SearchUsersResponse = {
   hasMore: boolean;
 };
 
+export type NativeUploadFilePart = {
+  name: string;
+  type: string;
+  uri: string;
+};
+
+export type UploadAvatarFile = File | NativeUploadFilePart;
+
 import { AuthHeaders, HandleUnauthorized, createRequest } from "./utils";
 
 export function createUsersApi(
@@ -99,9 +107,9 @@ export function createUsersApi(
       });
     },
 
-    uploadAvatar(file: File): Promise<{ avatarUrl: string }> {
+    uploadAvatar(file: UploadAvatarFile): Promise<{ avatarUrl: string }> {
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", file as unknown as Blob);
       return request<{ avatarUrl: string }>("/api/users/me/avatar", {
         method: "PUT",
         body: form,

@@ -172,7 +172,7 @@ export const SubjectHeader = ({
             return;
         }
 
-        router.push(`/chats/${conversationId}` as never);
+        router.push(`/chats/${encodeURIComponent(conversationId)}` as never);
     }, [openDirectConversationFromProfile, router]);
 
     if (!conversation) return null;
@@ -209,7 +209,11 @@ export const SubjectHeader = ({
             <View className="flex-row justify-between items-center border-b border-white/5 pl-2.5 pr-3 py-2" style={glow.surface}>
                 <View className="flex-row gap-1 items-center flex-1 min-w-0">
                     {isMobile && (
-                        <Pressable onPress={() => safeGoBack("/subjects")} hitSlop={8} className="p-2 rounded-xl">
+                        <Pressable
+                            onPress={() => safeGoBack("/subjects", { preferFallback: isMobile })}
+                            hitSlop={8}
+                            className="p-2 rounded-xl"
+                        >
                             <CaretLeftIcon size={24} className="text-text-subtle" weight="bold" />
                         </Pressable>
                     )}

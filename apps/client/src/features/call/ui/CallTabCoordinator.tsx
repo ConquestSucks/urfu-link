@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useCallStore } from "@/entities/call";
 import { getCallClientInstanceId } from "@/entities/call/model/call-client-instance";
@@ -22,7 +22,10 @@ type ActiveCallMessage = ActiveCallRecord & { type: "active-call" };
 type CallTabMessage = ActiveCallMessage;
 
 const hasBrowserTabApis = () =>
-    typeof globalThis.window !== "undefined"
+    Platform.OS === "web"
+    && typeof globalThis.window !== "undefined"
+    && typeof globalThis.window.addEventListener === "function"
+    && typeof globalThis.window.removeEventListener === "function"
     && typeof globalThis.localStorage !== "undefined";
 
 const readActiveCallRecord = (): ActiveCallRecord | null => {

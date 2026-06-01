@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { Avatar } from "@/shared/ui";
+import { Avatar, ModalOverlay } from "@/shared/ui";
 import { PhoneIcon, VideoCameraIcon } from "@/shared/ui/phosphor";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { useConversationParticipants, useParticipantsStore } from "@/entities/conversation/model/participants-store";
@@ -25,6 +25,7 @@ export const IncomingCallModal = () => {
 
     const [isAccepting, setIsAccepting] = useState(false);
     const [isDeclining, setIsDeclining] = useState(false);
+    const keepModalOpen = useCallback(() => undefined, []);
 
     useEffect(() => {
         if (!conversationId || participants.length > 0) {
@@ -97,61 +98,61 @@ export const IncomingCallModal = () => {
     }
 
     return (
-        <View
-            className="absolute inset-0 z-50 justify-center items-center bg-black/70 px-4"
-            style={{ position: "absolute" }}
+        <ModalOverlay
+            visible
+            onClose={keepModalOpen}
+            backdropClassName="bg-black/70 px-4"
+            contentClassName="w-full max-w-[520px] rounded-3xl border border-white/15 bg-app-card p-4"
         >
-            <View className="w-full max-w-[520px] rounded-3xl border border-white/15 bg-app-card p-4" style={glow.surfaceStrong}>
-                <View className="gap-3 mb-4">
-                    <Text className="text-white text-xl font-semibold">Входящий {callLabel}</Text>
-                    <View className="flex-row items-center gap-3">
-                        <View className="rounded-xl overflow-hidden bg-brand-650/10 p-3 border border-brand-300/10" style={glow.brandSubtle}>
-                            {incomingCall.callType === "Video" ? (
-                                <VideoCameraIcon size={24} className="text-text-subtle" />
-                            ) : (
-                                <PhoneIcon size={24} className="text-text-subtle" />
-                            )}
-                        </View>
-                        <View className="flex-1">
-                            <Text className="text-white text-lg font-semibold" numberOfLines={1}>
-                                {caller?.name ?? "Вызов"}
-                            </Text>
-                            <Text className="text-text-muted">
-                                Нажмите «Принять», чтобы подключиться
-                            </Text>
-                        </View>
-                        <Avatar size={52} src={caller?.avatarUrl} name={caller?.name ?? "A"} />
+            <View className="gap-3 mb-4">
+                <Text className="text-white text-xl font-semibold">Входящий {callLabel}</Text>
+                <View className="flex-row items-center gap-3">
+                    <View className="rounded-xl overflow-hidden bg-brand-650/10 p-3 border border-brand-300/10" style={glow.brandSubtle}>
+                        {incomingCall.callType === "Video" ? (
+                            <VideoCameraIcon size={24} className="text-text-subtle" />
+                        ) : (
+                            <PhoneIcon size={24} className="text-text-subtle" />
+                        )}
                     </View>
-                </View>
-
-                <View className="flex-row gap-3">
-                    <Pressable
-                        onPress={handleAccept}
-                        disabled={isAccepting || isDeclining}
-                        className="flex-1 rounded-xl py-2.5 items-center bg-brand-650 disabled:opacity-60"
-                        style={glow.brandSoft}
-                    >
-                        {isAccepting ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <Text className="text-white font-semibold">Принять</Text>
-                        )}
-                    </Pressable>
-
-                    <Pressable
-                        onPress={handleDecline}
-                        disabled={isAccepting || isDeclining}
-                        className="flex-1 rounded-xl py-2.5 items-center bg-red-600/80 disabled:opacity-60"
-                        style={glow.danger}
-                    >
-                        {isDeclining ? (
-                            <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                            <Text className="text-white font-semibold">Отклонить</Text>
-                        )}
-                    </Pressable>
+                    <View className="flex-1">
+                        <Text className="text-white text-lg font-semibold" numberOfLines={1}>
+                            {caller?.name ?? "Вызов"}
+                        </Text>
+                        <Text className="text-text-muted">
+                            Нажмите «Принять», чтобы подключиться
+                        </Text>
+                    </View>
+                    <Avatar size={52} src={caller?.avatarUrl} name={caller?.name ?? "A"} />
                 </View>
             </View>
-        </View>
+
+            <View className="flex-row gap-3">
+                <Pressable
+                    onPress={handleAccept}
+                    disabled={isAccepting || isDeclining}
+                    className="flex-1 rounded-xl py-2.5 items-center bg-brand-650 disabled:opacity-60"
+                    style={glow.brandSoft}
+                >
+                    {isAccepting ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <Text className="text-white font-semibold">Принять</Text>
+                    )}
+                </Pressable>
+
+                <Pressable
+                    onPress={handleDecline}
+                    disabled={isAccepting || isDeclining}
+                    className="flex-1 rounded-xl py-2.5 items-center bg-red-600/80 disabled:opacity-60"
+                    style={glow.danger}
+                >
+                    {isDeclining ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                        <Text className="text-white font-semibold">Отклонить</Text>
+                    )}
+                </Pressable>
+            </View>
+        </ModalOverlay>
     );
 };

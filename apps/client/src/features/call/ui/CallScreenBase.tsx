@@ -15,6 +15,7 @@ import { useCurrentUserId } from "@/shared/store/auth-store";
 import { useCurrentUser } from "@/entities/user";
 import { playCallSound } from "@/shared/lib/call-sounds";
 import { sendCallLeaveBeacon } from "@/shared/lib/call-leave-beacon";
+import { subscribePageLifecycle } from "@/shared/lib/page-lifecycle";
 import { CallRoom } from "./CallRoom";
 import type { ParticipantInfo } from "./CallRoom.types";
 
@@ -162,7 +163,7 @@ export const CallScreen = () => {
             return;
         }
 
-        router.replace(`/chats/${callConversationId}` as never);
+        router.replace(`/chats/${encodeURIComponent(callConversationId)}` as never);
     }, [callConversationId, router]);
 
     const handleLeave = useCallback(async () => {
@@ -273,7 +274,7 @@ export const CallScreen = () => {
     }, [call, callToken, isCurrentUserConnected, isTokenLoading, loadToken]);
 
     useEffect(() => {
-        if (typeof window === "undefined" || !call?.id || call.status === "Ended") {
+        if (!call?.id || call.status === "Ended") {
             return;
         }
 
@@ -282,10 +283,7 @@ export const CallScreen = () => {
             clearToken(call.id);
         };
 
-        window.addEventListener("pagehide", handlePageHide);
-        return () => {
-            window.removeEventListener("pagehide", handlePageHide);
-        };
+        return subscribePageLifecycle({ onPageHide: handlePageHide });
     }, [call?.id, call?.status, clearToken]);
 
     useEffect(() => {

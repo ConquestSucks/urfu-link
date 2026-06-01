@@ -14,6 +14,7 @@ export const List = <T,>({ data, renderItem }: InboxListProps<T>) => {
             className="h-full"
             contentContainerStyle={{ paddingBottom: bottomPad }}
             contentContainerClassName="md:gap-1 md:px-3"
+            keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
         >
             {data.map((item, index) => (

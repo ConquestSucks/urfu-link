@@ -12,6 +12,12 @@ const inboxDetailStackOptions = {
     headerShown: false as const,
     animation: "slide_from_right" as const,
     presentation: "card" as const,
+    contentStyle: { backgroundColor: "#0B1225" },
+};
+
+const inboxStackScreenOptions = {
+    headerShown: false as const,
+    contentStyle: { backgroundColor: "#080D1D" },
 };
 
 export const MasterDetailLayout = ({ sidebar, isDetailView }: MasterDetailLayoutProps) => {
@@ -19,7 +25,7 @@ export const MasterDetailLayout = ({ sidebar, isDetailView }: MasterDetailLayout
     const { isMobile } = useWindowSize();
 
     const stack = (
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack screenOptions={inboxStackScreenOptions}>
             <Stack.Screen name="index" />
             <Stack.Screen name="[id]" options={inboxDetailStackOptions} />
         </Stack>
@@ -30,18 +36,21 @@ export const MasterDetailLayout = ({ sidebar, isDetailView }: MasterDetailLayout
             <View style={styles.flex}>
                 {!isDetailView && (
                     <View
-                        style={[styles.sidebarOverlay, styles.pointerEventsBoxNone]}
+                        testID="master-detail-sidebar-overlay"
+                        style={styles.sidebarOverlay}
+                        pointerEvents="box-none"
                         className="bg-app-bg"
                     >
                         {sidebar}
                     </View>
                 )}
                 <View
+                    testID="master-detail-stack-container"
                     style={[
                         styles.flex,
                         !isDetailView && styles.outletHidden,
-                        isDetailView ? styles.pointerEventsAuto : styles.pointerEventsNone,
                     ]}
+                    pointerEvents={isDetailView ? "auto" : "none"}
                 >
                     {stack}
                 </View>
@@ -69,14 +78,5 @@ const styles = StyleSheet.create({
     },
     outletHidden: {
         opacity: 0,
-    },
-    pointerEventsAuto: {
-        pointerEvents: "auto",
-    },
-    pointerEventsBoxNone: {
-        pointerEvents: "box-none",
-    },
-    pointerEventsNone: {
-        pointerEvents: "none",
     },
 });

@@ -2,12 +2,24 @@ import { render, screen } from "@testing-library/react-native";
 import { Avatar } from "../Avatar";
 
 jest.mock("expo-image", () => ({
-    Image: ({ accessibilityLabel, source }: { accessibilityLabel?: string; source?: unknown }) => {
+    Image: ({
+        accessibilityLabel,
+        className,
+        source,
+        style,
+    }: {
+        accessibilityLabel?: string;
+        className?: string;
+        source?: unknown;
+        style?: unknown;
+    }) => {
         const { View } = require("react-native");
         return (
             <View
                 testID="avatar-image"
                 accessibilityLabel={accessibilityLabel}
+                className={className}
+                style={style}
                 {...({ source } as any)}
             />
         );
@@ -49,5 +61,43 @@ describe("Avatar accessibility", () => {
         expect(screen.getByTestId("avatar-image").props.source).toEqual({
             uri: "https://storage.test/user-avatars/avatars/user/avatar.png",
         });
+    });
+
+    it("renders image avatars with the web-style rounded square shape on native", () => {
+        render(<Avatar src="https://cdn.test/avatar.webp" size={48} />);
+
+        expect(screen.getByTestId("avatar-image").props.className).toContain("rounded-xl");
+        expect(screen.getByTestId("avatar-image").props.style).toEqual(
+            expect.objectContaining({
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+            }),
+        );
+    });
+
+    it("renders generated initials avatars with the web-style rounded square shape on native", () => {
+        render(<Avatar name="Ivan Petrov" size={48} />);
+
+        expect(screen.getByTestId("avatar-initials").props.className).toContain("rounded-xl");
+        expect(screen.getByTestId("avatar-initials").props.style).toEqual(
+            expect.objectContaining({
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+            }),
+        );
+    });
+
+    it("keeps explicit circular avatar overrides", () => {
+        render(<Avatar src="https://cdn.test/avatar.webp" size={48} className="rounded-full" />);
+
+        expect(screen.getByTestId("avatar-image").props.style).toEqual(
+            expect.objectContaining({
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+            }),
+        );
     });
 });

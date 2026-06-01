@@ -10,6 +10,7 @@ const mockCalls = {
     cancel: jest.fn(),
 };
 
+const mockModalOverlay = jest.fn();
 const mockStartCallRingtone = jest.fn(async (_kind: unknown) => true);
 const mockStopCallRingtone = jest.fn(async (_kind: unknown) => undefined);
 
@@ -40,8 +41,15 @@ jest.mock("@/shared/ui", () => ({
         const { Text } = require("react-native");
         return <Text testID="avatar">{name}</Text>;
     },
-    ModalOverlay: ({ children, visible }: { children: React.ReactNode; visible?: boolean }) =>
-        visible ? <>{children}</> : null,
+    ModalOverlay: (props: {
+        children: React.ReactNode;
+        visible?: boolean;
+        backdropClassName?: string;
+        contentClassName?: string;
+    }) => {
+        mockModalOverlay(props);
+        return props.visible ? <>{props.children}</> : null;
+    },
 }));
 
 jest.mock("@/shared/lib/call-sounds", () => ({
@@ -103,6 +111,20 @@ describe("OutgoingCallModal", () => {
                 avatarUrl: "https://cdn.test/bob.png",
             },
         ]);
+    });
+
+    it("renders ringing state inside the shared native modal overlay", () => {
+        useCallStore.getState().setOutgoingCall(makeCall());
+
+        render(<OutgoingCallModal />);
+
+        expect(mockModalOverlay).toHaveBeenCalledWith(
+            expect.objectContaining({
+                visible: true,
+                backdropClassName: expect.stringContaining("bg-black/70"),
+                contentClassName: expect.stringContaining("bg-app-card"),
+            }),
+        );
     });
 
     it("shows outgoing connection state and starts ringtone", async () => {

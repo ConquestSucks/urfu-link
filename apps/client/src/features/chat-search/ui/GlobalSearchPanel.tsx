@@ -36,7 +36,7 @@ export const GlobalSearchPanel = ({ onResultPress }: GlobalSearchPanelProps) => 
             return;
         }
         setPendingScrollToMessageId(item.messageId);
-        router.push(`/chats/${item.conversationId}` as never);
+        router.push(`/chats/${encodeURIComponent(item.conversationId)}` as never);
     };
 
     if (query.length < 2) return null;

@@ -34,6 +34,10 @@ import {
     usePresenceStore,
 } from "@/entities/presence";
 import { useConversationSend } from "../lib/use-conversation-send";
+import {
+    getDocumentVisibility,
+    subscribeDocumentVisibility,
+} from "@/shared/lib/document-visibility";
 
 export const ChatView = () => {
     const { currentTab, params } = useInboxRouting();
@@ -55,9 +59,7 @@ export const ChatView = () => {
     const [openThreadRootId, setOpenThreadRootId] = useState<string | null>(null);
     const [isPinnedModalOpen, setIsPinnedModalOpen] = useState(false);
     const [subjectProfileUserId, setSubjectProfileUserId] = useState<string | null>(null);
-    const [isDocumentVisible, setIsDocumentVisible] = useState(() =>
-        typeof document === "undefined" || document.visibilityState === "visible",
-    );
+    const [isDocumentVisible, setIsDocumentVisible] = useState(getDocumentVisibility);
     const { isMobile } = useWindowSize();
     const listRef = useRef<MessagesListHandle>(null);
     const inputRef = useRef<ChatInputHandle>(null);
@@ -195,20 +197,7 @@ export const ChatView = () => {
             });
     }, [chatId, shouldSkipRemoteConversationLoads]);
 
-    useEffect(() => {
-        if (typeof document === "undefined") {
-            return;
-        }
-
-        const handleVisibilityChange = () => {
-            setIsDocumentVisible(document.visibilityState === "visible");
-        };
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => {
-            document.removeEventListener("visibilitychange", handleVisibilityChange);
-        };
-    }, []);
+    useEffect(() => subscribeDocumentVisibility(setIsDocumentVisible), []);
 
     useEffect(() => {
         if (!chatId || shouldSkipRemoteConversationLoads || !isDocumentVisible) {

@@ -22,6 +22,12 @@ const AVATAR_COLORS = [
     "#DC2626",
     "#0891B2",
 ];
+const DEFAULT_AVATAR_RADIUS = 12;
+
+const getAvatarBorderRadius = (size: number, className?: string) =>
+    className?.split(/\s+/).includes("rounded-full")
+        ? size / 2
+        : Math.min(DEFAULT_AVATAR_RADIUS, size / 2);
 
 function getInitials(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -57,12 +63,19 @@ export const Avatar = ({
     decorative,
 }: AvatarProps) => {
     const label = getAccessibilityLabel(name, accessibilityLabel, decorative);
+    const borderRadius = getAvatarBorderRadius(size, className);
 
     if (!src) {
         if (name) {
             return (
                 <View
-                    style={{ width: size, height: size, backgroundColor: getAvatarColor(name) }}
+                    testID="avatar-initials"
+                    style={{
+                        width: size,
+                        height: size,
+                        borderRadius,
+                        backgroundColor: getAvatarColor(name),
+                    }}
                     className={`rounded-xl shrink-0 items-center justify-center ${className ?? ""}`}
                     accessibilityLabel={label}
                     accessible={!decorative}
@@ -75,7 +88,8 @@ export const Avatar = ({
         }
         return (
             <View
-                style={{ width: size, height: size }}
+                testID="avatar-placeholder"
+                style={{ width: size, height: size, borderRadius }}
                 className={`rounded-xl bg-slate-750 shrink-0 ${className ?? ""}`}
                 accessibilityLabel={label}
                 accessible={!decorative}
@@ -85,7 +99,7 @@ export const Avatar = ({
     return (
         <Image
             source={{ uri: getAvatarVariantUrl(src, size) }}
-            style={{ width: size, height: size }}
+            style={{ width: size, height: size, borderRadius }}
             className={`rounded-xl shrink-0 ${className ?? ""}`}
             accessibilityLabel={label}
             contentFit="cover"
