@@ -6,6 +6,7 @@ import { MobileBottomTabs } from "../MobileBottomTabs";
 
 let mockPathname = "/chats";
 let mockSegments = ["(authorized)", "chats"];
+let mockLocalParams: Record<string, string | undefined> = {};
 const mockReplace = jest.fn();
 
 jest.mock("expo-router", () => ({
@@ -14,6 +15,7 @@ jest.mock("expo-router", () => ({
     },
     usePathname: () => mockPathname,
     useSegments: () => mockSegments,
+    useLocalSearchParams: () => mockLocalParams,
 }));
 
 jest.mock("@/shared/lib/nativewind-interop", () => ({
@@ -48,15 +50,26 @@ describe("MobileBottomTabs", () => {
         jest.clearAllMocks();
         mockPathname = "/chats";
         mockSegments = ["(authorized)", "chats"];
+        mockLocalParams = {};
     });
 
     it("hides tabs when nested chat detail is active even if pathname is still the list route", () => {
         mockSegments = ["(authorized)", "chats", "[id]"];
+        mockLocalParams = { id: "chat-1" };
 
         render(<MobileBottomTabs />);
 
         const style = StyleSheet.flatten(screen.getByTestId("mobile-bottom-tabs-container").props.style);
         expect(style.pointerEvents).toBe("none");
+    });
+
+    it("shows tabs on the inbox root when only stale dynamic segments remain", () => {
+        mockSegments = ["(authorized)", "chats", "[id]"];
+
+        render(<MobileBottomTabs />);
+
+        const style = StyleSheet.flatten(screen.getByTestId("mobile-bottom-tabs-container").props.style);
+        expect(style.pointerEvents).toBe("auto");
     });
 
     it("keeps tabs interactive on the inbox list route", () => {

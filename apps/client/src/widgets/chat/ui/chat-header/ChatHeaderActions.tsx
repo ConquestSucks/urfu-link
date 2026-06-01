@@ -8,7 +8,6 @@ import {
 import React, { useRef } from "react";
 import { Pressable, View } from "react-native";
 import { getChatHeaderActions } from "../../config/headerActions";
-import { glow } from "@/shared/ui/glow";
 
 interface ChatHeaderActionsProps {
     onOpenProfile: () => void;
@@ -52,8 +51,8 @@ export const ChatHeaderActions = ({
         <View className="flex-row gap-1 items-center">
             {onStartAudioCall ? (
                 <Pressable
-                    className="p-2 rounded-xl bg-brand-650/10 active:bg-white/10"
-                    style={glow.brandSubtle}
+                    testID="chat-header-audio-call"
+                    className="p-2 rounded-xl active:bg-white/10"
                     onPress={onStartAudioCall}
                 >
                     <PhoneIcon size={24} className="text-text-muted" weight="regular" />
@@ -61,8 +60,8 @@ export const ChatHeaderActions = ({
             ) : null}
             {onStartVideoCall ? (
                 <Pressable
-                    className="p-2 rounded-xl bg-brand-650/10 active:bg-white/10"
-                    style={glow.brandSubtle}
+                    testID="chat-header-video-call"
+                    className="p-2 rounded-xl active:bg-white/10"
                     onPress={onStartVideoCall}
                 >
                     <VideoCameraIcon size={24} className="text-text-muted" weight="regular" />

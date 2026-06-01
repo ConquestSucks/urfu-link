@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react-native";
 import type { ReactNode } from "react";
+import { View } from "react-native";
 
 import { ChatHeader } from "../ChatHeader";
 
@@ -170,5 +171,23 @@ describe("ChatHeader presence state", () => {
         fireEvent.press(screen.getByTestId("chat-header-profile-trigger"));
 
         expect(screen.getByText("profile modal open")).toBeTruthy();
+    });
+
+    it("does not draw an extra avatar halo for an online direct chat", () => {
+        mockPeerPresence = {
+            userId: mockPeerUserId,
+            status: "Online",
+            platforms: [],
+            lastSeenAt: null,
+        };
+
+        render(<ChatHeader chatId="chat-1" />);
+
+        const avatarFrame = screen
+            .UNSAFE_getAllByType(View)
+            .find((view) => String(view.props.className ?? "").includes("relative z-1"));
+
+        expect(avatarFrame?.props.className).not.toContain("p-0.5");
+        expect(avatarFrame?.props.style).toBeUndefined();
     });
 });
