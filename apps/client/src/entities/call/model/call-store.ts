@@ -4,6 +4,7 @@ import {
     type CallTokenDto,
     type CallType,
 } from "@urfu-link/api-client";
+import { Platform } from "react-native";
 import { apiClient } from "@/shared/lib/api";
 import { getCallClientInstanceId } from "./call-client-instance";
 
@@ -64,7 +65,7 @@ const isTokenFresh = (token?: CallTokenDto | null): boolean => {
 };
 
 const readRemoteActiveCallId = (): string | null => {
-    if (typeof globalThis.localStorage === "undefined") {
+    if (Platform.OS !== "web" || typeof globalThis.localStorage === "undefined") {
         return null;
     }
 

@@ -11,6 +11,7 @@ const mockRouterPush = jest.fn();
 let mockCurrentView: "messages" | "notifications" = "messages";
 let mockCurrentTab: "chats" | "subjects" = "chats";
 let mockSegments = ["(authorized)", "chats", "[id]"];
+let mockPathname = "/chats/chat-1";
 let mockNotifications: any[] = [
     {
         id: "notification-1",
@@ -43,6 +44,7 @@ jest.mock("@/shared/lib/useInboxRouting", () => ({
     useInboxRouting: () => ({
         currentTab: mockCurrentTab,
         currentView: mockCurrentView,
+        pathname: mockPathname,
         params: { id: "chat-1" },
     }),
 }));
@@ -144,6 +146,7 @@ describe("InboxLayout navigation", () => {
         mockCurrentView = "messages";
         mockCurrentTab = "chats";
         mockSegments = ["(authorized)", "chats", "[id]"];
+        mockPathname = "/chats/chat-1";
         mockNotifications = [
             {
                 id: "notification-1",
@@ -167,15 +170,37 @@ describe("InboxLayout navigation", () => {
 
         fireEvent.press(screen.getByTestId("inbox-chat-row"));
 
-        expect(mockRouterPush).toHaveBeenCalledWith("/chats/chat-1");
+        expect(mockRouterPush).toHaveBeenCalledWith({
+            params: { id: "chat-1" },
+            pathname: "/chats/[id]",
+        });
     });
 
     it("clears stale active chat selection outside the detail route", () => {
         mockSegments = ["(authorized)", "chats"];
+        mockPathname = "/chats";
 
         render(<InboxLayout />);
 
         expect(screen.getByTestId("inbox-chat-active-state").props.children).toBe("idle");
+    });
+
+    it("marks a chat active only when the actual route is its detail route", () => {
+        mockSegments = ["(authorized)", "chats"];
+        mockPathname = "/chats/chat-1";
+
+        render(<InboxLayout />);
+
+        expect(screen.getByTestId("inbox-chat-active-state").props.children).toBe("active");
+    });
+
+    it("keeps the mobile detail route visible when only the nested route segment changes", () => {
+        mockSegments = ["(authorized)", "chats", "[id]"];
+        mockPathname = "/chats";
+
+        render(<InboxLayout />);
+
+        expect(screen.getByTestId("inbox-chat-active-state").props.children).toBe("active");
     });
 
     it("opens a notification deep link and prepares message scrolling", () => {

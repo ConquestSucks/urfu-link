@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import { useChatStore } from "@/entities/conversation/model/chat-store";
+import { subscribePageLifecycle } from "@/shared/lib/page-lifecycle";
 
 /**
  * Подключается к ChatHub при mount, disconnect при unmount.
@@ -21,10 +22,10 @@ export const useChatHub = () => {
             connect();
         };
 
-        if (typeof window !== "undefined") {
-            window.addEventListener("pagehide", handlePageHide);
-            window.addEventListener("pageshow", handlePageShow);
-        }
+        const unsubscribePageLifecycle = subscribePageLifecycle({
+            onPageHide: handlePageHide,
+            onPageShow: handlePageShow,
+        });
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
@@ -35,10 +36,7 @@ export const useChatHub = () => {
         });
 
         return () => {
-            if (typeof window !== "undefined") {
-                window.removeEventListener("pagehide", handlePageHide);
-                window.removeEventListener("pageshow", handlePageShow);
-            }
+            unsubscribePageLifecycle();
             disconnect();
             subscription.remove();
         };

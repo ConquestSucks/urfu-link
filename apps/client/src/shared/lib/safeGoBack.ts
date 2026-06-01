@@ -1,7 +1,12 @@
 import { router, type Href } from "expo-router";
 import { Platform } from "react-native";
-export function safeGoBack(fallbackHref: Href) {
-    if (Platform.OS === "web") {
+
+type SafeGoBackOptions = {
+    preferFallback?: boolean;
+};
+
+export function safeGoBack(fallbackHref: Href, options: SafeGoBackOptions = {}) {
+    if (Platform.OS === "web" || options.preferFallback) {
         router.replace(fallbackHref);
         return;
     }

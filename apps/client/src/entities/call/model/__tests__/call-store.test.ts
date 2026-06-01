@@ -1,4 +1,5 @@
 import type { CallSessionDto, CallTokenDto } from "@urfu-link/api-client";
+import { Platform } from "react-native";
 
 const mockCalls = {
     start: jest.fn(),
@@ -21,6 +22,12 @@ jest.mock("../call-client-instance", () => ({
 }));
 
 const { useCallStore } = require("../call-store");
+const setPlatformOS = (os: typeof Platform.OS) => {
+    Object.defineProperty(Platform, "OS", {
+        configurable: true,
+        get: () => os,
+    });
+};
 
 const now = "2026-05-30T10:00:00.000Z";
 
@@ -74,6 +81,7 @@ const makeToken = (overrides: Partial<CallTokenDto> = {}): CallTokenDto => ({
 describe("useCallStore", () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        setPlatformOS("web");
         jest.spyOn(Date, "now").mockReturnValue(Date.parse(now));
         Object.defineProperty(globalThis, "localStorage", {
             configurable: true,
@@ -218,6 +226,23 @@ describe("useCallStore", () => {
         expect(result).toEqual(active);
         expect(useCallStore.getState().activeCall).toEqual(active);
         expect(useCallStore.getState().outgoingCall).toBeNull();
+    });
+
+    it("ignores browser active-call storage on native", async () => {
+        setPlatformOS("android");
+        const ringing = makeCall({ callType: "Audio" });
+        (globalThis.localStorage.getItem as jest.Mock).mockReturnValue(JSON.stringify({
+            callId: "call-remote",
+            clientInstanceId: "client-2",
+            updatedAt: Date.now(),
+        }));
+        mockCalls.start.mockResolvedValue(ringing);
+
+        const result = await useCallStore.getState().startCall("conversation-1", "Audio");
+
+        expect(mockCalls.get).not.toHaveBeenCalled();
+        expect(mockCalls.start).toHaveBeenCalledWith("conversation-1", "Audio");
+        expect(result).toEqual(ringing);
     });
 
     it("accept event promotes a matching outgoing call to active", () => {

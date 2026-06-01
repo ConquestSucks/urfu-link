@@ -9,7 +9,7 @@ import {
 } from "@/entities/conversation/model/participants-store";
 import { useCurrentUserId } from "@/shared/store/auth-store";
 import { startCallRingtone, stopCallRingtone } from "@/shared/lib/call-sounds";
-import { Avatar } from "@/shared/ui";
+import { Avatar, ModalOverlay } from "@/shared/ui";
 import { PhoneDisconnectIcon, PhoneIcon, VideoCameraIcon } from "@/shared/ui/phosphor";
 import { glow } from "@/shared/ui/glow";
 
@@ -27,6 +27,7 @@ export const OutgoingCallModal = () => {
     const [isCancelling, setIsCancelling] = useState(false);
     const outgoingCallIdRef = useRef<string | null>(null);
     const openedCallIdRef = useRef<string | null>(null);
+    const keepModalOpen = useCallback(() => undefined, []);
 
     useEffect(() => {
         if (!conversationId || participants.length > 0) return;
@@ -92,47 +93,47 @@ export const OutgoingCallModal = () => {
     }
 
     return (
-        <View
-            className="absolute inset-0 z-50 justify-center items-center bg-black/70 px-4"
-            style={{ position: "absolute" }}
+        <ModalOverlay
+            visible
+            onClose={keepModalOpen}
+            backdropClassName="bg-black/70 px-4"
+            contentClassName="w-full max-w-[420px] rounded-3xl border border-white/15 bg-app-card p-5"
         >
-            <View className="w-full max-w-[420px] rounded-3xl border border-white/15 bg-app-card p-5" style={glow.surfaceStrong}>
-                <View className="items-center gap-3">
-                    <View className="h-12 w-12 rounded-2xl bg-brand-650/15 border border-brand-300/10 items-center justify-center" style={glow.brandSubtle}>
-                        {outgoingCall.callType === "Video" ? (
-                            <VideoCameraIcon size={24} className="text-white" />
-                        ) : (
-                            <PhoneIcon size={24} className="text-white" />
-                        )}
-                    </View>
-
-                    <Avatar size={72} src={peer?.avatarUrl} name={peer?.name ?? "U"} />
-
-                    <View className="items-center gap-1">
-                        <Text className="text-white text-xl font-semibold" numberOfLines={1}>
-                            {peer?.name ?? "Пользователь"}
-                        </Text>
-                        <Text className="text-text-muted text-sm">{callLabel}</Text>
-                        <Text className="text-white/80 text-sm">Устанавливаем соединение</Text>
-                    </View>
+            <View className="items-center gap-3">
+                <View className="h-12 w-12 rounded-2xl bg-brand-650/15 border border-brand-300/10 items-center justify-center" style={glow.brandSubtle}>
+                    {outgoingCall.callType === "Video" ? (
+                        <VideoCameraIcon size={24} className="text-white" />
+                    ) : (
+                        <PhoneIcon size={24} className="text-white" />
+                    )}
                 </View>
 
-                <Pressable
-                    onPress={handleCancel}
-                    disabled={isCancelling}
-                    className="mt-5 h-12 rounded-2xl bg-red-600/90 items-center justify-center flex-row gap-2 disabled:opacity-60"
-                    style={glow.danger}
-                >
-                    {isCancelling ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                        <>
-                            <PhoneDisconnectIcon size={18} className="text-white" />
-                            <Text className="text-white font-semibold">Отменить</Text>
-                        </>
-                    )}
-                </Pressable>
+                <Avatar size={72} src={peer?.avatarUrl} name={peer?.name ?? "U"} />
+
+                <View className="items-center gap-1">
+                    <Text className="text-white text-xl font-semibold" numberOfLines={1}>
+                        {peer?.name ?? "Пользователь"}
+                    </Text>
+                    <Text className="text-text-muted text-sm">{callLabel}</Text>
+                    <Text className="text-white/80 text-sm">Устанавливаем соединение</Text>
+                </View>
             </View>
-        </View>
+
+            <Pressable
+                onPress={handleCancel}
+                disabled={isCancelling}
+                className="mt-5 h-12 rounded-2xl bg-red-600/90 items-center justify-center flex-row gap-2 disabled:opacity-60"
+                style={glow.danger}
+            >
+                {isCancelling ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                    <>
+                        <PhoneDisconnectIcon size={18} className="text-white" />
+                        <Text className="text-white font-semibold">Отменить</Text>
+                    </>
+                )}
+            </Pressable>
+        </ModalOverlay>
     );
 };

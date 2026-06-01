@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
 import { usePresenceStore } from "@/entities/presence";
 import { notifyPresenceDisconnect } from "@/shared/lib/signalr";
+import { subscribePageLifecycle } from "@/shared/lib/page-lifecycle";
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 const shouldDisconnectForAppState = (nextState: AppStateStatus) =>
@@ -75,10 +76,10 @@ export function usePresenceHub() {
             connectAndStartHeartbeat();
         };
 
-        if (typeof window !== "undefined") {
-            window.addEventListener("pagehide", handlePageHide);
-            window.addEventListener("pageshow", handlePageShow);
-        }
+        const unsubscribePageLifecycle = subscribePageLifecycle({
+            onPageHide: handlePageHide,
+            onPageShow: handlePageShow,
+        });
 
         const subscription = AppState.addEventListener("change", (nextState: AppStateStatus) => {
             if (nextState === "active") {
@@ -89,10 +90,7 @@ export function usePresenceHub() {
         });
 
         return () => {
-            if (typeof window !== "undefined") {
-                window.removeEventListener("pagehide", handlePageHide);
-                window.removeEventListener("pageshow", handlePageShow);
-            }
+            unsubscribePageLifecycle();
             disconnectAndStopHeartbeat();
             subscription.remove();
         };

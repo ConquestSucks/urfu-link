@@ -3,6 +3,7 @@ import { Text } from "react-native";
 
 import { Inbox } from "../Inbox";
 import { InboxMobile } from "../InboxMobile";
+import { List } from "../List";
 
 let mockCurrentView: "messages" | "notifications" = "messages";
 
@@ -127,5 +128,11 @@ describe("Inbox loading state", () => {
         fireEvent.press(screen.getByText("Прочитать все"));
 
         expect(onMarkAllNotificationsRead).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps list row taps active while the search input is focused", () => {
+        render(<List data={rows} renderItem={renderItem} />);
+
+        expect(screen.UNSAFE_getByProps({ keyboardShouldPersistTaps: "handled" })).toBeTruthy();
     });
 });

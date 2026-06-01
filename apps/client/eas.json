@@ -31,6 +31,18 @@
         "EXPO_PUBLIC_API_URL": "https://api.urfu-link.ghjc.ru",
         "EXPO_PUBLIC_KEYCLOAK_URL": "https://id.ghjc.ru"
       }
+    },
+    "production-apk": {
+      "distribution": "internal",
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "prod",
+        "EXPO_PUBLIC_API_URL": "https://api.urfu-link.ghjc.ru",
+        "EXPO_PUBLIC_KEYCLOAK_URL": "https://id.ghjc.ru"
+      }
     }
   },
   "submit": {

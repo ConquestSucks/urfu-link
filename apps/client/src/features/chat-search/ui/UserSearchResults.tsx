@@ -21,7 +21,7 @@ export const UserSearchResults = () => {
         // Сбрасываем поиск — иначе при возврате на Inbox пользователь увидит
         // прежнюю выдачу. Кроме того clearGlobal вернёт scope в "messages".
         clearGlobal();
-        router.push(`/chats/${conversationId}` as never);
+        router.push(`/chats/${encodeURIComponent(conversationId)}` as never);
     };
 
     if (query.length < 2) return null;

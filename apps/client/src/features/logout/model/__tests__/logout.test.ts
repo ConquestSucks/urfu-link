@@ -1,7 +1,9 @@
 import {
     createKeycloakLogoutUrl,
     createPomeriumSignOutUrl,
+    performLogout,
 } from "../logout";
+import { Platform } from "react-native";
 
 jest.mock("@/shared/lib/config", () => ({
     appConfig: {
@@ -19,6 +21,13 @@ jest.mock("@/shared/store/auth-store", () => ({
         }),
     },
 }));
+
+const setPlatformOS = (os: typeof Platform.OS) => {
+    Object.defineProperty(Platform, "OS", {
+        configurable: true,
+        get: () => os,
+    });
+};
 
 describe("logout urls", () => {
     it("builds a same-origin Pomerium sign-out url with the current page as return target", () => {
@@ -44,5 +53,15 @@ describe("logout urls", () => {
         expect(url.searchParams.get("client_id")).toBe("urfu-link-web");
         expect(url.searchParams.get("post_logout_redirect_uri")).toBe("http://localhost:3000/");
         expect(url.searchParams.get("id_token_hint")).toBe("id-token");
+    });
+
+    it("does not require browser sessionStorage during native logout", () => {
+        setPlatformOS("android");
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {},
+        });
+
+        expect(() => performLogout()).not.toThrow();
     });
 });

@@ -1,12 +1,16 @@
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 
 import { ViewToggle } from "../ViewToggle";
 
+const mockReplace = jest.fn();
 const mockLink = jest.fn(({ children }: { children: React.ReactNode }) => children);
 
 jest.mock("expo-router", () => ({
     Link: (props: { children: React.ReactNode }) => mockLink(props),
+    router: {
+        replace: (...args: unknown[]) => mockReplace(...args),
+    },
 }));
 
 jest.mock("@/shared/lib/useWindowSize", () => ({
@@ -53,5 +57,27 @@ describe("ViewToggle", () => {
         expect(activeButton.props.className).toContain("rounded-full");
         expect(activeButton.props.className).toContain("bg-brand-650/12");
         expect(activeStyle?.boxShadow).toBeUndefined();
+    });
+
+    it("navigates directly when a mobile toggle item is pressed", () => {
+        const notificationHref = {
+            pathname: "/chats",
+            params: { view: "notifications" },
+        };
+
+        render(
+            <ViewToggle
+                currentView="messages"
+                createHref={(view) =>
+                    view === "notifications"
+                        ? notificationHref
+                        : { pathname: "/chats", params: { view } }
+                }
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("view-toggle-notifications"));
+
+        expect(mockReplace).toHaveBeenCalledWith(notificationHref);
     });
 });

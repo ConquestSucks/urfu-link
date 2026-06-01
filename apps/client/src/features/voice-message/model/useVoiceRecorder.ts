@@ -5,7 +5,6 @@ import {
     RecordingPresets,
     setAudioModeAsync,
     useAudioRecorder,
-    useAudioRecorderState,
 } from "expo-audio";
 import { getVoiceFileName, getVoiceMimeType } from "../lib/format";
 import type { VoiceRecordingDraft } from "./types";
@@ -27,20 +26,48 @@ type UseVoiceRecorderOptions = {
 export const useVoiceRecorder = ({
     maxDurationSeconds = DEFAULT_MAX_DURATION_SECONDS,
 }: UseVoiceRecorderOptions = {}) => {
-    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
-    const recorderState = useAudioRecorderState(audioRecorder);
+    const statusUrlRef = useRef<string | null>(null);
+    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY, (status) => {
+        statusUrlRef.current = status.url;
+        if (status.hasError) {
+            setError(status.error ?? "Не удалось записать голосовое сообщение");
+            setIsRecording(false);
+        }
+        if (status.isFinished) {
+            setIsRecording(false);
+        }
+    });
     const [draft, setDraft] = useState<VoiceRecordingDraft | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isRecording, setIsRecording] = useState(false);
     const [isStarting, setIsStarting] = useState(false);
     const [isStopping, setIsStopping] = useState(false);
+    const [durationMillis, setDurationMillis] = useState(0);
     const durationMillisRef = useRef(0);
+    const startedAtRef = useRef<number | null>(null);
+    const isRecordingRef = useRef(false);
 
     useEffect(() => {
-        durationMillisRef.current = recorderState.durationMillis ?? 0;
-    }, [recorderState.durationMillis]);
+        isRecordingRef.current = isRecording;
+    }, [isRecording]);
+
+    useEffect(() => {
+        durationMillisRef.current = durationMillis;
+    }, [durationMillis]);
+
+    useEffect(() => {
+        if (!isRecording) return;
+
+        const intervalId = setInterval(() => {
+            if (startedAtRef.current === null) return;
+            setDurationMillis(Date.now() - startedAtRef.current);
+        }, 250);
+
+        return () => clearInterval(intervalId);
+    }, [isRecording]);
 
     const startRecording = useCallback(async () => {
-        if (recorderState.isRecording || isStarting || draft) return;
+        if (isRecording || isStarting || draft) return;
 
         setError(null);
         setIsStarting(true);
@@ -59,22 +86,36 @@ export const useVoiceRecorder = ({
             });
             await audioRecorder.prepareToRecordAsync();
             await Promise.resolve(audioRecorder.record());
+            startedAtRef.current = Date.now();
+            durationMillisRef.current = 0;
+            setDurationMillis(0);
+            setIsRecording(true);
         } catch (recordingError) {
             console.error("Failed to start voice recording", recordingError);
             setError("Не удалось начать запись");
+            startedAtRef.current = null;
+            setIsRecording(false);
             await disableRecordingMode();
         } finally {
             setIsStarting(false);
         }
-    }, [audioRecorder, draft, isStarting, recorderState.isRecording]);
+    }, [audioRecorder, draft, isRecording, isStarting]);
 
     const stopRecording = useCallback(async () => {
-        if (!recorderState.isRecording || isStopping) return null;
+        if (!isRecording || isStopping) return null;
 
         setIsStopping(true);
         try {
             await audioRecorder.stop();
-            const uri = audioRecorder.uri ?? recorderState.url;
+            setIsRecording(false);
+            const elapsedMillis =
+                startedAtRef.current === null
+                    ? durationMillisRef.current
+                    : Math.max(durationMillisRef.current, Date.now() - startedAtRef.current);
+            durationMillisRef.current = elapsedMillis;
+            setDurationMillis(elapsedMillis);
+            startedAtRef.current = null;
+            const uri = audioRecorder.uri ?? statusUrlRef.current;
             if (!uri) {
                 setError("Не удалось сохранить запись");
                 return null;
@@ -98,29 +139,33 @@ export const useVoiceRecorder = ({
             setError("Не удалось остановить запись");
             return null;
         } finally {
+            setIsRecording(false);
             setIsStopping(false);
             await disableRecordingMode();
         }
     }, [
         audioRecorder,
+        isRecording,
         isStopping,
         maxDurationSeconds,
-        recorderState.isRecording,
-        recorderState.url,
     ]);
 
     const cancelRecording = useCallback(async () => {
         setError(null);
-        if (recorderState.isRecording) {
+        if (isRecording) {
             try {
                 await audioRecorder.stop();
             } catch {
                 // Ignore failed cancellation; the next prepareToRecordAsync recreates the recorder state.
             }
         }
+        startedAtRef.current = null;
+        durationMillisRef.current = 0;
+        setDurationMillis(0);
+        setIsRecording(false);
         setDraft(null);
         await disableRecordingMode();
-    }, [audioRecorder, recorderState.isRecording]);
+    }, [audioRecorder, isRecording]);
 
     const discardDraft = useCallback(() => {
         setDraft(null);
@@ -128,19 +173,19 @@ export const useVoiceRecorder = ({
     }, []);
 
     useEffect(() => {
-        if (!recorderState.isRecording) return;
-        if ((recorderState.durationMillis ?? 0) < maxDurationSeconds * 1000) return;
+        if (!isRecording) return;
+        if (durationMillis < maxDurationSeconds * 1000) return;
         void stopRecording();
     }, [
+        durationMillis,
+        isRecording,
         maxDurationSeconds,
-        recorderState.durationMillis,
-        recorderState.isRecording,
         stopRecording,
     ]);
 
     useEffect(
         () => () => {
-            if (audioRecorder.isRecording) {
+            if (isRecordingRef.current) {
                 Promise.resolve(audioRecorder.stop()).catch(() => undefined);
             }
             void disableRecordingMode();
@@ -151,10 +196,10 @@ export const useVoiceRecorder = ({
     return {
         draft,
         error,
-        isRecording: recorderState.isRecording,
+        isRecording,
         isStarting,
         isStopping,
-        durationSeconds: Math.floor((recorderState.durationMillis ?? 0) / 1000),
+        durationSeconds: Math.floor(durationMillis / 1000),
         maxDurationSeconds,
         startRecording,
         stopRecording,

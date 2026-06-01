@@ -16,11 +16,20 @@ import { useInboxConversations } from "../model/use-inbox-conversations";
 import { Inbox } from "./Inbox";
 import { InboxMobile } from "./InboxMobile";
 
+const isInboxDetailPath = (pathname: string, tab: "chats" | "subjects") =>
+    new RegExp(`^/${tab}/[^/?#]+`).test(pathname);
+
+const toInboxDetailPath = (tab: "chats" | "subjects", id: string) =>
+    ({
+        params: { id },
+        pathname: `/${tab}/[id]`,
+    }) as never;
+
 export const InboxLayout = () => {
     const segments = useSegments() as string[];
     const { isMobile } = useWindowSize();
 
-    const { currentTab, currentView, params } = useInboxRouting();
+    const { currentTab, currentView, params, pathname } = useInboxRouting();
 
     const conversationsLoading = useChatStore((s) => s.isConversationsLoading);
     const loadConversations = useChatStore((s) => s.loadConversations);
@@ -65,7 +74,9 @@ export const InboxLayout = () => {
     const markNotificationRead = useInboxStore((s) => s.markNotificationRead);
     const markAllNotificationsRead = useInboxStore((s) => s.markAllNotificationsRead);
 
-    const isDetailView = segments.includes("[id]");
+    const isDetailView = segments.includes("[id]") || isInboxDetailPath(pathname, currentTab);
+    const activeDetailId =
+        isDetailView && typeof params.id === "string" ? params.id : undefined;
 
     // params.view не нормализуем через router.setParams: expo-router падает на
     // первом рендере с "Attempted to navigate before mounting the Root Layout"
@@ -139,7 +150,8 @@ export const InboxLayout = () => {
             }
 
             if (currentTab === "chats") {
-                const isActive = isDetailView && item.id === params.id;
+                const isActive = item.id === activeDetailId;
+                const href = toInboxDetailPath("chats", item.id);
 
                 return (
                     <View key={item.id}>
@@ -147,7 +159,7 @@ export const InboxLayout = () => {
                             {...item}
                             isActive={isActive}
                             onPress={() => {
-                                router.push(`/chats/${item.id}`);
+                                router.push(href);
                             }}
                         />
                     </View>
@@ -159,17 +171,26 @@ export const InboxLayout = () => {
                 <View key={subject.id}>
                     <InboxSubjectGroup
                         subject={subject}
-                        activeChatId={
-                            isDetailView && typeof params.id === "string" ? params.id : undefined
-                        }
+                        activeChatId={activeDetailId}
                         onChatPress={(chatId) => {
-                            router.push(`/subjects/${chatId}`);
+                            const href = toInboxDetailPath("subjects", chatId);
+                            router.push(href);
                         }}
                     />
                 </View>
             );
         },
-        [currentView, currentTab, isDetailView, markNotificationRead, openNotification, params.id]
+        [
+            activeDetailId,
+            currentView,
+            currentTab,
+            isDetailView,
+            markNotificationRead,
+            openNotification,
+            params.id,
+            pathname,
+            segments,
+        ]
     );
 
     return (

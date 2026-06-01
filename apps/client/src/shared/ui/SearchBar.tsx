@@ -1,6 +1,6 @@
 import { MagnifyingGlassIcon, XIcon } from "@/shared/ui/phosphor";
 import { useState } from "react";
-import { Pressable, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { glow } from "./glow";
 
 interface SearchBarProps {
@@ -9,7 +9,13 @@ interface SearchBarProps {
     onChange?: (text: string) => void;
 }
 
-const noFocusOutline = { outlineStyle: "none" } as never;
+const styles = StyleSheet.create({
+    input: {
+        backgroundColor: "transparent",
+        paddingHorizontal: 0,
+        paddingVertical: 0,
+    },
+});
 
 export const SearchBar = ({ placeholder = "Поиск...", value, onChange }: SearchBarProps) => {
     const isControlled = value !== undefined;
@@ -39,13 +45,16 @@ export const SearchBar = ({ placeholder = "Поиск...", value, onChange }: Se
             />
 
             <TextInput
-                className="text-white outline-none text-sm h-full grow placeholder:text-text-subtle selection:bg-brand-600/40 selection:text-white caret-text-subtle"
+                className="text-white outline-none text-sm h-full grow"
                 placeholder={placeholder}
+                placeholderTextColor="#8B8FA8"
+                selectionColor="#2B7FFF"
+                cursorColor="#8B8FA8"
                 value={query}
                 onChangeText={handleChangeText}
                 underlineColorAndroid="transparent"
                 returnKeyType="search"
-                style={noFocusOutline}
+                style={styles.input}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
             />

@@ -6,7 +6,7 @@ import {
 } from "@/features/notifications";
 import { useNotificationStore } from "@/shared/store/notification-store";
 import { BellIcon, ChatCircleTextIcon } from "@/shared/ui/phosphor";
-import { Link } from "expo-router";
+import { Link, router } from "expo-router";
 import React from "react";
 import { Pressable, View } from "react-native";
 import { ViewType } from "../model/types";
@@ -58,24 +58,38 @@ export const ViewToggle = ({
                       ? "text-text-subtle"
                       : "text-text-placeholder";
 
+                const href = createHref(id);
+                const button = (
+                    <Pressable
+                        hitSlop={isMobile ? 8 : 0}
+                        accessibilityRole="tab"
+                        accessibilityLabel={label}
+                        accessibilityState={{ selected: isActive }}
+                        className={buttonClasses}
+                        testID={`view-toggle-${id}`}
+                        onPress={
+                            isMobile
+                                ? () => router.replace(href)
+                                : undefined
+                        }
+                        style={!isMobile && isActive ? glow.brandSoft : undefined}
+                    >
+                        <View className="relative">
+                            <Icon size={iconSize} weight={iconWeight} className={iconColor} />
+                            {hasBadge && unreadCount > 0 && (
+                                <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" style={glow.badge} />
+                            )}
+                        </View>
+                    </Pressable>
+                );
+
+                if (isMobile) {
+                    return <React.Fragment key={id}>{button}</React.Fragment>;
+                }
+
                 return (
-                    <Link key={id} href={createHref(id)} replace asChild>
-                        <Pressable
-                            hitSlop={isMobile ? 8 : 0}
-                            accessibilityRole="tab"
-                            accessibilityLabel={label}
-                            accessibilityState={{ selected: isActive }}
-                            className={buttonClasses}
-                            testID={`view-toggle-${id}`}
-                            style={!isMobile && isActive ? glow.brandSoft : undefined}
-                        >
-                            <View className="relative">
-                                <Icon size={iconSize} weight={iconWeight} className={iconColor} />
-                                {hasBadge && unreadCount > 0 && (
-                                    <View className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-app-bg" style={glow.badge} />
-                                )}
-                            </View>
-                        </Pressable>
+                    <Link key={id} href={href} replace asChild>
+                        {button}
                     </Link>
                 );
             })}

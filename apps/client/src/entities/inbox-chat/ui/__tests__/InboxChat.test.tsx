@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 import { InboxChat } from "../InboxChat";
 
@@ -22,6 +22,25 @@ jest.mock("@/shared/ui/phosphor", () => {
 });
 
 describe("InboxChat unread preview", () => {
+    it("fires row press from the visible row surface", () => {
+        const onPress = jest.fn();
+
+        render(
+            <InboxChat
+                id="direct-1"
+                avatarUrl=""
+                name="Peer User"
+                message="active chat"
+                time="12:00"
+                onPress={onPress}
+            />,
+        );
+
+        fireEvent.press(screen.getByTestId("inbox-chat-row"));
+
+        expect(onPress).toHaveBeenCalledTimes(1);
+    });
+
     it("does not use external row glow that gets clipped by inbox containers", () => {
         render(
             <InboxChat
