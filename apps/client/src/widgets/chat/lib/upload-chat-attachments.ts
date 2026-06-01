@@ -69,6 +69,7 @@ const uploadBody = async (
 
     await fetch(initRes.presignedPutUrl, {
         method: "PUT",
+        headers: { "Content-Type": upload.mimeType },
         body: upload.body,
     });
 

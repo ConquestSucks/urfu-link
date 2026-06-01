@@ -59,7 +59,47 @@ describe("uploadChatAttachments", () => {
         );
         expect(globalThis.fetch).toHaveBeenLastCalledWith(
             "https://storage.example/upload",
-            expect.objectContaining({ method: "PUT", body: blob }),
+            expect.objectContaining({
+                method: "PUT",
+                body: blob,
+                headers: { "Content-Type": "audio/m4a" },
+            }),
+        );
+    });
+
+    it("uploads web recorder voice drafts with the same MIME on init and PUT", async () => {
+        const blob = { size: 2048, type: "audio/webm;codecs=opus" } as Blob;
+        (globalThis.fetch as jest.Mock)
+            .mockResolvedValueOnce({
+                ok: true,
+                blob: jest.fn(async () => blob),
+            })
+            .mockResolvedValueOnce({ ok: true });
+
+        await uploadChatAttachments([], {
+            uri: "blob:https://client.test/voice",
+            fileName: "voice.webm",
+            mimeType: "audio/webm;codecs=opus",
+            durationSeconds: 17,
+        });
+
+        expect(apiClient.media.initUpload).toHaveBeenCalledWith(
+            expect.objectContaining({
+                fileName: "voice.webm",
+                size: 2048,
+                mimeType: "audio/webm;codecs=opus",
+                visibility: "Private",
+                requestedKind: "Voice",
+                durationSeconds: 17,
+            }),
+        );
+        expect(globalThis.fetch).toHaveBeenLastCalledWith(
+            "https://storage.example/upload",
+            expect.objectContaining({
+                method: "PUT",
+                body: blob,
+                headers: { "Content-Type": "audio/webm;codecs=opus" },
+            }),
         );
     });
 
