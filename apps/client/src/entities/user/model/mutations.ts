@@ -9,6 +9,7 @@ import type {
   UpdateNotificationsDto,
   UpdatePrivacyDto,
   UpdateSoundVideoDto,
+  UploadAvatarFile,
   UserProfile,
 } from "@urfu-link/api-client";
 import { userKeys } from "./queries";
@@ -52,7 +53,7 @@ export function useUpdateAccount() {
 export function useUploadAvatar() {
   const invalidateMe = useInvalidateMe();
   return useMutation({
-    mutationFn: (file: File) => apiClient.users.uploadAvatar(file),
+    mutationFn: (file: UploadAvatarFile) => apiClient.users.uploadAvatar(file),
     onSuccess: invalidateMe,
   });
 }

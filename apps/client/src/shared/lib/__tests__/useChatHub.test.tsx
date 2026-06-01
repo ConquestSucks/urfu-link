@@ -55,4 +55,14 @@ describe("useChatHub", () => {
             expect.any(Function),
         );
     });
+
+    it("does not require browser page lifecycle APIs on native", () => {
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {},
+        });
+
+        expect(() => renderHook(() => useChatHub())).not.toThrow();
+        expect(mockConnect).toHaveBeenCalledTimes(1);
+    });
 });

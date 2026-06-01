@@ -128,7 +128,7 @@ export const ChatHeader = ({
                 <View className="flex-row gap-1 items-center flex-1 min-w-0">
                     {isMobile && (
                         <Pressable
-                            onPress={() => safeGoBack("/chats")}
+                            onPress={() => safeGoBack("/chats", { preferFallback: isMobile })}
                             hitSlop={8}
                             className="p-2 rounded-xl"
                         >

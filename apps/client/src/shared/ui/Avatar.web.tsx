@@ -22,6 +22,12 @@ const AVATAR_COLORS = [
     "#DC2626",
     "#0891B2",
 ];
+const DEFAULT_AVATAR_RADIUS = 12;
+
+const getAvatarBorderRadius = (size: number, className?: string) =>
+    className?.split(/\s+/).includes("rounded-full")
+        ? size / 2
+        : Math.min(DEFAULT_AVATAR_RADIUS, size / 2);
 
 const imageStyle: CSSProperties = {
     display: "block",
@@ -65,12 +71,18 @@ export const Avatar = ({
     decorative,
 }: AvatarProps) => {
     const label = getAccessibilityLabel(name, accessibilityLabel, decorative);
+    const borderRadius = getAvatarBorderRadius(size, className);
 
     if (!src) {
         if (name) {
             return (
                 <View
-                    style={{ width: size, height: size, backgroundColor: getAvatarColor(name) }}
+                    style={{
+                        width: size,
+                        height: size,
+                        borderRadius,
+                        backgroundColor: getAvatarColor(name),
+                    }}
                     className={`rounded-xl shrink-0 items-center justify-center ${className ?? ""}`}
                     accessibilityLabel={label}
                     accessible={!decorative}
@@ -84,7 +96,7 @@ export const Avatar = ({
 
         return (
             <View
-                style={{ width: size, height: size }}
+                style={{ width: size, height: size, borderRadius }}
                 className={`rounded-xl bg-slate-750 shrink-0 ${className ?? ""}`}
                 accessibilityLabel={label}
                 accessible={!decorative}
@@ -97,7 +109,7 @@ export const Avatar = ({
 
     return (
         <View
-            style={{ width: size, height: size }}
+            style={{ width: size, height: size, borderRadius }}
             className={`rounded-xl shrink-0 overflow-hidden ${className ?? ""}`}
         >
             <img

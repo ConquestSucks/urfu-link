@@ -1,8 +1,16 @@
 import { useCurrentUser, useDeleteAvatar, useUploadAvatar } from "@/entities/user";
 import { Avatar, Button, Input, LabeledCard, Skeleton } from "@/shared/ui";
+import type { UploadAvatarFile } from "@urfu-link/api-client";
 import { Platform, ScrollView, View } from "react-native";
 
-async function pickFile(): Promise<File | null> {
+const getNativeAssetName = (fileName: string | null | undefined, mimeType: string | null | undefined) => {
+  if (fileName) return fileName;
+
+  const ext = mimeType?.split("/")[1] ?? "jpeg";
+  return `avatar.${ext}`;
+};
+
+async function pickFile(): Promise<UploadAvatarFile | null> {
   if (Platform.OS === "web") {
     return new Promise((resolve) => {
       const input = document.createElement("input");
@@ -29,10 +37,11 @@ async function pickFile(): Promise<File | null> {
   if (result.canceled) return null;
 
   const asset = result.assets[0];
-  const response = await fetch(asset.uri);
-  const blob = await response.blob();
-  const ext = asset.mimeType?.split("/")[1] ?? "jpeg";
-  return new File([blob], `avatar.${ext}`, { type: asset.mimeType ?? "image/jpeg" });
+  return {
+    name: getNativeAssetName(asset.fileName, asset.mimeType),
+    type: asset.mimeType ?? "image/jpeg",
+    uri: asset.uri,
+  };
 }
 
 export const ManageAccount = () => {

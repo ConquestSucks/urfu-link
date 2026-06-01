@@ -1,4 +1,5 @@
 import { fireEvent, render, waitFor } from "@testing-library/react-native";
+import { Platform } from "react-native";
 
 const mockPush = jest.fn();
 
@@ -40,6 +41,12 @@ jest.mock("@/shared/lib/api", () => ({
 const { useCallStore } = require("@/entities/call/model/call-store");
 const { useWindowSize } = require("@/shared/lib/useWindowSize");
 const { CallTabCoordinator } = require("../CallTabCoordinator");
+const setPlatformOS = (os: typeof Platform.OS) => {
+    Object.defineProperty(Platform, "OS", {
+        configurable: true,
+        get: () => os,
+    });
+};
 
 class MockBroadcastChannel {
     static messages: unknown[] = [];
@@ -87,6 +94,7 @@ const installBrowserApis = () => {
 describe("CallTabCoordinator", () => {
     beforeEach(() => {
         mockPush.mockClear();
+        setPlatformOS("web");
         storage.clear();
         MockBroadcastChannel.messages = [];
         useWindowSize.mockReturnValue({ width: 1024, isDesktop: true, isMobile: false });
@@ -138,5 +146,19 @@ describe("CallTabCoordinator", () => {
         await waitFor(() => {
             expect(screen.getByText("Звонок идет на другом устройстве")).toBeTruthy();
         });
+    });
+
+    it("does not touch browser tab APIs on native", () => {
+        setPlatformOS("android");
+        storage.set("urfu-link:active-call-tab", JSON.stringify({
+            callId: "call-1",
+            clientInstanceId: "client-2",
+            updatedAt: Date.now(),
+        }));
+
+        const screen = render(<CallTabCoordinator />);
+
+        expect(screen.queryByTestId("call-tab-coordinator")).toBeNull();
+        expect(globalThis.window.addEventListener).not.toHaveBeenCalled();
     });
 });

@@ -232,4 +232,18 @@ describe("CallScreen", () => {
         expect(mockSendCallLeaveBeacon).toHaveBeenCalledWith("call-123");
         expect(mockClearToken).toHaveBeenCalledWith("call-123");
     });
+
+    it("does not crash on native window shims without page lifecycle listeners", () => {
+        mockCallState.activeCall = {
+            ...mockCall,
+            status: "Active",
+            acceptedAtUtc: "2026-05-30T10:00:00.000Z",
+        };
+        Object.defineProperty(globalThis, "window", {
+            configurable: true,
+            value: {},
+        });
+
+        expect(() => render(<CallScreen />)).not.toThrow();
+    });
 });

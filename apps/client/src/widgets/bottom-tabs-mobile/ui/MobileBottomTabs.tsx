@@ -1,5 +1,5 @@
 import { AnimatedView } from "@/shared/lib/nativewind-interop";
-import { router, usePathname } from "expo-router";
+import { router, usePathname, useSegments } from "expo-router";
 import React, { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
@@ -10,8 +10,12 @@ import { glow } from "@/shared/ui/glow";
 
 const TIMING_MS = 320;
 
-function isChatDetailPath(pathname: string) {
-    return /\/chats\/[^/]+/.test(pathname) || /\/subjects\/[^/]+/.test(pathname);
+function isChatDetailPath(pathname: string, segments: string[]) {
+    return (
+        ((segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]")) ||
+        /\/chats\/[^/]+/.test(pathname) ||
+        /\/subjects\/[^/]+/.test(pathname)
+    );
 }
 
 function TabItems({ pathname }: { pathname: string }) {
@@ -43,7 +47,8 @@ function TabItems({ pathname }: { pathname: string }) {
 
 export const MobileBottomTabs = () => {
     const pathname = usePathname();
-    const hideTabs = isChatDetailPath(pathname);
+    const segments = useSegments() as string[];
+    const hideTabs = isChatDetailPath(pathname, segments);
     const visible = useSharedValue(hideTabs ? 0 : 1);
 
     useEffect(() => {
@@ -64,6 +69,7 @@ export const MobileBottomTabs = () => {
 
     return (
         <AnimatedView
+            testID="mobile-bottom-tabs-container"
             style={[
                 containerStyle,
                 hideTabs ? styles.pointerEventsNone : styles.pointerEventsAuto,

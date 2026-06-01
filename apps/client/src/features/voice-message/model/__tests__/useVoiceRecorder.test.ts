@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react-native";
-import { AudioModule, setAudioModeAsync } from "expo-audio";
+import { AudioModule, setAudioModeAsync, useAudioRecorderState } from "expo-audio";
 import { useVoiceRecorder } from "../useVoiceRecorder";
 
 type MockRecorderState = {
@@ -74,6 +74,12 @@ describe("useVoiceRecorder", () => {
         expect(mockAudioRecorder.record).toHaveBeenCalledTimes(1);
     });
 
+    it("does not poll recorder status after creating the native recorder", () => {
+        renderHook(() => useVoiceRecorder());
+
+        expect(useAudioRecorderState).not.toHaveBeenCalled();
+    });
+
     it("keeps recorder idle and exposes an error when microphone permission is denied", async () => {
         (AudioModule.requestRecordingPermissionsAsync as jest.Mock).mockResolvedValue({
             granted: false,
@@ -93,58 +99,66 @@ describe("useVoiceRecorder", () => {
     });
 
     it("creates a voice draft with whole-second duration and disables recording mode on stop", async () => {
-        const { result, rerender } = renderHook(() => useVoiceRecorder());
-        mockRecorderState = {
-            isRecording: true,
-            durationMillis: 12_300,
-            url: null,
-        };
-        rerender(undefined);
+        jest.useFakeTimers();
+        jest.setSystemTime(0);
+        const { result } = renderHook(() => useVoiceRecorder());
 
-        await act(async () => {
-            await result.current.stopRecording();
-        });
+        try {
+            await act(async () => {
+                await result.current.startRecording();
+            });
+            act(() => {
+                jest.advanceTimersByTime(12_300);
+            });
+            await act(async () => {
+                await result.current.stopRecording();
+            });
 
-        expect(mockAudioRecorder.stop).toHaveBeenCalledTimes(1);
-        expect(result.current.draft).toEqual(
-            expect.objectContaining({
-                uri: "file://voice.m4a",
-                mimeType: "audio/m4a",
-                durationSeconds: 12,
-            }),
-        );
-        expect(setAudioModeAsync).toHaveBeenCalledWith(
-            expect.objectContaining({ allowsRecording: false }),
-        );
+            expect(mockAudioRecorder.stop).toHaveBeenCalledTimes(1);
+            expect(result.current.draft).toEqual(
+                expect.objectContaining({
+                    uri: "file://voice.m4a",
+                    mimeType: "audio/m4a",
+                    durationSeconds: 12,
+                }),
+            );
+            expect(setAudioModeAsync).toHaveBeenCalledWith(
+                expect.objectContaining({ allowsRecording: false }),
+            );
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("auto-stops when the maximum voice duration is reached", async () => {
+        jest.useFakeTimers();
+        jest.setSystemTime(0);
         mockAudioRecorder.uri = "file://auto.webm";
-        const { rerender } = renderHook(() =>
+        const { result } = renderHook(() =>
             useVoiceRecorder({ maxDurationSeconds: 5 }),
         );
-        mockRecorderState = {
-            isRecording: true,
-            durationMillis: 5_000,
-            url: null,
-        };
 
-        await act(async () => {
-            rerender(undefined);
-            await Promise.resolve();
-        });
+        try {
+            await act(async () => {
+                await result.current.startRecording();
+            });
+            await act(async () => {
+                jest.advanceTimersByTime(5_000);
+                await Promise.resolve();
+            });
 
-        expect(mockAudioRecorder.stop).toHaveBeenCalledTimes(1);
+            expect(mockAudioRecorder.stop).toHaveBeenCalledTimes(1);
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it("cancels an active recording and returns the audio mode to playback", async () => {
-        const { result, rerender } = renderHook(() => useVoiceRecorder());
-        mockRecorderState = {
-            isRecording: true,
-            durationMillis: 1_000,
-            url: null,
-        };
-        rerender(undefined);
+        const { result } = renderHook(() => useVoiceRecorder());
+
+        await act(async () => {
+            await result.current.startRecording();
+        });
 
         await act(async () => {
             await result.current.cancelRecording();
