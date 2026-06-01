@@ -11,6 +11,7 @@ import { List } from "./List";
 import { NotificationListToolbar } from "./NotificationListToolbar";
 import { InboxListProps } from "../model/components";
 import { getInboxEmptyState } from "../lib/empty-state-config";
+import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
 import {
     GlobalSearchPanel,
     useGlobalSearch,
@@ -95,6 +96,8 @@ export const InboxMobile = <T,>({
                     <List key={`${currentTab}-${currentView}`} data={data} renderItem={renderItem} />
                 )}
             </View>
+
+            <MobileBottomTabs />
         </View>
     );
 };
