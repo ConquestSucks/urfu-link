@@ -78,6 +78,33 @@ public sealed class DeploymentContractTests
     }
 
     [Fact]
+    public void ProductionPublicServicesShouldAcceptMobileKeycloakBearerTokens()
+    {
+        foreach (var serviceValuesPath in ProductionPublicServiceValuesPaths())
+        {
+            var values = ReadRepoFile(serviceValuesPath);
+
+            Assert.Contains("Auth__TokenHeader: X-Pomerium-Jwt-Assertion", values, StringComparison.Ordinal);
+            Assert.Contains("Auth__Mobile__JwksUrl: http://keycloak.urfu-platform.svc.cluster.local:8080/realms/urfu-link/protocol/openid-connect/certs", values, StringComparison.Ordinal);
+            Assert.Contains("Auth__Mobile__Audience: urfu-link-api", values, StringComparison.Ordinal);
+            Assert.Contains("Auth__Mobile__ValidIssuer: https://id.ghjc.ru/realms/urfu-link", values, StringComparison.Ordinal);
+            Assert.Contains("Auth__Mobile__RoleClaim: roles", values, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void KeycloakBootstrapShouldIssueApiAudienceForFrontendPublicClient()
+    {
+        var bootstrap = ReadRepoFile("deploy", "k8s", "platform", "identity", "keycloak-bootstrap-job.yaml");
+        var frontendClientStart = bootstrap.IndexOf("ensure_client \"urfu-link-web\"", StringComparison.Ordinal);
+        var nextClientStart = bootstrap.IndexOf("# --- Pomerium", frontendClientStart, StringComparison.Ordinal);
+        var frontendClientBlock = bootstrap[frontendClientStart..nextClientStart];
+
+        Assert.Contains("ensure_audience_mapper \"$CLIENT_UUID\" \"urfu-link-api\"", frontendClientBlock, StringComparison.Ordinal);
+        Assert.Contains("ensure_roles_mapper \"$CLIENT_UUID\"", frontendClientBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UserServiceAvatarUploadShouldHaveWritableTempVolume()
     {
         var chartValues = ReadRepoFile("deploy", "helm", "charts", "urfu-service", "values.yaml");
@@ -366,6 +393,18 @@ public sealed class DeploymentContractTests
         var repoRoot = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", ".."));
 
         return File.ReadAllText(Path.Combine([repoRoot, .. pathSegments]));
+    }
+
+    private static IEnumerable<string[]> ProductionPublicServiceValuesPaths()
+    {
+        yield return ["deploy", "helm", "services", "api-gateway", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "user-service", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "chat-service", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "media-service", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "presence-service", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "notification-service", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "call-service", "values-prod.yaml"];
+        yield return ["deploy", "helm", "services", "discipline-service", "values-prod.yaml"];
     }
 
     private static string NormalizeLineEndings(string value) => value.ReplaceLineEndings("\n");

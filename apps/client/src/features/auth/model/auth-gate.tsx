@@ -1,91 +1,82 @@
 import { appConfig } from "@/shared/lib/config";
 import { useAuthStore } from "@/shared/store/auth-store";
-import { useEffect, useState } from "react";
+import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { PropsWithChildren } from "react";
-import { ActivityIndicator, View } from "react-native";
-import { KEYCLOAK_CLIENT_ID, KEYCLOAK_REALM } from "../keycloak-constants";
+import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
+import {
+    handleWebCallback,
+    startNativePKCEFlow as startNativeAuthRequest,
+    startWebPKCEFlow,
+} from "./dev-auth-flow";
 
-const SCOPES = "openid profile email offline_access";
-const REDIRECT_URI = window.location.origin + "/";
+WebBrowser.maybeCompleteAuthSession();
 
-function base64urlEncode(bytes: Uint8Array): string {
-    return btoa(String.fromCharCode(...bytes))
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=/g, "");
-}
+function NativeDevAuthGate({ children }: PropsWithChildren) {
+    const router = useRouter();
+    const { isTokenValid } = useAuthStore();
+    const [authenticating, setAuthenticating] = useState(false);
+    const [promptFailed, setPromptFailed] = useState(false);
+    const promptStartedRef = useRef(false);
 
-async function generateCodeVerifier(): Promise<string> {
-    const array = new Uint8Array(32);
-    crypto.getRandomValues(array);
-    return base64urlEncode(array);
-}
+    const startNativeLogin = useCallback(async () => {
+        setPromptFailed(false);
+        setAuthenticating(true);
 
-async function generateCodeChallenge(verifier: string): Promise<string> {
-    const data = new TextEncoder().encode(verifier);
-    const digest = await crypto.subtle.digest("SHA-256", data);
-    return base64urlEncode(new Uint8Array(digest));
-}
+        try {
+            const result = await startNativeAuthRequest();
+            if (result.type === "success" && result.params.code && result.params.state) {
+                router.replace({
+                    params: {
+                        code: result.params.code,
+                        state: result.params.state,
+                    },
+                    pathname: "/auth",
+                });
+                return;
+            }
 
-async function startPKCEFlow(): Promise<void> {
-    const codeVerifier = await generateCodeVerifier();
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
-    const state = base64urlEncode(crypto.getRandomValues(new Uint8Array(16)));
-
-    sessionStorage.setItem("pkce_code_verifier", codeVerifier);
-    sessionStorage.setItem("pkce_state", state);
-
-    const params = new URLSearchParams({
-        response_type: "code",
-        client_id: KEYCLOAK_CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        scope: SCOPES,
-        state,
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-    });
-
-    window.location.href = `${appConfig.keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth?${params}`;
-}
-
-async function handleCallback(
-    code: string,
-    state: string
-): Promise<{ accessToken: string; refreshToken: string; expiresAt: number; idToken: string | null } | null> {
-    const storedVerifier = sessionStorage.getItem("pkce_code_verifier");
-    const storedState = sessionStorage.getItem("pkce_state");
-
-    if (!storedVerifier || storedState !== state) return null;
-
-    sessionStorage.removeItem("pkce_code_verifier");
-    sessionStorage.removeItem("pkce_state");
-
-    const res = await fetch(
-        `${appConfig.keycloakUrl}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
-        {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-                grant_type: "authorization_code",
-                client_id: KEYCLOAK_CLIENT_ID,
-                code,
-                redirect_uri: REDIRECT_URI,
-                code_verifier: storedVerifier,
-            }).toString(),
+            setPromptFailed(result.type !== "opened");
+        } catch {
+            setPromptFailed(true);
+        } finally {
+            setAuthenticating(false);
         }
-    );
+    }, [router]);
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    return {
-        accessToken: data.access_token,
-        refreshToken: data.refresh_token ?? "",
-        expiresAt: Date.now() + data.expires_in * 1000,
-        idToken: typeof data.id_token === "string" ? data.id_token : null,
-    };
+    useEffect(() => {
+        if (isTokenValid() || promptStartedRef.current) {
+            return;
+        }
+
+        promptStartedRef.current = true;
+        void startNativeLogin();
+    }, [isTokenValid, startNativeLogin]);
+
+    if (authenticating || !isTokenValid()) {
+        return (
+            <View className="flex-1 items-center justify-center gap-4 bg-app-bg px-6">
+                <ActivityIndicator size="large" />
+                {promptFailed ? (
+                    <Pressable
+                        className="rounded-lg bg-app-primary px-5 py-3"
+                        onPress={() => {
+                            promptStartedRef.current = true;
+                            void startNativeLogin();
+                        }}
+                    >
+                        <Text className="font-semibold text-white">Retry login</Text>
+                    </Pressable>
+                ) : null}
+            </View>
+        );
+    }
+
+    return <>{children}</>;
 }
 
-function DevAuthGate({ children }: PropsWithChildren) {
+function WebDevAuthGate({ children }: PropsWithChildren) {
     const { isTokenValid, setTokens } = useAuthStore();
     const [exchanging, setExchanging] = useState(false);
 
@@ -98,7 +89,7 @@ function DevAuthGate({ children }: PropsWithChildren) {
             // Remove OAuth params from URL before doing anything else
             window.history.replaceState({}, "", window.location.pathname);
             setExchanging(true);
-            handleCallback(code, state)
+            handleWebCallback(code, state)
                 .then((result) => {
                     if (result) {
                         setTokens(result.accessToken, result.refreshToken, result.expiresAt, result.idToken);
@@ -109,7 +100,7 @@ function DevAuthGate({ children }: PropsWithChildren) {
         }
 
         if (!isTokenValid()) {
-            startPKCEFlow();
+            startWebPKCEFlow();
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -130,5 +121,9 @@ export function AuthGate({ children }: PropsWithChildren) {
         return <>{children}</>;
     }
 
-    return <DevAuthGate>{children}</DevAuthGate>;
+    if (Platform.OS !== "web") {
+        return <NativeDevAuthGate>{children}</NativeDevAuthGate>;
+    }
+
+    return <WebDevAuthGate>{children}</WebDevAuthGate>;
 }

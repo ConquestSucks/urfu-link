@@ -221,12 +221,19 @@ spec:
                   CLIENT_UUID="$(echo "$CLIENTS_JSON" | jq -r '.[0].id')"
                   echo "Client created with UUID: ${CLIENT_UUID}"
                 else
-                  echo "Client '${CL_ID}' already exists (UUID: ${CLIENT_UUID}), updating display info..."
+                  echo "Client '${CL_ID}' already exists (UUID: ${CLIENT_UUID}), updating display info and redirect settings..."
                   UPDATE_JSON="$(jq -n \
                     --arg name "${DISPLAY_NAME:-$CL_ID}" \
                     --arg baseUrl "$BASE_URL" \
+                    --argjson redirectUris "$REDIRECT_URIS_JSON" \
+                    --argjson webOrigins "$WEB_ORIGINS_JSON" \
                     --argjson serviceAccounts "$SERVICE_ACCOUNTS" \
-                    '{ name: $name, serviceAccountsEnabled: $serviceAccounts } | if $baseUrl != "" then . + {baseUrl: $baseUrl} else . end')"
+                    '{
+                      name: $name,
+                      serviceAccountsEnabled: $serviceAccounts,
+                      redirectUris: $redirectUris,
+                      webOrigins: $webOrigins
+                    } | if $baseUrl != "" then . + {baseUrl: $baseUrl} else . end')"
                   curl --fail --silent --show-error \
                     -X PUT \
                     -H "Authorization: Bearer ${KC_TOKEN}" \
@@ -275,6 +282,39 @@ spec:
                   echo "Groups mapper created."
                 else
                   echo "Groups mapper already exists."
+                fi
+              }
+
+              # ensure_roles_mapper <clientUuid>
+              # Adds realm-roles-to-roles protocol mapper if not present
+              ensure_roles_mapper() {
+                local CL_UUID="$1"
+                echo "Ensuring roles mapper on client ${CL_UUID}..."
+                EXISTING_MAPPERS="$(curl --silent --fail \
+                  -H "Authorization: Bearer ${KC_TOKEN}" \
+                  "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CL_UUID}/protocol-mappers/models")"
+                if ! echo "$EXISTING_MAPPERS" | jq -e '.[] | select(.name=="realm roles to roles claim")' >/dev/null 2>&1; then
+                  curl --fail --silent --show-error \
+                    -X POST \
+                    -H "Authorization: Bearer ${KC_TOKEN}" \
+                    -H "Content-Type: application/json" \
+                    "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CL_UUID}/protocol-mappers/models" \
+                    -d '{
+                      "name": "realm roles to roles claim",
+                      "protocol": "openid-connect",
+                      "protocolMapper": "oidc-usermodel-realm-role-mapper",
+                      "config": {
+                        "multivalued": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "roles",
+                        "jsonType.label": "String"
+                      }
+                    }' >/dev/null
+                  echo "Roles mapper created."
+                else
+                  echo "Roles mapper already exists."
                 fi
               }
 
@@ -451,7 +491,9 @@ spec:
               verify_internal_grpc_token
 
               # --- Frontend Web (public client for mobile) ---
-              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*","http://app.dev.127.0.0.1.nip.io/*"]' '["https://urfu-link.ghjc.ru","http://app.dev.127.0.0.1.nip.io"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
+              ensure_client "urfu-link-web" '["https://urfu-link.ghjc.ru/*","http://app.dev.127.0.0.1.nip.io/*","urfulink://auth"]' '["https://urfu-link.ghjc.ru","http://app.dev.127.0.0.1.nip.io"]' "true" "URFU Link" "https://urfu-link.ghjc.ru"
+              ensure_audience_mapper "$CLIENT_UUID" "urfu-link-api"
+              ensure_roles_mapper "$CLIENT_UUID"
               URFU_LINK_WEB_FULL="$(curl --silent --fail \
                 -H "Authorization: Bearer ${KC_TOKEN}" \
                 "${KEYCLOAK_URL}/admin/realms/urfu-link/clients/${CLIENT_UUID}")"

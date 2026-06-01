@@ -29,6 +29,6 @@ export const appStorage: StateStorage = {
             window.localStorage.removeItem(name);
             return;
         }
-        nativeStorage?.delete(name);
+        nativeStorage?.remove(name);
     }
 };
