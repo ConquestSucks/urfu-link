@@ -5,6 +5,8 @@ export const formatVoiceDuration = (seconds: number | null | undefined) => {
     return `${minutes}:${rest.toString().padStart(2, "0")}`;
 };
 
+const baseMimeType = (mimeType: string) => mimeType.split(";")[0].trim().toLowerCase();
+
 export const getVoiceMimeType = (uri: string, fallback: "native" | "web" = "native") => {
     const normalized = uri.toLowerCase().split("?")[0];
     if (normalized.endsWith(".webm")) return "audio/webm";
@@ -16,13 +18,14 @@ export const getVoiceMimeType = (uri: string, fallback: "native" | "web" = "nati
 };
 
 export const getVoiceFileName = (mimeType: string) => {
-    const extension = mimeType === "audio/webm"
+    const normalized = baseMimeType(mimeType);
+    const extension = normalized === "audio/webm"
         ? "webm"
-        : mimeType === "audio/ogg"
+        : normalized === "audio/ogg"
           ? "ogg"
-          : mimeType === "audio/opus"
+          : normalized === "audio/opus"
             ? "opus"
-            : mimeType === "audio/mp4"
+            : normalized === "audio/mp4"
               ? "mp4"
               : "m4a";
     return `voice-${Date.now()}.${extension}`;

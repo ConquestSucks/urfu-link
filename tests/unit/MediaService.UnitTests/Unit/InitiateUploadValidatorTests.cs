@@ -138,6 +138,8 @@ public class InitiateUploadValidatorTests
     [Theory]
     [InlineData("voice.m4a", "audio/m4a")]
     [InlineData("voice.webm", "audio/webm")]
+    [InlineData("voice.webm", "audio/webm;codecs=opus")]
+    [InlineData("voice.ogg", "audio/ogg;codecs=opus")]
     [InlineData("voice.mp4", "audio/mp4")]
     public void AcceptsExplicitVoiceRecorderMimeTypes(string fileName, string mimeType)
     {
