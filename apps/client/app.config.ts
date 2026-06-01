@@ -39,7 +39,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             cause: validated.error,
         });
     }
-    const projectId = process.env.EXPO_EAS_PROJECT_ID;
+    const configExtra = config.extra ?? {};
+    const configExtraEas =
+        typeof configExtra.eas === "object" && configExtra.eas !== null && !Array.isArray(configExtra.eas)
+            ? (configExtra.eas as Record<string, unknown>)
+            : {};
+    const configuredProjectId =
+        typeof configExtraEas.projectId === "string" ? configExtraEas.projectId : undefined;
+    const projectId = process.env.EXPO_EAS_PROJECT_ID ?? configuredProjectId;
     const iosBundleIdentifier =
         process.env.EXPO_IOS_BUNDLE_IDENTIFIER ??
         (appEnv === "prod" ? "ru.urfu.link" : "ru.urfu.link.dev");
@@ -150,12 +157,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             ),
         },
         extra: {
+            ...configExtra,
             appEnv,
             apiUrl,
             keycloakUrl,
             ...(projectId
                 ? {
                     eas: {
+                        ...configExtraEas,
                         projectId
                     }
                 }

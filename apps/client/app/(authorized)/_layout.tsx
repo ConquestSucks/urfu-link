@@ -1,4 +1,10 @@
+import { AuthGate } from "@/features/auth";
+import { useCurrentUser } from "@/entities/user";
 import { useWindowSize } from "@/shared/lib/useWindowSize";
+import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
+import { configureCallSounds } from "@/shared/lib/call-sounds";
+import { configureMessageSounds } from "@/shared/lib/message-sounds";
+import { glow } from "@/shared/ui/glow";
 import { SidebarDesktop } from "@/widgets/sidebar-desktop";
 import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
 import { Slot, useSegments } from "expo-router";
@@ -6,11 +12,6 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useCurrentUser } from "@/entities/user";
-import { configureMessageSounds } from "@/shared/lib/message-sounds";
-import { configureBrowserNotifications } from "@/shared/lib/browser-notifications";
-import { configureCallSounds } from "@/shared/lib/call-sounds";
-import { glow } from "@/shared/ui/glow";
 
 type IdleWindow = Window & {
     requestIdleCallback?: (callback: () => void) => number;
@@ -47,7 +48,7 @@ const SettingsDesktop = lazy(() =>
     })),
 );
 
-export default function AuthLayout() {
+function AuthorizedLayoutContent() {
     const segments = useSegments() as string[];
     const isThreadDetail =
         (segments.includes("chats") || segments.includes("subjects")) && segments.includes("[id]");
@@ -122,5 +123,13 @@ export default function AuthLayout() {
                 </Suspense>
             ) : null}
         </SafeAreaView>
+    );
+}
+
+export default function AuthLayout() {
+    return (
+        <AuthGate>
+            <AuthorizedLayoutContent />
+        </AuthGate>
     );
 }

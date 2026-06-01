@@ -65,7 +65,7 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
       "protocol": "openid-connect",
-      "redirectUris": ["http://localhost:3000/*", "http://localhost:8081/*"],
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:8081/*", "urfulink://auth"],
       "webOrigins": ["http://localhost:3000", "http://localhost:8081"],
       "attributes": {
         "post.logout.redirect.uris": "http://localhost:3000/##http://localhost:8081/"

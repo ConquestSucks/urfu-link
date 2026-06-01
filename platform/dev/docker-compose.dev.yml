@@ -245,7 +245,7 @@ services:
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=user_db;Username=user;Password=user;GSS Encryption Mode=Disable
       Kafka__BootstrapServers: kafka:29092
       Keycloak__ClientSecret: user-service-admin-dev-secret
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       Storage__PublicEndpoint: http://localhost:9000
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
@@ -274,7 +274,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       Infrastructure__Redis__Configuration: redis:6379
       # ServiceDefaults открывает H2C на :8081 во всех сервисах для gRPC.
       GrpcClients__InternalAuth__TokenEndpoint: http://keycloak:8080/realms/urfu-link/protocol/openid-connect/token
@@ -325,7 +325,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=media_db;Username=media;Password=media;GSS Encryption Mode=Disable
       Storage__Endpoint: http://minio:9000
       Storage__PublicEndpoint: http://localhost:9000
@@ -383,7 +383,7 @@ services:
       Kafka__BootstrapServers: kafka:29092
       Kafka__ConsumerTopic: urfu.user.events.v1
       Kafka__ConsumerGroup: presence-privacy-projection-v1
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=presence_db;Username=presence;Password=presence;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
@@ -429,7 +429,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=notification_db;Username=notification;Password=notification;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
       Notification__Push__Provider: fake
@@ -478,7 +478,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       GrpcClients__InternalAuth__TokenEndpoint: http://keycloak:8080/realms/urfu-link/protocol/openid-connect/token
       GrpcClients__InternalAuth__ClientId: chat-service-internal
       GrpcClients__InternalAuth__ClientSecret: chat-service-internal-dev-secret
@@ -525,7 +525,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Kafka__BootstrapServers: kafka:29092
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       ConnectionStrings__Primary: Host=postgres;Port=5432;Database=discipline_db;Username=discipline;Password=discipline;GSS Encryption Mode=Disable
       Infrastructure__Redis__Configuration: redis:6379
     depends_on:
@@ -554,7 +554,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       Cors__AllowedOrigins__0: http://localhost:3000
-      Auth__ValidIssuer: http://localhost:8080/realms/urfu-link
+      Auth__ValidIssuer: ${LOCAL_AUTH_ISSUER:-http://localhost:8080/realms/urfu-link}
       Infrastructure__Redis__Configuration: redis:6379
     ports:
       - "5080:8080"
