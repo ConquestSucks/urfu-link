@@ -71,7 +71,12 @@ public class MultiDeviceTests : IAsyncLifetime
     {
         var userId = Guid.NewGuid();
         var c1 = await TestPresenceHubClient.ConnectAsync(_factory, userId, Platform.Web, "d1");
+        var originalConnectionId = await WaitForStoredSessionConnectionAsync(userId, "d1");
         var c2 = await TestPresenceHubClient.ConnectAsync(_factory, userId, Platform.Web, "d1");
+        var replacementConnectionId = await WaitForStoredSessionConnectionAsync(
+            userId,
+            "d1",
+            connectionId => connectionId != originalConnectionId);
 
         _factory.OutboxWriter.Clear();
 
@@ -89,7 +94,7 @@ public class MultiDeviceTests : IAsyncLifetime
         var sessions = scope.ServiceProvider.GetRequiredService<IPresenceSessionStore>();
         var remaining = await sessions.GetSessionsAsync(userId, CancellationToken.None);
         remaining.Should().ContainSingle(s => s.DeviceId == "d1");
-        remaining.Single().ConnectionId.Should().NotBeNullOrWhiteSpace();
+        remaining.Single().ConnectionId.Should().Be(replacementConnectionId);
 
         await c2.StopAsync();
         await c2.DisposeAsync();
@@ -161,5 +166,43 @@ public class MultiDeviceTests : IAsyncLifetime
             await Task.Delay(50);
         }
         predicate().Should().BeTrue("timeout");
+    }
+
+    private async Task<string> WaitForStoredSessionConnectionAsync(
+        Guid userId,
+        string deviceId,
+        Func<string, bool>? connectionIdPredicate = null,
+        TimeSpan? timeout = null)
+    {
+        connectionIdPredicate ??= _ => true;
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(5));
+        while (DateTime.UtcNow < deadline)
+        {
+            await using (var scope = _factory.Services.CreateAsyncScope())
+            {
+                var sessions = scope.ServiceProvider.GetRequiredService<IPresenceSessionStore>();
+                var current = await sessions.GetSessionsAsync(userId, CancellationToken.None);
+                var storedConnectionId = current.SingleOrDefault(s => s.DeviceId == deviceId)?.ConnectionId;
+                if (!string.IsNullOrWhiteSpace(storedConnectionId)
+                    && connectionIdPredicate(storedConnectionId))
+                {
+                    return storedConnectionId;
+                }
+            }
+
+            await Task.Delay(50);
+        }
+
+        await using var finalScope = _factory.Services.CreateAsyncScope();
+        var finalSessions = finalScope.ServiceProvider.GetRequiredService<IPresenceSessionStore>();
+        var remaining = await finalSessions.GetSessionsAsync(userId, CancellationToken.None);
+        var matching = remaining
+            .Where(s => s.DeviceId == deviceId
+                && !string.IsNullOrWhiteSpace(s.ConnectionId)
+                && connectionIdPredicate(s.ConnectionId))
+            .ToList();
+        matching.Should().ContainSingle(
+            "the expected server-side connection id must be persisted before testing stale disconnect handling");
+        return matching.Single().ConnectionId!;
     }
 }
