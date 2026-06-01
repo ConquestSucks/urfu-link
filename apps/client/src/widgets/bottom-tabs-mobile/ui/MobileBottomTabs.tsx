@@ -11,6 +11,10 @@ import { glow } from "@/shared/ui/glow";
 
 const TIMING_MS = 320;
 
+interface MobileBottomTabsProps {
+    hidden?: boolean;
+}
+
 function TabItems({ pathname }: { pathname: string }) {
     return (
         <>
@@ -38,11 +42,11 @@ function TabItems({ pathname }: { pathname: string }) {
     );
 }
 
-export const MobileBottomTabs = () => {
+export const MobileBottomTabs = ({ hidden = false }: MobileBottomTabsProps) => {
     const pathname = usePathname();
     const segments = useSegments() as string[];
     const params = useLocalSearchParams<{ id?: string }>();
-    const hideTabs = isInboxDetailRoute({ pathname, segments, id: params.id });
+    const hideTabs = hidden || isInboxDetailRoute({ pathname, segments, id: params.id });
     const visible = useSharedValue(hideTabs ? 0 : 1);
 
     useEffect(() => {

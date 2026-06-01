@@ -9,6 +9,7 @@ import { SidebarDesktop } from "@/widgets/sidebar-desktop";
 import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
 import { Slot, useLocalSearchParams, usePathname, useSegments } from "expo-router";
 import { isInboxDetailRoute } from "@/shared/lib/inbox-detail-route";
+import { useMobileBottomTabsVisibilityStore } from "@/widgets/bottom-tabs-mobile/model/visibility";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { View } from "react-native";
 import type { Edge } from "react-native-safe-area-context";
@@ -54,11 +55,15 @@ function AuthorizedLayoutContent() {
     const segments = useSegments() as string[];
     const params = useLocalSearchParams<{ id?: string }>();
     const isThreadDetail = isInboxDetailRoute({ pathname, segments, id: params.id });
+    const isFocusedThreadDetail = useMobileBottomTabsVisibilityStore(
+        (state) => state.isDetailRouteFocused,
+    );
     const isCallRoute = segments.includes("call") && segments.includes("[id]");
     const { isDesktop, isMobile } = useWindowSize();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isRealtimeReady, setIsRealtimeReady] = useState(false);
-    const shouldElevateThreadDetail = isMobile && isThreadDetail;
+    const shouldHideMobileTabs = isThreadDetail || isFocusedThreadDetail;
+    const shouldElevateThreadDetail = isMobile && shouldHideMobileTabs;
 
     const { data: profile } = useCurrentUser();
 
@@ -104,12 +109,12 @@ function AuthorizedLayoutContent() {
                         left: 0,
                         right: 0,
                         bottom: 0,
-                        zIndex: isThreadDetail ? 0 : 3,
-                        elevation: isThreadDetail ? 0 : 1,
+                        zIndex: shouldHideMobileTabs ? 0 : 3,
+                        elevation: shouldHideMobileTabs ? 0 : 1,
                         pointerEvents: "box-none",
                     }}
                 >
-                    <MobileBottomTabs />
+                    <MobileBottomTabs hidden={shouldHideMobileTabs} />
                 </View>
             )}
 
