@@ -51,11 +51,17 @@ describe("MasterDetailLayout", () => {
         render(
             <MasterDetailLayout
                 isDetailView
-                sidebar={<Text testID="inbox-sidebar">Inbox</Text>}
+                sidebar={
+                    <>
+                        <Text testID="inbox-sidebar">Inbox</Text>
+                        <Text testID="mobile-bottom-tabs-container">Tabs</Text>
+                    </>
+                }
             />,
         );
 
         expect(screen.getByTestId("master-detail-stack-container").props.pointerEvents).toBe("auto");
         expect(screen.queryByTestId("inbox-sidebar")).toBeNull();
+        expect(screen.queryByTestId("mobile-bottom-tabs-container")).toBeNull();
     });
 });

@@ -60,6 +60,13 @@ jest.mock("@/widgets/header-mobile", () => ({
     },
 }));
 
+jest.mock("@/widgets/bottom-tabs-mobile", () => ({
+    MobileBottomTabs: () => {
+        const { View } = require("react-native");
+        return <View testID="mobile-bottom-tabs-container" />;
+    },
+}));
+
 jest.mock("../Header", () => ({
     Header: ({ title }: { title: string }) => {
         const { Text: MockText } = require("react-native");
@@ -110,6 +117,12 @@ describe("Inbox loading state", () => {
 
         expect(screen.getByText("Dev Teacher")).toBeTruthy();
         expect(screen.queryByTestId("chat-skeleton")).toBeNull();
+    });
+
+    it("renders the mobile bottom tabs as part of the inbox layout", () => {
+        render(<InboxMobile data={rows} renderItem={renderItem} />);
+
+        expect(screen.getByTestId("mobile-bottom-tabs-container")).toBeTruthy();
     });
 
     it("shows mark-all-read action for desktop notification list", () => {

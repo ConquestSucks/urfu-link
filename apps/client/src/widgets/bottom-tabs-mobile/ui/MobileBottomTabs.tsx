@@ -1,19 +1,10 @@
-import { AnimatedView } from "@/shared/lib/nativewind-interop";
-import { router, useLocalSearchParams, usePathname, useSegments } from "expo-router";
-import React, { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
-import { Easing, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { router, usePathname } from "expo-router";
+import React from "react";
+import { View } from "react-native";
 import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
-import { isInboxDetailRoute } from "@/shared/lib/inbox-detail-route";
 import { MOBILE_TABS } from "../config/tabs";
 import { MobileBottomTabItem } from "./MobileBottomTabItem";
 import { glow } from "@/shared/ui/glow";
-
-const TIMING_MS = 320;
-
-interface MobileBottomTabsProps {
-    hidden?: boolean;
-}
 
 function TabItems({ pathname }: { pathname: string }) {
     return (
@@ -42,54 +33,16 @@ function TabItems({ pathname }: { pathname: string }) {
     );
 }
 
-export const MobileBottomTabs = ({ hidden = false }: MobileBottomTabsProps) => {
+export const MobileBottomTabs = () => {
     const pathname = usePathname();
-    const segments = useSegments() as string[];
-    const params = useLocalSearchParams<{ id?: string }>();
-    const hideTabs = hidden || isInboxDetailRoute({ pathname, segments, id: params.id });
-    const visible = useSharedValue(hideTabs ? 0 : 1);
-
-    useEffect(() => {
-        visible.value = withTiming(hideTabs ? 0 : 1, {
-            duration: TIMING_MS,
-            easing: Easing.bezier(0.4, 0, 0.2, 1),
-        });
-    }, [hideTabs]);
-
-    const containerStyle = useAnimatedStyle(() => ({
-        height: MOBILE_TAB_BAR_HEIGHT * visible.value,
-        overflow: "hidden" as const,
-    }));
-
-    const rowStyle = useAnimatedStyle(() => ({
-        transform: [{ translateY: (1 - visible.value) * MOBILE_TAB_BAR_HEIGHT }],
-    }));
 
     return (
-        <AnimatedView
+        <View
             testID="mobile-bottom-tabs-container"
-            style={[
-                containerStyle,
-                hideTabs ? styles.pointerEventsNone : styles.pointerEventsAuto,
-            ]}
+            className="flex-row bg-app-bg border-t border-effects-white05 pb-[2px]"
+            style={{ height: MOBILE_TAB_BAR_HEIGHT, ...glow.surface }}
         >
-            <AnimatedView style={rowStyle}>
-                <View
-                    className="flex-row bg-app-bg border-t border-effects-white05 pb-[2px]"
-                    style={{ height: MOBILE_TAB_BAR_HEIGHT, ...glow.surface }}
-                >
-                    <TabItems pathname={pathname} />
-                </View>
-            </AnimatedView>
-        </AnimatedView>
+            <TabItems pathname={pathname} />
+        </View>
     );
 };
-
-const styles = StyleSheet.create({
-    pointerEventsAuto: {
-        pointerEvents: "auto",
-    },
-    pointerEventsNone: {
-        pointerEvents: "none",
-    },
-});

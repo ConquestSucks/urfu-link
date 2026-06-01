@@ -4,7 +4,7 @@ import { Redirect, Slot, usePathname, useRouter } from "expo-router";
 import { View, Text, Pressable, ScrollView } from "react-native";
 import { CaretLeftIcon } from "@/shared/ui/phosphor";
 import { SETTINGS_ITEMS } from "@/shared/config";
-import { MOBILE_TAB_BAR_HEIGHT } from "@/shared/config";
+import { MobileBottomTabs } from "@/widgets/bottom-tabs-mobile";
 import { glow } from "@/shared/ui/glow";
 
 const getHeaderTitle = (pathname: string) => {
@@ -46,11 +46,13 @@ export default function ProfileGroupLayout() {
             )}
 
             <ScrollView
-                contentContainerStyle={{ paddingBottom: 24 + MOBILE_TAB_BAR_HEIGHT }}
+                contentContainerStyle={{ paddingBottom: 24 }}
                 className="px-6 overflow-y-scroll"
             >
                 <Slot />
             </ScrollView>
+
+            <MobileBottomTabs />
         </View>
     );
 }
