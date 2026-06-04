@@ -37,7 +37,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: expo/expo-github-action@v8
+      - uses: expo/expo-github-action@v9
         with:
           expo-version: latest
           eas-version: latest
