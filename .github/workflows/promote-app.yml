@@ -36,7 +36,7 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.environment == 'prod' && 'master' || 'develop' }}
           token: ${{ secrets.GITHUB_TOKEN }}
